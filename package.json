@@ -1,0 +1,48 @@
+{
+  "name": "keundal",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "author": "dungsil (https://github.com/dungsil)",
+  "type": "module",
+  "scripts": {
+    "lint": "oxlint && oxfmt --check",
+    "lintfix": "oxlint --fix && oxfmt",
+    "prepare": "simple-git-hooks"
+  },
+  "devDependencies": {
+    "@keundal/tsconfig": "workspace:*",
+    "lint-staged": "17.5.1",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "simple-git-hooks": "2.14.0",
+    "turbo": "2.10.12",
+    "typescript": "catalog:"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm exec lint-staged"
+  },
+  "lint-staged": {
+    "**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}": [
+      "oxlint --fix",
+      "oxfmt"
+    ],
+    "**/*.{json,jsonc}": [
+      "oxfmt"
+    ]
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.4.2",
+      "onFail": "download"
+    },
+    "runtime": {
+      "name": "node",
+      "version": "24.21.0",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.4.2"
+}

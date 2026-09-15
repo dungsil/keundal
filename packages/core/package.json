@@ -1,0 +1,14 @@
+{
+  "name": "@keundal/core",
+  "private": true,
+  "type": "module",
+  "scripts": {},
+  "dependencies": {
+    "@standard-schema/spec": "catalog:",
+    "cordis": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/tsconfig": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

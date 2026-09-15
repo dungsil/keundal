@@ -1,0 +1,13 @@
+{
+  "name": "@keundal/tsconfig",
+  "version": "0.0.0",
+  "exports": {
+    ".": "./base.json"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "typescript": "catalog:"
+  }
+}
