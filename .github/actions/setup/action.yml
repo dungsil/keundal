@@ -11,7 +11,7 @@ runs:
   using: composite
   steps:
     - name: pnpm 및 Node.js 설정
-      uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+      uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
       with:
         cache: false # 내장 캐시의 중복 저장 경고를 피하기 위해 아래에서 저장할 job을 하나로 제한한다.
         install: false
