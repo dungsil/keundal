@@ -1,0 +1,32 @@
+name: 개발 환경 준비
+description: 프로젝트에 지정된 pnpm과 Node.js를 준비하고 의존성을 설치합니다.
+
+inputs:
+  turbo-cache:
+    description: Turbo 작업 캐시를 복원하고 저장합니다.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: pnpm 및 Node.js 설정
+      uses: pnpm/setup@c8e77b72cd6022852162c92aa10e7e72b7209c9b # v2
+      with:
+        cache: true
+        install: false
+
+    - name: 의존성 설치
+      shell: bash
+      env:
+        SKIP_INSTALL_SIMPLE_GIT_HOOKS: '1'
+      run: pnpm install --frozen-lockfile
+
+    - name: Turbo 캐시 설정
+      if: inputs.turbo-cache == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: .turbo/cache
+        key: ${{ runner.os }}-${{ runner.arch }}-turbo-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'turbo.json') }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-turbo-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'turbo.json') }}-
