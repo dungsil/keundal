@@ -1,0 +1,13 @@
+name: CodeQL 보안 검사
+description: JavaScript, TypeScript 및 GitHub Actions 코드를 분석합니다.
+
+runs:
+  using: composite
+  steps:
+    - name: CodeQL 초기화
+      uses: github/codeql-action/init@311b4ee155dcdab395044f00946f664bd51ff173 # v4
+      with:
+        languages: javascript-typescript,actions
+
+    - name: CodeQL 분석
+      uses: github/codeql-action/analyze@311b4ee155dcdab395044f00946f664bd51ff173 # v4

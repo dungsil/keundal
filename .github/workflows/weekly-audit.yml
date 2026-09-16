@@ -1,0 +1,30 @@
+name: 주간 보안 감사
+
+on:
+  schedule:
+    - cron: '30 19 * * 0' # 한국 시간 매주 월요일 04:30
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL 주간 보안 감사
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: 저장소 가져오기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: CodeQL 보안 검사
+        uses: ./.github/actions/codeql

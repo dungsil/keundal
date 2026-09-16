@@ -13,25 +13,47 @@ on:
       - 'pnpm-workspace.yaml'
       - 'tsconfig*.json'
   pull_request:
-    paths:
-      - 'packages/**'
-      - 'tools/**'
-      - '!packages/**/*.md'
-      - '!tools/**/*.md'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: 변경사항 확인
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      source: ${{ github.event_name != 'pull_request' || steps.filter.outputs.source == 'true' }}
+    steps:
+      # PR은 경로 확인을 항상 실행하여 문서 변경도 필수 검사 결과를 남긴다.
+      - name: 변경 경로 확인
+        if: github.event_name == 'pull_request'
+        id: filter
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
+        with:
+          filters: |
+            source:
+              - '{packages,tools}/**/!(*.md)'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig*.json'
+              - '.github/workflows/**'
+              - '.github/actions/**'
+      - name: 전체 검사 선택
+        if: github.event_name != 'pull_request'
+        run: echo '전체 검사를 실행합니다.'
+
   build:
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
     name: 빌드
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -50,6 +72,8 @@ jobs:
         run: pnpm build
 
   typecheck:
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
     name: 타입 검사
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -71,6 +95,8 @@ jobs:
         run: pnpm typecheck
 
   test:
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
     name: 테스트
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -89,6 +115,8 @@ jobs:
         run: pnpm test
 
   lint:
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
     name: 린트 및 형식 검사
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -103,3 +131,21 @@ jobs:
 
       - name: 린트 및 형식 검사
         run: pnpm lint
+
+  codeql:
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
+    name: CodeQL 보안 검사
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: 저장소 가져오기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: CodeQL 보안 검사
+        uses: ./.github/actions/codeql
