@@ -6,3 +6,9 @@
 node_modules/
 dist/
 .turbo/
+
+### AI Agents ###
+.agents/
+.codex/
+.claude/
+.cursor/
