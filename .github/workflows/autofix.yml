@@ -4,18 +4,23 @@ on:
   pull_request_target:
     branches: [main]
     types: [opened, labeled, ready_for_review]
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
 
 permissions:
   contents: read
 
 concurrency:
-  group: autofix-${{ github.event.pull_request.number }}
+  group: autofix-${{ github.event.pull_request.number || github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 jobs:
   autofix:
     name: '자동 병합 활성화'
     if: >-
+      github.event_name == 'pull_request_target' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       !github.event.pull_request.draft &&
       github.event.pull_request.auto_merge == null &&
@@ -32,3 +37,95 @@ jobs:
     steps:
       # 병합 조건은 Ruleset에서 관리하고, 여기서는 라벨에 따라 예약한다.
       - run: gh pr merge "$PR_URL" --auto --squash --match-head-commit "$HEAD_SHA"
+
+  lintfix:
+    name: 린트 수정 PR 생성
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      contains(fromJSON('["push", "workflow_dispatch"]'), github.event.workflow_run.event) &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    steps:
+      - name: 수정 대상 확인
+        id: source
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const repo = context.repo;
+            const defaultBranch = context.payload.repository.default_branch;
+            const { data: branch } = await github.rest.repos.getBranch({ ...repo, branch: defaultBranch });
+            if (branch.commit.sha !== run.head_sha) return;
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              ...repo, run_id: run.id,
+            });
+            if (!artifacts.some(artifact => artifact.name === 'lintfix' && !artifact.expired)) return;
+            core.setOutput('branch', run.head_branch);
+            core.setOutput('sha', run.head_sha);
+
+      - name: 수정 반영 인증 확인
+        if: steps.source.outputs.sha
+        env:
+          AUTOFIX_TOKEN: ${{ secrets.AUTOFIX_TOKEN }}
+        run: |
+          if [ -z "$AUTOFIX_TOKEN" ]; then
+            echo '::error::Actions secret에 AUTOFIX_TOKEN을 등록해야 합니다.'
+            exit 1
+          fi
+
+      # 메인 브랜치의 CI에서 만든 패치만 적용한다.
+      - name: 수정 기준 커밋 가져오기
+        if: steps.source.outputs.sha
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          persist-credentials: false
+
+      - name: 수정 패치 내려받기
+        if: steps.source.outputs.sha
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lintfix
+          path: ${{ runner.temp }}/lintfix
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: 수정 패치 적용
+        if: steps.source.outputs.sha
+        run: |
+          git config core.hooksPath /dev/null
+          git apply --index --whitespace=nowarn "$RUNNER_TEMP/lintfix/autofix.patch"
+
+      - name: 메인 브랜치의 수정 PR 생성
+        if: steps.source.outputs.sha
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.AUTOFIX_TOKEN }}
+          base: ${{ steps.source.outputs.branch }}
+          branch: codex/autofix/lint
+          title: 'style: 코드 스타일을 통일한다'
+          commit-message: 'style: 코드 스타일을 통일한다'
+          labels: '유형:자동수정'
+          body: |
+            ## 요약
+
+            메인 브랜치에 린트와 코드 형식 수정 사항을 반영합니다.
+
+            ## 수정 내역
+
+            - CI에서 `pnpm lintfix`를 실행하여 생성한 변경 사항입니다.
+
+            ## 검증 사항
+
+            생성된 PR의 CI와 Ruleset 조건을 충족하면 자동으로 병합합니다.
+
+            ## Ref
+
+            ${{ github.event.workflow_run.html_url }}
