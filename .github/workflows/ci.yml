@@ -3,7 +3,24 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - 'packages/**'
+      - 'tools/**'
+      - '!packages/**/*.md'
+      - '!tools/**/*.md'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
   pull_request:
+    paths:
+      - 'packages/**'
+      - 'tools/**'
+      - '!packages/**/*.md'
+      - '!tools/**/*.md'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
   workflow_dispatch:
 
 permissions:
