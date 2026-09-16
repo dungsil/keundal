@@ -8,11 +8,12 @@
 | `@keundal/plugin-agent-simple`         | 네 서비스를 조합해 `ctx.agent.run()`을 제공합니다.                     |
 | `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                             |
 | `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                 |
+| `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.          |
 | `@keundal/tsconfig`, `@keundal/tsdown` | 공통 TypeScript·빌드 설정을 제공합니다.                                |
 
 서비스 계약은 `packages/core/src/{llm,session,generation,compaction}.ts`에 정의하고, 구체 구현은 플러그인으로 주입합니다. AG-UI 타입, 이벤트 상수, 검증 기능은 `@keundal/core`에서 가져옵니다. `@ag-ui/core` 직접 의존은 코어의 프로토콜 래퍼에서만 관리합니다.
 
-플러그인 설정과 사용법은 [OpenAI 문서](packages/plugin-llm-openai/README.md)와 [메모리 저장소 문서](packages/plugin-store-memory/README.md)를 참고합니다.
+플러그인 설정과 사용법은 [OpenAI 문서](packages/plugin-llm-openai/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md)를 참고합니다.
 
 ## 서비스 계약
 
@@ -44,7 +45,7 @@ pnpm test
 pnpm lint
 ```
 
-- 패키지는 `@keundal/tsconfig/node.json`과 `@keundal/tsdown`을 사용합니다.
+- Node.js 패키지는 `@keundal/tsconfig/node.json`과 `@keundal/tsdown`을 사용합니다. IndexedDB 플러그인은 브라우저 대상 빌드 설정과 DOM 타입을 사용합니다.
 - 테스트는 각 패키지의 `tests/*.test.ts`에 작성하고 공개 진입점을 사용합니다. Turbo가 테스트 전에 패키지를 빌드합니다.
 - `typecheck`는 `tsconfig.test.json`으로 테스트 코드까지 검사합니다.
 - CI 공통 환경과 의존성 설치는 `.github/actions/setup/action.yml`에서 관리합니다.
