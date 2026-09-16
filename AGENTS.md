@@ -65,6 +65,10 @@ pnpm test
 pnpm lint
 ```
 
+## CI
+
+공통 환경 설정과 의존성 설치는 `.github/actions/setup/action.yml`의 composite action에서 관리합니다. 각 작업은 저장소를 체크아웃한 뒤 `./.github/actions/setup`을 호출합니다.
+
 ## Commit & Pull Request
 
 - 커밋, 이슈 혹은 PR을 만들 때만 [CONTRIBUTING.md](CONTRIBUTING.md)를 따릅니다.
