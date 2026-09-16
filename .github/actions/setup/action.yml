@@ -13,14 +13,37 @@ runs:
     - name: pnpm 및 Node.js 설정
       uses: pnpm/setup@c8e77b72cd6022852162c92aa10e7e72b7209c9b # v2
       with:
-        cache: true
+        cache: false # 내장 캐시의 중복 저장 경고를 피하기 위해 아래에서 저장할 job을 하나로 제한한다.
         install: false
+
+    - name: pnpm 캐시 경로 확인
+      id: pnpm-store
+      shell: bash
+      run: |
+        echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+        echo "arch=$(node -p 'process.arch')" >> "$GITHUB_OUTPUT"
+
+    - name: pnpm 캐시 복원
+      id: pnpm-cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: pnpm-cache-${{ runner.os }}-${{ steps.pnpm-store.outputs.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          pnpm-cache-${{ runner.os }}-${{ steps.pnpm-store.outputs.arch }}-
 
     - name: 의존성 설치
       shell: bash
       env:
         SKIP_INSTALL_SIMPLE_GIT_HOOKS: '1'
       run: pnpm install --frozen-lockfile
+
+    - name: pnpm 캐시 저장
+      if: github.job == 'build' && steps.pnpm-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}
 
     - name: Turbo 캐시 설정
       if: inputs.turbo-cache == 'true'
