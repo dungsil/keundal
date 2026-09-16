@@ -1,30 +1,8 @@
 # 기여하기
 
-Keundal에 기여해주셔서 감사합니다. 이 문서는 이슈와 PR 작성 규칙을 안내합니다.
-
 ## 이슈 만들기
 
-이슈는 반드시 아래 템플릿 중 하나를 선택해 작성합니다(빈 이슈는 비활성화되어 있습니다).
-본문은 한국어로 작성하고, 해당 내용이 없는 섹션은 생략합니다.
-
-### 버그 보고 시
-
-[BUG_REPORT.md](.github/ISSUE_TEMPLATE/BUG_REPORT.md)를 사용합니다.
-
-- 개요에는 이슈를 요약합니다.
-- 문제 사항에는 버그 내용을 서술합니다.
-- 재현방법에는 버그를 재현하는 순서를 단계별로 작성합니다.
-- 예상되는 해결방법에는 해결 아이디어가 있으면 작성합니다.
-
-### 기능 제안 시
-
-[FEATURE_REQUEST.md](.github/ISSUE_TEMPLATE/FEATURE_REQUEST.md)를 사용합니다.
-
-- 개요에는 제안하는 기능을 간단히 소개합니다.
-- 작동 방식에는 개발건의 동작 방식을 서술합니다.
-- 변경 전/변경 후에는 적용 전후 상태를 작성합니다.
-- 운영 방법에는 운영 절차를 단계별로 작성합니다.
-- 참고 자료에는 관련 문서나 자료 링크를 첨부합니다.
+[버그 보고](.github/ISSUE_TEMPLATE/BUG_REPORT.md), [기능 제안](.github/ISSUE_TEMPLATE/FEATURE_REQUEST.md), [하위 작업](.github/ISSUE_TEMPLATE/TASK.md) 중 맞는 템플릿을 사용합니다. 본문은 한국어로 작성하고, 해당 내용이 없는 섹션은 생략합니다.
 
 ## 커밋 메시지 규칙
 
@@ -41,7 +19,7 @@ Conventional Commits 형식을 따릅니다: `<type>(<scope>): <subject>`
 ## Pull Request 규칙
 
 - PR 제목은 위 커밋 메시지 규칙을 따릅니다.
-- PR 본문은 한국어로 [PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md)를 따릅니다. 요약, 수정 내역, 검증 사항, Ref, Closes 순서로 작성합니다.
+- PR 본문은 한국어로 [PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md)를 따릅니다. 해당 내용이 없는 섹션은 생략합니다.
 - 관련 이슈가 있으면 본문의 `Closes #<이슈 번호>`로 연결합니다.
 
 ## 라이선스

@@ -1,5 +1,5 @@
 <!--
-PR/MR 제목은 AGENTS.md의 Commit Message Convention을 따릅니다.
+PR 제목은 CONTRIBUTING.md의 커밋 메시지 규칙을 따릅니다.
 본문은 한국어로 작성하며, 해당 내용이 없는 섹션은 생략합니다.
 -->
 
