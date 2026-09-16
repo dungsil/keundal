@@ -9,11 +9,12 @@
 | `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                             |
 | `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                 |
 | `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.          |
+| `@keundal/plugin-store-sqlite`         | SQLite 파일로 `session`과 `generation`을 구현합니다.                   |
 | `@keundal/tsconfig`, `@keundal/tsdown` | 공통 TypeScript·빌드 설정을 제공합니다.                                |
 
-서비스 계약은 `packages/core/src/{llm,session,generation,compaction}.ts`에 정의하고, 구체 구현은 플러그인으로 주입합니다. AG-UI 타입, 이벤트 상수, 검증 기능은 `@keundal/core`에서 가져옵니다. `@ag-ui/core` 직접 의존은 코어의 프로토콜 래퍼에서만 관리합니다.
+서비스 계약은 `packages/core/src/{llm,session,generation,compaction}.ts`에 정의하고, 구체 구현은 플러그인으로 주입합니다. 저장소가 공유하는 대화 병합과 실행 메시지 조립은 `packages/core/src/messages.ts`에 둡니다. AG-UI 타입, 이벤트 상수, 검증 기능은 `@keundal/core`에서 가져옵니다. `@ag-ui/core` 직접 의존은 코어의 프로토콜 래퍼에서만 관리합니다.
 
-플러그인 설정과 사용법은 [OpenAI 문서](packages/plugin-llm-openai/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md)를 참고합니다.
+플러그인 설정과 사용법은 [OpenAI 문서](packages/plugin-llm-openai/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
 
 ## 서비스 계약
 
