@@ -124,13 +124,72 @@ jobs:
       - name: 저장소 가져오기
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: 개발 환경 준비
         uses: ./.github/actions/setup
 
       - name: 린트 및 형식 검사
+        id: lint
         run: pnpm lint
+
+      - name: 린트 및 형식 자동수정
+        id: lintfix
+        if: >-
+          failure() && steps.lint.outcome == 'failure' &&
+          ((github.event_name != 'pull_request' &&
+            github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) ||
+           (github.event_name == 'pull_request' &&
+            github.event.pull_request.base.ref == github.event.repository.default_branch &&
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            !github.event.pull_request.draft))
+        run: pnpm lintfix
+
+      - name: PR 브랜치에 자동수정 반영
+        if: >-
+          !cancelled() && github.event_name == 'pull_request' &&
+          contains(fromJSON('["success", "failure"]'), steps.lintfix.outcome)
+        env:
+          GH_TOKEN: ${{ secrets.AUTOFIX_TOKEN }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          if [ -z "$GH_TOKEN" ]; then
+            echo '::error::AUTOFIX_TOKEN이 필요합니다. Dependabot PR에서는 Dependabot secret에 등록해야 합니다.'
+            exit 1
+          fi
+          git config core.hooksPath /dev/null
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -u
+          git commit -m 'style: 코드 스타일을 통일한다'
+          gh auth setup-git
+          # CI 이후 브랜치가 변경되었다면 푸시를 거절한다.
+          git push --force-with-lease="refs/heads/$PR_BRANCH:$SOURCE_SHA" origin "HEAD:refs/heads/$PR_BRANCH"
+
+      - name: 수정 패치 생성
+        id: patch
+        if: >-
+          !cancelled() && github.event_name != 'pull_request' &&
+          contains(fromJSON('["success", "failure"]'), steps.lintfix.outcome)
+        run: |
+          git diff --binary --full-index > "$RUNNER_TEMP/autofix.patch"
+          if [ -s "$RUNNER_TEMP/autofix.patch" ]; then
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 수정 패치 업로드
+        if: ${{ !cancelled() && steps.patch.outputs.changed == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lintfix
+          path: ${{ runner.temp }}/autofix.patch
+          retention-days: 1
+          overwrite: true
 
   codeql:
     needs: changes
