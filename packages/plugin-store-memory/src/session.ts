@@ -1,0 +1,105 @@
+import {
+  parseRunAgentInput,
+  SessionService,
+  type ExecutionOptions,
+  type PreparedSession,
+  type RunAgentInput,
+  type SessionCommit,
+  type SessionSnapshot
+} from '@keundal/core'
+import type { Context } from 'cordis'
+
+import { mergeMessages } from './messages.js'
+import type { MemoryStore, StoredThread } from './store.js'
+
+function snapshot(threadId: string, thread: StoredThread): SessionSnapshot {
+  return { threadId, revision: thread.revision, messages: [...thread.messages], state: thread.state }
+}
+
+/**
+ * 스레드 대화와 상태를 메모리에 보관합니다. prepare는 저장된 대화를 요청 메시지 앞에 병합하고,
+ * commit은 기준 revision과 실행 종료 기록을 하나의 단위로 확정합니다.
+ */
+export class MemorySessionService extends SessionService {
+  private closed = false
+
+  constructor(
+    ctx: Context,
+    private readonly store: MemoryStore
+  ) {
+    super(ctx)
+    ctx.fiber.effect(() => () => {
+      this.closed = true
+    })
+  }
+
+  async get(threadId: string, options?: ExecutionOptions): Promise<SessionSnapshot | undefined> {
+    this.assertOpen()
+    options?.signal?.throwIfAborted()
+    const thread = this.store.threads.get(threadId)
+    return thread ? snapshot(threadId, thread) : undefined
+  }
+
+  async prepare(input: RunAgentInput, options?: ExecutionOptions): Promise<PreparedSession> {
+    this.assertOpen()
+    options?.signal?.throwIfAborted()
+    const request = parseRunAgentInput(input)
+    const thread = this.store.threads.get(request.threadId)
+    return {
+      input: {
+        ...request,
+        messages: mergeMessages(thread?.messages ?? [], request.messages),
+        state: request.state ?? thread?.state
+      },
+      revision: thread?.revision ?? 0
+    }
+  }
+
+  async commit(change: SessionCommit, options?: ExecutionOptions): Promise<SessionSnapshot> {
+    this.assertOpen()
+    options?.signal?.throwIfAborted()
+    if (typeof change.threadId !== 'string' || !change.threadId.trim())
+      throw new Error('commit requires a non-empty threadId')
+    if (!Number.isSafeInteger(change.expectedRevision) || change.expectedRevision < 0)
+      throw new Error('commit requires a non-negative expectedRevision')
+
+    const current = this.store.threads.get(change.threadId) ?? { revision: 0, messages: [], state: undefined }
+    if (current.revision !== change.expectedRevision) {
+      throw new Error(
+        `session revision conflict for ${change.threadId}: expected ${change.expectedRevision}, stored ${current.revision}`
+      )
+    }
+
+    const generation = change.generation
+    const runId = generation?.request.input.runId
+    if (generation) {
+      if (!runId) throw new Error('generation commit requires a runId')
+      if (generation.request.input.threadId !== change.threadId)
+        throw new Error(`generation ${runId} belongs to another thread: ${generation.request.input.threadId}`)
+      // 이미 종료를 확정한 실행은 메시지와 revision을 다시 반영하지 않습니다.
+      if (this.store.runs.get(runId)?.status !== 'running') return snapshot(change.threadId, current)
+    }
+
+    const next: StoredThread = {
+      revision: current.revision + 1,
+      messages: mergeMessages(current.messages, change.messages),
+      state: change.state ?? current.state
+    }
+    this.store.threads.set(change.threadId, next)
+    if (generation && runId) {
+      this.store.runs.set(runId, {
+        runId,
+        threadId: change.threadId,
+        request: generation.request,
+        status: generation.status,
+        journal: generation.journal,
+        messages: generation.messages
+      })
+    }
+    return snapshot(change.threadId, next)
+  }
+
+  private assertOpen(): void {
+    if (this.closed) throw new Error('memory session service disposed')
+  }
+}
