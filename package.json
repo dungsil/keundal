@@ -6,6 +6,9 @@
   "author": "dungsil (https://github.com/dungsil)",
   "type": "module",
   "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
     "lint": "oxlint && oxfmt --check",
     "lintfix": "oxlint --fix && oxfmt",
     "prepare": "simple-git-hooks"

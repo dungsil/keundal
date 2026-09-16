@@ -4,9 +4,13 @@ allowBuilds:
 savePrefix: ''
 
 catalog:
+  '@ag-ui/core': 0.0.59
+  '@types/node': 24.13.4
   '@standard-schema/spec': 1.1.0
   cordis: 4.0.0-rc.10
+  tsdown: 0.23.0
   typescript: 6.0.3
+  vitest: 5.0.0
 
 packages:
   - apps/*

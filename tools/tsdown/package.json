@@ -1,0 +1,15 @@
+{
+  "name": "@keundal/tsdown",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:"
+  },
+  "peerDependencies": {
+    "tsdown": "catalog:"
+  }
+}

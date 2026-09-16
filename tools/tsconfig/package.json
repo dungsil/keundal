@@ -2,7 +2,8 @@
   "name": "@keundal/tsconfig",
   "version": "0.0.0",
   "exports": {
-    ".": "./base.json"
+    ".": "./base.json",
+    "./node.json": "./node.json"
   },
   "devDependencies": {
     "typescript": "catalog:"
