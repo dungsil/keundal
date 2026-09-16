@@ -8,6 +8,7 @@
 | `@keundal/plugin-agent-simple`         | 네 서비스를 조합해 `ctx.agent.run()`을 제공합니다.                     |
 | `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                             |
 | `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                 |
+| `@keundal/plugin-compaction-summary`   | 이전 대화를 요약하고 최근 대화를 보존하는 `compaction`을 제공합니다.   |
 | `@keundal/tsconfig`, `@keundal/tsdown` | 공통 TypeScript·빌드 설정을 제공합니다.                                |
 
 서비스 계약은 `packages/core/src/{llm,session,generation,compaction}.ts`에 정의하고, 구체 구현은 플러그인으로 주입합니다. AG-UI 타입, 이벤트 상수, 검증 기능은 `@keundal/core`에서 가져옵니다. `@ag-ui/core` 직접 의존은 코어의 프로토콜 래퍼에서만 관리합니다.
