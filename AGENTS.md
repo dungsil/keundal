@@ -7,6 +7,7 @@
 | `@keundal/core`                | 네 서비스의 계약과 Cordis Context 타입 확장을 제공합니다. |
 | `@keundal/plugin-agent-simple` | 주입된 서비스를 조합해 에이전트 실행 진입점을 제공합니다. |
 | `@keundal/plugin-llm-openai`   | OpenAI Responses API로 `llm` 서비스를 구현합니다.         |
+| `@keundal/plugin-store-memory` | `session`과 `generation`을 메모리 저장소로 구현합니다.    |
 | `@keundal/tsconfig`            | 워크스페이스에서 사용하는 TypeScript 설정을 제공합니다.   |
 | `@keundal/tsdown`              | Node.js 라이브러리의 공통 빌드 설정을 제공합니다.         |
 
@@ -25,13 +26,21 @@
 
 `generation.recover()`는 저장된 부분 응답과 실행 상태를 복원합니다. 확정된 종료 상태를 유지하고, 미완료 작업은 `interrupted`로 확정합니다. 복구 과정에서는 LLM을 다시 호출하거나 자동 재시도하지 않습니다.
 
-현재 패키지는 서비스 계약, 조합 플러그인, OpenAI Responses 기반 LLM 플러그인을 제공합니다. 영속 저장소와 journal·커밋·복구 구현은 포함하지 않습니다. 해당 구현은 위 계약의 일관성과 내구성을 보장해야 합니다.
+현재 패키지는 서비스 계약, 조합 플러그인, OpenAI Responses 기반 LLM 플러그인, 메모리 저장소 플러그인을 제공합니다. 내구성 있는 저장소와 그 위의 journal·커밋·복구 구현은 포함하지 않습니다. 해당 구현은 위 계약의 일관성과 내구성을 보장해야 합니다.
 
 ## OpenAI 연결
 
 `@keundal/plugin-llm-openai`를 등록하면 `ctx.llm`을 제공합니다. 모델별 한도는 `models` 설정에서 조회하고, 입력 토큰 수는 Responses의 `input_tokens` API로 계산합니다. 생성 요청과 토큰 계산 요청은 같은 입력 변환을 사용합니다. 설정과 직접 호출 방법은 [플러그인 문서](packages/plugin-llm-openai/README.md)를 참고합니다.
 
 공급자 플러그인은 텍스트·도구 호출·추론 이벤트를 AG-UI로 변환하며, 실행 수명 이벤트는 생성하지 않습니다. 실패·불완전 응답·스트림 단절은 예외로 전달합니다. 외부 취소, 순회 중단, Cordis 플러그인 해제는 진행 중인 HTTP 요청을 취소합니다. 공급자 수준의 자동 재시도와 대화 저장은 사용하지 않습니다.
+
+## 메모리 저장소
+
+`@keundal/plugin-store-memory`를 등록하면 `ctx.session`과 `ctx.generation`을 함께 제공합니다. 두 서비스는 하나의 `MemoryStore`를 공유하므로 실행 종료 기록과 세션 커밋이 한 단위로 확정됩니다. 설정으로 기존 저장소를 전달하면 서비스를 다시 등록한 뒤에도 저장 상태가 남아, `ctx.generation.recover()`가 남은 실행을 `interrupted`로 확정할 수 있습니다.
+
+`prepare()`는 저장된 대화를 요청 메시지 앞에 병합하고, 같은 id의 요청 메시지로 저장된 항목을 대체합니다. 생성 실행은 `RUN_STARTED`부터 순서대로 journal에 기록하고, 성공한 실행만 생성한 메시지를 대화에 반영한 뒤 `RUN_FINISHED`를 전달합니다. 실패·취소·중단된 실행은 부분 응답을 실행 기록에만 남기고 대화와 상태를 바꾸지 않습니다.
+
+이 저장소는 프로세스 메모리를 사용하므로 프로세스가 종료되면 내용이 사라지고 여러 프로세스가 공유할 수 없습니다. 내구성이 필요하면 같은 계약을 구현한 별도 저장소가 필요합니다.
 
 ## 에이전트 조합
 
