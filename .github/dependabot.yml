@@ -3,6 +3,12 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
+    groups:
+      oxc:
+        patterns:
+          - 'oxlint'
+          - 'oxlint-tsgolint'
+          - 'oxfmt'
     ignore:
       - dependency-name: '@types/node'
         update-types:
@@ -22,6 +28,14 @@ updates:
       - /
       - /.github/actions/setup
       - /.github/actions/codeql
+    groups:
+      codeql:
+        patterns:
+          - 'github/codeql-action/*'
+      actions-cache:
+        patterns:
+          - 'actions/cache'
+          - 'actions/cache/*'
     commit-message:
       prefix: 'chore(deps)'
     labels:
