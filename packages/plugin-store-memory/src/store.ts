@@ -26,6 +26,9 @@ export interface StoredRun {
   journal: GenerationJournalEntry[]
   /** 실행이 생성한 메시지입니다. 실행 중에는 부분 응답이 담깁니다. */
   messages: AgentMessage[]
+  owner?: symbol
+  token?: symbol
+  lease: { active: boolean }
 }
 
 /**
