@@ -1,14 +1,32 @@
 {
   "name": "@keundal/core",
   "private": true,
+  "files": [
+    "dist"
+  ],
   "type": "module",
-  "scripts": {},
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
   "dependencies": {
+    "@ag-ui/core": "catalog:",
     "@standard-schema/spec": "catalog:",
     "cordis": "catalog:"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",
-    "typescript": "catalog:"
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
