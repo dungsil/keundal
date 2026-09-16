@@ -192,8 +192,7 @@ jobs:
           overwrite: true
 
   codeql:
-    needs: changes
-    if: needs.changes.outputs.source == 'true'
+    # 병합 규칙이 CodeQL 분석 결과를 요구하므로 변경 경로와 관계없이 실행한다.
     name: CodeQL 보안 검사
     runs-on: ubuntu-latest
     timeout-minutes: 30
