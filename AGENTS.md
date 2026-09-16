@@ -6,6 +6,7 @@
 | ------------------------------ | --------------------------------------------------------- |
 | `@keundal/core`                | 네 서비스의 계약과 Cordis Context 타입 확장을 제공합니다. |
 | `@keundal/plugin-agent-simple` | 주입된 서비스를 조합해 에이전트 실행 진입점을 제공합니다. |
+| `@keundal/plugin-llm-openai`   | OpenAI Responses API로 `llm` 서비스를 구현합니다.         |
 | `@keundal/tsconfig`            | 워크스페이스에서 사용하는 TypeScript 설정을 제공합니다.   |
 | `@keundal/tsdown`              | Node.js 라이브러리의 공통 빌드 설정을 제공합니다.         |
 
@@ -24,7 +25,13 @@
 
 `generation.recover()`는 저장된 부분 응답과 실행 상태를 복원합니다. 확정된 종료 상태를 유지하고, 미완료 작업은 `interrupted`로 확정합니다. 복구 과정에서는 LLM을 다시 호출하거나 자동 재시도하지 않습니다.
 
-현재 패키지는 서비스 계약과 조합 플러그인을 제공합니다. 실제 LLM 공급자, 영속 저장소, journal·커밋·복구 구현은 포함하지 않습니다. 해당 구현은 위 계약의 일관성과 내구성을 보장해야 합니다.
+현재 패키지는 서비스 계약, 조합 플러그인, OpenAI Responses 기반 LLM 플러그인을 제공합니다. 영속 저장소와 journal·커밋·복구 구현은 포함하지 않습니다. 해당 구현은 위 계약의 일관성과 내구성을 보장해야 합니다.
+
+## OpenAI 연결
+
+`@keundal/plugin-llm-openai`를 등록하면 `ctx.llm`을 제공합니다. 모델별 한도는 `models` 설정에서 조회하고, 입력 토큰 수는 Responses의 `input_tokens` API로 계산합니다. 생성 요청과 토큰 계산 요청은 같은 입력 변환을 사용합니다. 설정과 직접 호출 방법은 [플러그인 문서](packages/plugin-llm-openai/README.md)를 참고합니다.
+
+공급자 플러그인은 텍스트·도구 호출·추론 이벤트를 AG-UI로 변환하며, 실행 수명 이벤트는 생성하지 않습니다. 실패·불완전 응답·스트림 단절은 예외로 전달합니다. 외부 취소, 순회 중단, Cordis 플러그인 해제는 진행 중인 HTTP 요청을 취소합니다. 공급자 수준의 자동 재시도와 대화 저장은 사용하지 않습니다.
 
 ## 에이전트 조합
 
@@ -46,7 +53,7 @@ Node.js 패키지는 `@keundal/tsconfig/node.json`을 확장하고, `rootDir`와
 
 패키지의 `tsdown.config.ts`는 `@keundal/tsdown`의 공통 설정을 사용합니다. tsdown은 `src/index.ts`를 진입점으로 ESM 코드와 타입 선언을 `dist`에 생성합니다. 타입 검사는 `tsc --noEmit`으로 수행하며, 테스트는 Vitest로 실행합니다.
 
-코어와 조합 플러그인의 테스트는 각 패키지의 `tests/*.test.ts`에 두고 Vitest의 단언문을 사용합니다. `typecheck`는 `tsconfig.test.json`으로 테스트 코드도 검사합니다. 테스트는 패키지의 공개 진입점을 사용하므로 Turbo가 해당 패키지를 빌드한 뒤 테스트를 실행합니다.
+코어와 플러그인의 테스트는 각 패키지의 `tests/*.test.ts`에 두고 Vitest의 단언문을 사용합니다. `typecheck`는 `tsconfig.test.json`으로 테스트 코드도 검사합니다. 테스트는 패키지의 공개 진입점을 사용하므로 Turbo가 해당 패키지를 빌드한 뒤 테스트를 실행합니다.
 
 빌드·타입 검사·테스트 명령은 Turbo로 실행합니다. `turbo.json`에서 패키지 의존성에 따른 빌드 순서와 `dist` 출력 캐시를 관리합니다. 타입 검사는 빌드 의존성 없이 실행합니다.
 
