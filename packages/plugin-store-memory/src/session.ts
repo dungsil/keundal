@@ -92,8 +92,9 @@ export class MemorySessionService extends SessionService {
         threadId: change.threadId,
         request: generation.request,
         status: generation.status,
-        journal: generation.journal,
-        messages: generation.messages
+        journal: [...generation.journal],
+        messages: [...generation.messages],
+        lease: { active: false }
       })
     }
     return snapshot(change.threadId, next)

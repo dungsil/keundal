@@ -12,26 +12,17 @@ import type { Context } from 'cordis'
 
 import { GenerationRecorder } from './messages.js'
 import type { MemoryStore, StoredRun } from './store.js'
-
-function snapshot(record: StoredRun): GenerationSnapshot {
-  return {
-    request: record.request,
-    status: record.status,
-    journal: [...record.journal],
-    messages: [...record.messages]
-  }
-}
-
-/**
- * 준비된 입력을 LLM 스트림에 연결하고 실행 수명 이벤트, journal, 세션 커밋을 담당합니다. 실행 중에는
- * 부분 응답과 journal을 저장소에 남기고, 종료 상태는 세션 커밋과 함께 확정합니다. 성공한
- * RUN_FINISHED는 커밋 이후에 전달합니다.
- */
+const snapshot = (r: StoredRun): GenerationSnapshot => ({
+  request: r.request,
+  status: r.status,
+  journal: [...r.journal],
+  messages: [...r.messages]
+})
 export class MemoryGenerationService extends GenerationService {
-  private readonly controllers = new Set<AbortController>()
-  private readonly active = new Set<string>()
+  private readonly controllers = new Set<globalThis.AbortController>()
+  private readonly active = new Map<string, AbortSignal>()
+  private readonly owner = Symbol('generation-service')
   private closed = false
-
   constructor(
     ctx: Context,
     private readonly store: MemoryStore
@@ -39,17 +30,44 @@ export class MemoryGenerationService extends GenerationService {
     super(ctx)
     ctx.fiber.effect(() => () => {
       this.closed = true
-      for (const controller of this.controllers) {
-        controller.abort(new Error('memory generation service disposed'))
-      }
+      for (const run of this.store.runs.values())
+        if (run.owner === this.owner && run.status === 'running') run.lease.active = false
+      for (const c of this.controllers) c.abort(new Error('memory generation service disposed'))
     })
   }
-
   run(request: GenerationRequest, options: ExecutionOptions = {}): AsyncIterableIterator<AGUIEvent> {
     this.assertOpen()
     const controller = new globalThis.AbortController()
+    const token = Symbol('generation-run')
     const external = options.signal
-    const abort = () => controller.abort(external?.reason)
+    const abort = () => {
+      controller.abort(external?.reason)
+      if (external?.aborted && !this.closed) {
+        const record = this.store.runs.get(request.input.runId)
+        if (record?.owner === this.owner && record.token === token && record.status === 'running') {
+          const terminal: TerminalGeneration = {
+            request,
+            status: 'cancelled',
+            journal: [...record.journal],
+            messages: [...record.messages]
+          }
+          void this.ctx.session
+            .commit({
+              threadId: request.input.threadId,
+              expectedRevision: request.sessionRevision,
+              messages: [],
+              state: undefined,
+              generation: terminal
+            })
+            .catch(() => {})
+          record.status = 'cancelled'
+          record.owner = undefined
+          record.lease.active = false
+          record.journal = [...record.journal]
+          record.messages = [...record.messages]
+        }
+      }
+    }
     const cleanup = () => {
       external?.removeEventListener('abort', abort)
       controller.signal.removeEventListener('abort', cleanup)
@@ -59,22 +77,30 @@ export class MemoryGenerationService extends GenerationService {
     controller.signal.addEventListener('abort', cleanup, { once: true })
     if (external?.aborted) abort()
     else external?.addEventListener('abort', abort, { once: true })
-
     let stopped = false
-    const stop = () => {
-      stopped = true
-      if (!controller.signal.aborted) controller.abort(new Error('memory generation run stopped'))
-      cleanup()
-    }
-    const iterator = this.execute(request, controller.signal, () => stopped)
+    const iterator = this.execute(
+      request,
+      controller.signal,
+      token,
+      () => stopped,
+      () => {
+        stopped = true
+        if (!controller.signal.aborted) controller.abort(new Error('memory generation run stopped'))
+        cleanup()
+      }
+    )
     return {
       next: () => iterator.next(),
       return: async () => {
-        stop()
+        stopped = true
+        if (!controller.signal.aborted) controller.abort(new Error('memory generation run stopped'))
+        cleanup()
         return iterator.return(undefined)
       },
       throw: async (reason?: unknown) => {
-        stop()
+        stopped = true
+        if (!controller.signal.aborted) controller.abort(new Error('memory generation run stopped'))
+        cleanup()
         return iterator.throw(reason)
       },
       [Symbol.asyncIterator]() {
@@ -82,39 +108,46 @@ export class MemoryGenerationService extends GenerationService {
       }
     }
   }
-
   async get(runId: string, options?: ExecutionOptions): Promise<GenerationSnapshot | undefined> {
     this.assertOpen()
     options?.signal?.throwIfAborted()
-    const record = this.store.runs.get(runId)
-    return record ? snapshot(record) : undefined
+    const r = this.store.runs.get(runId)
+    return r ? snapshot(r) : undefined
   }
-
-  /**
-   * 저장된 실행을 모두 생성 순서대로 반환하고, 실행 중이던 기록은 interrupted로 확정합니다. 이
-   * 서비스가 실행 중인 실행은 건드리지 않으며, LLM을 다시 호출하지 않습니다.
-   */
   async recover(options?: ExecutionOptions): Promise<GenerationSnapshot[]> {
     this.assertOpen()
     options?.signal?.throwIfAborted()
-    const recovered: GenerationSnapshot[] = []
-    for (const record of this.store.runs.values()) {
-      if (record.status === 'running' && !this.active.has(record.runId)) record.status = 'interrupted'
-      recovered.push(snapshot(record))
+    const out: GenerationSnapshot[] = []
+    for (const r of this.store.runs.values()) {
+      if (r.status === 'running' && (!r.lease.active || (r.owner === this.owner && !this.active.has(r.runId)))) {
+        r.status = 'interrupted'
+        r.journal = [...r.journal]
+        r.messages = [...r.messages]
+      }
+      out.push(snapshot(r))
     }
-    return recovered
+    return out
   }
-
   private async *execute(
     request: GenerationRequest,
     signal: AbortSignal,
-    stopped: () => boolean
+    token: symbol,
+    stopped: () => boolean,
+    stop: () => void
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     const { threadId, runId } = request.input
     const recorder = new GenerationRecorder()
+    let record: StoredRun | undefined
     let settled = false
+    let registered = false
+    const current = () =>
+      record !== undefined &&
+      this.store.runs.get(runId) === record &&
+      record.owner === this.owner &&
+      record.status === 'running'
     const finish = async (status: Exclude<GenerationStatus, 'running'>) => {
-      if (settled) return
+      if (settled || !registered || !current() || !record) return
+      const activeRecord = record
       settled = true
       const terminal: TerminalGeneration = {
         request,
@@ -122,7 +155,6 @@ export class MemoryGenerationService extends GenerationService {
         journal: [...recorder.journal],
         messages: [...recorder.messages]
       }
-      // 종료를 확정한 실행만 대화에 반영하고, 그 밖의 종료는 부분 응답을 실행 기록에만 남깁니다.
       await this.ctx.session.commit({
         threadId,
         expectedRevision: request.sessionRevision,
@@ -130,46 +162,103 @@ export class MemoryGenerationService extends GenerationService {
         state: status === 'completed' ? request.input.state : undefined,
         generation: terminal
       })
+      if (this.store.runs.get(runId) === activeRecord) {
+        activeRecord.status = status
+        activeRecord.journal = terminal.journal
+        activeRecord.messages = terminal.messages
+        activeRecord.owner = undefined
+        activeRecord.lease.active = false
+      }
     }
-
     try {
       signal.throwIfAborted()
       this.validate(request)
       if (this.store.runs.has(runId)) throw new Error(`generation run is already recorded: ${runId}`)
-      this.store.runs.set(runId, {
+      if (!this.store.threads.has(threadId))
+        this.store.threads.set(threadId, { revision: 0, messages: [], state: undefined })
+      record = {
         runId,
         threadId,
         request,
         status: 'running',
         journal: recorder.journal,
-        messages: recorder.messages
-      })
-      this.active.add(runId)
+        messages: recorder.messages,
+        owner: this.owner,
+        token,
+        lease: { active: true }
+      }
+      this.store.runs.set(runId, record)
+      registered = true
+      this.active.set(runId, signal)
       const started: AGUIEvent = { type: EventType.RUN_STARTED, threadId, runId }
       recorder.record(started)
       yield started
-
+      signal.throwIfAborted()
       for await (const event of this.ctx.llm.stream(request, { signal })) {
         signal.throwIfAborted()
+        if (!current()) return
         recorder.record(event)
         yield event
       }
       signal.throwIfAborted()
+      if (!current()) return
       const finished: AGUIEvent = { type: EventType.RUN_FINISHED, threadId, runId, outcome: { type: 'success' } }
-      recorder.record(finished)
-      await finish('completed')
+      const journal = [...recorder.journal, { sequence: recorder.journal.length, event: finished }]
+      const terminal: TerminalGeneration = { request, status: 'completed', journal, messages: [...recorder.messages] }
+      await this.ctx.session.commit({
+        threadId,
+        expectedRevision: request.sessionRevision,
+        messages: terminal.messages,
+        state: request.input.state,
+        generation: terminal
+      })
+      if (this.store.runs.get(runId) === record) {
+        record.status = 'completed'
+        record.journal = journal
+        record.messages = terminal.messages
+        record.owner = undefined
+        record.lease.active = false
+      }
+      settled = true
       yield finished
     } catch (error) {
-      // 서비스가 해제되는 중이면 실행을 남겨 두고 recover()가 interrupted로 확정합니다.
-      if (!this.closed) await finish(stopped() ? 'interrupted' : signal.aborted ? 'cancelled' : 'failed')
+      if (!this.closed) {
+        try {
+          await finish(stopped() ? 'interrupted' : signal.aborted ? 'cancelled' : 'failed')
+        } catch {
+          // 원래 스트림 오류를 보존하고, finally에서 lease를 만료시킵니다.
+        }
+      }
+      if (record?.token === token && record.status === 'running') {
+        record.status = 'interrupted'
+        record.owner = undefined
+        record.lease.active = false
+        record.journal = [...record.journal]
+        record.messages = [...record.messages]
+      }
       throw error
     } finally {
-      // 소비자가 순회를 중단한 실행은 남은 부분 응답과 함께 interrupted로 확정합니다.
-      if (!this.closed) await finish('interrupted')
-      this.active.delete(runId)
+      try {
+        if (!this.closed) {
+          try {
+            await finish('interrupted')
+          } finally {
+            if (record?.token === token && record.status === 'running') {
+              record.status = 'interrupted'
+              record.owner = undefined
+              record.lease.active = false
+              record.journal = [...record.journal]
+              record.messages = [...record.messages]
+            }
+          }
+        }
+      } finally {
+        if (this.active.get(runId) === signal) this.active.delete(runId)
+        if (record?.token === token && record.status === 'running') record.lease.active = false
+        stop()
+      }
     }
   }
-
   private validate(request: GenerationRequest): void {
     const { threadId, runId } = request.input
     if (typeof threadId !== 'string' || !threadId.trim()) throw new Error('threadId must be a non-empty string')
@@ -179,7 +268,6 @@ export class MemoryGenerationService extends GenerationService {
     if (!Number.isSafeInteger(request.maxOutputTokens) || request.maxOutputTokens <= 0)
       throw new Error('maxOutputTokens must be a positive integer')
   }
-
   private assertOpen(): void {
     if (this.closed) throw new Error('memory generation service disposed')
   }
