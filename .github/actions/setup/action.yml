@@ -10,11 +10,18 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: pnpm 및 Node.js 설정
-      uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+    # pnpm/setup은 cache: false여도 lockfile 검증 캐시를 저장하므로 병렬 job에서 충돌한다.
+    - name: pnpm 설정
+      uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       with:
         cache: false # 내장 캐시의 중복 저장 경고를 피하기 위해 아래에서 저장할 job을 하나로 제한한다.
-        install: false
+        run_install: false
+
+    - name: Node.js 설정
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version-file: package.json
+        package-manager-cache: false
 
     - name: pnpm 캐시 경로 확인
       id: pnpm-store
