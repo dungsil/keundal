@@ -3,6 +3,8 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
+    commit-message:
+      prefix: 'chore(deps)'
     labels:
       - '유형:자동수정'
     schedule:
@@ -16,6 +18,8 @@ updates:
       - /
       - /.github/actions/setup
       - /.github/actions/codeql
+    commit-message:
+      prefix: 'chore(deps)'
     labels:
       - '유형:자동수정'
     schedule:
