@@ -2,14 +2,15 @@
 
 ## 패키지 구성
 
-| 패키지                         | 역할                                                      |
-| ------------------------------ | --------------------------------------------------------- |
-| `@keundal/core`                | 네 서비스의 계약과 Cordis Context 타입 확장을 제공합니다. |
-| `@keundal/plugin-agent-simple` | 주입된 서비스를 조합해 에이전트 실행 진입점을 제공합니다. |
-| `@keundal/plugin-llm-openai`   | OpenAI Responses API로 `llm` 서비스를 구현합니다.         |
-| `@keundal/plugin-store-memory` | `session`과 `generation`을 메모리 저장소로 구현합니다.    |
-| `@keundal/tsconfig`            | 워크스페이스에서 사용하는 TypeScript 설정을 제공합니다.   |
-| `@keundal/tsdown`              | Node.js 라이브러리의 공통 빌드 설정을 제공합니다.         |
+| 패키지                            | 역할                                                          |
+| --------------------------------- | ------------------------------------------------------------- |
+| `@keundal/core`                   | 네 서비스의 계약과 Cordis Context 타입 확장을 제공합니다.     |
+| `@keundal/plugin-agent-simple`    | 주입된 서비스를 조합해 에이전트 실행 진입점을 제공합니다.     |
+| `@keundal/plugin-llm-openai`      | OpenAI Responses API로 `llm` 서비스를 구현합니다.             |
+| `@keundal/plugin-store-memory`    | `session`과 `generation`을 메모리 저장소로 구현합니다.        |
+| `@keundal/plugin-store-indexeddb` | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다. |
+| `@keundal/tsconfig`               | 워크스페이스에서 사용하는 TypeScript 설정을 제공합니다.       |
+| `@keundal/tsdown`                 | Node.js 라이브러리의 공통 빌드 설정을 제공합니다.             |
 
 `packages/core/src/llm.ts`, `generation.ts`, `session.ts`, `compaction.ts`는 각각 추상 서비스 계약을 정의합니다. `context.ts`는 `ctx.llm`, `ctx.generation`, `ctx.session`, `ctx.compaction`의 타입을 확장합니다. 각 서비스의 구체 구현은 별도 플러그인으로 주입합니다.
 
@@ -26,7 +27,7 @@
 
 `generation.recover()`는 저장된 부분 응답과 실행 상태를 복원합니다. 확정된 종료 상태를 유지하고, 미완료 작업은 `interrupted`로 확정합니다. 복구 과정에서는 LLM을 다시 호출하거나 자동 재시도하지 않습니다.
 
-현재 패키지는 서비스 계약, 조합 플러그인, OpenAI Responses 기반 LLM 플러그인, 메모리 저장소 플러그인을 제공합니다. 내구성 있는 저장소와 그 위의 journal·커밋·복구 구현은 포함하지 않습니다. 해당 구현은 위 계약의 일관성과 내구성을 보장해야 합니다.
+현재 패키지는 서비스 계약, 조합 플러그인, OpenAI Responses 기반 LLM 플러그인, 메모리 저장소와 IndexedDB 저장소 플러그인을 제공합니다. 저장소 구현은 위 계약의 일관성과 내구성을 보장해야 합니다. 메모리 저장소는 프로세스 수명 안에서만 상태를 유지합니다.
 
 ## OpenAI 연결
 
@@ -41,6 +42,12 @@
 `prepare()`는 저장된 대화를 요청 메시지 앞에 병합하고, 같은 id의 요청 메시지로 저장된 항목을 대체합니다. 생성 실행은 `RUN_STARTED`부터 순서대로 journal에 기록하고, 성공한 실행만 생성한 메시지를 대화에 반영한 뒤 `RUN_FINISHED`를 전달합니다. 실패·취소·중단된 실행은 부분 응답을 실행 기록에만 남기고 대화와 상태를 바꾸지 않습니다.
 
 이 저장소는 프로세스 메모리를 사용하므로 프로세스가 종료되면 내용이 사라지고 여러 프로세스가 공유할 수 없습니다. 내구성이 필요하면 같은 계약을 구현한 별도 저장소가 필요합니다.
+
+## 브라우저 저장소
+
+`@keundal/plugin-store-indexeddb`는 IndexedDB에 세션과 실행 기록을 보관합니다. 스트림 이벤트를 저장한 뒤 전달하고, 성공한 실행의 세션 변경과 종료 기록은 하나의 트랜잭션으로 확정합니다. 복구는 저장된 부분 응답을 반환하며 LLM을 다시 호출하지 않습니다.
+
+여러 탭에서 같은 데이터베이스를 사용할 때는 Web Locks로 실행 소유권을 조정합니다. IndexedDB와 Web Locks가 제공되는 보안 컨텍스트에서 사용해야 합니다. 사용 방법과 브라우저 저장 공간의 한계는 [플러그인 문서](packages/plugin-store-indexeddb/README.md)를 참고합니다.
 
 ## 에이전트 조합
 
