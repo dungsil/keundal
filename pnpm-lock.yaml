@@ -176,6 +176,9 @@ catalogs:
     cordis:
       specifier: 4.0.0-rc.10
       version: 4.0.0-rc.10
+    openai:
+      specifier: 7.15.0
+      version: 7.15.0
     tsdown:
       specifier: 0.23.0
       version: 0.23.0
@@ -260,6 +263,40 @@ importers:
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.10
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.4
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(typescript@6.0.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.0(@types/node@24.13.4)(vite@8.3.0(@types/node@24.13.4)(yaml@2.9.1))
+
+  packages/plugin-llm-openai:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@standard-schema/spec':
+        specifier: 'catalog:'
+        version: 1.1.0
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.10
+      openai:
+        specifier: 'catalog:'
+        version: 7.15.0(zod@3.25.76)
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -1185,6 +1222,30 @@ packages:
     resolution: {integrity: sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q==}
     engines: {node: '>=12.20.0'}
 
+  openai@7.15.0:
+    resolution: {integrity: sha512-2DIwesnPSduw68MFx7nAdgvshrgvS8WOan5W8+tgUMlAy/tY+Q41g80Pa+w/v64rHA6rtn+dketa8QvMVxU96w==}
+    engines: {node: '>=22.0.0'}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      undici: '>=5 <9'
+      ws: ^8.21.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      undici:
+        optional: true
+      ws:
+        optional: true
+      zod:
+        optional: true
+
   oxfmt@0.68.0:
     resolution: {integrity: sha512-Z0XMofcXCGUXbcpBHnWyUiX93BGiw1B+lcHNbQDWEtOhX06ewoFfu4zXkyiLhRrNnMq0twqXRHUcJetf+GsiQQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1888,6 +1949,10 @@ snapshots:
   node@runtime:24.21.0: {}
 
   obug@2.2.1: {}
+
+  openai@7.15.0(zod@3.25.76):
+    optionalDependencies:
+      zod: 3.25.76
 
   oxfmt@0.68.0:
     dependencies:
