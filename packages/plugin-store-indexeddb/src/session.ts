@@ -1,4 +1,5 @@
 import {
+  mergeMessages,
   parseRunAgentInput,
   SessionService,
   type ExecutionOptions,
@@ -9,7 +10,6 @@ import {
 } from '@keundal/core'
 import type { Context } from 'cordis'
 
-import { mergeMessages } from './messages.js'
 import { IndexedDBStore } from './store.js'
 
 /** IndexedDB에 스레드 대화와 상태를 보관합니다. */

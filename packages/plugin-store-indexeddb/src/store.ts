@@ -1,16 +1,17 @@
-import type {
-  AGUIEvent,
-  AgentMessage,
-  GenerationJournalEntry,
-  GenerationRequest,
-  GenerationSnapshot,
-  GenerationStatus,
-  RunAgentInput,
-  SessionCommit,
-  SessionSnapshot
+import {
+  mergeMessages,
+  type AGUIEvent,
+  type AgentMessage,
+  type GenerationJournalEntry,
+  type GenerationRequest,
+  type GenerationSnapshot,
+  type GenerationStatus,
+  type RunAgentInput,
+  type SessionCommit,
+  type SessionSnapshot
 } from '@keundal/core'
 
-import { mergeMessages, recordJournal } from './messages.js'
+import { recordJournal } from './messages.js'
 
 const DATABASE_VERSION = 1
 const THREADS = 'threads'
