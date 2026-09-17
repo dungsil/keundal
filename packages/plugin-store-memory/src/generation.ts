@@ -3,6 +3,7 @@ import {
   GenerationService,
   type AGUIEvent,
   type ExecutionOptions,
+  type GenerationOptions,
   type GenerationRequest,
   type GenerationSnapshot,
   type GenerationStatus,
@@ -35,7 +36,7 @@ export class MemoryGenerationService extends GenerationService {
       for (const c of this.controllers) c.abort(new Error('memory generation service disposed'))
     })
   }
-  run(request: GenerationRequest, options: ExecutionOptions = {}): AsyncIterableIterator<AGUIEvent> {
+  run(request: GenerationRequest, options: GenerationOptions = {}): AsyncIterableIterator<AGUIEvent> {
     this.assertOpen()
     const controller = new globalThis.AbortController()
     const token = Symbol('generation-run')
@@ -87,7 +88,8 @@ export class MemoryGenerationService extends GenerationService {
         stopped = true
         if (!controller.signal.aborted) controller.abort(new Error('memory generation run stopped'))
         cleanup()
-      }
+      },
+      options.stream
     )
     return {
       next: () => iterator.next(),
@@ -133,7 +135,8 @@ export class MemoryGenerationService extends GenerationService {
     signal: AbortSignal,
     token: symbol,
     stopped: () => boolean,
-    stop: () => void
+    stop: () => void,
+    stream?: GenerationOptions['stream']
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     const { threadId, runId } = request.input
     const recorder = new GenerationRecorder()
@@ -194,7 +197,8 @@ export class MemoryGenerationService extends GenerationService {
       recorder.record(started)
       yield started
       signal.throwIfAborted()
-      for await (const event of this.ctx.llm.stream(request, { signal })) {
+      const events = stream ? stream(request, { signal }) : this.ctx.llm.stream(request, { signal })
+      for await (const event of events) {
         signal.throwIfAborted()
         if (!current()) return
         recorder.record(event)

@@ -9,10 +9,17 @@ import {
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { Service, type Context } from 'cordis'
 
+import { addTools, parseTools, streamWithTools, type ExecutableTool } from './tools.js'
+
+export type { ExecutableTool, ToolExecutionContext } from './tools.js'
+
 export interface SimpleAgentConfig {
   readonly model: string
   readonly maxOutputTokens: number
   readonly compaction?: SummaryCompactionConfig
+  readonly tools?: readonly ExecutableTool[]
+  /** 도구를 실행하고 후속 생성을 요청할 최대 횟수입니다. 기본값은 8입니다. */
+  readonly maxToolRounds?: number
 }
 
 const simpleAgentConfigSchema: StandardSchemaV1<SimpleAgentConfig, SimpleAgentConfig> = {
@@ -35,7 +42,24 @@ const simpleAgentConfigSchema: StandardSchemaV1<SimpleAgentConfig, SimpleAgentCo
           'compaction' in value ? value.compaction : undefined
         )
         if (compaction.issues) return { issues: compaction.issues }
-        return { value: { model: value.model, maxOutputTokens: value.maxOutputTokens, compaction: compaction.value } }
+        try {
+          const tools = parseTools('tools' in value ? value.tools : undefined)
+          const maxToolRounds = 'maxToolRounds' in value ? value.maxToolRounds : 8
+          if (typeof maxToolRounds !== 'number' || !Number.isSafeInteger(maxToolRounds) || maxToolRounds <= 0) {
+            throw new Error('maxToolRounds must be a positive integer')
+          }
+          return {
+            value: {
+              model: value.model,
+              maxOutputTokens: value.maxOutputTokens,
+              compaction: compaction.value,
+              tools,
+              maxToolRounds
+            }
+          }
+        } catch (error) {
+          return { issues: [{ message: error instanceof Error ? error.message : 'invalid tools config' }] }
+        }
       }
       return { issues: [{ message: 'model and a positive integer maxOutputTokens are required' }] }
     }
@@ -110,7 +134,8 @@ export class SimpleAgent extends Service {
       const options = { signal }
       const prepared = await this.ctx.session.prepare(request, options)
       signal.throwIfAborted()
-      let preparedInput = parseRunAgentInput(prepared.input)
+      const tools = this.config.tools ?? []
+      const preparedInput = addTools(parseRunAgentInput(prepared.input), tools)
       if (preparedInput.threadId !== request.threadId || preparedInput.runId !== request.runId) {
         throw new Error('session preparation must preserve threadId and runId')
       }
@@ -130,52 +155,82 @@ export class SimpleAgent extends Service {
         throw new Error('requested output budget exceeds the model limits')
       }
       const maxInputTokens = model.contextWindow - maxOutputTokens
-      const countTokens = async () => {
-        const count = await this.ctx.llm.countTokens(
-          {
-            input: preparedInput,
-            model: this.config.model,
-            maxOutputTokens
-          },
-          options
-        )
-        signal.throwIfAborted()
-        if (!Number.isSafeInteger(count) || count < 0) throw new Error('invalid input token count')
-        return count
-      }
-
-      let compaction: CompactionResult | undefined
-      if ((await countTokens()) > maxInputTokens) {
-        compaction = await compact(
-          this.ctx.llm,
-          {
-            input: preparedInput,
-            model: this.config.model,
-            maxInputTokens
-          },
-          { ...this.config.compaction, signal }
-        )
-        signal.throwIfAborted()
-        preparedInput = parseRunAgentInput({ ...preparedInput, messages: compaction.messages })
-        if ((await countTokens()) > maxInputTokens) {
-          throw new Error('compacted input still exceeds the model context budget')
-        }
-      }
+      const fitted = await this.fitInput(preparedInput, maxInputTokens, signal)
 
       signal.throwIfAborted()
       yield* this.ctx.generation.run(
         {
-          input: preparedInput,
+          input: fitted.input,
           model: this.config.model,
           maxOutputTokens,
           sessionRevision: prepared.revision,
-          ...(compaction ? { compaction } : {})
+          ...(fitted.compaction ? { compaction: fitted.compaction } : {})
         },
-        options
+        {
+          signal,
+          ...(tools.length
+            ? {
+                stream: (request, execution) => {
+                  const generationSignal = execution?.signal ?? signal
+                  return streamWithTools(
+                    this.ctx.llm,
+                    request,
+                    tools,
+                    this.config.maxToolRounds ?? 8,
+                    async (next) => (await this.fitInput(next, maxInputTokens, generationSignal)).input,
+                    generationSignal
+                  )
+                }
+              }
+            : {})
+        }
       )
     } finally {
       cleanup()
     }
+  }
+
+  private async fitInput(
+    input: RunAgentInput,
+    maxInputTokens: number,
+    signal: AbortSignal
+  ): Promise<{ input: RunAgentInput; compaction?: CompactionResult }> {
+    signal.throwIfAborted()
+    let preparedInput = input
+    const options = { signal }
+    const countTokens = async () => {
+      const count = await this.ctx.llm.countTokens(
+        {
+          input: preparedInput,
+          model: this.config.model,
+          maxOutputTokens: this.config.maxOutputTokens
+        },
+        options
+      )
+      signal.throwIfAborted()
+      if (!Number.isSafeInteger(count) || count < 0) throw new Error('invalid input token count')
+      return count
+    }
+
+    let compaction: CompactionResult | undefined
+    if ((await countTokens()) > maxInputTokens) {
+      compaction = await compact(
+        this.ctx.llm,
+        {
+          input: preparedInput,
+          model: this.config.model,
+          maxInputTokens
+        },
+        { ...this.config.compaction, signal }
+      )
+      signal.throwIfAborted()
+      preparedInput = parseRunAgentInput({ ...preparedInput, messages: compaction.messages })
+      if ((await countTokens()) > maxInputTokens) {
+        throw new Error('compacted input still exceeds the model context budget')
+      }
+    }
+
+    return { input: preparedInput, compaction }
   }
 }
 

@@ -12,6 +12,63 @@ import { Context, type Fiber } from 'cordis'
 import { IDBFactory } from 'fake-indexeddb'
 import { expect, test, type TestContext } from 'vitest'
 
+test('지정한 이벤트 공급자의 도구 결과를 저장하고 복구할 때 다시 실행하지 않는다', async (t) => {
+  const { ctx, calls, store, fibers } = await setup(t)
+  let invoked = 0
+  const events: LLMEvent[] = [
+    { type: EventType.TOOL_CALL_START, toolCallId: 'lookup-1', toolCallName: 'lookup' },
+    { type: EventType.TOOL_CALL_ARGS, toolCallId: 'lookup-1', delta: '{}' },
+    { type: EventType.TOOL_CALL_END, toolCallId: 'lookup-1' },
+    { type: EventType.TOOL_CALL_RESULT, messageId: 'result-1', toolCallId: 'lookup-1', content: 'found', role: 'tool' },
+    { type: EventType.TOOL_CALL_START, toolCallId: 'lookup-2', toolCallName: 'lookup' },
+    { type: EventType.TOOL_CALL_ARGS, toolCallId: 'lookup-2', delta: '{}' },
+    { type: EventType.TOOL_CALL_END, toolCallId: 'lookup-2' },
+    {
+      type: EventType.TOOL_CALL_RESULT,
+      messageId: 'result-2',
+      toolCallId: 'lookup-2',
+      content: 'found again',
+      role: 'tool'
+    }
+  ]
+  const delivered = []
+  for await (const event of ctx.generation.run(request(), {
+    stream: async function* (provided, options) {
+      invoked++
+      expect(provided.input.runId).toBe('run')
+      expect(options?.signal).toBeInstanceOf(globalThis.AbortSignal)
+      yield* events
+    }
+  })) {
+    delivered.push(event)
+    if (event.type === EventType.TOOL_CALL_RESULT) {
+      expect((await ctx.generation.get('run'))?.messages.at(-1)).toEqual({
+        id: event.messageId,
+        role: 'tool',
+        toolCallId: event.toolCallId,
+        content: event.content
+      })
+    }
+    if (event.type === EventType.RUN_FINISHED) {
+      expect((await ctx.session.get('thread'))?.messages.map((message) => message.id)).toEqual([
+        'lookup-1',
+        'result-1',
+        'lookup-2',
+        'result-2'
+      ])
+    }
+  }
+  expect(calls()).toBe(0)
+  const recorded = await ctx.generation.get('run')
+  expect(recorded?.request).toEqual(request())
+  expect(recorded?.journal.map(({ event }) => event)).toEqual(delivered)
+  expect((await ctx.session.get('thread'))?.revision).toBe(1)
+  await fibers.at(-1)!.dispose()
+  const reopened = await setup(t, [], store)
+  expect(await reopened.ctx.generation.recover()).toEqual([recorded])
+  expect(invoked).toBe(1)
+})
+
 class Locks implements WebLockManager {
   private readonly states = new Map<string, { locked: boolean; waiters: (() => void)[] }>()
 
