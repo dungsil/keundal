@@ -1,16 +1,24 @@
-# @keundal/plugin-compaction-summary
+# @keundal/compaction
 
-주입된 `llm`으로 이전 대화를 요약하는 `compaction` 구현입니다. `simpleAgentPlugin`과 함께 등록하면 입력 예산을 초과한 대화를 축약합니다.
+LLM으로 이전 대화를 요약하는 일반 라이브러리입니다. Cordis 플러그인 등록이나 별도의 서비스 수명 없이 `compact()`를 호출합니다.
 
 ```ts
-import summaryCompactionPlugin from '@keundal/plugin-compaction-summary'
+import { compact } from '@keundal/compaction'
 
-// llm을 제공하는 플러그인을 먼저 등록합니다.
-await ctx.plugin(summaryCompactionPlugin, {
-  keepRecentMessages: 6,
-  maxSummaryTokens: 1024
-})
+const result = await compact(
+  llm,
+  { input, model, maxInputTokens },
+  {
+    keepRecentMessages: 6,
+    maxSummaryTokens: 1024,
+    signal
+  }
+)
 ```
+
+`llm`은 `getModel`, `countTokens`, `stream` 메서드를 제공하는 객체입니다. Cordis의 `ctx.llm`이나 같은 계약을 구현한 일반 객체를 전달할 수 있습니다. 축약 요청과 결과 타입은 `@keundal/core`에 정의되어 있습니다.
+
+`simpleAgentPlugin`은 이 함수를 기본으로 호출하므로 별도 등록이 필요하지 않습니다. 에이전트 설정의 `compaction`에 아래 옵션을 전달할 수 있습니다.
 
 | 설정                 | 기본값 | 설명                                                                                                     |
 | -------------------- | ------ | -------------------------------------------------------------------------------------------------------- |
@@ -25,4 +33,4 @@ await ctx.plugin(summaryCompactionPlugin, {
 
 이미 예산 안에 들어오는 입력은 요약 호출 없이 그대로 반환합니다. 보존할 메시지만으로 예산을 초과하거나, 단일 메시지가 요약 요청 한도를 넘거나, 최종 요약을 포함한 입력이 예산을 초과하면 오류를 반환합니다. 최근 대화를 임의로 삭제하거나 무한히 재요약하지 않습니다. 이미지 등 멀티모달 내용은 JSON에 담긴 표현만 요약하며, 이미지를 직접 해석하는 기능은 제공하지 않습니다.
 
-외부 `AbortSignal`과 플러그인 해제는 진행 중인 모델 조회·토큰 계산·요약 스트림에 취소 신호를 전달합니다. 공급자 오류, 빈 요약, 끝나지 않은 텍스트 스트림은 그대로 실패 처리합니다.
+전달한 `AbortSignal`은 모델 조회·토큰 계산·요약 스트림까지 전달됩니다. 호출자가 작업 수명을 관리하며, `simpleAgentPlugin`은 실행 취소·순회 중단·플러그인 해제를 이 신호에 연결합니다. 공급자 오류, 빈 요약, 끝나지 않은 텍스트 스트림은 그대로 실패 처리합니다.

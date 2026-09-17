@@ -1,5 +1,5 @@
 {
-  "name": "@keundal/plugin-compaction-summary",
+  "name": "@keundal/compaction",
   "private": true,
   "files": [
     "dist"
@@ -18,12 +18,9 @@
   },
   "dependencies": {
     "@keundal/core": "workspace:*",
-    "@standard-schema/spec": "catalog:",
-    "cordis": "catalog:"
+    "@standard-schema/spec": "catalog:"
   },
   "devDependencies": {
-    "@keundal/plugin-agent-simple": "workspace:*",
-    "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",

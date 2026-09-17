@@ -1,20 +1,11 @@
 import { getEventListeners } from 'node:events'
 
 import {
-  EventType,
-  LLMService,
-  type LLMEvent,
-  type LLMRequest,
-  type ExecutionOptions,
-  type RunAgentInput
-} from '@keundal/core'
-import simpleAgentPlugin from '@keundal/plugin-agent-simple'
-import summaryCompactionPlugin, {
+  compact as compactMessages,
   SummaryCompactionConfigSchema,
   type SummaryCompactionConfig
-} from '@keundal/plugin-compaction-summary'
-import memoryStorePlugin from '@keundal/plugin-store-memory'
-import { Context } from 'cordis'
+} from '@keundal/compaction'
+import { EventType, type LLMEvent, type LLMRequest, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
 import { expect, test, type TestContext } from 'vitest'
 
 const input: RunAgentInput = {
@@ -38,7 +29,7 @@ async function* response(): AsyncIterable<LLMEvent> {
 }
 
 async function setup(
-  t: TestContext,
+  _t: TestContext,
   overrides: {
     contextWindow?: number
     stream?: (request: LLMRequest, options?: ExecutionOptions) => AsyncIterable<LLMEvent>
@@ -46,12 +37,8 @@ async function setup(
     config?: SummaryCompactionConfig
   } = {}
 ) {
-  const ctx = new Context()
   const requests: LLMRequest[] = []
-  class LLM extends LLMService {
-    constructor(ctx: Context) {
-      super(ctx)
-    }
+  class LLM {
     async getModel() {
       return { contextWindow: overrides.contextWindow ?? 10000, maxOutputTokens: 1000 }
     }
@@ -63,19 +50,19 @@ async function setup(
       return overrides.stream?.(request, options) ?? response()
     }
   }
-  const llm = await ctx.plugin(LLM)
-  const plugin = await ctx.plugin(summaryCompactionPlugin, {
-    keepRecentMessages: 1,
-    maxSummaryTokens: 100,
-    ...overrides.config
-  })
-  t.onTestFinished(async () => {
-    await plugin.dispose()
-    await llm.dispose()
-  })
+  const llm = new LLM()
   const compact = (data = input, budget = 700, options?: ExecutionOptions) =>
-    ctx.compaction.compact({ input: data, model: 'test', maxInputTokens: budget }, options)
-  return { ctx, plugin, requests, compact }
+    compactMessages(
+      llm,
+      { input: data, model: 'test', maxInputTokens: budget },
+      {
+        keepRecentMessages: 1,
+        maxSummaryTokens: 100,
+        ...overrides.config,
+        ...options
+      }
+    )
+  return { requests, compact }
 }
 
 test('summarizes old messages while preserving instructions, recent input and the original request', async (t) => {
@@ -181,13 +168,13 @@ test('propagates provider failures', async (t) => {
   await expect(compact()).rejects.toThrow('provider unavailable')
 })
 
-for (const mode of ['external', 'dispose']) {
+for (const mode of ['external']) {
   test(`cancels an active summary via ${mode} and removes external listeners`, async (t) => {
     let started!: () => void
     const ready = new Promise<void>((resolve) => {
       started = resolve
     })
-    const { compact, plugin, ctx } = await setup(t, {
+    const { compact } = await setup(t, {
       stream: async function* (_request, options) {
         started()
         await new Promise<void>((_resolve, reject) => {
@@ -197,16 +184,12 @@ for (const mode of ['external', 'dispose']) {
       }
     })
     const controller = new globalThis.AbortController()
-    const service = ctx.compaction
     const pending = compact(input, 700, { signal: controller.signal })
     const assertion = expect(pending).rejects.toThrow(mode === 'external' ? 'user cancelled' : 'disposed')
     await ready
-    if (mode === 'external') controller.abort(new Error('user cancelled'))
-    else await plugin.dispose()
+    controller.abort(new Error('user cancelled'))
     await assertion
     expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
-    if (mode === 'dispose')
-      await expect(service.compact({ input, model: 'test', maxInputTokens: 700 })).rejects.toThrow('disposed')
   })
 }
 
@@ -222,28 +205,4 @@ test('validates configuration', async () => {
   for (const value of [{ keepRecentMessages: 0 }, { maxSummaryTokens: -1 }, null, []]) {
     expect((await SummaryCompactionConfigSchema['~standard'].validate(value)).issues).toBeDefined()
   }
-})
-
-test('composes with the agent and memory store, commits after compaction, and retains original history', async (t) => {
-  const { ctx, requests } = await setup(t, { contextWindow: 2400 })
-  const store = await ctx.plugin(memoryStorePlugin)
-  const agent = await ctx.plugin(simpleAgentPlugin, { model: 'test', maxOutputTokens: 100 })
-  t.onTestFinished(async () => {
-    await agent.dispose()
-    await store.dispose()
-  })
-  await ctx.session.commit({
-    threadId: input.threadId,
-    expectedRevision: 0,
-    messages: input.messages,
-    state: input.state
-  })
-  const events = []
-  for await (const event of ctx.agent.run({ ...input, messages: [] })) events.push(event)
-  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
-  expect(requests.length).toBeGreaterThan(1)
-  const generation = await ctx.generation.get(input.runId)
-  expect(generation?.request.compaction?.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
-  const session = await ctx.session.get(input.threadId)
-  for (const message of input.messages) expect(session?.messages).toContainEqual(message)
 })

@@ -17,11 +17,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@keundal/compaction": "workspace:*",
     "@keundal/core": "workspace:*",
     "@standard-schema/spec": "catalog:",
     "cordis": "catalog:"
   },
   "devDependencies": {
+    "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",
