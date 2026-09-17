@@ -82,6 +82,14 @@ export class MessageAssembly {
           )
         })
       }
+      case EventType.TOOL_CALL_RESULT:
+        this.open = undefined
+        return this.write({
+          id: event.messageId,
+          role: 'tool',
+          toolCallId: event.toolCallId,
+          content: event.content
+        })
       case EventType.REASONING_MESSAGE_START:
         return this.write({ id: event.messageId, role: 'reasoning', content: '' })
       case EventType.REASONING_MESSAGE_CONTENT:

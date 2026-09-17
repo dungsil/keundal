@@ -3,12 +3,17 @@ import type { Context } from 'cordis'
 
 import type { CompactionResult } from './compaction.js'
 import type { ExecutionOptions } from './execution.js'
-import type { LLMRequest } from './llm.js'
+import type { LLMRequest, LLMService } from './llm.js'
 import type { AGUIEvent, AgentMessage } from './protocol.js'
 
 export interface GenerationRequest extends LLMRequest {
   readonly sessionRevision: number
   readonly compaction?: CompactionResult
+}
+
+export interface GenerationOptions extends ExecutionOptions {
+  /** 실행에 사용할 이벤트 공급자입니다. 생략하면 주입된 llm.stream을 사용하며, 저장하거나 복구 시 재실행하지 않습니다. */
+  readonly stream?: LLMService['stream']
 }
 
 export type GenerationStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
@@ -38,7 +43,7 @@ export abstract class GenerationService extends Service {
     super(ctx, 'generation')
   }
 
-  abstract run(request: GenerationRequest, options?: ExecutionOptions): AsyncIterable<AGUIEvent>
+  abstract run(request: GenerationRequest, options?: GenerationOptions): AsyncIterable<AGUIEvent>
 
   abstract get(runId: string, options?: ExecutionOptions): Promise<GenerationSnapshot | undefined>
 

@@ -3,6 +3,7 @@ import {
   GenerationService,
   type AGUIEvent,
   type ExecutionOptions,
+  type GenerationOptions,
   type GenerationRequest,
   type GenerationSnapshot,
   type GenerationStatus,
@@ -37,7 +38,7 @@ export class IndexedDBGenerationService extends GenerationService {
     ctx.fiber.effect(() => () => this.dispose())
   }
 
-  run(request: GenerationRequest, options: ExecutionOptions = {}): AsyncIterableIterator<AGUIEvent> {
+  run(request: GenerationRequest, options: GenerationOptions = {}): AsyncIterableIterator<AGUIEvent> {
     this.assertOpen()
     const controller = new globalThis.AbortController()
     const token = Symbol('indexeddb-generation-run')
@@ -64,7 +65,7 @@ export class IndexedDBGenerationService extends GenerationService {
     if (external?.aborted) onAbort()
     else external?.addEventListener('abort', onAbort, { once: true })
 
-    const iterator = this.execute(request, controller.signal, token, () => stopped, cleanup)
+    const iterator = this.execute(request, controller.signal, token, () => stopped, cleanup, options.stream)
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -117,7 +118,8 @@ export class IndexedDBGenerationService extends GenerationService {
     signal: AbortSignal,
     token: symbol,
     stopped: () => boolean,
-    cleanup: () => void
+    cleanup: () => void,
+    stream?: GenerationOptions['stream']
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     const { threadId, runId } = request.input
     let active: ActiveRun | undefined
@@ -146,7 +148,8 @@ export class IndexedDBGenerationService extends GenerationService {
 
       signal.throwIfAborted()
 
-      for await (const event of this.ctx.llm.stream(request, { signal })) {
+      const events = stream ? stream(request, { signal }) : this.ctx.llm.stream(request, { signal })
+      for await (const event of events) {
         signal.throwIfAborted()
         if (!this.isCurrent(runId, token)) return
         recorder.record(event)

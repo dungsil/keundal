@@ -6,6 +6,7 @@ import {
   GenerationService,
   type AGUIEvent,
   type ExecutionOptions,
+  type GenerationOptions,
   type GenerationRequest,
   type GenerationSnapshot,
   type GenerationStatus,
@@ -73,7 +74,7 @@ export class SqliteGenerationService extends GenerationService {
     })
   }
 
-  run(request: GenerationRequest, options: ExecutionOptions = {}): AsyncIterableIterator<AGUIEvent> {
+  run(request: GenerationRequest, options: GenerationOptions = {}): AsyncIterableIterator<AGUIEvent> {
     this.assertOpen()
     const { runId } = request.input
     const controller = new globalThis.AbortController()
@@ -101,7 +102,7 @@ export class SqliteGenerationService extends GenerationService {
       if (!controller.signal.aborted) controller.abort(new Error('SQLite generation run stopped'))
       cleanup()
     }
-    const iterator = this.execute(request, controller.signal, token, () => stopped)
+    const iterator = this.execute(request, controller.signal, token, () => stopped, options.stream)
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -148,7 +149,8 @@ export class SqliteGenerationService extends GenerationService {
     request: GenerationRequest,
     signal: AbortSignal,
     token: symbol,
-    stopped: () => boolean
+    stopped: () => boolean,
+    stream?: GenerationOptions['stream']
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     const { threadId, runId } = request.input
     let run: ActiveRun | undefined
@@ -175,7 +177,8 @@ export class SqliteGenerationService extends GenerationService {
       run.recorder.record(started)
       yield started
       signal.throwIfAborted()
-      for await (const event of this.ctx.llm.stream(request, { signal })) {
+      const events = stream ? stream(request, { signal }) : this.ctx.llm.stream(request, { signal })
+      for await (const event of events) {
         signal.throwIfAborted()
         // 실행이 종료를 확정했거나 다른 소유자가 넘겨받았으면 기록을 멈춥니다.
         if (!run.recorder.record(event)) return
