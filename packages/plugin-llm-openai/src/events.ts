@@ -1,10 +1,17 @@
 import { EventType, type LLMEvent } from '@keundal/core'
 import type { ResponseStreamEvent } from 'openai/resources/responses/responses'
 
-type Item = { type: 'message' | 'function_call' | 'reasoning'; text: string; callId?: string }
+type Item = {
+  type: 'message' | 'function_call' | 'reasoning'
+  text: string
+  callId?: string
+  hostMessageId?: string
+}
 
 export class ResponseEvents {
-  private readonly items = new Map<string, Item>();
+  private readonly items = new Map<string, Item>()
+  private hasAssistantHost = false
+  private lastItemWasReasoning = false;
 
   *convert(event: ResponseStreamEvent): Generator<LLMEvent> {
     switch (event.type) {
@@ -14,6 +21,8 @@ export class ResponseEvents {
         if (this.items.has(item.id)) throw new Error('duplicate OpenAI output item')
         if (item.type === 'message') {
           this.items.set(item.id, { type: item.type, text: '' })
+          this.hasAssistantHost = true
+          this.lastItemWasReasoning = false
           yield {
             type: EventType.TEXT_MESSAGE_START,
             messageId: item.id,
@@ -21,11 +30,25 @@ export class ResponseEvents {
             ...(item.phase ? { metadata: { 'openai.phase': item.phase } } : {})
           }
         } else if (item.type === 'function_call') {
-          this.items.set(item.id, { type: item.type, callId: item.call_id, text: '' })
+          // MessageAssembly는 추론 뒤에서도 마지막 어시스턴트 호스트를 재사용하므로, 순서를
+          // 보존하려면 추론 다음의 함수 호출을 새 어시스턴트 호스트로 엽니다.
+          const hostMessageId = this.hasAssistantHost && this.lastItemWasReasoning ? item.id : undefined
+          this.items.set(item.id, {
+            type: item.type,
+            callId: item.call_id,
+            text: '',
+            ...(hostMessageId === undefined ? {} : { hostMessageId })
+          })
+          if (hostMessageId !== undefined) {
+            yield { type: EventType.TEXT_MESSAGE_START, messageId: hostMessageId, role: 'assistant' }
+          }
+          this.hasAssistantHost = true
+          this.lastItemWasReasoning = false
           yield { type: EventType.TOOL_CALL_START, toolCallId: item.call_id, toolCallName: item.name }
           yield* this.append(item.id, item.arguments, 'function_call')
         } else if (item.type === 'reasoning') {
           this.items.set(item.id, { type: item.type, text: '' })
+          this.lastItemWasReasoning = true
           yield { type: EventType.REASONING_START, messageId: item.id }
           yield { type: EventType.REASONING_MESSAGE_START, messageId: item.id, role: 'reasoning' }
         } else {
@@ -62,6 +85,9 @@ export class ResponseEvents {
           if (item.call_id !== tracked.callId) throw new Error('OpenAI tool call identity changed')
           yield* this.finishText(item.id, item.arguments)
           yield { type: EventType.TOOL_CALL_END, toolCallId: item.call_id }
+          if (tracked.hostMessageId !== undefined) {
+            yield { type: EventType.TEXT_MESSAGE_END, messageId: tracked.hostMessageId }
+          }
         } else if (item.type === 'reasoning') {
           yield* this.finishText(item.id, item.summary.map((part) => part.text).join(''))
           if (item.encrypted_content) {

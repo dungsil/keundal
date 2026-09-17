@@ -3,7 +3,14 @@ import { getEventListeners } from 'node:events'
 import { createServer, type ServerResponse } from 'node:http'
 import { setImmediate } from 'node:timers/promises'
 
-import { EventType, parseAGUIEvent, type AgentMessage, type LLMEvent, type LLMRequest } from '@keundal/core'
+import {
+  EventType,
+  MessageAssembly,
+  parseAGUIEvent,
+  type AgentMessage,
+  type LLMEvent,
+  type LLMRequest
+} from '@keundal/core'
 import openaiLLMPlugin, { OpenAILLMConfigSchema } from '@keundal/plugin-llm-openai'
 import indexedDBStorePlugin, { type IndexedDBStoreConfig } from '@keundal/plugin-store-indexeddb'
 import { Context } from 'cordis'
@@ -271,6 +278,85 @@ test('추론 요약을 전달하고 암호화된 추론 값은 최종 값만 전
     { type: EventType.REASONING_ENCRYPTED_VALUE, subtype: 'message', entityId: 'rs_1', encryptedValue: 'final-value' },
     { type: EventType.REASONING_MESSAGE_END, messageId: 'rs_1' },
     { type: EventType.REASONING_END, messageId: 'rs_1' }
+  ])
+})
+
+test('메시지 조립 후 텍스트, 추론, 도구 호출 순서를 보존한다', async (t) => {
+  let calls = 0
+  const { ctx, requests } = await setup(t, (_request, response) =>
+    send(
+      response,
+      calls++ === 0
+        ? [
+            { type: 'response.created', response: { id: 'resp_1', status: 'in_progress' } },
+            { type: 'response.output_item.added', item: message },
+            { type: 'response.output_text.delta', item_id: 'msg_1', delta: 'Checking' },
+            {
+              type: 'response.output_item.done',
+              item: {
+                ...message,
+                status: 'completed',
+                content: [{ type: 'output_text', text: 'Checking', annotations: [] }]
+              }
+            },
+            { type: 'response.output_item.added', item: { id: 'rs_1', type: 'reasoning', summary: [] } },
+            { type: 'response.reasoning_summary_text.delta', item_id: 'rs_1', delta: 'Think again' },
+            {
+              type: 'response.output_item.done',
+              item: {
+                id: 'rs_1',
+                type: 'reasoning',
+                summary: [{ type: 'summary_text', text: 'Think again' }],
+                encrypted_content: 'final-value'
+              }
+            },
+            {
+              type: 'response.output_item.added',
+              item: { id: 'fc_1', type: 'function_call', call_id: 'call_1', name: 'weather', arguments: '' }
+            },
+            { type: 'response.function_call_arguments.delta', item_id: 'fc_1', delta: '{"city":"Seoul"}' },
+            {
+              type: 'response.output_item.done',
+              item: {
+                id: 'fc_1',
+                type: 'function_call',
+                call_id: 'call_1',
+                name: 'weather',
+                arguments: '{"city":"Seoul"}',
+                status: 'completed'
+              }
+            },
+            completed
+          ]
+        : [{ type: 'response.created', response: { id: 'resp_1', status: 'in_progress' } }, completed]
+    )
+  )
+  const assembly = new MessageAssembly()
+  for (const event of await collect(ctx.llm.stream(request))) assembly.apply(event)
+  await collect(
+    ctx.llm.stream({
+      ...request,
+      input: {
+        ...request.input,
+        messages: [
+          ...request.input.messages,
+          ...assembly.messages,
+          { id: 'tool-1', role: 'tool', toolCallId: 'call_1', content: 'Sunny' }
+        ]
+      }
+    })
+  )
+  expect(requests[1].body.input).toStrictEqual([
+    { role: 'user', content: 'Hello' },
+    { role: 'assistant', content: 'Checking' },
+    {
+      type: 'reasoning',
+      id: 'rs_1',
+      summary: [{ type: 'summary_text', text: 'Think again' }],
+      encrypted_content: 'final-value'
+    },
+    { type: 'function_call', call_id: 'call_1', name: 'weather', arguments: '{"city":"Seoul"}' },
+    { type: 'function_call_output', call_id: 'call_1', output: 'Sunny' }
   ])
 })
 
