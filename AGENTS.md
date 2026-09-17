@@ -50,6 +50,7 @@ pnpm lint
 
 - Node.js 패키지는 `@keundal/tsconfig/node.json`과 `@keundal/tsdown`을 사용합니다. IndexedDB 플러그인은 브라우저 대상 빌드 설정과 DOM 타입을 사용합니다.
 - 테스트는 각 패키지의 `tests/*.test.ts`에 작성하고 공개 진입점을 사용합니다. Turbo가 테스트 전에 패키지를 빌드합니다.
+- 테스트 케이스(`test`, `it`)와 그룹(`describe`) 이름은 한국어로 작성합니다. 케이스 이름은 실제로 검증하는 조건과 기대 동작을 드러내며, 코드 식별자와 프로토콜 값은 원문을 유지합니다.
 - `typecheck`는 `tsconfig.test.json`으로 테스트 코드까지 검사합니다.
 - CI 공통 환경과 의존성 설치는 `.github/actions/setup/action.yml`에서 관리합니다.
 
