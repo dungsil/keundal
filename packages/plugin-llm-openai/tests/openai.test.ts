@@ -3,9 +3,11 @@ import { getEventListeners } from 'node:events'
 import { createServer, type ServerResponse } from 'node:http'
 import { setImmediate } from 'node:timers/promises'
 
-import { EventType, parseAGUIEvent, type LLMEvent, type LLMRequest } from '@keundal/core'
+import { EventType, parseAGUIEvent, type AgentMessage, type LLMEvent, type LLMRequest } from '@keundal/core'
 import openaiLLMPlugin, { OpenAILLMConfigSchema } from '@keundal/plugin-llm-openai'
+import indexedDBStorePlugin, { type IndexedDBStoreConfig } from '@keundal/plugin-store-indexeddb'
 import { Context } from 'cordis'
+import { IDBFactory } from 'fake-indexeddb'
 import { expect, test, type TestContext } from 'vitest'
 
 const request: LLMRequest = {
@@ -324,31 +326,94 @@ test('HTTP 오류를 재시도하지 않고 SDK의 상태 코드를 보존한다
   expect(requests).toHaveLength(1)
 })
 
-test('OpenAI 메시지를 다시 입력할 때 어시스턴트의 phase 메타데이터를 보존한다', async (t) => {
-  const item = { ...message, phase: 'commentary' }
-  const { ctx, requests } = await setup(t, (_request, response) =>
+test('IndexedDB에 저장한 commentary와 final_answer를 새 Context의 OpenAI 요청에 복원한다', async (t) => {
+  const storeConfig: IndexedDBStoreConfig = {
+    databaseName: 'openai-phases',
+    indexedDB: new IDBFactory(),
+    locks: {
+      async request(_name, options, callback) {
+        options.signal?.throwIfAborted()
+        return callback({})
+      }
+    }
+  }
+  const first = await setup(t, (_request, response) =>
     send(response, [
-      { type: 'response.output_item.added', item },
+      { type: 'response.output_item.added', item: { ...message, phase: 'commentary' } },
       {
         type: 'response.output_item.done',
-        item: { ...item, status: 'completed', content: [{ type: 'output_text', text: 'Checking', annotations: [] }] }
+        item: { ...message, status: 'completed', content: [{ type: 'output_text', text: 'Checking', annotations: [] }] }
+      },
+      { type: 'response.output_item.added', item: { ...message, id: 'msg_2' } },
+      {
+        type: 'response.output_item.done',
+        item: {
+          ...message,
+          id: 'msg_2',
+          phase: 'final_answer',
+          status: 'completed',
+          content: [{ type: 'output_text', text: 'Answer', annotations: [] }]
+        }
       },
       completed
     ])
   )
-  const events = await collect(ctx.llm.stream(request))
-  expect(events[0].metadata).toStrictEqual({ 'openai.phase': 'commentary' })
-  expect(events.at(-1)?.metadata).toStrictEqual({ 'openai.phase': 'commentary' })
-  await collect(
-    ctx.llm.stream({
-      ...request,
-      input: {
-        ...request.input,
-        messages: [{ id: 'msg_1', role: 'assistant', content: 'Checking', metadata: events[0].metadata }]
-      }
-    })
+  const firstStore = await first.ctx.plugin(indexedDBStorePlugin, storeConfig)
+  t.onTestFinished(() => firstStore.dispose())
+  await first.ctx.session.commit({
+    threadId: request.input.threadId,
+    expectedRevision: 0,
+    messages: request.input.messages,
+    state: request.input.state
+  })
+  const prepared = await first.ctx.session.prepare({ ...request.input, messages: [] })
+  const events = await Array.fromAsync(
+    first.ctx.generation.run({ ...request, input: prepared.input, sessionRevision: prepared.revision })
   )
-  expect(requests[1].body.input).toStrictEqual([
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(events.filter((event) => event.type === EventType.TEXT_MESSAGE_START)).toStrictEqual([
+    {
+      type: EventType.TEXT_MESSAGE_START,
+      messageId: 'msg_1',
+      role: 'assistant',
+      metadata: { 'openai.phase': 'commentary' }
+    },
+    { type: EventType.TEXT_MESSAGE_START, messageId: 'msg_2', role: 'assistant' }
+  ])
+  expect(events.filter((event) => event.type === EventType.TEXT_MESSAGE_END)).toStrictEqual([
+    { type: EventType.TEXT_MESSAGE_END, messageId: 'msg_1' },
+    { type: EventType.TEXT_MESSAGE_END, messageId: 'msg_2', metadata: { 'openai.phase': 'final_answer' } }
+  ])
+  await firstStore.dispose()
+  await first.fiber.dispose()
+
+  const second = await setup(t, (_request, response) => send(response, [completed]))
+  const secondStore = await second.ctx.plugin(indexedDBStorePlugin, storeConfig)
+  t.onTestFinished(() => secondStore.dispose())
+  const generated: AgentMessage[] = [
+    { id: 'msg_1', role: 'assistant', content: 'Checking', metadata: { 'openai.phase': 'commentary' } },
+    { id: 'msg_2', role: 'assistant', content: 'Answer', metadata: { 'openai.phase': 'final_answer' } }
+  ]
+  const persistedRun = await second.ctx.generation.get(request.input.runId)
+  expect(persistedRun?.status).toBe('completed')
+  expect(persistedRun?.messages).toStrictEqual(generated)
+  expect(persistedRun?.journal.map((entry) => entry.event)).toStrictEqual(events)
+  expect(await second.ctx.session.get(request.input.threadId)).toStrictEqual({
+    threadId: request.input.threadId,
+    revision: 2,
+    messages: [...request.input.messages, ...generated],
+    state: request.input.state
+  })
+  const restored = await second.ctx.session.prepare({ ...request.input, runId: 'run-2', messages: [] })
+  expect(restored).toStrictEqual({
+    revision: 2,
+    input: { ...request.input, runId: 'run-2', messages: [...request.input.messages, ...generated] }
+  })
+
+  await collect(second.ctx.llm.stream({ ...request, input: restored.input }))
+  expect(second.requests).toHaveLength(1)
+  expect(second.requests[0].body.input).toStrictEqual([
+    { role: 'user', content: 'Hello' },
     {
       type: 'message',
       id: 'msg_1',
@@ -356,6 +421,14 @@ test('OpenAI 메시지를 다시 입력할 때 어시스턴트의 phase 메타�
       status: 'completed',
       phase: 'commentary',
       content: [{ type: 'output_text', text: 'Checking', annotations: [] }]
+    },
+    {
+      type: 'message',
+      id: 'msg_2',
+      role: 'assistant',
+      status: 'completed',
+      phase: 'final_answer',
+      content: [{ type: 'output_text', text: 'Answer', annotations: [] }]
     }
   ])
 })

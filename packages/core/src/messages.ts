@@ -46,9 +46,19 @@ export class MessageAssembly {
     switch (event.type) {
       case EventType.TEXT_MESSAGE_START:
         this.open = event.messageId
-        return this.write({ id: event.messageId, role: 'assistant', content: '' })
+        return this.write({
+          id: event.messageId,
+          role: 'assistant',
+          content: '',
+          ...(event.metadata === undefined ? {} : { metadata: event.metadata })
+        })
       case EventType.TEXT_MESSAGE_CONTENT:
         return this.append(event.messageId, { id: event.messageId, role: 'assistant', content: '' }, event.delta)
+      case EventType.TEXT_MESSAGE_END: {
+        const message = this.message(event.messageId)
+        if (!message || event.metadata === undefined) return undefined
+        return this.write({ ...message, metadata: { ...message.metadata, ...event.metadata } })
+      }
       case EventType.TOOL_CALL_START: {
         const host = this.host(event.toolCallId)
         this.callHosts.set(event.toolCallId, host.id)

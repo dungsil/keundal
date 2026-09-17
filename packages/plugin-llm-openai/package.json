@@ -23,9 +23,11 @@
     "openai": "catalog:"
   },
   "devDependencies": {
+    "@keundal/plugin-store-indexeddb": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",
+    "fake-indexeddb": "6.2.4",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
