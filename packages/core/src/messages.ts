@@ -77,6 +77,17 @@ export class MessageAssembly {
       case EventType.REASONING_MESSAGE_CONTENT:
         return this.append(event.messageId, { id: event.messageId, role: 'reasoning', content: '' }, event.delta)
       case EventType.REASONING_ENCRYPTED_VALUE: {
+        if (event.subtype === 'tool-call') {
+          const hostId = this.callHosts.get(event.entityId)
+          const host = hostId === undefined ? undefined : this.message(hostId)
+          if (host?.role !== 'assistant' || !host.toolCalls) return undefined
+          return this.write({
+            ...host,
+            toolCalls: host.toolCalls.map((call) =>
+              call.id === event.entityId ? { ...call, encryptedValue: event.encryptedValue } : call
+            )
+          })
+        }
         if (event.subtype !== 'message') return undefined
         const message = this.message(event.entityId)
         if (message?.role !== 'reasoning') return undefined
