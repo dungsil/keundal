@@ -78,13 +78,16 @@ export class SqliteSessionService extends SessionService {
     // DatabaseSync는 동기 API이므로 이 커밋은 반환된 Promise를 기다리지 않아도 저장됩니다.
     return this.store.transaction(() => {
       const current = this.store.readThread(change.threadId) ?? { revision: 0, messages: [], state: undefined }
+      // 이미 종료를 확정한 실행은 revision 검사보다 중복 적용 건너뛰기가 우선합니다. 종료 기록을
+      // 적용한 뒤 결과 확인에 실패한 호출이 기준 revision을 몰라도 같은 commit을 다시 시도할 수
+      // 있어야 하기 때문입니다.
+      if (generation && !this.store.isRunning(generation.request.input.runId)) return snapshot(change.threadId, current)
+
       if (current.revision !== change.expectedRevision) {
         throw new Error(
           `session revision conflict for ${change.threadId}: expected ${change.expectedRevision}, stored ${current.revision}`
         )
       }
-      // 이미 종료를 확정한 실행은 메시지와 revision을 다시 반영하지 않습니다.
-      if (generation && !this.store.isRunning(generation.request.input.runId)) return snapshot(change.threadId, current)
 
       if (generation) {
         const runId = generation.request.input.runId
