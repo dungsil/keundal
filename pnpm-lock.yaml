@@ -375,6 +375,9 @@ importers:
         specifier: 'catalog:'
         version: 7.15.0(ws@8.21.3)(zod@3.25.76)
     devDependencies:
+      '@keundal/plugin-store-indexeddb':
+        specifier: workspace:*
+        version: link:../plugin-store-indexeddb
       '@keundal/tsconfig':
         specifier: workspace:*
         version: link:../../tools/tsconfig
@@ -384,6 +387,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.4
+      fake-indexeddb:
+        specifier: 6.2.4
+        version: 6.2.4
       tsdown:
         specifier: 'catalog:'
         version: 0.23.0(typescript@6.0.3)
