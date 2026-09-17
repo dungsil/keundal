@@ -64,4 +64,4 @@ try {
 - 추론 항목의 최종 암호화 값은 `REASONING_ENCRYPTED_VALUE`로 전달합니다. 후속 요청을 구성하는 쪽에서 해당 `reasoning` 메시지의 `id`, `content`, `encryptedValue`를 보존해야 합니다.
 - 어시스턴트 메시지의 `phase`는 시작·종료 이벤트의 `metadata['openai.phase']`로 전달합니다. 저장된 메시지에도 이 메타데이터를 유지하면 후속 요청에서 복원합니다.
 
-요청에는 `store: false`와 `truncation: 'disabled'`를 지정합니다. 대화와 문맥 압축은 Keundal 측에서 관리합니다. `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`는 생성하지 않으며, journal·커밋·복구도 수행하지 않습니다. 전체 에이전트를 실행하려면 `generation`, `session`, `compaction` 구현을 함께 등록해야 합니다.
+요청에는 `store: false`와 `truncation: 'disabled'`를 지정합니다. 대화와 문맥 축약은 Keundal 측에서 관리합니다. `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`는 생성하지 않으며, journal·커밋·복구도 수행하지 않습니다. 전체 에이전트를 실행하려면 저장소 플러그인과 `@keundal/plugin-agent-simple`을 함께 등록합니다.

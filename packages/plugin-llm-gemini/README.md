@@ -65,7 +65,7 @@ try {
 - thought 서명은 `REASONING_ENCRYPTED_VALUE`로 전달합니다. 추론 파트의 서명은 `subtype: 'message'`이고 함수 호출 파트의 서명은 `subtype: 'tool-call'`입니다. 후속 요청을 구성하는 쪽에서 추론 메시지의 `content`·`encryptedValue`와 도구 호출의 `encryptedValue`를 보존하면 각 파트의 `thoughtSignature`로 복원됩니다. 텍스트 파트에 실린 thought 서명은 Gemini가 후속 요청에서 요구하지 않으므로 전달하지 않습니다.
 - `STOP`이 아닌 종료 사유(`MAX_TOKENS`, `SAFETY` 등)는 불완전 응답으로 예외로 전달합니다. 종료 사유 없이 스트림이 끝나거나 청크 순서가 어긋나도 예외로 전달합니다.
 
-생성 요청에는 출력 예산을 `maxOutputTokens`로 지정합니다. 대화와 문맥 압축은 Keundal 측에서 관리합니다. `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`는 생성하지 않으며, journal·커밋·복구도 수행하지 않습니다. 전체 에이전트를 실행하려면 `generation`, `session`, `compaction` 구현을 함께 등록해야 합니다.
+생성 요청에는 출력 예산을 `maxOutputTokens`로 지정합니다. 대화와 문맥 축약은 Keundal 측에서 관리합니다. `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`는 생성하지 않으며, journal·커밋·복구도 수행하지 않습니다. 전체 에이전트를 실행하려면 저장소 플러그인과 `@keundal/plugin-agent-simple`을 함께 등록합니다.
 
 ## 검증
 
