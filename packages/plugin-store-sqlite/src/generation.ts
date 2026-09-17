@@ -157,9 +157,11 @@ export class SqliteGenerationService extends GenerationService {
     try {
       signal.throwIfAborted()
       this.validate(request)
+      // 등록에 실패한 중복 시작이 빈 스레드 행을 남기지 않게 등록을 먼저 검사합니다.
       const registered = this.store.transaction(() => {
-        this.store.ensureThread(threadId)
-        return this.store.registerRun(runId, threadId, request, this.ownerId, Date.now() + LEASE_MS)
+        const created = this.store.registerRun(runId, threadId, request, this.ownerId, Date.now() + LEASE_MS)
+        if (created) this.store.ensureThread(threadId)
+        return created
       })
       if (!registered) throw new Error(`generation run is already recorded: ${runId}`)
       run = {
