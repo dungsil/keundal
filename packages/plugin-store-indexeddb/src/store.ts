@@ -333,7 +333,12 @@ export class IndexedDBStore {
 
   private open(): Promise<IDBDatabase> {
     if (this.closed) return Promise.reject(new Error('indexeddb store is closed'))
-    this.database ??= new Promise<IDBDatabase>((resolve, reject) => {
+    this.database ??= this.openDatabase()
+    return this.database
+  }
+
+  private openDatabase(): Promise<IDBDatabase> {
+    const opening = new Promise<IDBDatabase>((resolve, reject) => {
       let settled = false
       const settle = (callback: () => void) => {
         if (settled) return false
@@ -341,9 +346,9 @@ export class IndexedDBStore {
         callback()
         return true
       }
-      const opening = this.idb.open(this.databaseName, DATABASE_VERSION)
-      opening.onupgradeneeded = () => {
-        const database = opening.result
+      const request = this.idb.open(this.databaseName, DATABASE_VERSION)
+      request.onupgradeneeded = () => {
+        const database = request.result
         if (!database.objectStoreNames.contains(THREADS)) database.createObjectStore(THREADS, { keyPath: 'threadId' })
         if (!database.objectStoreNames.contains(RUNS)) database.createObjectStore(RUNS, { keyPath: 'runId' })
         if (!database.objectStoreNames.contains(JOURNAL)) {
@@ -351,17 +356,22 @@ export class IndexedDBStore {
           journal.createIndex('by-run', 'runId')
         }
       }
-      opening.onsuccess = () => {
-        const database = opening.result
+      request.onsuccess = () => {
+        const database = request.result
         database.onversionchange = () => database.close()
         if (!settle(() => resolve(database))) database.close()
       }
-      opening.onerror = () =>
-        settle(() => reject(opening.error ?? new Error(`could not open IndexedDB ${this.databaseName}`)))
-      opening.onblocked = () =>
+      request.onerror = () =>
+        settle(() => reject(request.error ?? new Error(`could not open IndexedDB ${this.databaseName}`)))
+      request.onblocked = () =>
         settle(() => reject(new Error(`opening IndexedDB ${this.databaseName} is blocked by another tab`)))
     })
-    return this.database
+    // 열기는 onblocked 등 일시적 상황으로 실패할 수 있으므로 캐시를 비워 다음 호출이 다시
+    // 시도하게 합니다. 블록이 풀린 뒤의 onsuccess는 이미 거부된 약속을 되살리지 못합니다.
+    opening.catch(() => {
+      if (this.database === opening) this.database = undefined
+    })
+    return opening
   }
 }
 
