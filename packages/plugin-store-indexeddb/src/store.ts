@@ -118,15 +118,27 @@ export class IndexedDBStore {
     })
   }
 
-  /** 이벤트 하나를 append-only journal에 먼저 확정합니다. */
-  async appendEvent(runId: string, event: AGUIEvent): Promise<void> {
-    await this.transaction([RUNS, JOURNAL], 'readwrite', async (transaction) => {
-      const runs = transaction.objectStore(RUNS)
-      const run = await request<StoredRun | undefined>(runs.get(runId))
-      if (!run || run.status !== 'running') throw new Error(`generation run is not active: ${runId}`)
-      transaction.objectStore(JOURNAL).add({ runId, sequence: run.nextSequence, event } satisfies StoredJournal)
-      runs.put({ ...run, nextSequence: run.nextSequence + 1 } satisfies StoredRun)
-    })
+  /** 배치로 쌓은 journal 항목을 한 트랜잭션에 append-only로 확정합니다. */
+  async appendEvents(runId: string, entries: readonly GenerationJournalEntry[]): Promise<void> {
+    if (!entries.length) return
+    await this.transaction(
+      [RUNS, JOURNAL],
+      'readwrite',
+      async (transaction) => {
+        const runs = transaction.objectStore(RUNS)
+        const run = await request<StoredRun | undefined>(runs.get(runId))
+        if (!run || run.status !== 'running') throw new Error(`generation run is not active: ${runId}`)
+        const journal = transaction.objectStore(JOURNAL)
+        for (const [offset, entry] of entries.entries()) {
+          if (entry.sequence !== run.nextSequence + offset)
+            throw new Error(`generation journal sequence is invalid for ${runId}`)
+          journal.add({ runId, sequence: entry.sequence, event: entry.event } satisfies StoredJournal)
+        }
+        runs.put({ ...run, nextSequence: entries[entries.length - 1].sequence + 1 } satisfies StoredRun)
+      },
+      undefined,
+      { durability: 'relaxed' }
+    )
   }
 
   async getRun(runId: string): Promise<GenerationSnapshot | undefined> {
@@ -301,7 +313,8 @@ export class IndexedDBStore {
     stores: string[],
     mode: IDBTransactionMode,
     body: (transaction: IDBTransaction) => Promise<T>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: { readonly durability?: IDBTransactionDurability }
   ): Promise<T> {
     if (this.closed) throw new Error('indexeddb store is closed')
     signal?.throwIfAborted()
@@ -309,7 +322,7 @@ export class IndexedDBStore {
     signal?.throwIfAborted()
     const transaction =
       mode === 'readwrite'
-        ? database.transaction(stores, mode, { durability: 'strict' })
+        ? database.transaction(stores, mode, { durability: options?.durability ?? 'strict' })
         : database.transaction(stores, mode)
     const complete = transactionDone(transaction)
     const abort = () => transaction.abort()
