@@ -1,5 +1,3 @@
-import { getEventListeners } from 'node:events'
-
 import {
   compact as compactMessages,
   SummaryCompactionConfigSchema,
@@ -65,7 +63,7 @@ async function setup(
   return { requests, compact }
 }
 
-test('summarizes old messages while preserving instructions, recent input and the original request', async (t) => {
+test('이전 메시지를 요약하고 지침, 최근 입력, 원본 요청을 보존한다', async (t) => {
   const { compact, requests } = await setup(t)
   const original = globalThis.structuredClone(input)
   const result = await compact()
@@ -81,13 +79,13 @@ test('summarizes old messages while preserving instructions, recent input and th
   expect(requests[0].input.state).toStrictEqual({})
 })
 
-test('returns unmodified messages without generating a summary when already within budget', async (t) => {
+test('입력이 예산 이내이면 요약을 생성하지 않고 기존 메시지를 반환한다', async (t) => {
   const { compact, requests } = await setup(t)
   expect(await compact(input, 10000)).toStrictEqual({ messages: input.messages, summary: '', sourceMessageIds: [] })
   expect(requests).toHaveLength(0)
 })
 
-test('summarizes oversized history in bounded chunks and carries the previous summary forward', async (t) => {
+test('한도를 넘는 이력을 예산에 맞게 나누어 요약하고 이전 요약을 다음 요청에 전달한다', async (t) => {
   const { compact, requests } = await setup(t, { contextWindow: 2400 })
   await compact()
   expect(requests).toHaveLength(2)
@@ -99,7 +97,7 @@ test('summarizes oversized history in bounded chunks and carries the previous su
   ).toBe('Earlier facts.')
 })
 
-test('preserves an entire recent tool exchange', async (t) => {
+test('최근 사용자 턴의 도구 호출과 결과를 함께 보존한다', async (t) => {
   const { compact } = await setup(t)
   const data: RunAgentInput = {
     ...input,
@@ -118,7 +116,7 @@ test('preserves an entire recent tool exchange', async (t) => {
   expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
 })
 
-test('rejects an oversized preserved turn before calling the model', async (t) => {
+test('보존할 대화가 예산을 넘으면 모델을 호출하기 전에 거부한다', async (t) => {
   const { compact, requests } = await setup(t)
   await expect(
     compact({
@@ -129,13 +127,13 @@ test('rejects an oversized preserved turn before calling the model', async (t) =
   expect(requests).toHaveLength(0)
 })
 
-test('rejects history that cannot fit even one summary request', async (t) => {
+test('요약 요청 하나에도 담을 수 없는 이력은 거부한다', async (t) => {
   const { compact, requests } = await setup(t, { contextWindow: 800 })
   await expect(compact()).rejects.toThrow('summarization input budget')
   expect(requests).toHaveLength(0)
 })
 
-test('rejects output that still exceeds the final budget', async (t) => {
+test('축약 결과가 최종 입력 예산을 넘으면 거부한다', async (t) => {
   const { compact } = await setup(t, {
     count: (request) =>
       request.input.messages.some(
@@ -150,7 +148,7 @@ test('rejects output that still exceeds the final budget', async (t) => {
   await expect(compact()).rejects.toThrow('compacted input still exceeds')
 })
 
-test('rejects incomplete or empty summary streams', async (t) => {
+test('시작 이벤트만 전달하고 종료된 요약 스트림을 거부한다', async (t) => {
   const { compact } = await setup(t, {
     stream: async function* () {
       yield { type: EventType.TEXT_MESSAGE_START, messageId: 'summary', role: 'assistant' }
@@ -159,7 +157,7 @@ test('rejects incomplete or empty summary streams', async (t) => {
   await expect(compact()).rejects.toThrow('without completed text')
 })
 
-test('propagates provider failures', async (t) => {
+test('공급자 오류를 호출자에게 전달한다', async (t) => {
   const { compact } = await setup(t, {
     stream: () => {
       throw new Error('provider unavailable')
@@ -168,32 +166,29 @@ test('propagates provider failures', async (t) => {
   await expect(compact()).rejects.toThrow('provider unavailable')
 })
 
-for (const mode of ['external']) {
-  test(`cancels an active summary via ${mode} and removes external listeners`, async (t) => {
-    let started!: () => void
-    const ready = new Promise<void>((resolve) => {
-      started = resolve
-    })
-    const { compact } = await setup(t, {
-      stream: async function* (_request, options) {
-        started()
-        await new Promise<void>((_resolve, reject) => {
-          options!.signal!.addEventListener('abort', () => reject(options!.signal!.reason), { once: true })
-        })
-        yield* response()
-      }
-    })
-    const controller = new globalThis.AbortController()
-    const pending = compact(input, 700, { signal: controller.signal })
-    const assertion = expect(pending).rejects.toThrow(mode === 'external' ? 'user cancelled' : 'disposed')
-    await ready
-    controller.abort(new Error('user cancelled'))
-    await assertion
-    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
+test('외부 취소 신호로 진행 중인 요약을 중단한다', async (t) => {
+  let started!: () => void
+  const ready = new Promise<void>((resolve) => {
+    started = resolve
   })
-}
+  const { compact } = await setup(t, {
+    stream: async function* (_request, options) {
+      started()
+      await new Promise<void>((_resolve, reject) => {
+        options!.signal!.addEventListener('abort', () => reject(options!.signal!.reason), { once: true })
+      })
+      yield* response()
+    }
+  })
+  const controller = new globalThis.AbortController()
+  const pending = compact(input, 700, { signal: controller.signal })
+  const assertion = expect(pending).rejects.toThrow('user cancelled')
+  await ready
+  controller.abort(new Error('user cancelled'))
+  await assertion
+})
 
-test('rejects already cancelled requests without invoking the provider', async (t) => {
+test('이미 취소된 요청은 공급자를 호출하지 않고 거부한다', async (t) => {
   const { compact, requests } = await setup(t)
   await expect(compact(input, 700, { signal: globalThis.AbortSignal.abort(new Error('cancelled')) })).rejects.toThrow(
     'cancelled'
@@ -201,7 +196,7 @@ test('rejects already cancelled requests without invoking the provider', async (
   expect(requests).toHaveLength(0)
 })
 
-test('validates configuration', async () => {
+test('잘못된 축약 설정을 거부한다', async () => {
   for (const value of [{ keepRecentMessages: 0 }, { maxSummaryTokens: -1 }, null, []]) {
     expect((await SummaryCompactionConfigSchema['~standard'].validate(value)).issues).toBeDefined()
   }

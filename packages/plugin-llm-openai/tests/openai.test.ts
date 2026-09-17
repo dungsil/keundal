@@ -100,7 +100,7 @@ async function setup(t: TestContext, handle: (request: Received, response: Serve
   return { ctx, fiber, requests }
 }
 
-test('sends a Responses request and converts fragmented UTF-8 SSE without run lifecycle events', async (t) => {
+test('Responses 요청을 보내고 분할된 UTF-8 SSE를 실행 수명 이벤트 없이 변환한다', async (t) => {
   const { ctx, requests } = await setup(t, async (_request, response) => {
     const bytes = Buffer.from(wire(textFrames))
     const split = bytes.indexOf(Buffer.from('안녕')) + 1
@@ -136,7 +136,7 @@ test('sends a Responses request and converts fragmented UTF-8 SSE without run li
   expect(getEventListeners(signal, 'abort')).toHaveLength(0)
 })
 
-test('counts exactly the same converted conversation, context, and tools that generation sends', async (t) => {
+test('생성 요청과 동일하게 변환한 대화, 컨텍스트, 도구의 토큰 수를 계산한다', async (t) => {
   const { ctx, requests } = await setup(t, (incoming, response) => {
     if (incoming.path === '/v1/responses/input_tokens') {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -218,7 +218,7 @@ test('counts exactly the same converted conversation, context, and tools that ge
   expect(rich).toStrictEqual(original)
 })
 
-test('keeps interleaved function item IDs separate from AG-UI tool call IDs', async (t) => {
+test('도구 호출 이벤트가 교차해도 공급자 항목 ID와 AG-UI 도구 호출 ID를 구분한다', async (t) => {
   const first = { id: 'fc_1', type: 'function_call', call_id: 'call_1', name: 'clock', arguments: '' }
   const second = { id: 'fc_2', type: 'function_call', call_id: 'call_2', name: 'weather', arguments: '' }
   const { ctx } = await setup(t, (_request, response) =>
@@ -245,7 +245,7 @@ test('keeps interleaved function item IDs separate from AG-UI tool call IDs', as
   ])
 })
 
-test('emits reasoning summaries and only the final encrypted reasoning value', async (t) => {
+test('추론 요약을 전달하고 암호화된 추론 값은 최종 값만 전달한다', async (t) => {
   const item = { id: 'rs_1', type: 'reasoning', summary: [], encrypted_content: 'partial-value' }
   const { ctx } = await setup(t, (_request, response) =>
     send(response, [
@@ -272,7 +272,7 @@ test('emits reasoning summaries and only the final encrypted reasoning value', a
   ])
 })
 
-test('streams refusals and fills only missing final text without duplicating deltas', async (t) => {
+test('거절 응답을 스트리밍하고 최종 텍스트에서 아직 전달하지 않은 부분만 보충한다', async (t) => {
   const { ctx } = await setup(t, (_request, response) =>
     send(response, [
       { type: 'response.output_item.added', item: message },
@@ -298,7 +298,7 @@ test.for([
   },
   { frame: { type: 'error', code: 'server_error', message: 'stream error', param: null }, error: /stream error/ },
   { frame: undefined, error: /before response.completed/ }
-])('rejects failed, incomplete, error, or truncated streams: $error', async ({ frame, error }, t) => {
+])('실패하거나 불완전하게 종료된 스트림을 거부한다: $error', async ({ frame, error }, t) => {
   const { ctx } = await setup(t, (_request, response) =>
     send(response, [textFrames[1], textFrames[2], ...(frame ? [frame] : [])])
   )
@@ -313,7 +313,7 @@ test.for([
   ])
 })
 
-test('does not retry HTTP failures or hide the SDK status code', async (t) => {
+test('HTTP 오류를 재시도하지 않고 SDK의 상태 코드를 보존한다', async (t) => {
   const { ctx, requests } = await setup(t, (_request, response) => {
     response.writeHead(429, { 'content-type': 'application/json' })
     response.end(
@@ -324,7 +324,7 @@ test('does not retry HTTP failures or hide the SDK status code', async (t) => {
   expect(requests).toHaveLength(1)
 })
 
-test('preserves assistant phase metadata when replaying an OpenAI message', async (t) => {
+test('OpenAI 메시지를 다시 입력할 때 어시스턴트의 phase 메타데이터를 보존한다', async (t) => {
   const item = { ...message, phase: 'commentary' }
   const { ctx, requests } = await setup(t, (_request, response) =>
     send(response, [
@@ -379,12 +379,12 @@ test.for([
     ],
     error: /differs from streamed content/
   }
-])('rejects inconsistent provider event sequences: $error', async ({ frames, error }, t) => {
+])('공급자 이벤트 순서와 내용이 일관되지 않으면 거부한다: $error', async ({ frames, error }, t) => {
   const { ctx } = await setup(t, (_request, response) => send(response, frames))
   await expect(collect(ctx.llm.stream(request))).rejects.toThrow(error)
 })
 
-test('rejects invalid token counts instead of treating them as available context', async (t) => {
+test('공급자가 반환한 토큰 수가 음수이면 거부한다', async (t) => {
   const { ctx } = await setup(t, (_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' })
     response.end(JSON.stringify({ object: 'response.input_tokens', input_tokens: -1 }))
@@ -392,7 +392,7 @@ test('rejects invalid token counts instead of treating them as available context
   await expect(ctx.llm.countTokens(request)).rejects.toThrow(/invalid OpenAI input token count/)
 })
 
-test('validates model limits, budgets, and unsupported input before any HTTP request', async (t) => {
+test('HTTP 요청 전에 모델 한도, 출력 예산, 지원하지 않는 입력을 검증한다', async (t) => {
   const { ctx, requests } = await setup(t, (_request, response) => send(response, [completed]))
   expect(await ctx.llm.getModel('test-model')).toStrictEqual(limits)
   await expect(ctx.llm.getModel('toString')).rejects.toThrow(/not configured/)
@@ -419,7 +419,7 @@ test('validates model limits, budgets, and unsupported input before any HTTP req
   ).toHaveProperty('issues')
 })
 
-test('pre-aborted and unused streams do not send requests or retain listeners', async (t) => {
+test('미리 취소하거나 사용하지 않고 반환한 스트림은 요청을 보내거나 리스너를 남기지 않는다', async (t) => {
   const { ctx, requests } = await setup(t, (_request, response) => send(response, [completed]))
   const external = new globalThis.AbortController()
   const unused = ctx.llm.stream(request, { signal: external.signal })[Symbol.asyncIterator]()
@@ -433,7 +433,7 @@ test('pre-aborted and unused streams do not send requests or retain listeners', 
   expect(requests).toHaveLength(0)
 })
 
-test.for(['signal', 'return', 'dispose'] as const)('aborts a blocked HTTP stream on %s', async (mode, t) => {
+test.for(['signal', 'return', 'dispose'] as const)('%s 요청으로 대기 중인 HTTP 스트림을 중단한다', async (mode, t) => {
   const closed = Promise.withResolvers<void>()
   const { ctx, fiber } = await setup(t, (_request, response) => {
     response.on('close', () => closed.resolve())
@@ -460,7 +460,7 @@ test.for(['signal', 'return', 'dispose'] as const)('aborts a blocked HTTP stream
   }
 })
 
-test('disposal cancels a pending token-count request before response headers', async (t) => {
+test('플러그인을 해제하면 응답 헤더를 기다리는 토큰 계산 요청을 취소한다', async (t) => {
   const started = Promise.withResolvers<void>()
   const closed = Promise.withResolvers<void>()
   const { ctx, fiber } = await setup(t, (_request, response) => {

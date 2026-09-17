@@ -121,7 +121,7 @@ async function setup(testContext: TestContext, overrides: Overrides = {}) {
   return { ctx, calls, generations, agentFiber, llmFiber, LLM, fibers, constructed }
 }
 
-test('prepares the session and forwards generation events without owning execution or persistence', async (t) => {
+test('세션을 준비하고 실행과 저장을 위임하며 생성 이벤트를 그대로 전달한다', async (t) => {
   const { ctx, calls, generations } = await setup(t, {
     prepare: (request) => ({
       input: { ...request, messages: [{ id: 'history', role: 'user', content: 'saved history' }] },
@@ -141,20 +141,20 @@ test('prepares the session and forwards generation events without owning executi
   expect(result.at(-1)).toBe(events.at(-1))
 })
 
-test('context exactly fitting the input budget does not need compaction', async (t) => {
+test('입력 크기가 예산과 정확히 같으면 축약하지 않는다', async (t) => {
   const { ctx, calls } = await setup(t)
   await collect(ctx.agent.run({ ...input, messages: [{ id: 'question', role: 'user', content: 'x'.repeat(80) }] }))
   expect(calls).toStrictEqual(['prepare', 'model', 'count', 'run'])
 })
 
-test('an input with no compactable history does not start generation', async (t) => {
+test('예산을 초과한 입력에 축약할 이력이 없으면 생성을 시작하지 않는다', async (t) => {
   const { ctx, calls, generations } = await setup(t, { countTokens: () => 81 })
   await expect(collect(ctx.agent.run(input))).rejects.toThrow(/no older conversation/)
   expect(calls).toStrictEqual(['prepare', 'model', 'count', 'model', 'count'])
   expect(generations).toHaveLength(0)
 })
 
-test('invalid model budgets and changed session identity fail before generation starts', async (t) => {
+test('출력 예산이 모델 한도를 넘거나 세션의 threadId가 바뀌면 생성 전에 실패한다', async (t) => {
   const badBudget = await setup(t, { getModel: () => ({ contextWindow: 100, maxOutputTokens: 10 }) })
   await expect(collect(badBudget.ctx.agent.run(input))).rejects.toThrow(/output budget/)
   expect(badBudget.calls).toStrictEqual(['prepare', 'model'])
@@ -165,7 +165,7 @@ test('invalid model budgets and changed session identity fail before generation 
   expect(badIdentity.calls).toStrictEqual(['prepare'])
 })
 
-test('pre-start cancellation and returning an unused iterator do not retain abort listeners or run services', async (t) => {
+test('시작 전 취소나 사용하지 않은 반복자의 반환은 리스너를 남기거나 서비스를 실행하지 않는다', async (t) => {
   const { ctx, calls } = await setup(t)
   const external = new globalThis.AbortController()
   const baseline = getEventListeners(external.signal, 'abort').length
@@ -179,7 +179,7 @@ test('pre-start cancellation and returning an unused iterator do not retain abor
   expect(calls).toStrictEqual([])
 })
 
-test('returning during session preparation aborts before waiting and prevents generation', async (t) => {
+test('세션 준비 중 반복자를 반환하면 준비 작업을 즉시 취소하고 생성을 시작하지 않는다', async (t) => {
   const started = Promise.withResolvers<void>()
   let preparationSignal: AbortSignal | undefined
   const { ctx, generations } = await setup(t, {
@@ -202,7 +202,7 @@ test('returning during session preparation aborts before waiting and prevents ge
   expect(generations).toHaveLength(0)
 })
 
-test('disposing the composition aborts the delegated generation and closes its iterator', async (t) => {
+test('에이전트 플러그인을 해제하면 위임한 생성을 취소하고 반복자를 닫는다', async (t) => {
   const started = Promise.withResolvers<void>()
   let executionSignal: AbortSignal | undefined
   let closed = false
@@ -236,7 +236,7 @@ test('disposing the composition aborts the delegated generation and closes its i
   expect(ctx.agent).toBeUndefined()
 })
 
-test('replacing an injected LLM rebuilds the composition without replacing the other services', async (t) => {
+test('주입된 LLM을 교체하면 다른 서비스를 유지하면서 에이전트를 다시 구성한다', async (t) => {
   const { ctx, llmFiber, LLM, fibers, constructed } = await setup(t)
   const previousAgent = ctx.agent
   expect(constructed).toStrictEqual({ llm: 1, session: 1, generation: 1 })
@@ -252,7 +252,7 @@ test('replacing an injected LLM rebuilds the composition without replacing the o
 })
 
 for (const mode of ['external', 'return', 'dispose']) {
-  test(`cancels the built-in summary on ${mode} without starting generation`, async (t) => {
+  test(`${mode} 요청으로 내장 요약을 취소하고 생성을 시작하지 않는다`, async (t) => {
     const started = Promise.withResolvers<void>()
     let summarySignal: AbortSignal | undefined
     let closed = false

@@ -136,7 +136,7 @@ test('RUN_STARTED 뒤 취소하면 다음 next 없이 cancelled를 확정하고 
   expect(calls()).toBe(0)
 })
 
-test('부분 응답을 전달한 뒤 멈춘 iterator도 취소하면 cancelled를 확정한다', async (t) => {
+test('부분 응답을 전달한 뒤 멈춘 반복자도 취소하면 cancelled로 확정한다', async (t) => {
   const never = new Promise<void>(() => {})
   const { ctx, calls } = await setup(
     t,
@@ -178,7 +178,7 @@ test('완료를 기다리는 동안 취소하면 cancelled만 확정하고 RUN_F
   expect(run?.journal.some((entry) => entry.event.type === EventType.RUN_FINISHED)).toBe(false)
 })
 
-test('다른 탭이 보유한 실행 lock은 recover가 interrupted로 오인하지 않는다', async (t) => {
+test('다른 탭이 실행 잠금을 보유하면 복구 시 running 상태를 유지한다', async (t) => {
   const factory = new IDBFactory()
   const locks = new Locks()
   const name = `shared-${globalThis.crypto.randomUUID()}`

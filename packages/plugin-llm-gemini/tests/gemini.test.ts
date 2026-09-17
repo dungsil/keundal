@@ -85,7 +85,7 @@ async function setup(t: TestContext, handle: (request: Received, response: Serve
   return { ctx, fiber, requests }
 }
 
-test('sends a streamGenerateContent request and converts fragmented UTF-8 SSE without run lifecycle events', async (t) => {
+test('streamGenerateContent 요청을 보내고 분할된 UTF-8 SSE를 실행 수명 이벤트 없이 변환한다', async (t) => {
   const { ctx, requests } = await setup(t, async (_request, response) => {
     const bytes = Buffer.from(wire(textChunks))
     const split = bytes.indexOf(Buffer.from('안녕')) + 1
@@ -115,7 +115,7 @@ test('sends a streamGenerateContent request and converts fragmented UTF-8 SSE wi
   expect(getEventListeners(signal, 'abort')).toHaveLength(0)
 })
 
-test('counts the same converted conversation and context, folding system instructions into contents', async (t) => {
+test('생성과 동일하게 변환한 대화와 컨텍스트에 시스템 지침을 합쳐 토큰 수를 계산한다', async (t) => {
   const { ctx, requests } = await setup(t, (incoming, response) => {
     if (incoming.path === '/v1beta/models/test-model:countTokens') {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -203,7 +203,7 @@ test('counts the same converted conversation and context, folding system instruc
   expect(rich).toStrictEqual(original)
 })
 
-test('opens and closes each function call part and synthesizes tool call IDs', async (t) => {
+test('각 함수 호출의 시작과 종료 이벤트를 전달하고 도구 호출 ID를 생성한다', async (t) => {
   const { ctx } = await setup(t, (_request, response) =>
     send(response, [
       {
@@ -233,7 +233,7 @@ test('opens and closes each function call part and synthesizes tool call IDs', a
   ])
 })
 
-test('delivers function call thought signatures as encrypted tool call values', async (t) => {
+test('함수 호출의 추론 서명을 도구 호출의 암호화된 값으로 전달한다', async (t) => {
   const { ctx } = await setup(t, (_request, response) =>
     send(response, [
       {
@@ -263,7 +263,7 @@ test('delivers function call thought signatures as encrypted tool call values', 
   ])
 })
 
-test('emits thought summaries and only the final thought signature', async (t) => {
+test('추론 요약을 전달하고 추론 메시지를 닫을 때 서명을 전달한다', async (t) => {
   const { ctx } = await setup(t, (_request, response) =>
     send(response, [
       {
@@ -299,7 +299,7 @@ test('emits thought summaries and only the final thought signature', async (t) =
   ])
 })
 
-test('ignores thought signatures on plain text parts and signature-only tails', async (t) => {
+test('일반 텍스트에 붙은 추론 서명과 서명만 있는 후속 항목을 무시한다', async (t) => {
   const { ctx } = await setup(t, (_request, response) =>
     send(response, [
       {
@@ -323,7 +323,7 @@ test('ignores thought signatures on plain text parts and signature-only tails', 
   ])
 })
 
-test('does not retry token-count HTTP failures or hide the SDK status code', async (t) => {
+test('토큰 계산 중 HTTP 오류를 재시도하지 않고 SDK의 상태 코드를 보존한다', async (t) => {
   const { ctx, requests } = await setup(t, (_request, response) => {
     response.writeHead(429, { 'content-type': 'application/json' })
     response.end(JSON.stringify({ error: { code: 429, message: 'rate limited', status: 'RESOURCE_EXHAUSTED' } }))
@@ -332,7 +332,7 @@ test('does not retry token-count HTTP failures or hide the SDK status code', asy
   expect(requests).toHaveLength(1)
 })
 
-test('round-trips thought signatures, function responses, and system instructions', async (t) => {
+test('저장된 추론 서명과 함수 응답을 생성 요청으로 변환한다', async (t) => {
   const { ctx, requests } = await setup(t, (_request, response) =>
     send(response, [{ responseId: 'resp-1', candidates: [{ finishReason: 'STOP' }] }])
   )
@@ -369,7 +369,7 @@ test('round-trips thought signatures, function responses, and system instruction
   })
 })
 
-test('restores IndexedDB reasoning and tool call signatures in a new Context Gemini request', async (t) => {
+test('IndexedDB에 저장한 추론과 도구 호출 서명을 새 Context의 Gemini 요청에 복원한다', async (t) => {
   const storeConfig: IndexedDBStoreConfig = {
     databaseName: 'gemini-signatures',
     indexedDB: new IDBFactory(),
@@ -541,7 +541,7 @@ test.for([
     error: /response identifier changed/,
     received: [start, content('a')]
   }
-])('rejects failed, incomplete, blocked, or inconsistent streams: $error', async ({ chunks, error, received }, t) => {
+])('실패, 미완료, 차단 또는 내용 불일치가 있는 스트림을 거부한다: $error', async ({ chunks, error, received }, t) => {
   const { ctx } = await setup(t, (_request, response) => send(response, chunks as Chunk[]))
   const collected: LLMEvent[] = []
   const consume = async () => {
@@ -551,7 +551,7 @@ test.for([
   expect(collected).toStrictEqual(received)
 })
 
-test('keeps chunks without candidates and finishes usage-only tails', async (t) => {
+test('후보 없이 사용량만 있는 청크를 허용하고 STOP 수신 시 응답을 종료한다', async (t) => {
   const { ctx } = await setup(t, (_request, response) =>
     send(response, [
       { responseId: 'resp-1', usageMetadata: { promptTokenCount: 4 } },
@@ -566,7 +566,7 @@ test('keeps chunks without candidates and finishes usage-only tails', async (t) 
   ])
 })
 
-test('does not retry HTTP failures or hide the SDK status code', async (t) => {
+test('HTTP 오류를 재시도하지 않고 SDK의 상태 코드를 보존한다', async (t) => {
   const { ctx, requests } = await setup(t, (_request, response) => {
     response.writeHead(429, { 'content-type': 'application/json' })
     response.end(JSON.stringify({ error: { code: 429, message: 'rate limited', status: 'RESOURCE_EXHAUSTED' } }))
@@ -575,7 +575,7 @@ test('does not retry HTTP failures or hide the SDK status code', async (t) => {
   expect(requests).toHaveLength(1)
 })
 
-test('rejects invalid token counts instead of treating them as available context', async (t) => {
+test('공급자가 반환한 토큰 수가 음수이면 거부한다', async (t) => {
   const { ctx } = await setup(t, (_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' })
     response.end(JSON.stringify({ totalTokens: -1 }))
@@ -583,7 +583,7 @@ test('rejects invalid token counts instead of treating them as available context
   await expect(ctx.llm.countTokens(request)).rejects.toThrow(/invalid Gemini input token count/)
 })
 
-test('validates model limits, budgets, and unsupported input before any HTTP request', async (t) => {
+test('HTTP 요청 전에 모델 한도, 출력 예산, 지원하지 않는 입력을 검증한다', async (t) => {
   const { ctx, requests } = await setup(t, (_request, response) =>
     send(response, [{ responseId: 'resp-1', candidates: [{ finishReason: 'STOP' }] }])
   )
@@ -623,7 +623,7 @@ test('validates model limits, budgets, and unsupported input before any HTTP req
   ).toHaveProperty('issues')
 })
 
-test('pre-aborted and unused streams do not send requests or retain listeners', async (t) => {
+test('미리 취소하거나 사용하지 않고 반환한 스트림은 요청을 보내거나 리스너를 남기지 않는다', async (t) => {
   const { ctx, requests } = await setup(t, (_request, response) =>
     send(response, [{ responseId: 'resp-1', candidates: [{ finishReason: 'STOP' }] }])
   )
@@ -639,7 +639,7 @@ test('pre-aborted and unused streams do not send requests or retain listeners', 
   expect(requests).toHaveLength(0)
 })
 
-test.for(['signal', 'return', 'dispose'] as const)('aborts a blocked HTTP stream on %s', async (mode, t) => {
+test.for(['signal', 'return', 'dispose'] as const)('%s 요청으로 대기 중인 HTTP 스트림을 중단한다', async (mode, t) => {
   const closed = Promise.withResolvers<void>()
   const { ctx, fiber } = await setup(t, (_request, response) => {
     response.on('close', () => closed.resolve())
@@ -669,7 +669,7 @@ test.for(['signal', 'return', 'dispose'] as const)('aborts a blocked HTTP stream
   }
 })
 
-test('disposal cancels a pending token-count request before response headers', async (t) => {
+test('플러그인을 해제하면 응답 헤더를 기다리는 토큰 계산 요청을 취소한다', async (t) => {
   const started = Promise.withResolvers<void>()
   const closed = Promise.withResolvers<void>()
   const { ctx, fiber } = await setup(t, (_request, response) => {

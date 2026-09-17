@@ -104,7 +104,7 @@ const request = (runId = 'run'): GenerationRequest => ({
   sessionRevision: 0
 })
 
-test('abort 이후 next 없이도 get으로 cancelled 상태를 확인한다', async (t) => {
+test('취소 후 next를 다시 호출하지 않아도 get으로 cancelled 상태를 확인한다', async (t) => {
   const { ctx } = await setup(t, { events: reply, holdAfter: 1 }, databasePath(t))
   const controller = new globalThis.AbortController()
   const iterator = ctx.generation.run(request(), { signal: controller.signal }) as AsyncIterableIterator<AGUIEvent>
@@ -114,7 +114,7 @@ test('abort 이후 next 없이도 get으로 cancelled 상태를 확인한다', a
   expect((await ctx.generation.get('run'))?.status).toBe('cancelled')
 })
 
-test('pending next 중 return은 스트림을 중단하고 interrupted로 확정한다', async (t) => {
+test('next가 대기 중일 때 return을 호출하면 스트림을 중단하고 interrupted로 확정한다', async (t) => {
   const { ctx, held } = await setup(t, { events: reply, holdAfter: 2 }, databasePath(t))
   const iterator = ctx.generation.run(request()) as AsyncIterableIterator<AGUIEvent>
   await iterator.next()
@@ -150,7 +150,7 @@ test('재등록 뒤 recover가 부분 응답을 interrupted로 확정하고 LLM�
   expect(statuses(await second.ctx.generation.recover())).toEqual(['interrupted'])
 })
 
-test('임차를 연장하는 다른 서비스의 실행은 recover가 실행 중으로 둔다', async (t) => {
+test('임차가 유효한 다른 서비스의 실행은 복구 시 running 상태를 유지한다', async (t) => {
   const path = databasePath(t)
   const first = await setup(t, { events: reply, holdAfter: 2 }, path)
   const controller = new globalThis.AbortController()
@@ -204,7 +204,7 @@ test('중복 runId는 기존 실행 상태를 변경하지 않는다', async (t)
   expect((await ctx.generation.get('run'))?.status).toBe('interrupted')
 })
 
-test('시작하지 않은 duplicate iterator abort는 원본 실행을 변경하지 않는다', async (t) => {
+test('시작하지 않은 중복 실행의 반복자를 취소해도 원본 실행을 변경하지 않는다', async (t) => {
   const { ctx } = await setup(t, { events: reply }, databasePath(t))
   const first = ctx.generation.run(request()) as AsyncIterableIterator<AGUIEvent>
   await first.next()
@@ -221,7 +221,7 @@ test('시작하지 않은 duplicate iterator abort는 원본 실행을 변경하
   expect((await ctx.generation.get('run'))?.status).toBe('interrupted')
 })
 
-test('return 실패 뒤 외부 signal listener를 정리한다', async (t) => {
+test('return 호출이 실패해도 외부 취소 신호의 리스너를 정리한다', async (t) => {
   const { ctx } = await setup(t, { events: reply }, databasePath(t))
   const controller = new globalThis.AbortController()
   const iterator = ctx.generation.run(request(), { signal: controller.signal }) as AsyncIterableIterator<AGUIEvent>

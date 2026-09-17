@@ -1,8 +1,8 @@
-import { EventType, parseAGUIEvent, parseRunAgentInput, type RunAgentInput } from '@keundal/core'
+import { parseAGUIEvent, parseRunAgentInput, type RunAgentInput } from '@keundal/core'
 import { describe, expect, test } from 'vitest'
 
-describe('run input contract', () => {
-  test('preserves conversation, tool, and execution data from a wire request', () => {
+describe('실행 입력 계약', () => {
+  test('수신한 요청의 대화, 도구, 실행 데이터를 보존한다', () => {
     const input: RunAgentInput = {
       threadId: 'conversation-1',
       runId: 'generation-2',
@@ -17,7 +17,7 @@ describe('run input contract', () => {
     expect(parseRunAgentInput(input)).toStrictEqual(input)
   })
 
-  test('rejects a request with no run identifier', () => {
+  test('실행 식별자가 없는 요청을 거부한다', () => {
     expect(() =>
       parseRunAgentInput({
         threadId: 'conversation-1',
@@ -30,18 +30,14 @@ describe('run input contract', () => {
   })
 })
 
-describe('event contract', () => {
-  test('preserves tool-call fields and the event discriminator', () => {
+describe('이벤트 계약', () => {
+  test('도구 호출 필드와 이벤트 유형을 보존한다', () => {
     const event = { type: 'TOOL_CALL_ARGS', toolCallId: 'clock-1', delta: '{"timezone":"Asia/Seoul"}' }
     const parsed = parseAGUIEvent(event)
     expect(parsed).toStrictEqual(event)
-    expect(parsed.type).toBe(EventType.TOOL_CALL_ARGS)
-    if (parsed.type !== EventType.TOOL_CALL_ARGS) throw new Error('unexpected event type')
-    expect(parsed.toolCallId).toBe('clock-1')
-    expect(parsed.delta).toBe('{"timezone":"Asia/Seoul"}')
   })
 
-  test('preserves successful execution identifiers and outcome', () => {
+  test('성공한 실행의 식별자와 결과를 보존한다', () => {
     const event = {
       type: 'RUN_FINISHED',
       threadId: 'conversation-1',
@@ -56,7 +52,7 @@ describe('event contract', () => {
     { type: 'TOOL_CALL_ARGS', delta: '{}' },
     { type: 'RUN_STARTED', threadId: 'conversation-1' },
     { type: 'UNKNOWN_EVENT' }
-  ])('rejects malformed wire event $type', (event) => {
+  ])('형식이 잘못된 $type 이벤트를 거부한다', (event) => {
     expect(() => parseAGUIEvent(event)).toThrow()
   })
 })

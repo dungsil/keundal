@@ -265,7 +265,7 @@ test('소비자가 순회를 중단한 실행은 interrupted로 확정한다', a
   expect(types(run?.journal.map((entry) => entry.event) ?? [])).toEqual([EventType.RUN_STARTED])
 })
 
-test('recover는 재등록 뒤 남은 실행을 interrupted로 확정하고 LLM을 다시 호출하지 않는다', async (t) => {
+test('LLM 응답을 기다리던 실행은 저장소 재등록 뒤 복구하면 interrupted로 확정하고 LLM을 재호출하지 않는다', async (t) => {
   const store = new MemoryStore()
   const { ctx, calls, held, fibers } = await setup(t, { events: reply, holdAfter: 2 }, store)
   const controller = new globalThis.AbortController()
