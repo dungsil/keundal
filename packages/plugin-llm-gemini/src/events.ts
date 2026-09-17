@@ -18,7 +18,9 @@ export class ContentsEvents {
   private finished = false
   private responseId?: string
   private idPrefix?: string
-  private readonly counts = { text: 0, thought: 0, call: 0 };
+  private hasAssistantHost = false
+  private lastItemWasThought = false
+  private readonly counts = { text: 0, thought: 0, call: 0, host: 0 };
 
   *convert(chunk: GenerateContentResponse): Generator<LLMEvent> {
     if (this.finished) throw new Error('Gemini sent chunks after the response finished')
@@ -66,6 +68,7 @@ export class ContentsEvents {
         this.open = undefined
       }
       this.open ??= yield* this.begin('thought')
+      this.lastItemWasThought = true
       if (part.thoughtSignature) {
         if (this.open.signature && this.open.signature !== part.thoughtSignature) {
           throw new Error('Gemini changed the thought signature of an output item', { cause: part })
@@ -89,6 +92,8 @@ export class ContentsEvents {
       this.open = undefined
     }
     this.open ??= yield* this.begin('text')
+    this.hasAssistantHost = true
+    this.lastItemWasThought = false
     if (part.text) {
       this.open.text += part.text
       yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: this.open.id, delta: part.text }
@@ -102,6 +107,15 @@ export class ContentsEvents {
     }
     if (!call.name) throw new Error('Gemini function call has no name', { cause: call })
     const toolCallId = call.id || `${this.prefix}-call-${this.counts.call++}`
+    // MessageAssembly는 추론 뒤에서도 마지막 어시스턴트 호스트를 재사용하므로, 생각 부분 다음의
+    // 함수 호출은 새 어시스턴트 호스트로 열어 조립 순서를 보존합니다.
+    const hostMessageId =
+      this.hasAssistantHost && this.lastItemWasThought ? `${this.prefix}-host-${this.counts.host++}` : undefined
+    if (hostMessageId !== undefined) {
+      yield { type: EventType.TEXT_MESSAGE_START, messageId: hostMessageId, role: 'assistant' }
+    }
+    this.hasAssistantHost = true
+    this.lastItemWasThought = false
     yield { type: EventType.TOOL_CALL_START, toolCallId, toolCallName: call.name }
     yield { type: EventType.TOOL_CALL_ARGS, toolCallId, delta: JSON.stringify(call.args ?? {}) }
     if (part.thoughtSignature) {
@@ -113,6 +127,9 @@ export class ContentsEvents {
       }
     }
     yield { type: EventType.TOOL_CALL_END, toolCallId }
+    if (hostMessageId !== undefined) {
+      yield { type: EventType.TEXT_MESSAGE_END, messageId: hostMessageId }
+    }
   }
 
   private *begin(kind: ItemKind): Generator<LLMEvent, Item> {
