@@ -127,7 +127,7 @@ async function setup(t: TestContext, handle: (request: Received, response: Serve
   return { ctx, fiber, requests }
 }
 
-test('sends a Messages request and converts fragmented UTF-8 SSE without run lifecycle events', async (t) => {
+test('Messages 요청을 보내고 분할된 UTF-8 SSE를 실행 수명 이벤트 없이 변환한다', async (t) => {
   const { ctx, requests } = await setup(t, async (_request, response) => {
     const bytes = Buffer.from(wire(textFrames))
     const split = bytes.indexOf(Buffer.from('안녕')) + 1
@@ -160,7 +160,7 @@ test('sends a Messages request and converts fragmented UTF-8 SSE without run lif
   expect(getEventListeners(signal, 'abort')).toHaveLength(0)
 })
 
-test('counts the same messages, system instructions, tools, context, and images used for generation', async (t) => {
+test('생성에 사용하는 메시지, 시스템 지시문, 도구, 문맥, 이미지로 토큰을 계산한다', async (t) => {
   const { ctx, requests } = await setup(t, (incoming, response) => {
     if (incoming.path === '/v1/messages/count_tokens') {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -249,7 +249,7 @@ test('counts the same messages, system instructions, tools, context, and images 
   expect(getEventListeners(signal, 'abort')).toHaveLength(0)
 })
 
-test('streams multiple tool calls with provider IDs and assembles fragmented JSON arguments', async (t) => {
+test('여러 도구 호출을 공급자 ID로 스트리밍하고 분할된 JSON 인자를 조립한다', async (t) => {
   const { ctx } = await setup(t, (_request, response) =>
     send(response, [
       start,
@@ -274,7 +274,7 @@ test('streams multiple tool calls with provider IDs and assembles fragmented JSO
   ])
 })
 
-test('round-trips signed thinking, redacted thinking, text, and tool calls through message assembly', async (t) => {
+test('메시지 조립을 거쳐 서명이 포함된 추론, 암호화된 추론, 텍스트, 도구 호출을 복원한다', async (t) => {
   let calls = 0
   const { ctx, requests } = await setup(t, (_request, response) =>
     send(
@@ -371,73 +371,70 @@ test('round-trips signed thinking, redacted thinking, text, and tool calls throu
   ])
 })
 
-test.for(['text', 'tool_use'] as const)(
-  'preserves %s, thinking, tool order after message assembly',
-  async (firstType, t) => {
-    let calls = 0
-    const firstBlock =
-      firstType === 'text'
-        ? { type: 'text', text: 'Checking first' }
-        : { type: 'tool_use', id: 'call_1', name: 'clock', input: { city: 'Seoul' } }
-    const { ctx, requests } = await setup(t, (_request, response) =>
-      send(
-        response,
-        calls++ === 0
-          ? [
-              start,
-              blockStart(0, firstBlock),
-              blockStop(0),
-              blockStart(1, { type: 'thinking', thinking: 'Think again', signature: 'signed-thinking' }),
-              blockStop(1),
-              blockStart(2, { type: 'tool_use', id: 'call_2', name: 'weather', input: { city: 'Seoul' } }),
-              blockStop(2),
-              finish('tool_use'),
-              stop
-            ]
-          : [start, finish(), stop]
-      )
+test.for(['text', 'tool_use'] as const)('메시지 조립 후 %s, 추론, 도구 호출 순서를 보존한다', async (firstType, t) => {
+  let calls = 0
+  const firstBlock =
+    firstType === 'text'
+      ? { type: 'text', text: 'Checking first' }
+      : { type: 'tool_use', id: 'call_1', name: 'clock', input: { city: 'Seoul' } }
+  const { ctx, requests } = await setup(t, (_request, response) =>
+    send(
+      response,
+      calls++ === 0
+        ? [
+            start,
+            blockStart(0, firstBlock),
+            blockStop(0),
+            blockStart(1, { type: 'thinking', thinking: 'Think again', signature: 'signed-thinking' }),
+            blockStop(1),
+            blockStart(2, { type: 'tool_use', id: 'call_2', name: 'weather', input: { city: 'Seoul' } }),
+            blockStop(2),
+            finish('tool_use'),
+            stop
+          ]
+        : [start, finish(), stop]
     )
-    const assembly = new MessageAssembly()
-    for (const event of await collect(ctx.llm.stream(request))) assembly.apply(event)
-    const results: AgentMessage[] = [
-      ...(firstType === 'tool_use'
-        ? [{ id: 'tool-1', role: 'tool' as const, toolCallId: 'call_1', content: '12:00' }]
-        : []),
-      { id: 'tool-2', role: 'tool', toolCallId: 'call_2', content: 'Sunny' }
-    ]
-    await collect(
-      ctx.llm.stream({
-        ...request,
-        input: { ...request.input, messages: [...request.input.messages, ...assembly.messages, ...results] }
-      })
-    )
-    expect(requests[1].body.messages).toStrictEqual([
-      { role: 'user', content: [{ type: 'text', text: 'Hello' }] },
-      {
-        role: 'assistant',
-        content: [
-          firstBlock,
-          { type: 'thinking', thinking: 'Think again', signature: 'signed-thinking' },
-          { type: 'tool_use', id: 'call_2', name: 'weather', input: { city: 'Seoul' } }
-        ]
-      },
-      {
-        role: 'user',
-        content: [
-          ...(firstType === 'tool_use' ? [{ type: 'tool_result', tool_use_id: 'call_1', content: '12:00' }] : []),
-          { type: 'tool_result', tool_use_id: 'call_2', content: 'Sunny' }
-        ]
-      }
-    ])
-  }
-)
+  )
+  const assembly = new MessageAssembly()
+  for (const event of await collect(ctx.llm.stream(request))) assembly.apply(event)
+  const results: AgentMessage[] = [
+    ...(firstType === 'tool_use'
+      ? [{ id: 'tool-1', role: 'tool' as const, toolCallId: 'call_1', content: '12:00' }]
+      : []),
+    { id: 'tool-2', role: 'tool', toolCallId: 'call_2', content: 'Sunny' }
+  ]
+  await collect(
+    ctx.llm.stream({
+      ...request,
+      input: { ...request.input, messages: [...request.input.messages, ...assembly.messages, ...results] }
+    })
+  )
+  expect(requests[1].body.messages).toStrictEqual([
+    { role: 'user', content: [{ type: 'text', text: 'Hello' }] },
+    {
+      role: 'assistant',
+      content: [
+        firstBlock,
+        { type: 'thinking', thinking: 'Think again', signature: 'signed-thinking' },
+        { type: 'tool_use', id: 'call_2', name: 'weather', input: { city: 'Seoul' } }
+      ]
+    },
+    {
+      role: 'user',
+      content: [
+        ...(firstType === 'tool_use' ? [{ type: 'tool_result', tool_use_id: 'call_1', content: '12:00' }] : []),
+        { type: 'tool_result', tool_use_id: 'call_2', content: 'Sunny' }
+      ]
+    }
+  ])
+})
 
-test.for(['end_turn', 'tool_use', 'stop_sequence'])('accepts the normal %s stop reason', async (reason, t) => {
+test.for(['end_turn', 'tool_use', 'stop_sequence'])('정상 종료 사유인 %s를 허용한다', async (reason, t) => {
   const { ctx } = await setup(t, (_request, response) => send(response, [start, finish(reason), stop]))
   expect(await collect(ctx.llm.stream(request))).toStrictEqual([])
 })
 
-test('finishes and closes the HTTP stream after message_stop even if the server keeps it open', async (t) => {
+test('서버가 연결을 유지해도 message_stop을 받으면 순회를 마치고 HTTP 스트림을 닫는다', async (t) => {
   const closed = Promise.withResolvers<void>()
   const { ctx } = await setup(t, (_request, response) => {
     response.on('close', () => closed.resolve())
@@ -449,24 +446,24 @@ test('finishes and closes the HTTP stream after message_stop even if the server 
 })
 
 test.for([
-  { name: 'missing message_stop', frames: [start, finish()] },
-  { name: 'missing stop reason', frames: [start, stop] },
-  { name: 'max_tokens', frames: [start, finish('max_tokens'), stop] },
-  { name: 'pause_turn', frames: [start, finish('pause_turn'), stop] },
-  { name: 'unfinished content block', frames: [start, textFrames[1], finish(), stop] },
-  { name: 'delta without a block', frames: [start, textFrames[2], finish(), stop] },
-  { name: 'duplicate block index', frames: [start, textFrames[1], textFrames[1], finish(), stop] },
-  { name: 'stop without a block', frames: [start, blockStop(0), finish(), stop] },
+  { name: 'message_stop 누락', frames: [start, finish()] },
+  { name: '종료 사유 누락', frames: [start, stop] },
+  { name: '출력 토큰 한도 초과(max_tokens)', frames: [start, finish('max_tokens'), stop] },
+  { name: '응답 일시 중단(pause_turn)', frames: [start, finish('pause_turn'), stop] },
+  { name: '완료되지 않은 콘텐츠 블록', frames: [start, textFrames[1], finish(), stop] },
+  { name: '대응하는 블록이 없는 delta', frames: [start, textFrames[2], finish(), stop] },
+  { name: '중복된 블록 인덱스', frames: [start, textFrames[1], textFrames[1], finish(), stop] },
+  { name: '대응하는 블록이 없는 종료 이벤트', frames: [start, blockStop(0), finish(), stop] },
   {
-    name: 'wrong delta kind',
+    name: '블록과 맞지 않는 delta 유형',
     frames: [start, textFrames[1], blockDelta(0, { type: 'thinking_delta', thinking: 'x' })]
   },
   {
-    name: 'unsupported block',
+    name: '지원하지 않는 블록',
     frames: [start, blockStart(0, { type: 'server_tool_use', id: 'srv_1', name: 'web_search', input: {} })]
   },
   {
-    name: 'malformed tool JSON',
+    name: 'JSON 문법에 맞지 않는 도구 인자',
     frames: [
       start,
       blockStart(0, { type: 'tool_use', id: 'call_1', name: 'clock', input: {} }),
@@ -477,7 +474,7 @@ test.for([
     ]
   },
   {
-    name: 'non-object tool JSON',
+    name: 'JSON 객체가 아닌 도구 인자',
     frames: [
       start,
       blockStart(0, { type: 'tool_use', id: 'call_1', name: 'clock', input: {} }),
@@ -487,12 +484,12 @@ test.for([
       stop
     ]
   }
-])('rejects incomplete or inconsistent streams: $name', async ({ frames }, t) => {
+])('불완전하거나 일관성이 없는 스트림을 거부한다: $name', async ({ frames }, t) => {
   const { ctx } = await setup(t, (_request, response) => send(response, frames))
   await expect(collect(ctx.llm.stream(request))).rejects.toThrow()
 })
 
-test('preserves partial content when a provider error interrupts the SSE stream', async (t) => {
+test('공급자 오류로 SSE 스트림이 중단되어도 이미 전달한 내용을 보존한다', async (t) => {
   const { ctx } = await setup(t, (_request, response) =>
     send(response, [
       ...textFrames.slice(0, 3),
@@ -510,7 +507,7 @@ test('preserves partial content when a provider error interrupts the SSE stream'
   ])
 })
 
-test.for(['stream', 'countTokens'] as const)('preserves SDK HTTP errors without retrying %s', async (operation, t) => {
+test.for(['stream', 'countTokens'] as const)('%s를 재시도하지 않고 SDK HTTP 오류를 유지한다', async (operation, t) => {
   const { ctx, requests } = await setup(t, (_request, response) => {
     response.writeHead(429, { 'content-type': 'application/json' })
     response.end(JSON.stringify({ type: 'error', error: { type: 'rate_limit_error', message: 'rate limited' } }))
@@ -524,7 +521,7 @@ test.for(['stream', 'countTokens'] as const)('preserves SDK HTTP errors without 
 })
 
 test.for([-1, 1.5, null, '3', Number.MAX_SAFE_INTEGER + 1])(
-  'rejects an invalid input token count: %s',
+  '유효하지 않은 입력 토큰 수를 거부한다: %s',
   async (count, t) => {
     const { ctx } = await setup(t, (_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -543,11 +540,11 @@ test.for([
   { models: { model: { contextWindow: 8, maxOutputTokens: 9 } } },
   { models: { model: { contextWindow: 8, maxOutputTokens: 0 } } },
   { models: { model: { contextWindow: 8.5, maxOutputTokens: 4 } } }
-])('rejects invalid plugin configuration: %j', async (config) => {
+])('유효하지 않은 플러그인 설정을 거부한다: %j', async (config) => {
   expect(await AnthropicLLMConfigSchema['~standard'].validate(config)).toHaveProperty('issues')
 })
 
-test('validates model limits and output budgets without sending HTTP requests', async (t) => {
+test('HTTP 요청을 보내기 전에 모델 한도와 출력 예산을 검증한다', async (t) => {
   const { ctx, requests } = await setup(t, (_request, response) => send(response, [start, finish(), stop]))
   const model = await ctx.llm.getModel('test-model')
   expect(model).toStrictEqual(limits)
@@ -585,7 +582,7 @@ test.for([
   },
   { id: 'tool', role: 'tool', toolCallId: 'missing', content: '{}' },
   { id: 'reasoning', role: 'reasoning', content: 'summary', encryptedValue: 'foreign-signature' }
-] satisfies AgentMessage[])('rejects unsupported input before HTTP: $id', async (message, t) => {
+] satisfies AgentMessage[])('HTTP 요청 전에 지원하지 않는 입력을 거부한다: $id', async (message, t) => {
   const { ctx, requests } = await setup(t, (_request, response) => send(response, [start, finish(), stop]))
   const invalid = { ...request, input: { ...request.input, messages: [message] } }
   await expect(ctx.llm.countTokens(invalid)).rejects.toThrow()
@@ -593,7 +590,7 @@ test.for([
   expect(requests).toHaveLength(0)
 })
 
-test('pre-aborted and unused streams do not send requests or retain abort listeners', async (t) => {
+test('미리 취소되거나 사용하지 않은 스트림은 요청을 보내지 않고 취소 리스너를 정리한다', async (t) => {
   const { ctx, requests } = await setup(t, (_request, response) => send(response, [start, finish(), stop]))
   const external = new globalThis.AbortController()
   const unused = ctx.llm.stream(request, { signal: external.signal })[Symbol.asyncIterator]()
@@ -612,39 +609,42 @@ test('pre-aborted and unused streams do not send requests or retain abort listen
   expect(requests).toHaveLength(0)
 })
 
-test.for(['signal', 'return', 'throw', 'dispose'] as const)('aborts pending stream next on %s', async (mode, t) => {
-  const closed = Promise.withResolvers<void>()
-  const { ctx, fiber } = await setup(t, (_request, response) => {
-    response.on('close', () => closed.resolve())
-    response.writeHead(200, { 'content-type': 'text/event-stream' })
-    response.write(wire([start, textFrames[1]]))
-  })
-  const external = new globalThis.AbortController()
-  const service = ctx.llm
-  const iterator = service.stream(request, { signal: external.signal })[Symbol.asyncIterator]()
-  expect((await iterator.next()).value.type).toBe(EventType.TEXT_MESSAGE_START)
-  const pending = iterator.next()
-  const rejected = expect(pending).rejects.toThrow(/cancelled|stopped|disposed/)
-  let returned: Promise<IteratorResult<LLMEvent>> | undefined
-  let thrown: Promise<unknown> | undefined
-  if (mode === 'signal') external.abort(new Error('cancelled by caller'))
-  else if (mode === 'return') returned = iterator.return!()
-  else if (mode === 'throw') {
-    const reason = new Error('consumer threw')
-    thrown = expect(iterator.throw!(reason)).rejects.toBe(reason)
-  } else await fiber.dispose()
-  await rejected
-  if (returned) expect((await returned).done).toBe(true)
-  if (thrown) await thrown
-  await closed.promise
-  expect(getEventListeners(external.signal, 'abort')).toHaveLength(0)
-  if (mode === 'dispose') {
-    expect(ctx.llm).toBeUndefined()
-    await expect(service.getModel('test-model')).rejects.toThrow(/disposed/)
-    expect(() => service.stream(request)).toThrow(/disposed/)
-    await expect(service.countTokens(request)).rejects.toThrow(/disposed/)
+test.for(['signal', 'return', 'throw', 'dispose'] as const)(
+  '%s로 대기 중인 스트림 next를 취소한다',
+  async (mode, t) => {
+    const closed = Promise.withResolvers<void>()
+    const { ctx, fiber } = await setup(t, (_request, response) => {
+      response.on('close', () => closed.resolve())
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.write(wire([start, textFrames[1]]))
+    })
+    const external = new globalThis.AbortController()
+    const service = ctx.llm
+    const iterator = service.stream(request, { signal: external.signal })[Symbol.asyncIterator]()
+    expect((await iterator.next()).value.type).toBe(EventType.TEXT_MESSAGE_START)
+    const pending = iterator.next()
+    const rejected = expect(pending).rejects.toThrow(/cancelled|stopped|disposed/)
+    let returned: Promise<IteratorResult<LLMEvent>> | undefined
+    let thrown: Promise<unknown> | undefined
+    if (mode === 'signal') external.abort(new Error('cancelled by caller'))
+    else if (mode === 'return') returned = iterator.return!()
+    else if (mode === 'throw') {
+      const reason = new Error('consumer threw')
+      thrown = expect(iterator.throw!(reason)).rejects.toBe(reason)
+    } else await fiber.dispose()
+    await rejected
+    if (returned) expect((await returned).done).toBe(true)
+    if (thrown) await thrown
+    await closed.promise
+    expect(getEventListeners(external.signal, 'abort')).toHaveLength(0)
+    if (mode === 'dispose') {
+      expect(ctx.llm).toBeUndefined()
+      await expect(service.getModel('test-model')).rejects.toThrow(/disposed/)
+      expect(() => service.stream(request)).toThrow(/disposed/)
+      await expect(service.countTokens(request)).rejects.toThrow(/disposed/)
+    }
   }
-})
+)
 
 test.for([
   { operation: 'stream', mode: 'signal' },
@@ -653,7 +653,7 @@ test.for([
   { operation: 'stream', mode: 'dispose' },
   { operation: 'countTokens', mode: 'signal' },
   { operation: 'countTokens', mode: 'dispose' }
-] as const)('cancels $operation before response headers on $mode', async ({ operation, mode }, t) => {
+] as const)('응답 헤더를 받기 전에 $mode로 $operation을 취소한다', async ({ operation, mode }, t) => {
   const started = Promise.withResolvers<void>()
   const closed = Promise.withResolvers<void>()
   const { ctx, fiber } = await setup(t, (_request, response) => {
