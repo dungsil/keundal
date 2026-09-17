@@ -24,7 +24,7 @@ async function* response(): AsyncIterable<LLMEvent> {
   yield { type: EventType.TEXT_MESSAGE_END, messageId: 'summary' }
 }
 
-test('composes with the agent and memory store, commits after compaction, and retains original history', async (t) => {
+test('에이전트와 메모리 저장소를 조합하면 축약 후 커밋하고 원본 이력을 보존한다', async (t) => {
   const ctx = new Context()
   const requests: LLMRequest[] = []
   class LLM extends LLMService {

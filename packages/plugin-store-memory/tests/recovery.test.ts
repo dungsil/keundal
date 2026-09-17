@@ -69,7 +69,7 @@ async function setup(store = new MemoryStore(), holdEnabled = true, failure?: Er
   fibers.push(await ctx.plugin(LLM), await ctx.plugin(memoryStorePlugin, { store }))
   return { ctx, store, fibers, llm: ctx.llm as LLM, held }
 }
-test('abort 이후 next 없이도 get으로 cancelled 상태를 확인한다', async (t) => {
+test('취소 후 next를 다시 호출하지 않아도 get으로 cancelled 상태를 확인한다', async (t) => {
   const { ctx, fibers } = await setup()
   const c = new globalThis.AbortController()
   const it = ctx.generation.run(req(), { signal: c.signal }) as AsyncIterableIterator<AGUIEvent>
@@ -80,7 +80,7 @@ test('abort 이후 next 없이도 get으로 cancelled 상태를 확인한다', a
     for (const f of fibers.toReversed()) await f.dispose()
   })
 })
-test('pending next 중 return은 스트림을 중단하고 interrupted로 확정한다', async (t) => {
+test('next가 대기 중일 때 return을 호출하면 스트림을 중단하고 interrupted로 확정한다', async (t) => {
   const { ctx, fibers, held } = await setup()
   const it = ctx.generation.run(req()) as AsyncIterableIterator<AGUIEvent>
   await it.next()
@@ -96,7 +96,7 @@ test('pending next 중 return은 스트림을 중단하고 interrupted로 확정
     for (const f of fibers.toReversed()) await f.dispose()
   })
 })
-test('동일 store 재등록 recover가 부분 응답을 interrupted로 확정하고 재호출하지 않는다', async (t) => {
+test('부분 응답 전달 후 멈춘 실행은 저장소 재등록 뒤 복구하면 interrupted로 확정하고 LLM을 재호출하지 않는다', async (t) => {
   const store = new MemoryStore()
   const first = await setup(store)
   const it = first.ctx.generation.run(req()) as AsyncIterableIterator<AGUIEvent>
@@ -185,7 +185,7 @@ test('살아 있는 다른 서비스의 실행은 recover에서 running을 유�
     for (const f of [...second.fibers, ...first.fibers].toReversed()) await f.dispose()
   })
 })
-test('시작하지 않은 duplicate iterator abort는 원본 실행을 변경하지 않는다', async (t) => {
+test('시작하지 않은 중복 실행의 반복자를 취소해도 원본 실행을 변경하지 않는다', async (t) => {
   const { ctx, fibers, llm } = await setup()
   const first = ctx.generation.run(req()) as AsyncIterableIterator<AGUIEvent>
   await first.next()
@@ -201,7 +201,7 @@ test('시작하지 않은 duplicate iterator abort는 원본 실행을 변경하
     for (const f of fibers.toReversed()) await f.dispose()
   })
 })
-test('return 실패 뒤 외부 signal listener를 정리한다', async (t) => {
+test('return 호출이 실패해도 외부 취소 신호의 리스너를 정리한다', async (t) => {
   const { ctx, fibers } = await setup(new MemoryStore(), false)
   const c = new globalThis.AbortController()
   const it = ctx.generation.run(req(), { signal: c.signal }) as AsyncIterableIterator<AGUIEvent>
