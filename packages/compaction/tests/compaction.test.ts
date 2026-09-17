@@ -1,7 +1,8 @@
 import {
   compact as compactMessages,
   SummaryCompactionConfigSchema,
-  type SummaryCompactionConfig
+  type SummaryCompactionConfig,
+  type SummaryCompactionOptions
 } from '@keundal/compaction'
 import { EventType, type LLMEvent, type LLMRequest, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
 import { expect, test, type TestContext } from 'vitest'
@@ -49,7 +50,7 @@ async function setup(
     }
   }
   const llm = new LLM()
-  const compact = (data = input, budget = 700, options?: ExecutionOptions) =>
+  const compact = (data = input, budget = 700, options?: SummaryCompactionOptions) =>
     compactMessages(
       llm,
       { input: data, model: 'test', maxInputTokens: budget },
@@ -83,6 +84,29 @@ test('입력이 예산 이내이면 요약을 생성하지 않고 기존 메시�
   const { compact, requests } = await setup(t)
   expect(await compact(input, 10000)).toStrictEqual({ messages: input.messages, summary: '', sourceMessageIds: [] })
   expect(requests).toHaveLength(0)
+})
+
+test('inputTokens 옵션을 전달하면 첫 카운트 호출을 건너뛴다', async (t) => {
+  let counts = 0
+  const withOption = await setup(t, {
+    count: () => {
+      counts++
+      return 1
+    }
+  })
+  const result = await withOption.compact(input, 700, { inputTokens: 1 })
+  expect(counts).toBe(0)
+  expect(result).toStrictEqual({ messages: input.messages, summary: '', sourceMessageIds: [] })
+
+  counts = 0
+  const withoutOption = await setup(t, {
+    count: () => {
+      counts++
+      return 1
+    }
+  })
+  await withoutOption.compact(input, 700)
+  expect(counts).toBe(1)
 })
 
 test('한도를 넘는 이력을 예산에 맞게 나누어 요약하고 이전 요약을 다음 요청에 전달한다', async (t) => {

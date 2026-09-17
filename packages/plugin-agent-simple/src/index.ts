@@ -196,41 +196,35 @@ export class SimpleAgent extends Service {
     signal: AbortSignal
   ): Promise<{ input: RunAgentInput; compaction?: CompactionResult }> {
     signal.throwIfAborted()
-    let preparedInput = input
-    const options = { signal }
-    const countTokens = async () => {
+    const countTokens = async (candidate: RunAgentInput) => {
       const count = await this.ctx.llm.countTokens(
         {
-          input: preparedInput,
+          input: candidate,
           model: this.config.model,
           maxOutputTokens: this.config.maxOutputTokens
         },
-        options
+        { signal }
       )
       signal.throwIfAborted()
       if (!Number.isSafeInteger(count) || count < 0) throw new Error('invalid input token count')
       return count
     }
 
-    let compaction: CompactionResult | undefined
-    if ((await countTokens()) > maxInputTokens) {
-      compaction = await compact(
-        this.ctx.llm,
-        {
-          input: preparedInput,
-          model: this.config.model,
-          maxInputTokens
-        },
-        { ...this.config.compaction, signal }
-      )
-      signal.throwIfAborted()
-      preparedInput = parseRunAgentInput({ ...preparedInput, messages: compaction.messages })
-      if ((await countTokens()) > maxInputTokens) {
-        throw new Error('compacted input still exceeds the model context budget')
-      }
-    }
+    const count = await countTokens(input)
+    if (count <= maxInputTokens) return { input }
 
-    return { input: preparedInput, compaction }
+    const compaction = await compact(
+      this.ctx.llm,
+      {
+        input,
+        model: this.config.model,
+        maxInputTokens
+      },
+      { ...this.config.compaction, signal, inputTokens: count }
+    )
+    signal.throwIfAborted()
+    // compact()가 반환하는 메시지는 내부에서 이미 검증된 객체다. 최종 예산 초과는 compact()가 검사한다.
+    return { input: { ...input, messages: compaction.messages }, compaction }
   }
 }
 
