@@ -17,7 +17,7 @@
 
 서비스 계약은 `packages/core/src/{llm,session,generation,compaction}.ts`에 정의하고, 구체 구현은 플러그인으로 주입합니다. 저장소가 공유하는 대화 병합과 실행 메시지 조립은 `packages/core/src/messages.ts`에 둡니다. AG-UI 타입, 이벤트 상수, 검증 기능은 `@keundal/core`에서 가져옵니다. `@ag-ui/core` 직접 의존은 코어의 프로토콜 래퍼에서만 관리합니다.
 
-플러그인 설정과 사용법은 [에이전트 문서](packages/plugin-agent-simple/README.md), [OpenAI 문서](packages/plugin-llm-openai/README.md), [Anthropic 문서](packages/plugin-llm-anthropic/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
+플러그인 설정과 사용법은 [에이전트 문서](packages/plugin-agent-simple/README.md), [OpenAI 문서](packages/plugin-llm-openai/README.md), [Gemini 문서](packages/plugin-llm-gemini/README.md), [Anthropic 문서](packages/plugin-llm-anthropic/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [축약 문서](packages/compaction/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
 
 ## 서비스 계약
 
