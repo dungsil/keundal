@@ -1,14 +1,11 @@
 import { getEventListeners } from 'node:events'
 
 import {
-  CompactionService,
   EventType,
   GenerationService,
   LLMService,
   SessionService,
   type AGUIEvent,
-  type CompactionRequest,
-  type CompactionResult,
   type ExecutionOptions,
   type GenerationRequest,
   type LLMModel,
@@ -53,7 +50,7 @@ interface Overrides {
   getModel?: (model: string, options?: ExecutionOptions) => LLMModel | Promise<LLMModel>
   countTokens?: (request: LLMRequest, options?: ExecutionOptions) => number | Promise<number>
   prepare?: (request: RunAgentInput, options?: ExecutionOptions) => PreparedSession | Promise<PreparedSession>
-  compact?: (request: CompactionRequest, options?: ExecutionOptions) => CompactionResult | Promise<CompactionResult>
+  stream?: LLMService['stream']
   run?: GenerationService['run']
 }
 
@@ -61,7 +58,7 @@ async function setup(testContext: TestContext, overrides: Overrides = {}) {
   const ctx = new Context()
   const calls: string[] = []
   const generations: { request: GenerationRequest; options?: ExecutionOptions }[] = []
-  const constructed = { llm: 0, session: 0, compaction: 0, generation: 0 }
+  const constructed = { llm: 0, session: 0, generation: 0 }
   class LLM extends LLMService {
     constructor(ctx: Context) {
       super(ctx)
@@ -80,7 +77,7 @@ async function setup(testContext: TestContext, overrides: Overrides = {}) {
         0
       )
     }
-    stream = unexpected
+    stream = overrides.stream ?? unexpected
   }
   class Session extends SessionService {
     constructor(ctx: Context) {
@@ -93,21 +90,6 @@ async function setup(testContext: TestContext, overrides: Overrides = {}) {
     }
     get = unexpected
     commit = unexpected
-  }
-  class Compaction extends CompactionService {
-    constructor(ctx: Context) {
-      super(ctx)
-      constructed.compaction++
-    }
-    async compact(request: CompactionRequest, options?: ExecutionOptions): Promise<CompactionResult> {
-      calls.push('compact')
-      if (overrides.compact) return overrides.compact(request, options)
-      return {
-        messages: [{ id: 'summary', role: 'system', content: 'summary' }],
-        summary: 'summary',
-        sourceMessageIds: request.input.messages.map((message) => message.id)
-      }
-    }
   }
   class Generation extends GenerationService {
     constructor(ctx: Context) {
@@ -131,10 +113,10 @@ async function setup(testContext: TestContext, overrides: Overrides = {}) {
   })
   const llmFiber = await ctx.plugin(LLM)
   fibers.push(llmFiber, await ctx.plugin(Session), await ctx.plugin(Generation))
-  const pendingAgent = ctx.plugin(simpleAgentPlugin, config)
-  expect(ctx.agent, 'composition must wait for all four services').toBeUndefined()
-  fibers.push(await ctx.plugin(Compaction))
-  const agentFiber = await pendingAgent
+  const agentFiber = await ctx.plugin(simpleAgentPlugin, {
+    ...config,
+    compaction: { keepRecentMessages: 1, maxSummaryTokens: 20 }
+  })
   fibers.push(agentFiber)
   return { ctx, calls, generations, agentFiber, llmFiber, LLM, fibers, constructed }
 }
@@ -159,40 +141,16 @@ test('prepares the session and forwards generation events without owning executi
   expect(result.at(-1)).toBe(events.at(-1))
 })
 
-test('compacts over-budget context, rechecks its size, and forwards provenance without changing source messages', async (t) => {
-  const original: RunAgentInput = { ...input, messages: [{ id: 'history', role: 'user', content: 'x'.repeat(81) }] }
-  const snapshot = globalThis.structuredClone(original)
-  let compactionRequest: CompactionRequest | undefined
-  const { ctx, calls, generations } = await setup(t, {
-    compact: (request) => {
-      compactionRequest = request
-      return {
-        messages: [{ id: 'summary', role: 'system', content: 'short' }],
-        summary: 'short',
-        sourceMessageIds: ['history']
-      }
-    }
-  })
-  await collect(ctx.agent.run(original))
-  expect(calls).toStrictEqual(['prepare', 'model', 'count', 'compact', 'count', 'run'])
-  expect(compactionRequest?.maxInputTokens).toBe(80)
-  expect(compactionRequest?.model).toBe('test-model')
-  expect(original).toStrictEqual(snapshot)
-  expect(generations[0].request.compaction?.sourceMessageIds).toStrictEqual(['history'])
-  expect(generations[0].request.input.messages).toStrictEqual([{ id: 'summary', role: 'system', content: 'short' }])
-  expect(generations[0].request.sessionRevision).toBe(7)
-})
-
 test('context exactly fitting the input budget does not need compaction', async (t) => {
   const { ctx, calls } = await setup(t)
   await collect(ctx.agent.run({ ...input, messages: [{ id: 'question', role: 'user', content: 'x'.repeat(80) }] }))
   expect(calls).toStrictEqual(['prepare', 'model', 'count', 'run'])
 })
 
-test('an oversized compaction result does not start generation', async (t) => {
+test('an input with no compactable history does not start generation', async (t) => {
   const { ctx, calls, generations } = await setup(t, { countTokens: () => 81 })
-  await expect(collect(ctx.agent.run(input))).rejects.toThrow(/compacted input still exceeds/)
-  expect(calls).toStrictEqual(['prepare', 'model', 'count', 'compact', 'count'])
+  await expect(collect(ctx.agent.run(input))).rejects.toThrow(/no older conversation/)
+  expect(calls).toStrictEqual(['prepare', 'model', 'count', 'model', 'count'])
   expect(generations).toHaveLength(0)
 })
 
@@ -281,7 +239,7 @@ test('disposing the composition aborts the delegated generation and closes its i
 test('replacing an injected LLM rebuilds the composition without replacing the other services', async (t) => {
   const { ctx, llmFiber, LLM, fibers, constructed } = await setup(t)
   const previousAgent = ctx.agent
-  expect(constructed).toStrictEqual({ llm: 1, session: 1, compaction: 1, generation: 1 })
+  expect(constructed).toStrictEqual({ llm: 1, session: 1, generation: 1 })
   await llmFiber.dispose()
   expect(ctx.agent).toBeUndefined()
   expect(() => previousAgent.run(input)).toThrow(/disposed/)
@@ -289,6 +247,46 @@ test('replacing an injected LLM rebuilds the composition without replacing the o
   // Cordis activates the dependent plugin after the replacement service becomes available.
   await ctx.agent.run(input).return!()
   expect(ctx.agent).not.toBe(previousAgent)
-  expect(constructed).toStrictEqual({ llm: 2, session: 1, compaction: 1, generation: 1 })
+  expect(constructed).toStrictEqual({ llm: 2, session: 1, generation: 1 })
   expect(await collect(ctx.agent.run(input))).toStrictEqual(events)
 })
+
+for (const mode of ['external', 'return', 'dispose']) {
+  test(`cancels the built-in summary on ${mode} without starting generation`, async (t) => {
+    const started = Promise.withResolvers<void>()
+    let summarySignal: AbortSignal | undefined
+    let closed = false
+    const { ctx, agentFiber, generations } = await setup(t, {
+      countTokens: (request) => (request.input.messages.some((message) => message.id === 'old') ? 81 : 1),
+      stream: async function* (_request, options) {
+        const signal = getSignal(options)
+        summarySignal = signal
+        yield { type: EventType.TEXT_MESSAGE_START, messageId: 'summary', role: 'assistant' }
+        try {
+          started.resolve()
+          await new Promise<void>((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+          })
+        } finally {
+          closed = true
+        }
+      }
+    })
+    const external = new globalThis.AbortController()
+    const iterator = ctx.agent.run(
+      { ...input, messages: [{ id: 'old', role: 'user', content: 'old history' }, ...input.messages] },
+      { signal: external.signal }
+    )
+    const pending = iterator.next()
+    const rejected = expect(pending).rejects.toThrow()
+    await started.promise
+    if (mode === 'external') external.abort(new Error('cancelled'))
+    else if (mode === 'dispose') await agentFiber.dispose()
+    else await iterator.return!()
+    await rejected
+    expect(summarySignal?.aborted).toBe(true)
+    expect(closed).toBe(true)
+    expect(generations).toHaveLength(0)
+    expect(getEventListeners(external.signal, 'abort')).toHaveLength(0)
+  })
+}

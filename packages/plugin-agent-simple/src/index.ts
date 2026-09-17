@@ -1,3 +1,4 @@
+import { compact, SummaryCompactionConfigSchema, type SummaryCompactionConfig } from '@keundal/compaction'
 import {
   parseRunAgentInput,
   type AGUIEvent,
@@ -11,6 +12,7 @@ import { Service, type Context } from 'cordis'
 export interface SimpleAgentConfig {
   readonly model: string
   readonly maxOutputTokens: number
+  readonly compaction?: SummaryCompactionConfig
 }
 
 const simpleAgentConfigSchema: StandardSchemaV1<SimpleAgentConfig, SimpleAgentConfig> = {
@@ -29,7 +31,11 @@ const simpleAgentConfigSchema: StandardSchemaV1<SimpleAgentConfig, SimpleAgentCo
         Number.isSafeInteger(value.maxOutputTokens) &&
         value.maxOutputTokens > 0
       ) {
-        return { value: { model: value.model, maxOutputTokens: value.maxOutputTokens } }
+        const compaction = SummaryCompactionConfigSchema['~standard'].validate(
+          'compaction' in value ? value.compaction : undefined
+        )
+        if (compaction.issues) return { issues: compaction.issues }
+        return { value: { model: value.model, maxOutputTokens: value.maxOutputTokens, compaction: compaction.value } }
       }
       return { issues: [{ message: 'model and a positive integer maxOutputTokens are required' }] }
     }
@@ -140,13 +146,14 @@ export class SimpleAgent extends Service {
 
       let compaction: CompactionResult | undefined
       if ((await countTokens()) > maxInputTokens) {
-        compaction = await this.ctx.compaction.compact(
+        compaction = await compact(
+          this.ctx.llm,
           {
             input: preparedInput,
             model: this.config.model,
             maxInputTokens
           },
-          options
+          { ...this.config.compaction, signal }
         )
         signal.throwIfAborted()
         preparedInput = parseRunAgentInput({ ...preparedInput, messages: compaction.messages })
@@ -176,7 +183,7 @@ export const simpleAgentPlugin = Object.assign(
   function simpleAgentPlugin(ctx: Context, config: SimpleAgentConfig) {
     new SimpleAgent(ctx, config)
   },
-  { inject: ['llm', 'generation', 'session', 'compaction'], Config: simpleAgentConfigSchema }
+  { inject: ['llm', 'generation', 'session'], Config: simpleAgentConfigSchema }
 )
 
 export { simpleAgentConfigSchema as SimpleAgentConfigSchema }

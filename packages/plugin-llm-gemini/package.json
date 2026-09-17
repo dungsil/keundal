@@ -1,5 +1,5 @@
 {
-  "name": "@keundal/plugin-agent-simple",
+  "name": "@keundal/plugin-llm-gemini",
   "private": true,
   "files": [
     "dist"
@@ -17,13 +17,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@keundal/compaction": "workspace:*",
+    "@google/genai": "catalog:",
     "@keundal/core": "workspace:*",
     "@standard-schema/spec": "catalog:",
     "cordis": "catalog:"
   },
   "devDependencies": {
-    "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",
