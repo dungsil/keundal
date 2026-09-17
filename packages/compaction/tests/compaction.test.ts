@@ -116,6 +116,27 @@ test('최근 사용자 턴의 도구 호출과 결과를 함께 보존한다', a
   expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
 })
 
+test('사용자 턴을 가로지르는 도구 호출부터 결과까지 원래 순서로 보존한다', async (t) => {
+  const { compact, requests } = await setup(t)
+  const retained: RunAgentInput['messages'] = [
+    { id: 'lookup-request', role: 'user', content: 'Look up the result' },
+    {
+      id: 'lookup-call',
+      role: 'assistant',
+      toolCalls: [{ id: 'lookup-1', type: 'function', function: { name: 'lookup', arguments: '{"key":"a"}' } }]
+    },
+    { id: 'follow-up', role: 'user', content: 'Include the source' },
+    { id: 'lookup-result', role: 'tool', toolCallId: 'lookup-1', content: 'Found a at source b' }
+  ]
+  const result = await compact({ ...input, messages: [...input.messages.slice(0, -1), ...retained] }, 1200)
+
+  expect(result.messages.slice(2)).toStrictEqual(retained)
+  expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
+  const history = requests[0].input.messages[1]
+  if (history.role !== 'user' || typeof history.content !== 'string') throw new Error('expected summary history')
+  expect(JSON.parse(history.content).messages).toStrictEqual([input.messages[1], input.messages[2]])
+})
+
 test('보존할 대화가 예산을 넘으면 모델을 호출하기 전에 거부한다', async (t) => {
   const { compact, requests } = await setup(t)
   await expect(
@@ -155,6 +176,67 @@ test('시작 이벤트만 전달하고 종료된 요약 스트림을 거부한�
     }
   })
   await expect(compact()).rejects.toThrow('without completed text')
+})
+
+const summaryStart: LLMEvent = { type: EventType.TEXT_MESSAGE_START, messageId: 'summary', role: 'assistant' }
+const summaryContent: LLMEvent = { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'summary', delta: 'Earlier facts.' }
+const summaryEnd: LLMEvent = { type: EventType.TEXT_MESSAGE_END, messageId: 'summary' }
+
+test.for([
+  {
+    condition: '시작 전 내용',
+    events: [summaryContent, summaryStart, summaryEnd],
+    error: 'invalid summary text stream'
+  },
+  {
+    condition: '시작 전 종료',
+    events: [summaryEnd, summaryStart, summaryContent],
+    error: 'invalid summary text stream'
+  },
+  {
+    condition: '다른 메시지 ID의 내용',
+    events: [summaryStart, { ...summaryContent, messageId: 'other' }, summaryEnd],
+    error: 'invalid summary text stream'
+  },
+  {
+    condition: '다른 메시지 ID의 종료',
+    events: [summaryStart, summaryContent, { ...summaryEnd, messageId: 'other' }],
+    error: 'invalid summary text stream'
+  },
+  {
+    condition: '종료 후 내용',
+    events: [summaryStart, summaryContent, summaryEnd, summaryContent],
+    error: 'invalid summary text stream'
+  },
+  {
+    condition: '중복 종료',
+    events: [summaryStart, summaryContent, summaryEnd, summaryEnd],
+    error: 'invalid summary text stream'
+  },
+  {
+    condition: '두 번째 시작',
+    events: [summaryStart, summaryContent, { ...summaryStart, messageId: 'other' }, summaryEnd],
+    error: 'summary must contain a single text message'
+  }
+])('잘못된 요약 이벤트를 거부한다: $condition', async ({ events, error }, t) => {
+  const { compact } = await setup(t, {
+    stream: async function* () {
+      yield* events
+    }
+  })
+  await expect(compact()).rejects.toThrow(error)
+})
+
+test.for([
+  { condition: '내용 이벤트가 없음', events: [summaryStart, summaryEnd] },
+  { condition: '공백만 있음', events: [summaryStart, { ...summaryContent, delta: ' \t\n ' }, summaryEnd] }
+])('정상 종료되어도 빈 요약을 거부한다: $condition', async ({ events }, t) => {
+  const { compact } = await setup(t, {
+    stream: async function* () {
+      yield* events
+    }
+  })
+  await expect(compact()).rejects.toThrow('summary stream ended without completed text')
 })
 
 test('공급자 오류를 호출자에게 전달한다', async (t) => {

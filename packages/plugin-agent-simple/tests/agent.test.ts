@@ -47,6 +47,7 @@ const getSignal = (options?: ExecutionOptions): AbortSignal => {
 }
 
 interface Overrides {
+  maxSummaryTokens?: number
   getModel?: (model: string, options?: ExecutionOptions) => LLMModel | Promise<LLMModel>
   countTokens?: (request: LLMRequest, options?: ExecutionOptions) => number | Promise<number>
   prepare?: (request: RunAgentInput, options?: ExecutionOptions) => PreparedSession | Promise<PreparedSession>
@@ -115,7 +116,7 @@ async function setup(testContext: TestContext, overrides: Overrides = {}) {
   fibers.push(llmFiber, await ctx.plugin(Session), await ctx.plugin(Generation))
   const agentFiber = await ctx.plugin(simpleAgentPlugin, {
     ...config,
-    compaction: { keepRecentMessages: 1, maxSummaryTokens: 20 }
+    compaction: { keepRecentMessages: 1, maxSummaryTokens: overrides.maxSummaryTokens ?? 20 }
   })
   fibers.push(agentFiber)
   return { ctx, calls, generations, agentFiber, llmFiber, LLM, fibers, constructed }
@@ -163,6 +164,72 @@ test('출력 예산이 모델 한도를 넘거나 세션의 threadId가 바뀌�
   })
   await expect(collect(badIdentity.ctx.agent.run(input))).rejects.toThrow(/preserve threadId and runId/)
   expect(badIdentity.calls).toStrictEqual(['prepare'])
+})
+
+const invalidNumbers = [
+  { condition: '음수', value: -1 },
+  { condition: '소수', value: 0.5 },
+  { condition: 'NaN', value: Number.NaN },
+  { condition: '무한대', value: Number.POSITIVE_INFINITY },
+  { condition: '안전한 정수 범위 초과', value: Number.MAX_SAFE_INTEGER + 1 }
+]
+
+test.for(invalidNumbers)('잘못된 session revision이면 생성 전에 거부한다: $condition', async ({ value }, t) => {
+  const { ctx, generations } = await setup(t, {
+    prepare: (request) => ({ input: request, revision: value })
+  })
+
+  await expect(collect(ctx.agent.run(input))).rejects.toThrow('session revision must be a non-negative integer')
+  expect(generations).toHaveLength(0)
+})
+
+test.for(invalidNumbers)('잘못된 입력 토큰 수이면 생성 전에 거부한다: $condition', async ({ value }, t) => {
+  const { ctx, generations } = await setup(t, { countTokens: () => value })
+
+  await expect(collect(ctx.agent.run(input))).rejects.toThrow('invalid input token count')
+  expect(generations).toHaveLength(0)
+})
+
+test.for([
+  { condition: '입력 예산 초과', value: 81, error: 'compacted input still exceeds the model context budget' },
+  ...invalidNumbers.map((entry) => ({ ...entry, error: 'invalid input token count' }))
+])('축약 후 다시 계산한 토큰 수가 잘못되면 생성을 차단한다: $condition', async ({ value, error }, t) => {
+  const summaries: LLMRequest[] = []
+  const compactedCounts: { outputBudget: number; tokens: number }[] = []
+  const { ctx, generations } = await setup(t, {
+    maxSummaryTokens: 10,
+    countTokens: (request) => {
+      if (request.input.messages.some((message) => message.id === 'old-user')) return 100
+      const hasSummary = request.input.messages.some(
+        (message) =>
+          'content' in message && typeof message.content === 'string' && message.content.includes('Earlier facts.')
+      )
+      if (!hasSummary) return 10
+      const tokens = request.maxOutputTokens === 10 ? 80 : value
+      compactedCounts.push({ outputBudget: request.maxOutputTokens, tokens })
+      return tokens
+    },
+    stream: async function* (request) {
+      summaries.push(request)
+      yield { type: EventType.TEXT_MESSAGE_START, messageId: 'summary', role: 'assistant' }
+      yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'summary', delta: 'Earlier facts.' }
+      yield { type: EventType.TEXT_MESSAGE_END, messageId: 'summary' }
+    }
+  })
+  const withHistory: RunAgentInput = {
+    ...input,
+    messages: [
+      { id: 'old-user', role: 'user', content: 'Earlier question' },
+      { id: 'old-answer', role: 'assistant', content: 'Earlier answer' },
+      ...input.messages
+    ]
+  }
+
+  await expect(collect(ctx.agent.run(withHistory))).rejects.toThrow(error)
+  expect(summaries).toHaveLength(1)
+  expect(compactedCounts).toContainEqual({ outputBudget: 10, tokens: 80 })
+  expect(compactedCounts).toContainEqual({ outputBudget: 20, tokens: value })
+  expect(generations).toHaveLength(0)
 })
 
 test('시작 전 취소나 사용하지 않은 반복자의 반환은 리스너를 남기거나 서비스를 실행하지 않는다', async (t) => {
