@@ -56,3 +56,21 @@ pnpm lint
 - CI 공통 환경과 의존성 설치는 `.github/actions/setup/action.yml`에서 관리합니다.
 
 커밋, 이슈, PR을 만들 때는 [CONTRIBUTING.md](CONTRIBUTING.md)를 따릅니다.
+
+## Agent skills
+
+### Korean repository text
+
+Before drafting Korean documents, commit messages, issues, pull requests, reviews, or comments, read the installed `vibe-docs` skill and follow its `Required application order`. Preserve the exact form of domain terms and label strings defined in `CONTEXT.md`, relevant ADRs, and `docs/agents/`.
+
+### Issue tracker
+
+Issues live in GitHub Issues of the `dungsil/keundal` repository and are handled with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default Korean vocabulary with `상태:` and `유형:` axes. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single context — `CONTEXT.md` at repository root and `docs/adr/`. See `docs/agents/domain.md`.
