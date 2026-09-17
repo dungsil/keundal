@@ -63,20 +63,26 @@ async function setup(
   const ctx = new Context()
   const fibers: Fiber[] = []
   let calls = 0
+  const methodCalls: string[] = []
   class LLM extends LLMService {
     async getModel(): Promise<LLMModel> {
+      methodCalls.push('getModel')
       throw new Error('unused')
     }
     async countTokens(): Promise<number> {
+      methodCalls.push('countTokens')
       throw new Error('unused')
     }
-    async *stream(_request: LLMRequest, options: ExecutionOptions = {}) {
+    stream(_request: LLMRequest, options: ExecutionOptions = {}) {
       calls++
-      for (const event of events) {
-        options.signal?.throwIfAborted()
-        yield event
-      }
-      await afterEvents
+      methodCalls.push('stream')
+      return (async function* () {
+        for (const event of events) {
+          options.signal?.throwIfAborted()
+          yield event
+        }
+        await afterEvents
+      })()
     }
   }
   fibers.push(await ctx.plugin(LLM), await ctx.plugin(indexedDBStorePlugin, { store }))
@@ -84,7 +90,7 @@ async function setup(
     for (const fiber of fibers.toReversed()) await fiber.dispose()
     store.close()
   })
-  return { ctx, fibers, store, calls: () => calls }
+  return { ctx, fibers, store, calls: () => calls, methodCalls }
 }
 
 async function eventually<T>(value: () => Promise<T | undefined>): Promise<T> {
@@ -326,6 +332,143 @@ test('데이터베이스를 다시 열어도 확정된 session을 복원한다',
     state: { persisted: true }
   })
 })
+
+test('부분 응답을 남기고 다시 열면 recover가 원본 기록을 보존하며 interrupted를 멱등적으로 확정한다', async (t) => {
+  const factory = new IDBFactory()
+  const locks = new Locks()
+  const name = `recovery-${globalThis.crypto.randomUUID()}`
+  const firstStore = new IndexedDBStore({ databaseName: name, indexedDB: factory, locks })
+  const first = await setup(
+    t,
+    [
+      { type: EventType.TEXT_MESSAGE_START, messageId: 'partial', role: 'assistant' },
+      { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'partial', delta: 'unfinished reply' }
+    ],
+    firstStore
+  )
+  const session = {
+    threadId: 'thread',
+    revision: 1,
+    messages: [{ id: 'previous', role: 'assistant' as const, content: 'committed reply' }],
+    state: { step: 0 }
+  }
+  await first.ctx.session.commit({ ...session, expectedRevision: 0 })
+  const generationRequest = request('run', 1)
+  const iterator = first.ctx.generation.run(generationRequest)[Symbol.asyncIterator]()
+  expect((await iterator.next()).value).toEqual({ type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' })
+  expect((await iterator.next()).value?.type).toBe(EventType.TEXT_MESSAGE_START)
+  expect((await iterator.next()).value?.type).toBe(EventType.TEXT_MESSAGE_CONTENT)
+  const expected = {
+    request: generationRequest,
+    status: 'running',
+    messages: [{ id: 'partial', role: 'assistant', content: 'unfinished reply' }],
+    journal: [
+      { sequence: 0, event: { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' } },
+      { sequence: 1, event: { type: EventType.TEXT_MESSAGE_START, messageId: 'partial', role: 'assistant' } },
+      { sequence: 2, event: { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'partial', delta: 'unfinished reply' } }
+    ]
+  }
+  expect(await first.ctx.generation.get('run')).toEqual(expected)
+  expect(first.methodCalls).toEqual(['stream'])
+
+  // 반복자를 종료하지 않고 서비스를 해제해 미완료 실행을 남깁니다.
+  for (const fiber of first.fibers.toReversed()) await fiber.dispose()
+  firstStore.close()
+
+  const secondStore = new IndexedDBStore({ databaseName: name, indexedDB: factory, locks })
+  const second = await setup(t, [], secondStore)
+  expect(await second.ctx.generation.get('run')).toEqual(expected)
+  const recovered = { ...expected, status: 'interrupted' }
+  expect(await second.ctx.generation.recover()).toEqual([recovered])
+  expect(await second.ctx.generation.recover()).toEqual([recovered])
+  expect(await second.ctx.generation.get('run')).toEqual(recovered)
+  expect(await second.ctx.session.get('thread')).toEqual(session)
+  expect(second.methodCalls).toEqual([])
+})
+
+test.for(['completed', 'failed', 'cancelled', 'interrupted'] as const)(
+  '%s로 확정한 실행을 다시 열고 두 번 복구해도 상태와 저장 내용을 보존하며 LLM을 호출하지 않는다',
+  async (status, t) => {
+    const factory = new IDBFactory()
+    const locks = new Locks()
+    const name = `terminal-${globalThis.crypto.randomUUID()}`
+    const firstStore = new IndexedDBStore({ databaseName: name, indexedDB: factory, locks })
+    const failure = Promise.withResolvers<void>()
+    const first = await setup(
+      t,
+      [
+        { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' },
+        { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'reply', delta: 'stored reply' }
+      ],
+      firstStore,
+      status === 'failed' ? failure.promise : undefined
+    )
+    const generationRequest = request()
+    const controller = new globalThis.AbortController()
+    const iterator = first.ctx.generation.run(generationRequest, { signal: controller.signal })[Symbol.asyncIterator]()
+    await iterator.next()
+    await iterator.next()
+    await iterator.next()
+
+    if (status === 'completed') {
+      expect((await iterator.next()).value?.type).toBe(EventType.RUN_FINISHED)
+      expect((await iterator.next()).done).toBe(true)
+    } else if (status === 'failed') {
+      const ending = iterator.next()
+      failure.reject(new Error('provider failed after partial reply'))
+      await expect(ending).rejects.toThrow('provider failed after partial reply')
+    } else if (status === 'cancelled') {
+      controller.abort(new Error('cancelled after partial reply'))
+      await expect(iterator.next()).rejects.toThrow('cancelled after partial reply')
+    } else {
+      await iterator.return?.()
+    }
+
+    const expected = {
+      request: generationRequest,
+      status,
+      messages: [{ id: 'reply', role: 'assistant', content: 'stored reply' }],
+      journal: [
+        { sequence: 0, event: { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' } },
+        { sequence: 1, event: { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' } },
+        { sequence: 2, event: { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'reply', delta: 'stored reply' } },
+        ...(status === 'completed'
+          ? [
+              {
+                sequence: 3,
+                event: {
+                  type: EventType.RUN_FINISHED,
+                  threadId: 'thread',
+                  runId: 'run',
+                  outcome: { type: 'success' }
+                }
+              }
+            ]
+          : [])
+      ]
+    }
+    const session = {
+      threadId: 'thread',
+      revision: 1,
+      messages: status === 'completed' ? [{ id: 'reply', role: 'assistant', content: 'stored reply' }] : [],
+      state: status === 'completed' ? { step: 1 } : undefined
+    }
+    expect(await first.ctx.generation.get('run')).toEqual(expected)
+    expect(await first.ctx.session.get('thread')).toEqual(session)
+    expect(first.methodCalls).toEqual(['stream'])
+    for (const fiber of first.fibers.toReversed()) await fiber.dispose()
+    firstStore.close()
+
+    const secondStore = new IndexedDBStore({ databaseName: name, indexedDB: factory, locks })
+    const second = await setup(t, [], secondStore)
+    expect(await second.ctx.generation.get('run')).toEqual(expected)
+    expect(await second.ctx.generation.recover()).toEqual([expected])
+    expect(await second.ctx.generation.recover()).toEqual([expected])
+    expect(await second.ctx.generation.get('run')).toEqual(expected)
+    expect(await second.ctx.session.get('thread')).toEqual(session)
+    expect(second.methodCalls).toEqual([])
+  }
+)
 
 test('중복 runId 시도는 기존 실행을 변경하지 않는다', async (t) => {
   const { ctx } = await setup(t)
