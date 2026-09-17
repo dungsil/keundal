@@ -3,9 +3,11 @@ import { getEventListeners } from 'node:events'
 import { createServer, type ServerResponse } from 'node:http'
 import { setImmediate } from 'node:timers/promises'
 
-import { EventType, parseAGUIEvent, type LLMEvent, type LLMRequest } from '@keundal/core'
+import { EventType, parseAGUIEvent, type AgentMessage, type LLMEvent, type LLMRequest } from '@keundal/core'
 import geminiLLMPlugin, { GeminiLLMConfigSchema } from '@keundal/plugin-llm-gemini'
+import indexedDBStorePlugin, { type IndexedDBStoreConfig } from '@keundal/plugin-store-indexeddb'
 import { Context } from 'cordis'
+import { IDBFactory } from 'fake-indexeddb'
 import { expect, test, type TestContext } from 'vitest'
 
 const request: LLMRequest = {
@@ -365,6 +367,111 @@ test('round-trips thought signatures, function responses, and system instruction
     ],
     generationConfig: { maxOutputTokens: 32, thinkingConfig: { includeThoughts: true } }
   })
+})
+
+test('restores IndexedDB reasoning and tool call signatures in a new Context Gemini request', async (t) => {
+  const storeConfig: IndexedDBStoreConfig = {
+    databaseName: 'gemini-signatures',
+    indexedDB: new IDBFactory(),
+    locks: {
+      async request(_name, options, callback) {
+        options.signal?.throwIfAborted()
+        return callback({})
+      }
+    }
+  }
+  const first = await setup(t, (_request, response) =>
+    send(response, [
+      {
+        responseId: 'resp-1',
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [
+                { thought: true, text: 'Thinking', thoughtSignature: 'reasoning-signature' },
+                { text: 'Checking' },
+                { functionCall: { id: 'fc-1', name: 'clock', args: {} } },
+                {
+                  functionCall: { id: 'fc-2', name: 'weather', args: { city: 'Seoul' } },
+                  thoughtSignature: 'call-signature'
+                }
+              ]
+            }
+          }
+        ]
+      },
+      { responseId: 'resp-1', candidates: [{ finishReason: 'STOP' }] }
+    ])
+  )
+  const firstStore = await first.ctx.plugin(indexedDBStorePlugin, storeConfig)
+  t.onTestFinished(() => firstStore.dispose())
+  await first.ctx.session.commit({
+    threadId: request.input.threadId,
+    expectedRevision: 0,
+    messages: request.input.messages,
+    state: request.input.state
+  })
+  const prepared = await first.ctx.session.prepare({ ...request.input, messages: [] })
+  const events = await Array.fromAsync(
+    first.ctx.generation.run({ ...request, input: prepared.input, sessionRevision: prepared.revision })
+  )
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  await firstStore.dispose()
+  await first.fiber.dispose()
+
+  const second = await setup(t, (_request, response) =>
+    send(response, [{ responseId: 'resp-2', candidates: [{ finishReason: 'STOP' }] }])
+  )
+  const secondStore = await second.ctx.plugin(indexedDBStorePlugin, storeConfig)
+  t.onTestFinished(() => secondStore.dispose())
+  const generated: AgentMessage[] = [
+    { id: 'resp-1-thought-0', role: 'reasoning', content: 'Thinking', encryptedValue: 'reasoning-signature' },
+    {
+      id: 'resp-1-text-0',
+      role: 'assistant',
+      content: 'Checking',
+      toolCalls: [
+        { id: 'fc-1', type: 'function', function: { name: 'clock', arguments: '{}' } },
+        {
+          id: 'fc-2',
+          type: 'function',
+          function: { name: 'weather', arguments: '{"city":"Seoul"}' },
+          encryptedValue: 'call-signature'
+        }
+      ]
+    }
+  ]
+  const results: AgentMessage[] = [
+    { id: 'tool-1', role: 'tool', toolCallId: 'fc-1', content: '{"time":"12:00"}' },
+    { id: 'tool-2', role: 'tool', toolCallId: 'fc-2', content: '{"temperature":20}' }
+  ]
+  const restored = await second.ctx.session.prepare({ ...request.input, runId: 'run-2', messages: results })
+  expect(restored).toStrictEqual({
+    revision: 2,
+    input: { ...request.input, runId: 'run-2', messages: [...request.input.messages, ...generated, ...results] }
+  })
+  const persistedRun = await second.ctx.generation.get(request.input.runId)
+  expect(persistedRun?.status).toBe('completed')
+  expect(persistedRun?.messages).toStrictEqual(generated)
+  expect(persistedRun?.journal.map((entry) => entry.event)).toStrictEqual(events)
+
+  await collect(second.ctx.llm.stream({ ...request, input: restored.input }))
+  expect(second.requests).toHaveLength(1)
+  expect(second.requests[0].body.contents).toStrictEqual([
+    { role: 'user', parts: [{ text: 'Hello' }] },
+    { role: 'model', parts: [{ thought: true, text: 'Thinking', thoughtSignature: 'reasoning-signature' }] },
+    {
+      role: 'model',
+      parts: [
+        { text: 'Checking' },
+        { functionCall: { name: 'clock', args: {} } },
+        { functionCall: { name: 'weather', args: { city: 'Seoul' } }, thoughtSignature: 'call-signature' }
+      ]
+    },
+    { role: 'user', parts: [{ functionResponse: { name: 'clock', response: { time: '12:00' } } }] },
+    { role: 'user', parts: [{ functionResponse: { name: 'weather', response: { temperature: 20 } } }] }
+  ])
 })
 
 const start = { type: EventType.TEXT_MESSAGE_START, messageId: 'resp-1-text-0', role: 'assistant' }
