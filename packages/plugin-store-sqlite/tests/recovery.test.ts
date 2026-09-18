@@ -290,3 +290,57 @@ test('취소한 실행은 재등록 뒤에도 cancelled를 유지한다', async 
   expect(statuses(await second.ctx.generation.recover())).toEqual(['cancelled'])
   expect(second.calls).toEqual([])
 })
+
+test('배치 크기를 넘는 이벤트도 완료된 실행의 journal과 메시지에 모두 남는다', async (t) => {
+  const events: LLMEvent[] = [
+    { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' },
+    ...Array.from({ length: 100 }, (_, i): LLMEvent => ({
+      type: EventType.TEXT_MESSAGE_CONTENT,
+      messageId: 'reply',
+      delta: String(i)
+    }))
+  ]
+  const { ctx } = await setup(t, { events }, databasePath(t))
+  await collect(ctx.generation.run(request()))
+
+  const run = await ctx.generation.get('run')
+  expect(run?.status).toBe('completed')
+  // RUN_STARTED와 RUN_FINISHED도 journal에 함께 확정된다.
+  expect(run?.journal).toHaveLength(events.length + 2)
+  expect(run?.journal.map((entry) => entry.sequence)).toEqual(Array.from({ length: events.length + 2 }, (_, i) => i))
+  expect(run?.messages).toEqual([
+    { id: 'reply', role: 'assistant', content: Array.from({ length: 100 }, (_, i) => String(i)).join('') }
+  ])
+})
+
+test('중단된 실행은 플러시된 journal까지 복구한다', async (t) => {
+  const path = databasePath(t)
+  const events: LLMEvent[] = [
+    { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' },
+    ...Array.from({ length: 40 }, (_, i): LLMEvent => ({
+      type: EventType.TEXT_MESSAGE_CONTENT,
+      messageId: 'reply',
+      delta: String(i)
+    }))
+  ]
+  const first = await setup(t, { events, holdAfter: 41 }, path)
+  const controller = new globalThis.AbortController()
+  const running = collect(first.ctx.generation.run(request(), { signal: controller.signal }))
+  await first.held
+
+  // 서비스가 해제되어도 확정된 배치와 대기 중이던 기록이 플러시되어 남는다.
+  await first.fibers[1]?.dispose()
+  await running.catch(() => {})
+
+  const second = await setup(t, { events: reply }, path)
+  const recovered = await second.ctx.generation.recover()
+
+  expect(statuses(recovered)).toEqual(['interrupted'])
+  // 확정된 배치 32개와 해제 시 플러시된 나머지 10개를 합쳐 42개다.
+  expect(recovered[0]?.journal).toHaveLength(42)
+  expect(recovered[0]?.journal.map((entry) => entry.sequence)).toEqual(Array.from({ length: 42 }, (_, i) => i))
+  expect(recovered[0]?.messages).toEqual([
+    { id: 'reply', role: 'assistant', content: Array.from({ length: 40 }, (_, i) => String(i)).join('') }
+  ])
+  expect(second.calls).toEqual([])
+})

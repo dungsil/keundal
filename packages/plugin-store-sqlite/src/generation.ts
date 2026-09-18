@@ -43,9 +43,10 @@ const snapshot = (run: StoredRun): GenerationSnapshot => ({
 })
 
 /**
- * 실행 기록을 SQLite 저장소에 보관합니다. RUN_STARTED부터 순서대로 journal과 실행 메시지를 이벤트마다
- * 기록하고, 실행이 끝나면 세션 커밋과 종료 상태를 하나의 트랜잭션으로 확정한 뒤 RUN_FINISHED를
- * 전달합니다. 실행은 소유자별 임차로 보호되므로 다른 프로세스의 recover()가 실행 중인 기록을
+ * 실행 기록을 SQLite 저장소에 보관합니다. RUN_STARTED부터 순서대로 journal과 실행 메시지를 배치로
+ * 확정하고, 실행이 끝나면 세션 커밋과 종료 상태를 하나의 트랜잭션으로 확정한 뒤 RUN_FINISHED를
+ * 전달합니다. 서비스가 해제될 때도 대기 중인 기록을 플러시해 마지막으로 확정한 지점까지 남깁니다.
+ * 실행은 소유자별 임차로 보호되므로 다른 프로세스의 recover()가 실행 중인 기록을
  * 중단시키지 않습니다.
  */
 export class SqliteGenerationService extends GenerationService {
@@ -66,6 +67,14 @@ export class SqliteGenerationService extends GenerationService {
       for (const controller of this.controllers) controller.abort(new Error('SQLite generation service disposed'))
       this.stopHeartbeat()
       try {
+        // 해제 전에 대기 중인 기록을 확정해 다른 프로세스의 recover()가 부분 응답을 이어받게 합니다.
+        for (const run of this.active.values()) {
+          try {
+            run.recorder.flush()
+          } catch {
+            // 해제 중인 저장소의 기록 실패는 무시합니다.
+          }
+        }
         // 해제한 서비스가 소유하던 실행은 다른 프로세스의 recover()가 확정할 수 있게 합니다.
         this.store.releaseLeases(this.ownerId)
       } finally {
@@ -204,6 +213,8 @@ export class SqliteGenerationService extends GenerationService {
    */
   private async settle(run: ActiveRun, status: TerminalStatus, finished?: AGUIEvent): Promise<void> {
     if (run.settled) return
+    // readRun()으로 저장된 journal과 메시지를 다시 읽으므로, 읽기 전에 대기 중인 기록을 확정합니다.
+    run.recorder.flush()
     run.settled = true
     const stored = this.store.readRun(run.runId)
     if (!stored) return
