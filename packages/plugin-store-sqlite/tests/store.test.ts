@@ -286,6 +286,25 @@ test('같은 실행의 종료 기록을 두 번 커밋해도 메시지와 revisi
   expect(repeated).toEqual(stored)
 })
 
+test('같은 종료 commit을 다시 적용해도 revision과 메시지를 중복 반영하지 않는다', async (t) => {
+  const { ctx } = await setup(t, { events: reply })
+  await collect(ctx.generation.run(request('run')))
+  const stored = await ctx.session.get('thread')
+  const run = await ctx.generation.get('run')
+  if (!stored || !run) throw new Error('the first run must be recorded')
+
+  await expect(
+    ctx.session.commit({
+      threadId: 'thread',
+      expectedRevision: 0,
+      messages: run.messages,
+      state: stored.state,
+      generation: { request: run.request, status: 'completed', journal: run.journal, messages: run.messages }
+    })
+  ).resolves.toEqual(stored)
+  expect(await ctx.session.get('thread')).toEqual(stored)
+})
+
 test('LLM 스트림 실패는 실행을 failed로 확정하고 부분 응답만 남긴다', async (t) => {
   const { ctx } = await setup(t, {
     events: reply.slice(0, 2),
