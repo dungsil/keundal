@@ -42,7 +42,8 @@ function convertMessage(message: AgentMessage): ResponseInput {
       ]
     case 'assistant': {
       const items: ResponseInput = []
-      if (message.content !== undefined) {
+      // 도구 전용 호스트가 빈 텍스트를 가질 수 있으므로 내용이 없으면 message 항목을 만들지 않습니다.
+      if (message.content) {
         const phase: unknown = message.metadata?.['openai.phase']
         if (phase === 'commentary' || phase === 'final_answer') {
           items.push({
