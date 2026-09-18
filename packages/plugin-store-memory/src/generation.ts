@@ -60,7 +60,15 @@ export class MemoryGenerationService extends GenerationService {
               state: undefined,
               generation: terminal
             })
-            .catch(() => {})
+            .then(
+              () => {},
+              () => {
+                // 취소 커밋이 실패하면 종료가 확정되지 않았으므로 recover()가 다시 확정할 수
+                // 있게 interrupted로 남깁니다.
+                if (this.store.runs.get(request.input.runId) === record && record.status === 'cancelled')
+                  record.status = 'interrupted'
+              }
+            )
           record.status = 'cancelled'
           record.owner = undefined
           record.lease.active = false

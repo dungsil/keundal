@@ -80,6 +80,24 @@ test('취소 후 next를 다시 호출하지 않아도 get으로 cancelled 상�
     for (const f of fibers.toReversed()) await f.dispose()
   })
 })
+test('취소 커밋이 실패하면 recover 가능한 interrupted로 남긴다', async (t) => {
+  const { ctx, fibers } = await setup()
+  const c = new globalThis.AbortController()
+  const it = ctx.generation.run(req(), { signal: c.signal }) as AsyncIterableIterator<AGUIEvent>
+  await it.next()
+  // 다른 기록이 revision을 올리면 취소 커밋이 충돌로 실패합니다.
+  await ctx.session.commit({ threadId: 'thread', expectedRevision: 0, messages: [], state: undefined })
+  c.abort(new Error('cancelled'))
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  const run = await ctx.generation.get('run')
+  expect(run?.status).toBe('interrupted')
+  expect(run?.journal.some((entry) => entry.event.type === EventType.RUN_FINISHED)).toBe(false)
+  expect((await ctx.generation.recover())[0]?.status).toBe('interrupted')
+  expect((await ctx.session.get('thread'))?.revision).toBe(1)
+  t.onTestFinished(async () => {
+    for (const f of fibers.toReversed()) await f.dispose()
+  })
+})
 test('next가 대기 중일 때 return을 호출하면 스트림을 중단하고 interrupted로 확정한다', async (t) => {
   const { ctx, fibers, held } = await setup()
   const it = ctx.generation.run(req()) as AsyncIterableIterator<AGUIEvent>
