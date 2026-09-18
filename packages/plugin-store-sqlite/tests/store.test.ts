@@ -402,3 +402,16 @@ test('설정 스키마는 비어 있지 않은 데이터베이스 경로를 요�
   expect(sqliteStoreConfigSchema['~standard'].validate({ path: '  ' })).toHaveProperty('issues')
   expect(sqliteStoreConfigSchema['~standard'].validate({})).toHaveProperty('issues')
 })
+
+test('이미 기록된 runId로 시작을 거부할 때 빈 스레드를 남기지 않는다', async (t) => {
+  const { ctx } = await setup(t, { events: reply })
+  const first = ctx.generation.run(request('run'))[Symbol.asyncIterator]()
+  await first.next()
+
+  const duplicate = ctx.generation.run({
+    ...request('run'),
+    input: { ...request('run').input, threadId: 'other', runId: 'run' }
+  })
+  await expect(collect(duplicate)).rejects.toThrow(/already recorded/)
+  expect(await ctx.session.get('other')).toBeUndefined()
+})
