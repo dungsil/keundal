@@ -3,6 +3,7 @@ import {
   GenerationService,
   type AGUIEvent,
   type ExecutionOptions,
+  type GenerationJournalEntry,
   type GenerationOptions,
   type GenerationRequest,
   type GenerationSnapshot,
@@ -14,12 +15,23 @@ import type { Context } from 'cordis'
 import { GenerationRecorder } from './messages.js'
 import { IndexedDBStore } from './store.js'
 
+/** journal을 배치로 확정하는 기준 크기입니다. */
+const JOURNAL_BATCH_SIZE = 32
+/** journal을 배치로 확정하는 최대 간격입니다. */
+const JOURNAL_BATCH_INTERVAL_MS = 50
+
 interface ActiveRun {
   readonly request: GenerationRequest
   readonly token: symbol
   readonly release: () => Promise<void>
   readonly cleanup: () => void
   finalizing?: Promise<GenerationStatus | undefined>
+  /** 아직 저장소에 확정하지 않은 journal 항목입니다. */
+  journal: GenerationJournalEntry[]
+  /** 첫 대기 항목이 들어온 시각 이후로 플러시해야 하는 기한입니다. */
+  journalDeadline?: number
+  /** 진행 중인 플러시로, 재진입 방지에 씁니다. */
+  journalFlush?: Promise<void>
 }
 
 /** 실행 journal과 종료 상태를 IndexedDB에 저장합니다. */
@@ -135,14 +147,27 @@ export class IndexedDBGenerationService extends GenerationService {
         signal.throwIfAborted()
         return
       }
-      active = { request, token, release: locked.release, cleanup }
+      active = { request, token, release: locked.release, cleanup, journal: [] }
       this.active.set(runId, active)
       registered = true
       signal.throwIfAborted()
 
+      // startRun이 nextSequence 0으로 등록하므로 0부터 부여합니다.
+      let nextSequence = 0
+      const appendJournal = (event: AGUIEvent): void => {
+        if (!active) throw new Error('journal buffer requires an active run')
+        active.journal.push({ sequence: nextSequence++, event })
+        active.journalDeadline ??= Date.now() + JOURNAL_BATCH_INTERVAL_MS
+      }
+      const shouldFlush = (): boolean =>
+        active !== undefined &&
+        (active.journal.length >= JOURNAL_BATCH_SIZE ||
+          (active.journalDeadline !== undefined && Date.now() >= active.journalDeadline))
+
       const started: AGUIEvent = { type: EventType.RUN_STARTED, threadId, runId }
       recorder.record(started)
-      await this.track(this.store.appendEvent(runId, started))
+      appendJournal(started)
+      await this.flush(active) // RUN_STARTED는 스트리밍 시작 전에 확정한다 (실행당 1회).
       if (this.closed) return
       yield started
 
@@ -153,12 +178,14 @@ export class IndexedDBGenerationService extends GenerationService {
         signal.throwIfAborted()
         if (!this.isCurrent(runId, token)) return
         recorder.record(event)
-        await this.track(this.store.appendEvent(runId, event))
+        appendJournal(event)
+        if (shouldFlush()) await this.flush(active)
         if (this.closed || !this.isCurrent(runId, token)) return
         yield event
       }
       signal.throwIfAborted()
       if (!this.isCurrent(runId, token)) return
+      await this.flush(active)
 
       const finished: AGUIEvent = { type: EventType.RUN_FINISHED, threadId, runId, outcome: { type: 'success' } }
       const terminal = await this.finalize(runId, token, 'completed', finished)
@@ -190,6 +217,31 @@ export class IndexedDBGenerationService extends GenerationService {
     }
   }
 
+  /** 대기 중인 journal 항목을 한 트랜잭션으로 확정합니다. 이미 진행 중인 플러시가 있으면 함께 기다립니다. */
+  private async flush(active: ActiveRun): Promise<void> {
+    if (!active.journal.length) return
+    if (active.journalFlush) return active.journalFlush
+    const entries = active.journal
+    active.journal = []
+    active.journalDeadline = undefined
+    const flush = this.track(
+      this.store.appendEvents(active.request.input.runId, entries).catch((error) => {
+        // 실패한 배치를 버퍼 맨 앞에 되돌려 다음 확정에서 재시도합니다. 되돌리지 않으면 journal에 구멍이 생깁니다.
+        active.journal.unshift(...entries)
+        throw error
+      })
+    ).finally(() => {
+      active.journalFlush = undefined
+    })
+    active.journalFlush = flush
+    return flush
+  }
+
+  /** 대기 항목이 있으면 확정을 기다리거나 시작합니다. */
+  private async drain(active: ActiveRun): Promise<void> {
+    if (active.journal.length) await (active.journalFlush ?? this.flush(active))
+  }
+
   private async finalize(
     runId: string,
     token: symbol,
@@ -198,6 +250,8 @@ export class IndexedDBGenerationService extends GenerationService {
   ): Promise<GenerationStatus | undefined> {
     const active = this.active.get(runId)
     if (!active || active.token !== token) return undefined
+    // 종료 journal을 만들기 전에 저장소를 다시 읽으므로 대기 항목을 먼저 확정합니다.
+    await this.drain(active)
     if (active.finalizing) return active.finalizing
     active.finalizing = (async () => {
       const snapshot = await this.track(this.store.getRun(runId))
@@ -234,6 +288,8 @@ export class IndexedDBGenerationService extends GenerationService {
     const active = [...this.active.values()]
     await Promise.all(
       active.map(async (run) => {
+        // 저장소가 닫히기 전에 대기 항목을 확정하려 하되, 이미 닫혔다면 기존 해제 태도대로 무시합니다.
+        await this.drain(run).catch(() => {})
         await run.finalizing?.catch(() => {})
         try {
           await run.release()

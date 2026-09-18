@@ -41,14 +41,7 @@ test('지정한 이벤트 공급자의 도구 결과를 저장하고 복구할 �
     }
   })) {
     delivered.push(event)
-    if (event.type === EventType.TOOL_CALL_RESULT) {
-      expect((await ctx.generation.get('run'))?.messages.at(-1)).toEqual({
-        id: event.messageId,
-        role: 'tool',
-        toolCallId: event.toolCallId,
-        content: event.content
-      })
-    }
+    // 배치 확정이라 전달 시점에는 도구 결과가 아직 journal에 반영되지 않을 수 있습니다.
     if (event.type === EventType.RUN_FINISHED) {
       expect((await ctx.session.get('thread'))?.messages.map((message) => message.id)).toEqual([
         'lookup-1',
@@ -159,7 +152,7 @@ async function eventually<T>(value: () => Promise<T | undefined>): Promise<T> {
   throw new Error('condition was not reached')
 }
 
-test('이벤트를 전달하기 전에 journal에 저장하고 완료 커밋 뒤 RUN_FINISHED를 전달한다', async (t) => {
+test('이벤트를 journal에 접두사로 저장하고 완료 커밋 뒤 RUN_FINISHED를 전달한다', async (t) => {
   const { ctx } = await setup(t, [
     { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' },
     { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'reply', delta: 'hello' }
@@ -168,7 +161,10 @@ test('이벤트를 전달하기 전에 journal에 저장하고 완료 커밋 뒤
   for await (const event of ctx.generation.run(request())) {
     if (event.type !== EventType.RUN_FINISHED) {
       const run = await ctx.generation.get('run')
-      expect(run?.journal.map((entry) => entry.event.type)).toContain(event.type)
+      // 배치 확정이므로 journal은 전달 중인 이벤트까지의 접두사로만 뒤처질 수 있습니다.
+      expect(run?.journal.map((entry) => entry.event.type)).toEqual(
+        [...delivered, event.type].slice(0, run?.journal.length)
+      )
     } else {
       expect((await ctx.session.get('thread'))?.messages).toEqual([
         { id: 'reply', role: 'assistant', content: 'hello' }
@@ -295,7 +291,9 @@ test('generation 종료 transaction의 구조화 복제 오류는 run과 journal
   const { ctx, store } = await setup(t)
   const generation = request('clone-run')
   await store.startRun(generation)
-  await store.appendEvent('clone-run', { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'clone-run' })
+  await store.appendEvents('clone-run', [
+    { sequence: 0, event: { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'clone-run' } }
+  ])
   await expect(
     ctx.session.commit({
       threadId: 'thread',
@@ -415,6 +413,20 @@ test('부분 응답을 남기고 다시 열면 recover가 원본 기록을 보�
   expect((await iterator.next()).value).toEqual({ type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' })
   expect((await iterator.next()).value?.type).toBe(EventType.TEXT_MESSAGE_START)
   expect((await iterator.next()).value?.type).toBe(EventType.TEXT_MESSAGE_CONTENT)
+  // 배치 미달이라 이 시점에 확정된 journal은 RUN_STARTED뿐입니다.
+  expect(await first.ctx.generation.get('run')).toEqual({
+    request: generationRequest,
+    status: 'running',
+    messages: [],
+    journal: [{ sequence: 0, event: { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' } }]
+  })
+  expect(first.methodCalls).toEqual(['stream'])
+
+  // 반복자를 종료하지 않고 서비스를 해제해 미완료 실행을 남깁니다.
+  for (const fiber of first.fibers.toReversed()) await fiber.dispose()
+  firstStore.close()
+
+  // 해제 경로의 플러시로 대기 중이던 journal도 모두 확정됩니다.
   const expected = {
     request: generationRequest,
     status: 'running',
@@ -425,13 +437,6 @@ test('부분 응답을 남기고 다시 열면 recover가 원본 기록을 보�
       { sequence: 2, event: { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'partial', delta: 'unfinished reply' } }
     ]
   }
-  expect(await first.ctx.generation.get('run')).toEqual(expected)
-  expect(first.methodCalls).toEqual(['stream'])
-
-  // 반복자를 종료하지 않고 서비스를 해제해 미완료 실행을 남깁니다.
-  for (const fiber of first.fibers.toReversed()) await fiber.dispose()
-  firstStore.close()
-
   const secondStore = new IndexedDBStore({ databaseName: name, indexedDB: factory, locks })
   const second = await setup(t, [], secondStore)
   expect(await second.ctx.generation.get('run')).toEqual(expected)
@@ -557,4 +562,70 @@ test('열기가 막혀 실패한 뒤에도 다음 시도가 데이터베이스�
   const store = new IndexedDBStore({ databaseName: 'retry-open', indexedDB: factory as unknown as IDBFactory })
   await expect(store.getThread('thread')).rejects.toThrow(/blocked/)
   await expect(store.getThread('thread')).resolves.toBeUndefined()
+})
+
+test('배치 크기를 넘는 이벤트도 완료된 실행의 journal에 모두 남는다', async (t) => {
+  // JOURNAL_BATCH_SIZE(32)×3을 넘도록 충분한 청크를 보내 여러 번의 배치 확정을 거칩니다.
+  const chunk = (index: number): LLMEvent => ({
+    type: EventType.TEXT_MESSAGE_CONTENT,
+    messageId: 'reply',
+    delta: `chunk-${index}`
+  })
+  const chunks = Array.from({ length: 96 }, chunk)
+  const { ctx } = await setup(t, [
+    { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' },
+    ...chunks,
+    { type: EventType.TEXT_MESSAGE_END, messageId: 'reply' }
+  ])
+  const delivered = []
+  for await (const event of ctx.generation.run(request())) delivered.push(event)
+  expect(delivered).toHaveLength(100)
+  const recorded = await ctx.generation.get('run')
+  expect(recorded?.status).toBe('completed')
+  expect(recorded?.journal.map((entry) => entry.event)).toEqual(delivered)
+  expect(recorded?.journal.map((entry) => entry.sequence)).toEqual(
+    Array.from({ length: delivered.length }, (_, index) => index)
+  )
+})
+
+test('소비자가 순회를 중단해도 플러시된 journal로 복구한다', async (t) => {
+  const factory = new IDBFactory()
+  const locks = new Locks()
+  const name = `stop-${globalThis.crypto.randomUUID()}`
+  const firstStore = new IndexedDBStore({ databaseName: name, indexedDB: factory, locks })
+  const first = await setup(
+    t,
+    [
+      { type: EventType.TEXT_MESSAGE_START, messageId: 'partial', role: 'assistant' },
+      { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'partial', delta: 'one' },
+      { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'partial', delta: 'two' },
+      { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'partial', delta: 'three' }
+    ],
+    firstStore
+  )
+  const iterator = first.ctx.generation.run(request())[Symbol.asyncIterator]()
+  expect((await iterator.next()).value?.type).toBe(EventType.RUN_STARTED)
+  expect((await iterator.next()).value?.type).toBe(EventType.TEXT_MESSAGE_START)
+  expect((await iterator.next()).value?.type).toBe(EventType.TEXT_MESSAGE_CONTENT)
+  await iterator.return?.()
+
+  const expected = {
+    request: request(),
+    status: 'interrupted',
+    messages: [{ id: 'partial', role: 'assistant', content: 'one' }],
+    journal: [
+      { sequence: 0, event: { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' } },
+      { sequence: 1, event: { type: EventType.TEXT_MESSAGE_START, messageId: 'partial', role: 'assistant' } },
+      { sequence: 2, event: { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'partial', delta: 'one' } }
+    ]
+  }
+  expect(await first.ctx.generation.get('run')).toEqual(expected)
+  for (const fiber of first.fibers.toReversed()) await fiber.dispose()
+  firstStore.close()
+
+  const secondStore = new IndexedDBStore({ databaseName: name, indexedDB: factory, locks })
+  const second = await setup(t, [], secondStore)
+  expect(await second.ctx.generation.recover()).toEqual([{ ...expected }])
+  expect(await second.ctx.generation.get('run')).toEqual(expected)
+  expect(second.methodCalls).toEqual([])
 })
