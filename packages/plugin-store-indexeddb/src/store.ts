@@ -325,18 +325,21 @@ export class IndexedDBStore {
         ? database.transaction(stores, mode, { durability: options?.durability ?? 'strict' })
         : database.transaction(stores, mode)
     const complete = transactionDone(transaction)
-    const abort = () => transaction.abort()
+    // 완료된 transaction에 대한 abort는 InvalidStateError를 던지므로 리스너에서도 방어합니다.
+    const abort = () => {
+      try {
+        transaction.abort()
+      } catch {
+        // 이미 완료된 transaction은 중단할 수 없습니다.
+      }
+    }
     signal?.addEventListener('abort', abort, { once: true })
     try {
       const value = await body(transaction)
       await complete
       return value
     } catch (error) {
-      try {
-        transaction.abort()
-      } catch {
-        // 이미 완료된 transaction은 중단할 수 없습니다.
-      }
+      abort()
       await complete.catch(() => {})
       throw error
     } finally {
