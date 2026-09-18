@@ -113,7 +113,10 @@ export class OpenAILLMService extends LLMService {
           }
         }
         signal.throwIfAborted()
-        throw new Error('OpenAI stream ended before response.completed')
+        for (const event of events.finish()) {
+          signal.throwIfAborted()
+          yield event
+        }
       } finally {
         stream.controller.abort()
       }

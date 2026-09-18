@@ -379,17 +379,118 @@ test('거절 응답을 스트리밍하고 최종 텍스트에서 아직 전달�
 })
 
 test.for([
+  { name: '열린 텍스트', frames: textFrames.slice(0, 4) },
+  { name: '이미 닫힌 텍스트', frames: textFrames.slice(0, -1) }
+])('response.completed 없이 EOF에 도달하면 텍스트를 한 번만 종료한다: $name', async ({ frames }, t) => {
+  const { ctx } = await setup(t, (_request, response) => send(response, frames))
+  const signal = new globalThis.AbortController().signal
+  expect(await collect(ctx.llm.stream(request, { signal }))).toStrictEqual([
+    { type: EventType.TEXT_MESSAGE_START, messageId: 'msg_1', role: 'assistant' },
+    { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'msg_1', delta: '안녕' },
+    { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'msg_1', delta: '하세요' },
+    { type: EventType.TEXT_MESSAGE_END, messageId: 'msg_1' }
+  ])
+  expect(getEventListeners(signal, 'abort')).toHaveLength(0)
+})
+
+test('EOF에서 열린 추론을 종료하되 미확정 암호화 값은 전달하지 않는다', async (t) => {
+  const { ctx } = await setup(t, (_request, response) =>
+    send(response, [
+      {
+        type: 'response.output_item.added',
+        item: { id: 'rs_1', type: 'reasoning', summary: [], encrypted_content: 'partial-value' }
+      },
+      { type: 'response.reasoning_summary_text.delta', item_id: 'rs_1', delta: 'Partial summary' }
+    ])
+  )
+  expect(await collect(ctx.llm.stream(request))).toStrictEqual([
+    { type: EventType.REASONING_START, messageId: 'rs_1' },
+    { type: EventType.REASONING_MESSAGE_START, messageId: 'rs_1', role: 'reasoning' },
+    { type: EventType.REASONING_MESSAGE_CONTENT, messageId: 'rs_1', delta: 'Partial summary' },
+    { type: EventType.REASONING_MESSAGE_END, messageId: 'rs_1' },
+    { type: EventType.REASONING_END, messageId: 'rs_1' }
+  ])
+})
+
+test('도구 호출이 완료된 뒤 EOF에 도달하면 종료 이벤트를 중복 전달하지 않는다', async (t) => {
+  const item = { id: 'fc_1', type: 'function_call', call_id: 'call_1', name: 'clock', arguments: '{}' }
+  const { ctx } = await setup(t, (_request, response) =>
+    send(response, [
+      { type: 'response.output_item.added', item },
+      { type: 'response.output_item.done', item: { ...item, status: 'completed' } }
+    ])
+  )
+  expect(await collect(ctx.llm.stream(request))).toStrictEqual([
+    { type: EventType.TOOL_CALL_START, toolCallId: 'call_1', toolCallName: 'clock' },
+    { type: EventType.TOOL_CALL_ARGS, toolCallId: 'call_1', delta: '{}' },
+    { type: EventType.TOOL_CALL_END, toolCallId: 'call_1' }
+  ])
+})
+
+test('EOF에서도 완료되지 않은 도구 호출은 거부한다', async (t) => {
+  const { ctx } = await setup(t, (_request, response) =>
+    send(response, [
+      {
+        type: 'response.output_item.added',
+        item: { id: 'fc_1', type: 'function_call', call_id: 'call_1', name: 'clock', arguments: '{}' }
+      }
+    ])
+  )
+  const received: LLMEvent[] = []
+  const consume = async () => {
+    for await (const event of ctx.llm.stream(request)) received.push(event)
+  }
+  await expect(consume()).rejects.toThrow(/unfinished tool calls/)
+  expect(received.map((event) => event.type)).toStrictEqual([EventType.TOOL_CALL_START, EventType.TOOL_CALL_ARGS])
+})
+
+test('EOF로 받은 부분 응답을 커밋한 뒤 RUN_FINISHED를 한 번만 전달한다', async (t) => {
+  const { ctx, requests } = await setup(t, (_request, response) => send(response, textFrames.slice(0, 3)))
+  const store = await ctx.plugin(indexedDBStorePlugin, {
+    databaseName: 'openai-eof',
+    indexedDB: new IDBFactory(),
+    locks: {
+      async request(_name, options, callback) {
+        options.signal?.throwIfAborted()
+        return callback({})
+      }
+    }
+  } satisfies IndexedDBStoreConfig)
+  t.onTestFinished(() => store.dispose())
+  const prepared = await ctx.session.prepare(request.input)
+  const generated: AgentMessage = { id: 'msg_1', role: 'assistant', content: '안녕' }
+  const types: string[] = []
+  for await (const event of ctx.generation.run({
+    ...request,
+    input: prepared.input,
+    sessionRevision: prepared.revision
+  })) {
+    types.push(event.type)
+    if (event.type === EventType.RUN_FINISHED) {
+      expect(event).toMatchObject({ threadId: 'thread-1', runId: 'run-1', outcome: { type: 'success' } })
+      expect((await ctx.session.get('thread-1'))?.messages).toContainEqual(generated)
+      expect(await ctx.generation.get('run-1')).toMatchObject({ status: 'completed', messages: [generated] })
+    }
+  }
+  expect(types).toStrictEqual([
+    EventType.RUN_STARTED,
+    EventType.TEXT_MESSAGE_START,
+    EventType.TEXT_MESSAGE_CONTENT,
+    EventType.TEXT_MESSAGE_END,
+    EventType.RUN_FINISHED
+  ])
+  expect(requests).toHaveLength(1)
+})
+
+test.for([
   { frame: { type: 'response.failed', response: { error: { message: 'provider failed' } } }, error: /provider failed/ },
   {
     frame: { type: 'response.incomplete', response: { incomplete_details: { reason: 'max_output_tokens' } } },
     error: /max_output_tokens/
   },
-  { frame: { type: 'error', code: 'server_error', message: 'stream error', param: null }, error: /stream error/ },
-  { frame: undefined, error: /before response.completed/ }
-])('실패하거나 불완전하게 종료된 스트림을 거부한다: $error', async ({ frame, error }, t) => {
-  const { ctx } = await setup(t, (_request, response) =>
-    send(response, [textFrames[1], textFrames[2], ...(frame ? [frame] : [])])
-  )
+  { frame: { type: 'error', code: 'server_error', message: 'stream error', param: null }, error: /stream error/ }
+])('공급자가 명시한 실패와 불완전 응답은 거부한다: $error', async ({ frame, error }, t) => {
+  const { ctx } = await setup(t, (_request, response) => send(response, [textFrames[1], textFrames[2], frame]))
   const received: LLMEvent[] = []
   const consume = async () => {
     for await (const event of ctx.llm.stream(request)) received.push(event)
@@ -410,6 +511,25 @@ test('HTTP 오류를 재시도하지 않고 SDK의 상태 코드를 보존한다
   })
   await expect(collect(ctx.llm.stream(request))).rejects.toMatchObject({ status: 429 })
   expect(requests).toHaveLength(1)
+})
+
+test('응답 본문을 받다가 전송 오류가 발생하면 EOF 정상 종료로 처리하지 않는다', async (t) => {
+  const connected = Promise.withResolvers<ServerResponse>()
+  const { ctx, requests } = await setup(t, (_request, response) => {
+    response.writeHead(200, { 'content-type': 'text/event-stream' })
+    response.write(wire([textFrames[1], textFrames[2]]))
+    connected.resolve(response)
+  })
+  const signal = new globalThis.AbortController().signal
+  const iterator = ctx.llm.stream(request, { signal })[Symbol.asyncIterator]()
+  expect((await iterator.next()).value.type).toBe(EventType.TEXT_MESSAGE_START)
+  expect((await iterator.next()).value.type).toBe(EventType.TEXT_MESSAGE_CONTENT)
+  const pending = iterator.next()
+  const rejected = expect(pending).rejects.toThrow()
+  ;(await connected.promise).destroy()
+  await rejected
+  expect(requests).toHaveLength(1)
+  expect(getEventListeners(signal, 'abort')).toHaveLength(0)
 })
 
 test('IndexedDB에 저장한 commentary와 final_answer를 새 Context의 OpenAI 요청에 복원한다', async (t) => {
