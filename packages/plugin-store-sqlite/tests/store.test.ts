@@ -47,14 +47,6 @@ test('지정한 이벤트 공급자의 도구 결과를 저장하고 복구할 �
     }
   })) {
     delivered.push(event)
-    if (event.type === EventType.TOOL_CALL_RESULT) {
-      expect((await ctx.generation.get('run'))?.messages.at(-1)).toEqual({
-        id: event.messageId,
-        role: 'tool',
-        toolCallId: event.toolCallId,
-        content: event.content
-      })
-    }
     if (event.type === EventType.RUN_FINISHED) {
       expect((await ctx.session.get('thread'))?.messages.map((message) => message.id)).toEqual([
         'lookup-1',
@@ -66,6 +58,20 @@ test('지정한 이벤트 공급자의 도구 결과를 저장하고 복구할 �
   }
   expect(calls).toEqual([])
   const recorded = await ctx.generation.get('run')
+  expect(recorded?.messages).toEqual([
+    {
+      id: 'lookup-1',
+      role: 'assistant',
+      toolCalls: [{ id: 'lookup-1', type: 'function', function: { name: 'lookup', arguments: '{}' } }]
+    },
+    { id: 'result-1', role: 'tool', toolCallId: 'lookup-1', content: 'found' },
+    {
+      id: 'lookup-2',
+      role: 'assistant',
+      toolCalls: [{ id: 'lookup-2', type: 'function', function: { name: 'lookup', arguments: '{}' } }]
+    },
+    { id: 'result-2', role: 'tool', toolCallId: 'lookup-2', content: 'found again' }
+  ])
   expect(recorded?.request).toEqual(request('run'))
   expect(recorded?.journal.map(({ event }) => event)).toEqual(delivered)
   expect((await ctx.session.get('thread'))?.revision).toBe(1)
@@ -334,21 +340,36 @@ test('소비자가 순회를 중단한 실행은 interrupted로 확정한다', a
   expect(types(run?.journal.map((entry) => entry.event) ?? [])).toEqual([EventType.RUN_STARTED])
 })
 
-test('실행 중에도 journal과 부분 응답이 데이터베이스 행으로 남는다', async (t) => {
-  const { ctx, path, held } = await setup(t, { events: reply, holdAfter: 2 })
+test('실행 중에도 확정된 배치까지 journal과 부분 응답이 데이터베이스 행으로 남는다', async (t) => {
+  const { ctx, path, held } = await setup(t, {
+    events: [
+      { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' },
+      ...Array.from({ length: 40 }, (_, i): LLMEvent => ({
+        type: EventType.TEXT_MESSAGE_CONTENT,
+        messageId: 'reply',
+        delta: String(i)
+      }))
+    ],
+    holdAfter: 41
+  })
   const controller = new globalThis.AbortController()
   const running = collect(ctx.generation.run(request('run'), { signal: controller.signal }))
   await held
 
   const reader = new DatabaseSync(path)
   try {
-    const journal = reader.prepare('SELECT event FROM run_journal WHERE run_id = ? ORDER BY sequence').all('run') as {
+    const journal = reader
+      .prepare('SELECT sequence, event FROM run_journal WHERE run_id = ? ORDER BY sequence')
+      .all('run') as {
+      sequence: number
       event: string
     }[]
+    expect(journal).toHaveLength(32)
+    expect(journal.map((row) => row.sequence)).toEqual(Array.from({ length: 32 }, (_, i) => i))
     expect(journal.map((row) => (JSON.parse(row.event) as AGUIEvent).type)).toEqual([
       EventType.RUN_STARTED,
       EventType.TEXT_MESSAGE_START,
-      EventType.TEXT_MESSAGE_CONTENT
+      ...Array.from({ length: 30 }, () => EventType.TEXT_MESSAGE_CONTENT)
     ])
     const messages = reader
       .prepare('SELECT message FROM run_messages WHERE run_id = ? ORDER BY position')
@@ -356,7 +377,7 @@ test('실행 중에도 journal과 부분 응답이 데이터베이스 행으로 
       message: string
     }[]
     expect(messages.map((row) => JSON.parse(row.message))).toEqual([
-      { id: 'reply', role: 'assistant', content: 'hello' }
+      { id: 'reply', role: 'assistant', content: Array.from({ length: 30 }, (_, i) => String(i)).join('') }
     ])
   } finally {
     reader.close()
@@ -364,6 +385,14 @@ test('실행 중에도 journal과 부분 응답이 데이터베이스 행으로 
 
   controller.abort(new Error('cancelled by client'))
   await expect(running).rejects.toThrow('cancelled by client')
+
+  const run = await ctx.generation.get('run')
+  expect(run?.status).toBe('cancelled')
+  expect(run?.journal).toHaveLength(42)
+  expect(run?.journal.map((entry) => entry.sequence)).toEqual(Array.from({ length: 42 }, (_, i) => i))
+  expect(run?.messages).toEqual([
+    { id: 'reply', role: 'assistant', content: Array.from({ length: 40 }, (_, i) => String(i)).join('') }
+  ])
 })
 
 test('설정 스키마는 비어 있지 않은 데이터베이스 경로를 요구한다', () => {
@@ -372,4 +401,17 @@ test('설정 스키마는 비어 있지 않은 데이터베이스 경로를 요�
   })
   expect(sqliteStoreConfigSchema['~standard'].validate({ path: '  ' })).toHaveProperty('issues')
   expect(sqliteStoreConfigSchema['~standard'].validate({})).toHaveProperty('issues')
+})
+
+test('이미 기록된 runId로 시작을 거부할 때 빈 스레드를 남기지 않는다', async (t) => {
+  const { ctx } = await setup(t, { events: reply })
+  const first = ctx.generation.run(request('run'))[Symbol.asyncIterator]()
+  await first.next()
+
+  const duplicate = ctx.generation.run({
+    ...request('run'),
+    input: { ...request('run').input, threadId: 'other', runId: 'run' }
+  })
+  await expect(collect(duplicate)).rejects.toThrow(/already recorded/)
+  expect(await ctx.session.get('other')).toBeUndefined()
 })

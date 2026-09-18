@@ -1,9 +1,13 @@
 # `@keundal/plugin-store-indexeddb`
 
 `indexedDBStorePlugin`은 브라우저의 IndexedDB에 `session`과 `generation` 서비스를 함께
-저장합니다. `threads`, `runs`, `journal`을 분리하며, 스트림 이벤트는 사용자에게 전달하기 전에
-append-only journal에 확정합니다. 성공한 `RUN_FINISHED`는 세션 메시지, revision, 실행 종료
-기록을 하나의 `readwrite` transaction으로 저장한 뒤 전달합니다.
+저장합니다. `threads`, `runs`, `journal`을 분리하며, 스트림 이벤트는 배치(최대 32개, 실행
+종료 시 잔여분 포함)로 모아 append-only journal에 확정합니다. `RUN_STARTED`는 스트리밍
+시작 전에 즉시 확정하므로, 실행이 비정상으로 끊겨도 마지막으로 확정한 배치까지의 journal로
+복구할 수 있습니다. 배치 확정은 완화된 내구성(`durability: 'relaxed'`)으로 기록하므로
+운영체제 자체가 중단되면 마지막 배치 몇 개가 유실될 수 있습니다. 성공한 `RUN_FINISHED`는
+세션 메시지, revision, 실행 종료 기록을 하나의 `readwrite` transaction으로 저장한 뒤
+전달합니다.
 
 ```ts
 import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
