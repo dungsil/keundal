@@ -85,6 +85,21 @@ export class ResponseEvents {
     if (this.items.size) throw new Error('OpenAI response completed with unfinished output items')
   }
 
+  *finish(): Generator<LLMEvent> {
+    for (const item of this.items.values()) {
+      if (item.type === 'function_call') throw new Error('OpenAI stream ended with unfinished tool calls')
+    }
+    for (const [id, item] of this.items) {
+      if (item.type === 'message') {
+        yield { type: EventType.TEXT_MESSAGE_END, messageId: id }
+      } else {
+        yield { type: EventType.REASONING_MESSAGE_END, messageId: id }
+        yield { type: EventType.REASONING_END, messageId: id }
+      }
+    }
+    this.items.clear()
+  }
+
   private *append(id: string, delta: string, type: Item['type']): Generator<LLMEvent> {
     const item = this.items.get(id)
     if (!item || item.type !== type) throw new Error('OpenAI delta has no matching output item')
