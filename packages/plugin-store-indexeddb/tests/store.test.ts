@@ -9,7 +9,7 @@ import {
 } from '@keundal/core'
 import indexedDBStorePlugin, { IndexedDBStore, type WebLockManager } from '@keundal/plugin-store-indexeddb'
 import { Context, type Fiber } from 'cordis'
-import { IDBFactory } from 'fake-indexeddb'
+import { IDBFactory, IDBVersionChangeEvent } from 'fake-indexeddb'
 import { expect, test, type TestContext } from 'vitest'
 
 test('지정한 이벤트 공급자의 도구 결과를 저장하고 복구할 때 다시 실행하지 않는다', async (t) => {
@@ -542,6 +542,26 @@ test('중복 runId 시도는 기존 실행을 변경하지 않는다', async (t)
   await first.return?.()
   await rejected
   expect((await ctx.generation.get('run'))?.status).toBe('interrupted')
+})
+
+test('열기가 막혀 실패한 뒤에도 다음 시도가 데이터베이스를 다시 연다', async () => {
+  const real = new IDBFactory()
+  let blocked = true
+  // 첫 open만 onblocked를 발생시키는 스텁 팩토리입니다.
+  const factory = {
+    open(name: string, version?: number): IDBOpenDBRequest {
+      if (!blocked) return real.open(name, version)
+      blocked = false
+      const request = {} as IDBOpenDBRequest
+      void Promise.resolve().then(() =>
+        request.onblocked?.(new IDBVersionChangeEvent('blocked', { oldVersion: 0, newVersion: 1 }))
+      )
+      return request
+    }
+  }
+  const store = new IndexedDBStore({ databaseName: 'retry-open', indexedDB: factory as unknown as IDBFactory })
+  await expect(store.getThread('thread')).rejects.toThrow(/blocked/)
+  await expect(store.getThread('thread')).resolves.toBeUndefined()
 })
 
 test('배치 크기를 넘는 이벤트도 완료된 실행의 journal에 모두 남는다', async (t) => {
