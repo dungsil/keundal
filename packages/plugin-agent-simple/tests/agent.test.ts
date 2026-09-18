@@ -151,7 +151,7 @@ test('입력 크기가 예산과 정확히 같으면 축약하지 않는다', as
 test('예산을 초과한 입력에 축약할 이력이 없으면 생성을 시작하지 않는다', async (t) => {
   const { ctx, calls, generations } = await setup(t, { countTokens: () => 81 })
   await expect(collect(ctx.agent.run(input))).rejects.toThrow(/no older conversation/)
-  expect(calls).toStrictEqual(['prepare', 'model', 'count', 'model', 'count'])
+  expect(calls).toStrictEqual(['prepare', 'model', 'count', 'model'])
   expect(generations).toHaveLength(0)
 })
 
@@ -191,9 +191,9 @@ test.for(invalidNumbers)('잘못된 입력 토큰 수이면 생성 전에 거부
 })
 
 test.for([
-  { condition: '입력 예산 초과', value: 81, error: 'compacted input still exceeds the model context budget' },
+  { condition: '입력 예산 초과', value: 81, error: 'compacted input still exceeds the input budget' },
   ...invalidNumbers.map((entry) => ({ ...entry, error: 'invalid input token count' }))
-])('축약 후 다시 계산한 토큰 수가 잘못되면 생성을 차단한다: $condition', async ({ value, error }, t) => {
+])('축약 결과의 토큰 수가 예산을 넘거나 잘못되면 생성을 차단한다: $condition', async ({ value, error }, t) => {
   const summaries: LLMRequest[] = []
   const compactedCounts: { outputBudget: number; tokens: number }[] = []
   const { ctx, generations } = await setup(t, {
@@ -205,9 +205,8 @@ test.for([
           'content' in message && typeof message.content === 'string' && message.content.includes('Earlier facts.')
       )
       if (!hasSummary) return 10
-      const tokens = request.maxOutputTokens === 10 ? 80 : value
-      compactedCounts.push({ outputBudget: request.maxOutputTokens, tokens })
-      return tokens
+      compactedCounts.push({ outputBudget: request.maxOutputTokens, tokens: value })
+      return value
     },
     stream: async function* (request) {
       summaries.push(request)
@@ -227,8 +226,8 @@ test.for([
 
   await expect(collect(ctx.agent.run(withHistory))).rejects.toThrow(error)
   expect(summaries).toHaveLength(1)
-  expect(compactedCounts).toContainEqual({ outputBudget: 10, tokens: 80 })
-  expect(compactedCounts).toContainEqual({ outputBudget: 20, tokens: value })
+  // 축약 직후 에이전트가 토큰 수를 다시 세지 않는다. 요약이 반영된 입력은 compact()의 최종 검사에서만 센다.
+  expect(compactedCounts).toStrictEqual([{ outputBudget: 10, tokens: value }])
   expect(generations).toHaveLength(0)
 })
 

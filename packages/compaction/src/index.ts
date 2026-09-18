@@ -16,6 +16,11 @@ export interface SummaryCompactionConfig {
   readonly maxSummaryTokens?: number
 }
 
+export interface SummaryCompactionOptions extends SummaryCompactionConfig, ExecutionOptions {
+  /** 호출자가 이미 세은 request.input의 입력 토큰 수입니다. 전달하면 첫 카운트 왕복을 건너뜁니다. */
+  readonly inputTokens?: number
+}
+
 function parseConfig(config: SummaryCompactionConfig) {
   const keepRecentMessages = config.keepRecentMessages ?? 6
   const maxSummaryTokens = config.maxSummaryTokens ?? 1024
@@ -50,7 +55,7 @@ export type CompactionLLM = Pick<LLMService, 'getModel' | 'countTokens' | 'strea
 export async function compact(
   llm: CompactionLLM,
   request: CompactionRequest,
-  options: ExecutionOptions & SummaryCompactionConfig = {}
+  options: SummaryCompactionOptions = {}
 ): Promise<CompactionResult> {
   const config = parseConfig(options)
   const signal = options.signal
@@ -58,7 +63,7 @@ export async function compact(
   if (!Number.isSafeInteger(request.maxInputTokens) || request.maxInputTokens <= 0) {
     throw new Error('maxInputTokens must be a positive integer')
   }
-  const input = parseRunAgentInput(globalThis.structuredClone(request.input))
+  const input = parseRunAgentInput(request.input)
   const model = await llm.getModel(request.model, { signal })
   signal?.throwIfAborted()
   if (
@@ -76,7 +81,15 @@ export async function compact(
     if (!Number.isSafeInteger(tokens) || tokens < 0) throw new Error('invalid input token count')
     return tokens
   }
-  if ((await count(input)) <= request.maxInputTokens) {
+  let initialCount: number
+  if (options.inputTokens !== undefined) {
+    signal?.throwIfAborted()
+    initialCount = options.inputTokens
+  } else {
+    initialCount = await count(input)
+  }
+  if (!Number.isSafeInteger(initialCount) || initialCount < 0) throw new Error('invalid input token count')
+  if (initialCount <= request.maxInputTokens) {
     return { messages: input.messages, summary: '', sourceMessageIds: [] }
   }
 
