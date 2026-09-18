@@ -3,7 +3,14 @@ import { getEventListeners } from 'node:events'
 import { createServer, type ServerResponse } from 'node:http'
 import { setImmediate } from 'node:timers/promises'
 
-import { EventType, parseAGUIEvent, type AgentMessage, type LLMEvent, type LLMRequest } from '@keundal/core'
+import {
+  EventType,
+  MessageAssembly,
+  parseAGUIEvent,
+  type AgentMessage,
+  type LLMEvent,
+  type LLMRequest
+} from '@keundal/core'
 import geminiLLMPlugin, { GeminiLLMConfigSchema } from '@keundal/plugin-llm-gemini'
 import indexedDBStorePlugin, { type IndexedDBStoreConfig } from '@keundal/plugin-store-indexeddb'
 import { Context } from 'cordis'
@@ -320,6 +327,73 @@ test('일반 텍스트에 붙은 추론 서명과 서명만 있는 후속 항목
     { type: EventType.TEXT_MESSAGE_START, messageId: 'resp-1-text-0', role: 'assistant' },
     { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'resp-1-text-0', delta: 'Answer' },
     { type: EventType.TEXT_MESSAGE_END, messageId: 'resp-1-text-0' }
+  ])
+})
+
+test('메시지 조립 후 텍스트, 생각, 함수 호출 순서를 보존한다', async (t) => {
+  let calls = 0
+  const { ctx, requests } = await setup(t, (_request, response) =>
+    send(
+      response,
+      calls++ === 0
+        ? [
+            { responseId: 'resp-1', candidates: [{ content: { role: 'model', parts: [{ text: 'Checking' }] } }] },
+            {
+              responseId: 'resp-1',
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ thought: true, text: 'Think again', thoughtSignature: 'sig-1' }]
+                  }
+                }
+              ]
+            },
+            {
+              responseId: 'resp-1',
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [
+                      {
+                        functionCall: { id: 'fc-1', name: 'weather', args: { city: 'Seoul' } },
+                        thoughtSignature: 'sig-2'
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            { responseId: 'resp-1', candidates: [{ finishReason: 'STOP' }] }
+          ]
+        : [{ responseId: 'resp-2', candidates: [{ finishReason: 'STOP' }] }]
+    )
+  )
+  const assembly = new MessageAssembly()
+  for (const event of await collect(ctx.llm.stream(request))) assembly.apply(event)
+  await collect(
+    ctx.llm.stream({
+      ...request,
+      input: {
+        ...request.input,
+        messages: [
+          ...request.input.messages,
+          ...assembly.messages,
+          { id: 'tool-1', role: 'tool', toolCallId: 'fc-1', content: '{"weather":"Sunny"}' }
+        ]
+      }
+    })
+  )
+  expect(requests[1].body.contents).toStrictEqual([
+    { role: 'user', parts: [{ text: 'Hello' }] },
+    { role: 'model', parts: [{ text: 'Checking' }] },
+    { role: 'model', parts: [{ thought: true, text: 'Think again', thoughtSignature: 'sig-1' }] },
+    {
+      role: 'model',
+      parts: [{ functionCall: { name: 'weather', args: { city: 'Seoul' } }, thoughtSignature: 'sig-2' }]
+    },
+    { role: 'user', parts: [{ functionResponse: { name: 'weather', response: { weather: 'Sunny' } } }] }
   ])
 })
 
