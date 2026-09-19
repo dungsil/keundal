@@ -564,6 +564,25 @@ test('열기가 막혀 실패한 뒤에도 다음 시도가 데이터베이스�
   await expect(store.getThread('thread')).resolves.toBeUndefined()
 })
 
+test('버전 변경으로 연결이 닫힌 뒤에도 다음 시도가 데이터베이스를 다시 연다', async () => {
+  const factory = new IDBFactory()
+  const store = new IndexedDBStore({
+    databaseName: `versionchange-${globalThis.crypto.randomUUID()}`,
+    indexedDB: factory
+  })
+  await store.commit({ threadId: 'thread', expectedRevision: 0, messages: [], state: undefined })
+
+  // 외부에서 데이터베이스를 삭제하면 열린 연결에 versionchange가 전달된다.
+  const deleted = Promise.withResolvers<void>()
+  const request = factory.deleteDatabase(store.databaseName)
+  request.onsuccess = () => deleted.resolve()
+  request.onerror = () => deleted.reject(request.error ?? new Error('delete failed'))
+  await deleted.promise
+
+  // 닫힌 연결 대신 저장소를 다시 열어 빈 데이터베이스에서 동작을 이어간다.
+  await expect(store.getThread('thread')).resolves.toBeUndefined()
+})
+
 test('배치 크기를 넘는 이벤트도 완료된 실행의 journal에 모두 남는다', async (t) => {
   // JOURNAL_BATCH_SIZE(32)×3을 넘도록 충분한 청크를 보내 여러 번의 배치 확정을 거칩니다.
   const chunk = (index: number): LLMEvent => ({
