@@ -7,7 +7,9 @@ import {
   EventType,
   LLMService,
   type AGUIEvent,
+  type AgentMessage,
   type ExecutionOptions,
+  type GenerationJournalEntry,
   type GenerationRequest,
   type LLMEvent,
   type LLMModel,
@@ -303,6 +305,55 @@ test('같은 종료 commit을 다시 적용해도 revision과 메시지를 중�
     })
   ).resolves.toEqual(stored)
   expect(await ctx.session.get('thread')).toEqual(stored)
+})
+
+test('기록이 없는 실행의 첫 종료 커밋은 실행 기록과 메시지를 새로 확정한다', async (t) => {
+  const { ctx } = await setup(t, { events: [] })
+  const imported = request('imported')
+  const messages: AgentMessage[] = [{ id: 'reply', role: 'assistant', content: 'hello' }]
+  const journal: GenerationJournalEntry[] = [
+    { sequence: 0, event: { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'imported' } },
+    {
+      sequence: 1,
+      event: { type: EventType.RUN_FINISHED, threadId: 'thread', runId: 'imported', outcome: { type: 'success' } }
+    }
+  ]
+
+  const committed = await ctx.session.commit({
+    threadId: 'thread',
+    expectedRevision: 0,
+    messages,
+    state: { step: 2 },
+    generation: { request: imported, status: 'completed', journal, messages }
+  })
+
+  expect(committed.revision).toBe(1)
+  expect(committed.messages).toEqual(messages)
+  const recorded = await ctx.generation.get('imported')
+  expect(recorded?.status).toBe('completed')
+  expect(recorded?.request).toEqual(imported)
+  expect(recorded?.journal).toEqual(journal)
+  expect(recorded?.messages).toEqual(messages)
+})
+
+test('저장된 실행을 다른 스레드의 종료 커밋으로 되돌리면 거부된다', async (t) => {
+  const { ctx } = await setup(t, { events: reply })
+  await collect(ctx.generation.run(request('run')))
+  const stored = await ctx.session.get('thread')
+  const run = await ctx.generation.get('run')
+  if (!stored || !run) throw new Error('the first run must be recorded')
+  const forged: GenerationRequest = { ...run.request, input: { ...run.request.input, threadId: 'elsewhere' } }
+
+  await expect(
+    ctx.session.commit({
+      threadId: 'elsewhere',
+      expectedRevision: 0,
+      messages: run.messages,
+      state: undefined,
+      generation: { request: forged, status: 'completed', journal: run.journal, messages: run.messages }
+    })
+  ).rejects.toThrow(/belongs to another thread/)
+  expect(await ctx.session.get('elsewhere')).toBeUndefined()
 })
 
 test('LLM 스트림 실패는 실행을 failed로 확정하고 부분 응답만 남긴다', async (t) => {
