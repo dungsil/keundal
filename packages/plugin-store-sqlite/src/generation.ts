@@ -111,7 +111,7 @@ export class SqliteGenerationService extends GenerationService {
       if (!controller.signal.aborted) controller.abort(new Error('SQLite generation run stopped'))
       cleanup()
     }
-    const iterator = this.execute(request, controller.signal, token, () => stopped, options.stream)
+    const iterator = this.execute(request, controller.signal, token, () => stopped, cleanup, options.stream)
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -159,6 +159,7 @@ export class SqliteGenerationService extends GenerationService {
     signal: AbortSignal,
     token: symbol,
     stopped: () => boolean,
+    cleanup: () => void,
     stream?: GenerationOptions['stream']
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     const { threadId, runId } = request.input
@@ -205,6 +206,9 @@ export class SqliteGenerationService extends GenerationService {
       await this.conclude(run, stopped(), signal).catch(() => {})
       throw error
     } finally {
+      // 순회가 어떻게 끝났든 취소 신호 연결과 컨트롤러 등록을 정리합니다. return이나 throw로
+      // 끝나는 경우가 아니면 컨트롤러가 중단되지 않아 이 경로에서만 정리됩니다.
+      cleanup()
       if (run && this.active.get(runId)?.token === token) this.active.delete(runId)
       if (!this.active.size) this.stopHeartbeat()
       await this.conclude(run, stopped(), signal).catch((concludeError: unknown) => {

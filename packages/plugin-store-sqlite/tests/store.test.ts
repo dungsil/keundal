@@ -1,3 +1,4 @@
+import { getEventListeners } from 'node:events'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -494,4 +495,25 @@ test('이미 기록된 runId로 시작을 거부할 때 빈 스레드를 남기�
   })
   await expect(collect(duplicate)).rejects.toThrow(/already recorded/)
   expect(await ctx.session.get('other')).toBeUndefined()
+})
+
+test('실행이 끝나면 외부 취소 신호의 리스너와 컨트롤러 정리를 마친다', async (t) => {
+  const { ctx } = await setup(t, { events: reply })
+  const controller = new globalThis.AbortController()
+  await collect(ctx.generation.run(request('run'), { signal: controller.signal }))
+
+  expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
+})
+
+test('스트림이 실패한 뒤에도 외부 취소 신호의 리스너를 정리한다', async (t) => {
+  const { ctx } = await setup(t, {
+    events: reply.slice(0, 2),
+    fail: new Error('openai stream failed')
+  })
+  const controller = new globalThis.AbortController()
+
+  await expect(collect(ctx.generation.run(request('run'), { signal: controller.signal }))).rejects.toThrow(
+    'openai stream failed'
+  )
+  expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
 })
