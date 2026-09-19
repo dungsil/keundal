@@ -199,7 +199,12 @@ export class SqliteGenerationService extends GenerationService {
       }
       signal.throwIfAborted()
       const finished: AGUIEvent = { type: EventType.RUN_FINISHED, threadId, runId, outcome: { type: 'success' } }
-      await this.settle(run, 'completed', finished)
+      const settledStatus = await this.settle(run, 'completed', finished)
+      // 다른 소유자가 회수해 종료가 적용되지 않았으면 성공을 전달하지 않습니다.
+      if (settledStatus !== 'completed') {
+        signal.throwIfAborted()
+        return
+      }
       yield finished
     } catch (error) {
       failed = true
@@ -221,15 +226,21 @@ export class SqliteGenerationService extends GenerationService {
 
   /**
    * 실행을 종료 상태로 확정합니다. 종료 상태는 세션 커밋과 함께 저장되며, 커밋이 실패하면 실행을
-   * interrupted로 남겨 recover()가 다시 확정할 수 있게 합니다.
+   * interrupted로 남겨 recover()가 다시 확정할 수 있게 합니다. 실제로 적용된 종료 상태를
+   * 돌려줍니다. 다른 소유자가 회수해 이미 종료된 실행에는 이 소유자의 종료를 적용하지 않습니다.
    */
-  private async settle(run: ActiveRun, status: TerminalStatus, finished?: AGUIEvent): Promise<void> {
-    if (run.settled) return
+  private async settle(
+    run: ActiveRun,
+    status: TerminalStatus,
+    finished?: AGUIEvent
+  ): Promise<GenerationStatus | undefined> {
+    if (run.settled) return undefined
     // readRun()으로 저장된 journal과 메시지를 다시 읽으므로, 읽기 전에 대기 중인 기록을 확정합니다.
     run.recorder.flush()
     run.settled = true
     const stored = this.store.readRun(run.runId)
-    if (!stored) return
+    if (!stored) return undefined
+    if (stored.status !== 'running') return stored.status
     const generation: TerminalGeneration = {
       request: run.request,
       status,
@@ -244,6 +255,7 @@ export class SqliteGenerationService extends GenerationService {
         state: status === 'completed' ? run.request.input.state : undefined,
         generation
       })
+      return status
     } catch (error) {
       this.store.abandonRun(run.runId, this.ownerId, 'interrupted')
       throw error
