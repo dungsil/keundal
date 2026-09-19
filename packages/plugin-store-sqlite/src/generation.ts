@@ -164,6 +164,7 @@ export class SqliteGenerationService extends GenerationService {
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     const { threadId, runId } = request.input
     let run: ActiveRun | undefined
+    let failed = false
     try {
       signal.throwIfAborted()
       this.validate(request)
@@ -201,6 +202,7 @@ export class SqliteGenerationService extends GenerationService {
       await this.settle(run, 'completed', finished)
       yield finished
     } catch (error) {
+      failed = true
       await this.conclude(run, stopped(), signal).catch(() => {})
       throw error
     } finally {
@@ -209,7 +211,11 @@ export class SqliteGenerationService extends GenerationService {
       cleanup()
       if (run && this.active.get(runId)?.token === token) this.active.delete(runId)
       if (!this.active.size) this.stopHeartbeat()
-      await this.conclude(run, stopped(), signal)
+      await this.conclude(run, stopped(), signal).catch((concludeError: unknown) => {
+        // 보존한 실행 오류가 있으면 종료 확정의 재실패가 그 오류를 대신하지 않게 합니다.
+        if (failed) return
+        throw concludeError
+      })
     }
   }
 

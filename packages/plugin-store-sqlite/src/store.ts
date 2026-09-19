@@ -100,7 +100,10 @@ ON CONFLICT (thread_id, message_id) DO UPDATE SET message = excluded.message`
 
 const REGISTER_RUN = `INSERT INTO runs (run_id, thread_id, request, status, owner_id, lease_expires_at)
 VALUES (?, ?, ?, 'running', ?, ?) ON CONFLICT (run_id) DO NOTHING`
+const ENSURE_RUN = `INSERT INTO runs (run_id, thread_id, request, status, owner_id, lease_expires_at)
+VALUES (?, ?, ?, ?, NULL, NULL) ON CONFLICT (run_id) DO NOTHING`
 const READ_RUN = 'SELECT run_id, thread_id, request, status FROM runs WHERE run_id = ?'
+const READ_RUN_HEADER = 'SELECT thread_id, status FROM runs WHERE run_id = ?'
 const READ_RUNS = 'SELECT run_id, thread_id, request, status FROM runs ORDER BY rowid'
 const READ_OWNERSHIPS = 'SELECT run_id, status, owner_id, lease_expires_at FROM runs ORDER BY rowid'
 const READ_RUNNING = `SELECT 1 FROM runs WHERE run_id = ? AND status = 'running'`
@@ -129,6 +132,11 @@ interface RunRow {
   readonly run_id: string
   readonly thread_id: string
   readonly request: string
+  readonly status: GenerationStatus
+}
+
+interface RunHeaderRow {
+  readonly thread_id: string
   readonly status: GenerationStatus
 }
 
@@ -253,6 +261,20 @@ export class SqliteStore {
   readRun(runId: string): StoredRun | undefined {
     const row = this.row<RunRow>(READ_RUN, runId)
     return row ? this.toRun(row) : undefined
+  }
+
+  /** 실행이 속한 스레드와 상태만 읽습니다. 실행이 없으면 undefined를 돌려줍니다. */
+  readRunHeader(runId: string): { threadId: string; status: GenerationStatus } | undefined {
+    const row = this.row<RunHeaderRow>(READ_RUN_HEADER, runId)
+    return row ? { threadId: row.thread_id, status: row.status } : undefined
+  }
+
+  /**
+   * 실행 기록이 없으면 주어진 상태로 등록합니다. 기록이 이미 있으면 아무것도 바꾸지 않으므로,
+   * 종료 커밋이 실행 시작 없이 도착해도 journal과 메시지를 받을 행을 만들 수 있습니다.
+   */
+  ensureRun(runId: string, threadId: string, request: GenerationRequest, status: GenerationStatus): void {
+    this.statement(ENSURE_RUN).run(runId, threadId, JSON.stringify(request), status)
   }
 
   /** 저장된 모든 실행을 등록 순서로 읽습니다. */
