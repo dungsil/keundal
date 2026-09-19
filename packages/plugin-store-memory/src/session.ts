@@ -71,10 +71,13 @@ export class MemorySessionService extends SessionService {
       if (!runId) throw new Error('generation commit requires a runId')
       if (generation.request.input.threadId !== change.threadId)
         throw new Error(`generation ${runId} belongs to another thread: ${generation.request.input.threadId}`)
+      const stored = this.store.runs.get(runId)
+      if (stored && stored.threadId !== change.threadId)
+        throw new Error(`generation ${runId} belongs to another thread: ${stored.threadId}`)
       // 이미 종료를 확정한 실행은 revision 검사보다 중복 적용 건너뛰기가 우선합니다. 종료 기록을
       // 적용한 뒤 결과 확인에 실패한 호출이 기준 revision을 몰라도 같은 commit을 다시 시도할 수
-      // 있어야 하기 때문입니다.
-      if (this.store.runs.get(runId)?.status !== 'running') return snapshot(change.threadId, current)
+      // 있어야 하기 때문입니다. 기록이 없는 실행은 중복이 아니므로 첫 종료 기록을 확정합니다.
+      if (stored && stored.status !== 'running') return snapshot(change.threadId, current)
     }
 
     if (current.revision !== change.expectedRevision) {
