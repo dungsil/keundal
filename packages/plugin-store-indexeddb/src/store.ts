@@ -374,7 +374,12 @@ export class IndexedDBStore {
       }
       request.onsuccess = () => {
         const database = request.result
-        database.onversionchange = () => database.close()
+        database.onversionchange = () => {
+          // 다른 탭의 버전 변경·데이터베이스 삭제를 막지 않게 연결을 닫고, 캐시를 비워 다음
+          // 연산이 다시 열게 합니다. 닫힌 연결을 캐시에 두면 저장소가 영구히 사용 불가가 됩니다.
+          database.close()
+          if (this.database === opening) this.database = undefined
+        }
         if (!settle(() => resolve(database))) database.close()
       }
       request.onerror = () =>
