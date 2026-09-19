@@ -189,6 +189,44 @@ test('임차가 만료된 실행은 recover가 interrupted로 확정한다', asy
   expect((await second.ctx.generation.get('run'))?.status).toBe('interrupted')
 })
 
+test('실행을 회수당한 뒤 원래 스트림이 완료되어도 RUN_FINISHED를 전달하지 않는다', async (t) => {
+  const path = databasePath(t)
+  const first = await setup(t, { events: [] }, path)
+  const held = Promise.withResolvers<void>()
+  const collected = collect(
+    first.ctx.generation.run(request(), {
+      signal: new globalThis.AbortController().signal,
+      stream: async function* () {
+        yield reply[0]
+        await held.promise
+        yield reply[1]
+      }
+    })
+  )
+  collected.catch(() => {})
+  await new Promise((r) => setTimeout(r, 20))
+
+  // 실행 중인 프로세스가 임차를 연장하지 못해 다른 프로세스가 회수한 상황을 만든다.
+  const writer = new DatabaseSync(path)
+  try {
+    writer.prepare('UPDATE runs SET lease_expires_at = 0 WHERE run_id = ?').run('run')
+  } finally {
+    writer.close()
+  }
+  const second = await setup(t, { events: [] }, path)
+  expect(statuses(await second.ctx.generation.recover())).toEqual(['interrupted'])
+
+  // 회수된 뒤에도 원래 스트림은 정상 완료 지점까지 도달한다.
+  held.resolve()
+  const events = await collected
+  expect(events.some((event) => event.type === EventType.RUN_FINISHED)).toBe(false)
+
+  const run = await second.ctx.generation.get('run')
+  expect(run?.status).toBe('interrupted')
+  expect(run?.journal.some((entry) => entry.event.type === EventType.RUN_FINISHED)).toBe(false)
+  expect((await second.ctx.session.get('thread'))?.messages).toEqual([])
+})
+
 test('중복 runId는 기존 실행 상태를 변경하지 않는다', async (t) => {
   const { ctx } = await setup(t, { events: reply }, databasePath(t))
   const first = ctx.generation.run(request()) as AsyncIterableIterator<AGUIEvent>
