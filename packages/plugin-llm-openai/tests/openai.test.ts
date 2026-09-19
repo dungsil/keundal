@@ -227,6 +227,33 @@ test('생성 요청과 동일하게 변환한 대화, 컨텍스트, 도구의 �
   expect(rich).toStrictEqual(original)
 })
 
+test('암호화 값이 없는 추론은 재전송할 수 없으므로 요청에서 제외한다', async (t) => {
+  const { ctx, requests } = await setup(t, (incoming, response) => send(response, [completed]))
+  const truncated: LLMRequest = {
+    ...request,
+    input: {
+      ...request.input,
+      messages: [
+        { id: 'rs_eof', role: 'reasoning', content: 'Partial summary' },
+        { id: 'user-2', role: 'user', content: 'Continue' }
+      ]
+    }
+  }
+
+  await collect(ctx.llm.stream(truncated))
+
+  expect(requests[0].body).toStrictEqual({
+    model: 'test-model',
+    input: [{ role: 'user', content: 'Continue' }],
+    tools: [],
+    stream: true,
+    store: false,
+    max_output_tokens: 32,
+    truncation: 'disabled',
+    include: ['reasoning.encrypted_content']
+  })
+})
+
 test('도구 호출 이벤트가 교차해도 공급자 항목 ID와 AG-UI 도구 호출 ID를 구분한다', async (t) => {
   const first = { id: 'fc_1', type: 'function_call', call_id: 'call_1', name: 'clock', arguments: '' }
   const second = { id: 'fc_2', type: 'function_call', call_id: 'call_2', name: 'weather', arguments: '' }
