@@ -31,8 +31,9 @@ export class RunRecorder {
    */
   record(event: AGUIEvent): boolean {
     if (this.stopped) return false
-    this.pending.push(event)
+    // 조립이 거부한 이벤트는 journal 대상이 아니므로, 오류 경로의 flush가 남기지 않게 먼저 조립합니다.
     const message = this.assembly.apply(event)
+    this.pending.push(event)
     if (message) this.changed.set(message.id, message)
     if (this.pending.length === 1) this.deadline = Date.now() + JOURNAL_BATCH_INTERVAL_MS
     const due = this.pending.length >= JOURNAL_BATCH_SIZE || Date.now() >= (this.deadline ?? Infinity)
