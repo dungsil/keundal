@@ -93,7 +93,21 @@ export function createInput(request: LLMRequest): Pick<ResponseCreateParamsBase,
   if (parsed.context.length) {
     input.push({ role: 'user', content: JSON.stringify({ context: parsed.context }) })
   }
-  input.push(...parsed.messages.flatMap(convertMessage))
+  // 도구 결과는 앞선 도구 호출이 있어야 의미가 있습니다. Gemini·Anthropic 변환기처럼 호출 없는
+  // 결과를 공급자 요청 전에 거부해, 오류 발견 지점이 공급자로 밀리지 않게 합니다.
+  const seen = new Set<string>()
+  for (const message of parsed.messages) {
+    for (const item of convertMessage(message)) {
+      if ('call_id' in item && typeof item.call_id === 'string') {
+        if (item.type === 'function_call') {
+          seen.add(item.call_id)
+        } else if (item.type === 'function_call_output' && !seen.has(item.call_id)) {
+          throw new Error(`tool call result has no matching tool call: ${item.call_id}`)
+        }
+      }
+      input.push(item)
+    }
+  }
   return {
     model: request.model,
     input,
