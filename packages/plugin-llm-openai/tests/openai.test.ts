@@ -254,6 +254,24 @@ test('암호화 값이 없는 추론은 재전송할 수 없으므로 요청에�
   })
 })
 
+test('앞선 도구 호출 없는 도구 결과는 공급자 요청 전에 거부한다', async (t) => {
+  const { ctx, requests } = await setup(t, (incoming, response) => send(response, [completed]))
+  const orphan: LLMRequest = {
+    ...request,
+    input: {
+      ...request.input,
+      messages: [
+        { id: 'q1', role: 'user', content: 'question' },
+        { id: 'tool-1', role: 'tool', toolCallId: 'ghost', content: '{}' }
+      ]
+    }
+  }
+
+  await expect(ctx.llm.countTokens(orphan)).rejects.toThrow(/no matching tool call/)
+  await expect(collect(ctx.llm.stream(orphan))).rejects.toThrow(/no matching tool call/)
+  expect(requests).toEqual([])
+})
+
 test('도구 호출 이벤트가 교차해도 공급자 항목 ID와 AG-UI 도구 호출 ID를 구분한다', async (t) => {
   const first = { id: 'fc_1', type: 'function_call', call_id: 'call_1', name: 'clock', arguments: '' }
   const second = { id: 'fc_2', type: 'function_call', call_id: 'call_2', name: 'weather', arguments: '' }
