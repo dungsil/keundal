@@ -330,6 +330,16 @@ test('LLM 스트림 실패는 실행을 failed로 확정하고 부분 응답만 
   })
 })
 
+test('잘못된 스트림 이벤트는 저장 전에 거부하고 마지막 유효 journal만 보존한다', async (t) => {
+  const { ctx } = await setup(t, { events: [{ type: EventType.TOOL_CALL_ARGS, toolCallId: 'missing', delta: '{}' }] })
+  const iterator = ctx.generation.run(request('run'))[Symbol.asyncIterator]()
+  await iterator.next()
+  await expect(iterator.next()).rejects.toThrow(/no matching tool call/)
+  const run = await ctx.generation.get('run')
+  expect(run?.status).toBe('failed')
+  expect(run?.journal.map((entry) => entry.event.type)).toEqual([EventType.RUN_STARTED])
+})
+
 test('외부 취소는 실행을 cancelled로 확정하고 부분 journal을 보존한다', async (t) => {
   const { ctx, held } = await setup(t, { events: reply, holdAfter: 1 })
   const controller = new globalThis.AbortController()
