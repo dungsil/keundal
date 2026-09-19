@@ -15,7 +15,7 @@ import {
   type LLMRequest,
   type RunAgentInput
 } from '@keundal/core'
-import sqliteStorePlugin from '@keundal/plugin-store-sqlite'
+import sqliteStorePlugin, { SqliteStore } from '@keundal/plugin-store-sqlite'
 import { Context, type Fiber } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
 
@@ -243,6 +243,34 @@ test('커밋 실패는 성공 종료 journal을 노출하지 않고 recover 가�
   expect(run?.status).toBe('interrupted')
   expect(run?.journal.some((entry) => entry.event.type === EventType.RUN_FINISHED)).toBe(false)
   expect(statuses(await ctx.generation.recover())).toEqual(['interrupted'])
+})
+
+test('종료 확정이 반복해서 실패해도 원래 스트림 오류를 보존한다', async (t) => {
+  const path = databasePath(t)
+  const { ctx } = await setup(t, { events: [] }, path)
+  const failure = new Error('llm stream failed')
+
+  await expect(
+    collect(
+      ctx.generation.run(request(), {
+        stream: async function* () {
+          yield { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' }
+          // 종료 확정(플러시)도 함께 실패하도록 스트림 실패 전에 실행 기록 테이블을 없앤다.
+          const breaker = new DatabaseSync(path)
+          try {
+            breaker.exec('DROP TABLE runs')
+          } finally {
+            breaker.close()
+          }
+          throw failure
+        }
+      })
+    )
+  ).rejects.toThrow('llm stream failed')
+
+  // 해제 경로가 저장소를 다시 쓸 수 있게 스키마를 복원한다.
+  const restorer = new SqliteStore(path)
+  restorer.release()
 })
 
 test('완료한 실행은 재등록 뒤에도 completed를 유지한다', async (t) => {
