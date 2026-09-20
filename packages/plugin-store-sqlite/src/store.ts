@@ -89,6 +89,7 @@ CREATE INDEX IF NOT EXISTS run_messages_order ON run_messages (run_id, position)
 const BUSY_TIMEOUT_MS = 5_000
 
 const READ_THREAD = 'SELECT revision, state FROM threads WHERE thread_id = ?'
+const READ_THREADS = 'SELECT thread_id, revision, state FROM threads ORDER BY rowid'
 const READ_THREAD_MESSAGES = 'SELECT message FROM thread_messages WHERE thread_id = ? ORDER BY position'
 const ENSURE_THREAD =
   'INSERT INTO threads (thread_id, revision, state) VALUES (?, 0, NULL) ON CONFLICT (thread_id) DO NOTHING'
@@ -124,6 +125,12 @@ const REFRESH_LEASES = `UPDATE runs SET lease_expires_at = ? WHERE status = 'run
 const RELEASE_LEASES = `UPDATE runs SET lease_expires_at = NULL WHERE status = 'running' AND owner_id = ?`
 
 interface ThreadRow {
+  readonly revision: number
+  readonly state: string | null
+}
+
+interface ThreadListRow {
+  readonly thread_id: string
   readonly revision: number
   readonly state: string | null
 }
@@ -225,6 +232,18 @@ export class SqliteStore {
       ),
       state: row.state === null ? undefined : parse<RunAgentInput['state']>(row.state)
     }
+  }
+
+  /** 저장된 모든 스레드를 등록 순서로 읽습니다. */
+  listThreads(): Array<{ threadId: string } & StoredThread> {
+    return this.rows<ThreadListRow>(READ_THREADS).map((row) => ({
+      threadId: row.thread_id,
+      revision: row.revision,
+      messages: this.rows<MessageRow>(READ_THREAD_MESSAGES, row.thread_id).map((message) =>
+        parse<AgentMessage>(message.message)
+      ),
+      state: row.state === null ? undefined : parse<RunAgentInput['state']>(row.state)
+    }))
   }
 
   /** 스레드가 없으면 revision 0인 빈 스레드를 만듭니다. */

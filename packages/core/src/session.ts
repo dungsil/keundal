@@ -37,6 +37,9 @@ export abstract class SessionService extends Service {
 
   abstract get(threadId: string, options?: ExecutionOptions): Promise<SessionSnapshot | undefined>
 
+  /** 저장된 모든 스레드의 스냅숏을 저장소가 정한 안정적인 순서로 돌려줍니다. */
+  abstract list(options?: ExecutionOptions): Promise<SessionSnapshot[]>
+
   abstract prepare(input: RunAgentInput, options?: ExecutionOptions): Promise<PreparedSession>
 
   /**
