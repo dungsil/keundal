@@ -165,8 +165,8 @@ settings:
 catalogs:
   default:
     '@ag-ui/core':
-      specifier: 0.0.59
-      version: 0.0.59
+      specifier: 1.0.0
+      version: 1.0.0
     '@anthropic-ai/sdk':
       specifier: 0.126.0
       version: 0.126.0
@@ -339,7 +339,7 @@ importers:
     dependencies:
       '@ag-ui/core':
         specifier: 'catalog:'
-        version: 0.0.59
+        version: 1.0.0(zod@3.25.76)
       '@standard-schema/spec':
         specifier: 'catalog:'
         version: 1.1.0
@@ -649,8 +649,13 @@ importers:
 
 packages:
 
-  '@ag-ui/core@0.0.59':
-    resolution: {integrity: sha512-hDgy4ipTqXieT8YG8Mr917Y+FD/f11VK1GefZ5CwTDCuNqS/oTwjJ5l/DZkicThgS8hQW/Y7wPylPBMBJ8BkUg==}
+  '@ag-ui/core@1.0.0':
+    resolution: {integrity: sha512-yCRhsQvb4+lmGMrDsi4TOJxqKpm/kb3H64wwL+Z90jNVrkhy17RErfzsNgybfbjNKLM0nenEDYDVJsZHJJSigQ==}
+    peerDependencies:
+      zod: ^3.25.18 || ^4.0.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
 
   '@anthropic-ai/sdk@0.126.0':
     resolution: {integrity: sha512-VhiZl6rA/8uC+MgDaOhEcAWaIZ2tPnIY885jlZqxrGrutUW2nqCtophBtlsX0tk5kChBUjV/1NVjL3y0M4OwUg==}
@@ -2028,8 +2033,8 @@ packages:
 
 snapshots:
 
-  '@ag-ui/core@0.0.59':
-    dependencies:
+  '@ag-ui/core@1.0.0(zod@3.25.76)':
+    optionalDependencies:
       zod: 3.25.76
 
   '@anthropic-ai/sdk@0.126.0(zod@3.25.76)':
@@ -2895,4 +2900,5 @@ snapshots:
       '@yuku-parser/binding-win32-arm64': 0.9.5
       '@yuku-parser/binding-win32-x64': 0.9.5
 
-  zod@3.25.76: {}
+  zod@3.25.76:
+    optional: true
