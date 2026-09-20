@@ -446,3 +446,134 @@ test('설정은 실행 함수를 보존하고 중복 도구와 잘못된 반복 
     expect(result.issues?.length).toBeGreaterThan(0)
   }
 })
+
+const callEvents = (toolCallId: string, toolCallName: string): LLMEvent[] => [
+  { type: EventType.TOOL_CALL_START, toolCallId, toolCallName },
+  { type: EventType.TOOL_CALL_ARGS, toolCallId, delta: '{}' },
+  { type: EventType.TOOL_CALL_END, toolCallId }
+]
+const answerEvents = (messageId: string): LLMEvent[] => [
+  { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' },
+  { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: 'done' },
+  { type: EventType.TEXT_MESSAGE_END, messageId }
+]
+
+test('parallelTools를 켜면 실행이 겹치고 결과는 호출 순서대로 전달된다', async (t) => {
+  const markers: string[] = []
+  const gate = Promise.withResolvers<void>()
+  const tools: ExecutableTool[] = [
+    {
+      name: 'slow',
+      description: 'slow',
+      parameters: { type: 'object', properties: {} },
+      execute: async () => {
+        markers.push('slow-start')
+        await gate.promise
+        markers.push('slow-done')
+        return 'slow-result'
+      }
+    },
+    {
+      name: 'fast',
+      description: 'fast',
+      parameters: { type: 'object', properties: {} },
+      execute: async () => {
+        markers.push('fast-start')
+        markers.push('fast-done')
+        return 'fast-result'
+      }
+    }
+  ]
+  const { ctx } = await setup(
+    t,
+    [[...callEvents('call-slow', 'slow'), ...callEvents('call-fast', 'fast')], answerEvents('answer')],
+    { tools, parallelTools: true }
+  )
+  const collected = collect(ctx.agent.run(input))
+  collected.catch(() => {})
+
+  // 느린 도구가 끝나기를 기다리지 않고 빠른 도구가 먼저 끝난다.
+  await expect.poll(() => markers).toStrictEqual(['slow-start', 'fast-start', 'fast-done'])
+  gate.resolve()
+  const events = await collected
+
+  expect(
+    events
+      .filter((event) => event.type === EventType.TOOL_CALL_RESULT)
+      .map((event) => (event.type === EventType.TOOL_CALL_RESULT ? event.toolCallId : ''))
+  ).toEqual(['call-slow', 'call-fast'])
+})
+
+test('parallelTools를 끄면 실행이 순차적으로 진행된다', async (t) => {
+  const markers: string[] = []
+  const tools: ExecutableTool[] = [
+    {
+      name: 'slow',
+      description: 'slow',
+      parameters: { type: 'object', properties: {} },
+      execute: async () => {
+        markers.push('slow-start')
+        markers.push('slow-done')
+        return 'slow-result'
+      }
+    },
+    {
+      name: 'fast',
+      description: 'fast',
+      parameters: { type: 'object', properties: {} },
+      execute: async () => {
+        markers.push('fast-start')
+        markers.push('fast-done')
+        return 'fast-result'
+      }
+    }
+  ]
+  const { ctx } = await setup(
+    t,
+    [[...callEvents('call-slow', 'slow'), ...callEvents('call-fast', 'fast')], answerEvents('answer')],
+    { tools }
+  )
+
+  const events = await collect(ctx.agent.run(input))
+
+  expect(markers).toEqual(['slow-start', 'slow-done', 'fast-start', 'fast-done'])
+  expect(
+    events
+      .filter((event) => event.type === EventType.TOOL_CALL_RESULT)
+      .map((event) => (event.type === EventType.TOOL_CALL_RESULT ? event.toolCallId : ''))
+  ).toEqual(['call-slow', 'call-fast'])
+})
+
+test('병렬 실행에서 먼저 실패한 호출의 오류를 순서대로 전달한다', async (t) => {
+  const markers: string[] = []
+  const tools: ExecutableTool[] = [
+    {
+      name: 'boom',
+      description: 'boom',
+      parameters: { type: 'object', properties: {} },
+      execute: async () => {
+        markers.push('boom-start')
+        throw new Error('boom failed')
+      }
+    },
+    {
+      name: 'good',
+      description: 'good',
+      parameters: { type: 'object', properties: {} },
+      execute: async () => {
+        markers.push('good-start')
+        markers.push('good-done')
+        return 'good-result'
+      }
+    }
+  ]
+  const { ctx } = await setup(
+    t,
+    [[...callEvents('call-boom', 'boom'), ...callEvents('call-good', 'good')], answerEvents('answer')],
+    { tools, parallelTools: true }
+  )
+
+  await expect(collect(ctx.agent.run(input))).rejects.toThrow('boom failed')
+  // 겹쳐 시작된 나머지 실행은 이미 수행됐지만 결과는 기록되지 않습니다.
+  expect(markers).toEqual(['boom-start', 'good-start', 'good-done'])
+})

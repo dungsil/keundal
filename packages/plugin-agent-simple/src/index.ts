@@ -20,6 +20,8 @@ export interface SimpleAgentConfig {
   readonly tools?: readonly ExecutableTool[]
   /** 도구를 실행하고 후속 생성을 요청할 최대 횟수입니다. 기본값은 8입니다. */
   readonly maxToolRounds?: number
+  /** 같은 응답의 도구 실행을 겹쳐 시작합니다. 기본값은 false로 순차 실행입니다. */
+  readonly parallelTools?: boolean
 }
 
 const simpleAgentConfigSchema: StandardSchemaV1<SimpleAgentConfig, SimpleAgentConfig> = {
@@ -48,13 +50,16 @@ const simpleAgentConfigSchema: StandardSchemaV1<SimpleAgentConfig, SimpleAgentCo
           if (typeof maxToolRounds !== 'number' || !Number.isSafeInteger(maxToolRounds) || maxToolRounds <= 0) {
             throw new Error('maxToolRounds must be a positive integer')
           }
+          const parallelTools = 'parallelTools' in value ? value.parallelTools : false
+          if (typeof parallelTools !== 'boolean') throw new Error('parallelTools must be a boolean')
           return {
             value: {
               model: value.model,
               maxOutputTokens: value.maxOutputTokens,
               compaction: compaction.value,
               tools,
-              maxToolRounds
+              maxToolRounds,
+              parallelTools
             }
           }
         } catch (error) {
@@ -178,7 +183,8 @@ export class SimpleAgent extends Service {
                     tools,
                     this.config.maxToolRounds ?? 8,
                     async (next) => (await this.fitInput(next, maxInputTokens, generationSignal)).input,
-                    generationSignal
+                    generationSignal,
+                    { parallel: this.config.parallelTools ?? false }
                   )
                 }
               }
