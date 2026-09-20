@@ -20,7 +20,7 @@
     "oxlint": "1.83.0",
     "oxlint-tsgolint": "7.0.2001",
     "simple-git-hooks": "2.14.0",
-    "turbo": "2.10.12",
+    "turbo": "2.10.13",
     "typescript": "catalog:"
   },
   "simple-git-hooks": {
