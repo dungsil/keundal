@@ -40,6 +40,12 @@ export class MemorySessionService extends SessionService {
     return thread ? snapshot(threadId, thread) : undefined
   }
 
+  async list(options?: ExecutionOptions): Promise<SessionSnapshot[]> {
+    this.assertOpen()
+    options?.signal?.throwIfAborted()
+    return [...this.store.threads.entries()].map(([threadId, thread]) => snapshot(threadId, thread))
+  }
+
   async prepare(input: RunAgentInput, options?: ExecutionOptions): Promise<PreparedSession> {
     this.assertOpen()
     options?.signal?.throwIfAborted()

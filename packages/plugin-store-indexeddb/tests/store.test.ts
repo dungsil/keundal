@@ -648,3 +648,35 @@ test('소비자가 순회를 중단해도 플러시된 journal로 복구한다',
   expect(await second.ctx.generation.get('run')).toEqual(expected)
   expect(second.methodCalls).toEqual([])
 })
+
+test('list는 스레드를 id 순으로, 실행을 runId 순으로 돌려준다', async (t) => {
+  const factory = new IDBFactory()
+  const locks = new Locks()
+  const store = new IndexedDBStore({
+    databaseName: `list-${globalThis.crypto.randomUUID()}`,
+    indexedDB: factory,
+    locks
+  })
+  const { ctx } = await setup(t, [], store)
+  await ctx.session.commit({
+    threadId: 'beta',
+    expectedRevision: 0,
+    messages: [{ id: 'm1', role: 'user', content: 'one' }],
+    state: undefined
+  })
+  for await (const _event of ctx.generation.run(request('z-run'))) void _event
+  await ctx.session.commit({
+    threadId: 'alpha',
+    expectedRevision: 0,
+    messages: [{ id: 'm2', role: 'user', content: 'two' }],
+    state: undefined
+  })
+
+  const sessions = await ctx.session.list()
+  expect(sessions.map((snapshot) => snapshot.threadId)).toEqual(['alpha', 'beta', 'thread'])
+  expect(sessions.map((snapshot) => snapshot.revision)).toEqual([1, 1, 1])
+
+  const runs = await ctx.generation.list()
+  expect(runs.map((snapshot) => snapshot.request.input.runId)).toEqual(['z-run'])
+  expect(runs[0]?.status).toBe('completed')
+})

@@ -110,6 +110,12 @@ export class IndexedDBGenerationService extends GenerationService {
     return this.store.getRun(runId)
   }
 
+  async list(options?: ExecutionOptions): Promise<GenerationSnapshot[]> {
+    this.assertOpen()
+    options?.signal?.throwIfAborted()
+    return this.store.listRuns()
+  }
+
   async recover(options?: ExecutionOptions): Promise<GenerationSnapshot[]> {
     this.assertOpen()
     const signal = options?.signal ?? new globalThis.AbortController().signal
