@@ -1,0 +1,39 @@
+{
+  "name": "@keundal/server",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./app": {
+      "types": "./dist/app.d.ts",
+      "import": "./dist/app.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@keundal/core": "workspace:*",
+    "@keundal/plugin-agent-simple": "workspace:*",
+    "@keundal/plugin-llm-anthropic": "workspace:*",
+    "@keundal/plugin-llm-gemini": "workspace:*",
+    "@keundal/plugin-llm-openai": "workspace:*",
+    "@keundal/plugin-store-sqlite": "workspace:*",
+    "cordis": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/plugin-store-memory": "workspace:*",
+    "@keundal/tsconfig": "workspace:*",
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
