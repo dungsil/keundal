@@ -1,0 +1,24 @@
+{
+  "name": "@keundal/example-basic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@keundal/core": "workspace:*",
+    "@keundal/plugin-agent-simple": "workspace:*",
+    "@keundal/plugin-llm-openai": "workspace:*",
+    "@keundal/plugin-store-sqlite": "workspace:*",
+    "cordis": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/tsconfig": "workspace:*",
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  }
+}

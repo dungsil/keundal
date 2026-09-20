@@ -19,5 +19,6 @@ catalog:
 
 packages:
   - apps/*
+  - examples/*
   - packages/*
   - tools/*

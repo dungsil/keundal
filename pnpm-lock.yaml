@@ -227,6 +227,40 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  examples/basic:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@keundal/plugin-agent-simple':
+        specifier: workspace:*
+        version: link:../../packages/plugin-agent-simple
+      '@keundal/plugin-llm-openai':
+        specifier: workspace:*
+        version: link:../../packages/plugin-llm-openai
+      '@keundal/plugin-store-sqlite':
+        specifier: workspace:*
+        version: link:../../packages/plugin-store-sqlite
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.10
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.4
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(typescript@6.0.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
   packages/compaction:
     dependencies:
       '@keundal/core':
