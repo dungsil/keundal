@@ -161,6 +161,54 @@ test('사용자 턴을 가로지르는 도구 호출부터 결과까지 원래 �
   expect(JSON.parse(history.content).messages).toStrictEqual([input.messages[1], input.messages[2]])
 })
 
+test('보존 영역의 도구 결과가 사용자 턴을 가로질러 호출과 함께 보존된다', async (t) => {
+  const { compact } = await setup(t)
+  const data: RunAgentInput = {
+    ...input,
+    messages: [
+      ...input.messages.slice(0, 3),
+      { id: 'u1', role: 'user', content: 'turn one' },
+      {
+        id: 'a2',
+        role: 'assistant',
+        toolCalls: [{ id: 'call-2', type: 'function', function: { name: 'lookup', arguments: '{"key":"b"}' } }]
+      },
+      { id: 'u2', role: 'user', content: 'turn two' },
+      {
+        id: 'a1',
+        role: 'assistant',
+        toolCalls: [{ id: 'call-1', type: 'function', function: { name: 'lookup', arguments: '{"key":"a"}' } }]
+      },
+      { id: 't2', role: 'tool', toolCallId: 'call-2', content: 'found b' },
+      { id: 't1', role: 'tool', toolCallId: 'call-1', content: 'found a' },
+      { id: 'u3', role: 'user', content: 'turn three' },
+      { id: 'u4', role: 'user', content: 'answer now' }
+    ]
+  }
+  // 초기 경계가 t1에 걸치고, t1이 경계를 u1 앞으로 당긴 뒤 t2가 a2까지 한 번 더 당기는
+  // 되감기 연쇄를 만든다.
+  const result = await compact(data, 1000, { keepRecentMessages: 3 })
+
+  // 요약 턴(UUID id)이 시스템 지침과 보존 영역 사이에 삽입된다.
+  expect(result.messages[0]?.id).toBe('system')
+  expect(
+    result.messages[1]?.role === 'user' &&
+      typeof result.messages[1]?.content === 'string' &&
+      result.messages[1]?.content.includes('Earlier facts.')
+  ).toBe(true)
+  expect(result.messages.slice(2).map((message) => message.id)).toStrictEqual([
+    'u1',
+    'a2',
+    'u2',
+    'a1',
+    't2',
+    't1',
+    'u3',
+    'u4'
+  ])
+  expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
+})
+
 test('보존할 대화가 예산을 넘으면 모델을 호출하기 전에 거부한다', async (t) => {
   const { compact, requests } = await setup(t)
   await expect(
