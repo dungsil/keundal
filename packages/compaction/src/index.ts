@@ -96,14 +96,20 @@ export async function compact(
   // 최근 사용자 턴 전체를 보존하여 도구 호출과 결과가 분리되지 않게 합니다.
   let boundary = Math.max(0, input.messages.length - config.keepRecentMessages)
   while (boundary > 0 && input.messages[boundary]?.role !== 'user') boundary--
+  // 도구 호출 id를 첫 어시스턴트 호스트의 위치에 연결해 경계 스캔의 조회를 상수 시간으로 만듭니다.
+  const callHosts = new Map<string, number>()
+  for (let index = 0; index < input.messages.length; index++) {
+    const message = input.messages[index]
+    if (message.role !== 'assistant') continue
+    for (const call of message.toolCalls ?? []) {
+      if (!callHosts.has(call.id)) callHosts.set(call.id, index)
+    }
+  }
   // 사용자 메시지 사이를 가로지르는 도구 결과도 호출과 함께 보존합니다.
   for (let index = boundary; index < input.messages.length; index++) {
     const message = input.messages[index]
     if (message.role !== 'tool') continue
-    const callIndex = input.messages.findIndex(
-      (candidate) =>
-        candidate.role === 'assistant' && candidate.toolCalls?.some((call) => call.id === message.toolCallId)
-    )
+    const callIndex = callHosts.get(message.toolCallId) ?? -1
     if (callIndex >= 0 && callIndex < boundary) {
       boundary = callIndex
       while (boundary > 0 && input.messages[boundary]?.role !== 'user') boundary--
