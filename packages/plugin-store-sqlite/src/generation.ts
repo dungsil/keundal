@@ -135,6 +135,12 @@ export class SqliteGenerationService extends GenerationService {
     return run && snapshot(run)
   }
 
+  async list(options?: ExecutionOptions): Promise<GenerationSnapshot[]> {
+    this.assertOpen()
+    options?.signal?.throwIfAborted()
+    return this.store.listRuns().map(snapshot)
+  }
+
   /**
    * 저장된 부분 응답과 실행 상태를 복원합니다. 다른 소유자가 임차를 연장하고 있는 실행은 실행 중으로
    * 두고, 그 밖의 미완료 실행은 interrupted로 확정합니다. LLM은 다시 호출하지 않습니다.

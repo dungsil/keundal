@@ -90,6 +90,7 @@ async function setup(testContext: TestContext, overrides: Overrides = {}) {
       return overrides.prepare?.(request, options) ?? { input: globalThis.structuredClone(request), revision: 7 }
     }
     get = unexpected
+    list = unexpected
     commit = unexpected
   }
   class Generation extends GenerationService {
@@ -106,6 +107,7 @@ async function setup(testContext: TestContext, overrides: Overrides = {}) {
       })()
     }
     get = unexpected
+    list = unexpected
     recover = unexpected
   }
   const fibers: Fiber[] = []

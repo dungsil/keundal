@@ -363,3 +363,28 @@ test('LLM 응답을 기다리던 실행은 저장소 재등록 뒤 복구하면 
   expect(recovered[0]?.messages).toEqual([{ id: 'reply', role: 'assistant', content: 'hello' }])
   expect(calls.filter((call) => call === 'stream')).toEqual(['stream'])
 })
+
+test('list는 스레드와 실행을 등록 순서로 돌려준다', async (t) => {
+  const { ctx } = await setup(t, { events: reply })
+  await ctx.session.commit({
+    threadId: 'first',
+    expectedRevision: 0,
+    messages: [{ id: 'm1', role: 'user', content: 'one' }],
+    state: undefined
+  })
+  await collect(ctx.generation.run(request('run')))
+  await ctx.session.commit({
+    threadId: 'second',
+    expectedRevision: 0,
+    messages: [{ id: 'm2', role: 'user', content: 'two' }],
+    state: undefined
+  })
+
+  const sessions = await ctx.session.list()
+  expect(sessions.map((snapshot) => snapshot.threadId)).toEqual(['first', 'thread', 'second'])
+  expect(sessions.map((snapshot) => snapshot.revision)).toEqual([1, 1, 1])
+
+  const runs = await ctx.generation.list()
+  expect(runs.map((snapshot) => snapshot.request.input.runId)).toEqual(['run'])
+  expect(runs[0]?.status).toBe('completed')
+})

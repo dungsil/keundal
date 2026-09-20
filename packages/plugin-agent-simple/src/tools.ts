@@ -68,7 +68,8 @@ export async function* streamWithTools(
   tools: readonly ExecutableTool[],
   maxToolRounds: number,
   prepareInput: (input: RunAgentInput) => Promise<RunAgentInput>,
-  signal: AbortSignal
+  signal: AbortSignal,
+  options: { parallel?: boolean } = {}
 ): AsyncGenerator<LLMEvent> {
   const registered = new Map(tools.map((tool) => [tool.name, tool]))
   const usedIds = new Set(
@@ -120,25 +121,53 @@ export async function* streamWithTools(
       if (!isObject(args)) throw new Error(`tool arguments must be a JSON object: ${call.name}`)
       return { call, tool, args }
     })
-    for (const { call, tool, args } of executions) {
-      signal.throwIfAborted()
-      const content = await tool.execute(args, {
-        threadId: request.input.threadId,
-        runId: request.input.runId,
-        toolCallId: call.id,
-        signal
-      })
-      signal.throwIfAborted()
-      if (typeof content !== 'string') throw new Error(`tool result must be a string: ${call.name}`)
-      const event: LLMEvent = {
-        type: EventType.TOOL_CALL_RESULT,
-        messageId: globalThis.crypto.randomUUID(),
-        toolCallId: call.id,
-        role: 'tool',
-        content
+    const executionContext = (call: PendingCall): ToolExecutionContext => ({
+      threadId: request.input.threadId,
+      runId: request.input.runId,
+      toolCallId: call.id,
+      signal
+    })
+    if (options.parallel) {
+      // 실행을 겹쳐 시작하고 결과는 호출 순서대로 전달합니다. 순서가 되기 전에 실패한 실행이
+      // 있으면 그 오류를 전달하고, 아직 전달하지 않은 나머지 실행의 결과는 기록하지 않습니다.
+      // 감싼 거부는 순서가 될 때까지 처리되지 않으므로 원래 오류를 보존하려 상자로 받습니다.
+      const pending = executions.map(({ call, tool, args }) => ({
+        call,
+        tool,
+        task: Promise.resolve(tool.execute(args, executionContext(call))).catch((error: unknown) => error)
+      }))
+      for (const { call, tool, task } of pending) {
+        signal.throwIfAborted()
+        const content = await task
+        signal.throwIfAborted()
+        if (content instanceof Error) throw content
+        if (typeof content !== 'string') throw new Error(`tool result must be a string: ${tool.name}`)
+        const event: LLMEvent = {
+          type: EventType.TOOL_CALL_RESULT,
+          messageId: globalThis.crypto.randomUUID(),
+          toolCallId: call.id,
+          role: 'tool',
+          content
+        }
+        assembly.apply(event)
+        yield event
       }
-      assembly.apply(event)
-      yield event
+    } else {
+      for (const { call, tool, args } of executions) {
+        signal.throwIfAborted()
+        const content = await tool.execute(args, executionContext(call))
+        signal.throwIfAborted()
+        if (typeof content !== 'string') throw new Error(`tool result must be a string: ${tool.name}`)
+        const event: LLMEvent = {
+          type: EventType.TOOL_CALL_RESULT,
+          messageId: globalThis.crypto.randomUUID(),
+          toolCallId: call.id,
+          role: 'tool',
+          content
+        }
+        assembly.apply(event)
+        yield event
+      }
     }
     rounds++
     signal.throwIfAborted()

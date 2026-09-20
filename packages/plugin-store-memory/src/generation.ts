@@ -124,6 +124,12 @@ export class MemoryGenerationService extends GenerationService {
     const r = this.store.runs.get(runId)
     return r ? snapshot(r) : undefined
   }
+
+  async list(options?: ExecutionOptions): Promise<GenerationSnapshot[]> {
+    this.assertOpen()
+    options?.signal?.throwIfAborted()
+    return [...this.store.runs.values()].map(snapshot)
+  }
   async recover(options?: ExecutionOptions): Promise<GenerationSnapshot[]> {
     this.assertOpen()
     options?.signal?.throwIfAborted()

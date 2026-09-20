@@ -47,6 +47,9 @@ export abstract class GenerationService extends Service {
 
   abstract get(runId: string, options?: ExecutionOptions): Promise<GenerationSnapshot | undefined>
 
+  /** 저장된 모든 실행의 스냅숏을 저장소가 정한 안정적인 순서로 돌려줍니다. 상태는 바꾸지 않습니다. */
+  abstract list(options?: ExecutionOptions): Promise<GenerationSnapshot[]>
+
   /**
    * 마지막 내구성 저장 지점까지 부분 응답과 상태를 복원하고 미완료 실행을 interrupted로
    * 확정합니다. LLM 재호출이나 자동 재시도는 수행하지 않습니다.

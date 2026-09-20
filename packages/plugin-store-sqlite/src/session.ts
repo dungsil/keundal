@@ -45,6 +45,17 @@ export class SqliteSessionService extends SessionService {
     return thread && snapshot(threadId, thread)
   }
 
+  async list(options?: ExecutionOptions): Promise<SessionSnapshot[]> {
+    this.assertOpen()
+    options?.signal?.throwIfAborted()
+    return this.store.listThreads().map(({ threadId, revision, messages, state }) => ({
+      threadId,
+      revision,
+      messages,
+      state
+    }))
+  }
+
   async prepare(input: RunAgentInput, options?: ExecutionOptions): Promise<PreparedSession> {
     this.assertOpen()
     options?.signal?.throwIfAborted()

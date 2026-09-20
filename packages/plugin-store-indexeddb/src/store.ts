@@ -85,6 +85,19 @@ export class IndexedDBStore {
     return stored && snapshotThread(stored)
   }
 
+  /** 저장된 모든 스레드를 threadId 사전순으로 읽습니다. */
+  async listThreads(signal?: AbortSignal): Promise<SessionSnapshot[]> {
+    return this.transaction(
+      [THREADS],
+      'readonly',
+      async (transaction) => {
+        const stored = await request<StoredThread[]>(transaction.objectStore(THREADS).getAll())
+        return stored.sort((a, b) => a.threadId.localeCompare(b.threadId)).map(snapshotThread)
+      },
+      signal
+    )
+  }
+
   async prepareThread(threadId: string, signal?: AbortSignal): Promise<StoredThread | undefined> {
     return this.transaction(
       [THREADS],

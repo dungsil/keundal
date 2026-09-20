@@ -32,6 +32,12 @@ export class IndexedDBSessionService extends SessionService {
     return this.store.getThread(threadId, options?.signal)
   }
 
+  async list(options?: ExecutionOptions): Promise<SessionSnapshot[]> {
+    this.assertOpen()
+    options?.signal?.throwIfAborted()
+    return this.store.listThreads(options?.signal)
+  }
+
   async prepare(input: RunAgentInput, options?: ExecutionOptions): Promise<PreparedSession> {
     this.assertOpen()
     options?.signal?.throwIfAborted()
