@@ -8,7 +8,7 @@ savePrefix: ''
 catalog:
   '@ag-ui/core': 0.0.59
   '@anthropic-ai/sdk': 0.126.0
-  '@google/genai': 2.22.0
+  '@google/genai': 2.23.0
   '@types/node': 24.13.4
   '@standard-schema/spec': 1.1.0
   cordis: 4.0.0-rc.10
