@@ -150,8 +150,7 @@ export function createInput(
             {
               type: 'tool_result',
               tool_use_id: message.toolCallId,
-              content:
-                typeof message.content === 'string' ? message.content : message.content.map(convertContent)
+              content: typeof message.content === 'string' ? message.content : message.content.map(convertContent)
             }
           ]
         })
