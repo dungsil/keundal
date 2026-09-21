@@ -17,9 +17,7 @@ function convertContent(part: UserContent): ResponseInputContent {
       type: 'input_image',
       detail: 'auto',
       image_url:
-        part.source.type === 'url'
-          ? part.source.value
-          : `data:${part.source.mimeType};base64,${part.source.value}`
+        part.source.type === 'url' ? part.source.value : `data:${part.source.mimeType};base64,${part.source.value}`
     }
   }
   throw new Error(`unsupported OpenAI input content: ${part.type}`)
