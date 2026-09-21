@@ -90,9 +90,9 @@ export function createAgentApp(services: AgentAppServices): RequestListener {
       }
 
       sendJson(response, 404, { error: `no route for ${request.method} ${url.pathname}` })
-    } catch (error) {
+    } catch {
       if (!response.headersSent) {
-        sendJson(response, 400, { error: String((error as Error)?.message ?? error) })
+        sendJson(response, 400, { error: 'invalid request' })
       } else if (!response.writableEnded) {
         response.end()
       }
