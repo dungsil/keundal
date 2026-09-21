@@ -64,7 +64,13 @@ function convertMessage(message: AgentMessage): ResponseInput {
       return items
     }
     case 'tool':
-      return [{ type: 'function_call_output', call_id: message.toolCallId, output: message.content }]
+      return [
+        {
+          type: 'function_call_output',
+          call_id: message.toolCallId,
+          output: typeof message.content === 'string' ? message.content : message.content.map(convertContent)
+        }
+      ]
     case 'reasoning':
       // store: false로 요청할 때 추론 항목은 encrypted_content 없이 다시 보낼 수 없습니다. 스트림이
       // 끊겨 암호화 값을 받지 못한 추론을 요약만 담아 보내면 이후 요청이 모두 거부되므로 제외합니다.

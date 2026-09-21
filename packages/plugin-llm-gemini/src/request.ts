@@ -1,4 +1,4 @@
-import type { FunctionDeclaration, Content, Part, Tool } from '@google/genai'
+import type { Content, FunctionDeclaration, FunctionResponsePart, Part, Tool } from '@google/genai'
 import { parseRunAgentInput, type AgentMessage, type AgentTool, type LLMRequest } from '@keundal/core'
 
 type AssistantMessage = Extract<AgentMessage, { role: 'assistant' }>
@@ -49,7 +49,7 @@ function convertAssistantMessage(message: AssistantMessage): Content | undefined
   return parts.length ? { role: 'model', parts } : undefined
 }
 
-function convertToolResponse(content: string): Record<string, unknown> {
+function convertToolTextResponse(content: string): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(content)
     if (isRecord(parsed)) return parsed
@@ -59,10 +59,45 @@ function convertToolResponse(content: string): Record<string, unknown> {
   return { output: content }
 }
 
+function convertToolMediaPart(part: UserContent): FunctionResponsePart[] {
+  if (part.type === 'text') return []
+  if (part.source.type === 'data') {
+    return [{ inlineData: { mimeType: part.source.mimeType, data: part.source.value } }]
+  }
+  return [
+    {
+      fileData: {
+        fileUri: part.source.value,
+        ...(part.source.mimeType ? { mimeType: part.source.mimeType } : {})
+      }
+    }
+  ]
+}
+
 function convertToolMessage(message: ToolMessage, callNames: Map<string, string>): Content {
   const name = callNames.get(message.toolCallId)
   if (!name) throw new Error(`Gemini tool message has no matching tool call: ${message.toolCallId}`)
-  return { role: 'user', parts: [{ functionResponse: { name, response: convertToolResponse(message.content) } }] }
+  if (typeof message.content === 'string') {
+    return {
+      role: 'user',
+      parts: [{ functionResponse: { name, response: convertToolTextResponse(message.content) } }]
+    }
+  }
+
+  const text = message.content.flatMap((part) => (part.type === 'text' ? [part.text] : [])).join('')
+  const parts = message.content.flatMap(convertToolMediaPart)
+  return {
+    role: 'user',
+    parts: [
+      {
+        functionResponse: {
+          name,
+          ...(text ? { response: convertToolTextResponse(text) } : {}),
+          ...(parts.length ? { parts } : {})
+        }
+      }
+    ]
+  }
 }
 
 function convertReasoningMessage(message: ReasoningMessage): Content | undefined {

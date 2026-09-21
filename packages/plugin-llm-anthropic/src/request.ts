@@ -1,6 +1,7 @@
 import type {
   Base64ImageSource,
   ContentBlockParam,
+  ImageBlockParam,
   MessageCountTokensParams,
   TextBlockParam,
   Tool
@@ -33,7 +34,7 @@ function imageData(data: string | undefined, mimeType: string): Base64ImageSourc
   return { type: 'base64', media_type: mimeType, data }
 }
 
-function convertContent(part: UserContent): ContentBlockParam {
+function convertContent(part: UserContent): TextBlockParam | ImageBlockParam {
   if (part.type === 'text') return { type: 'text', text: part.text }
   if (part.type === 'image') {
     if (part.source.type === 'url') {
@@ -145,7 +146,14 @@ export function createInput(
       case 'tool':
         appendMessage(messages, {
           role: 'user',
-          content: [{ type: 'tool_result', tool_use_id: message.toolCallId, content: message.content }]
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: message.toolCallId,
+              content:
+                typeof message.content === 'string' ? message.content : message.content.map(convertContent)
+            }
+          ]
         })
         break
       case 'reasoning':
