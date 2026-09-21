@@ -170,7 +170,10 @@ test('생성 요청과 동일하게 변환한 대화, 컨텍스트, 도구의 �
             { type: 'text', text: 'What is shown?' },
             { type: 'image', source: { type: 'url', value: 'https://example.com/image.png' } },
             { type: 'image', source: { type: 'data', value: 'AA==', mimeType: 'image/png' } },
-            { type: 'binary', id: 'file_1', mimeType: 'image/png' }
+            {
+              type: 'image',
+              source: { type: 'file', value: 'file_1', provider: 'openai', mimeType: 'image/png' }
+            }
           ]
         },
         {

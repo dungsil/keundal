@@ -10,19 +10,16 @@ type UserContent = Exclude<Extract<AgentMessage, { role: 'user' }>['content'], s
 function convertContent(part: UserContent): ResponseInputContent {
   if (part.type === 'text') return { type: 'input_text', text: part.text }
   if (part.type === 'image') {
+    if (part.source.type === 'file') {
+      return { type: 'input_image', detail: 'auto', file_id: part.source.value }
+    }
     return {
       type: 'input_image',
       detail: 'auto',
       image_url:
-        part.source.type === 'url' ? part.source.value : `data:${part.source.mimeType};base64,${part.source.value}`
-    }
-  }
-  if (part.type === 'binary' && part.mimeType.startsWith('image/')) {
-    if (part.id) return { type: 'input_image', detail: 'auto', file_id: part.id }
-    return {
-      type: 'input_image',
-      detail: 'auto',
-      image_url: part.url ?? `data:${part.mimeType};base64,${part.data}`
+        part.source.type === 'url'
+          ? part.source.value
+          : `data:${part.source.mimeType};base64,${part.source.value}`
     }
   }
   throw new Error(`unsupported OpenAI input content: ${part.type}`)

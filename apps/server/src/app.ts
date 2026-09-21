@@ -61,8 +61,6 @@ export function createAgentApp(services: AgentAppServices): RequestListener {
             response.write(
               sseEvent({
                 type: EventType.RUN_ERROR,
-                threadId: input.threadId,
-                runId: input.runId,
                 message: String((error as Error)?.message ?? error)
               })
             )

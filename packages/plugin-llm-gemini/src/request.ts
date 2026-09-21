@@ -13,13 +13,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function convertContentPart(part: UserContent): Part {
   if (part.type === 'text') return { text: part.text }
   if (part.type === 'image') {
-    if (part.source.type === 'url') return { fileData: { fileUri: part.source.value } }
-    return { inlineData: { mimeType: part.source.mimeType, data: part.source.value } }
-  }
-  if (part.type === 'binary' && part.mimeType.startsWith('image/')) {
-    if (part.id) return { fileData: { fileUri: part.id, mimeType: part.mimeType } }
-    if (part.url) return { fileData: { fileUri: part.url, mimeType: part.mimeType } }
-    return { inlineData: { mimeType: part.mimeType, data: part.data } }
+    if (part.source.type === 'data') {
+      return { inlineData: { mimeType: part.source.mimeType, data: part.source.value } }
+    }
+    return {
+      fileData: {
+        fileUri: part.source.value,
+        ...(part.source.mimeType ? { mimeType: part.source.mimeType } : {})
+      }
+    }
   }
   throw new Error(`unsupported Gemini input content: ${part.type}`)
 }

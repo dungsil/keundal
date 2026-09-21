@@ -36,19 +36,13 @@ function imageData(data: string | undefined, mimeType: string): Base64ImageSourc
 function convertContent(part: UserContent): ContentBlockParam {
   if (part.type === 'text') return { type: 'text', text: part.text }
   if (part.type === 'image') {
-    return {
-      type: 'image',
-      source:
-        part.source.type === 'url'
-          ? { type: 'url', url: part.source.value }
-          : imageData(part.source.value, part.source.mimeType)
+    if (part.source.type === 'url') {
+      return { type: 'image', source: { type: 'url', url: part.source.value } }
     }
-  }
-  if (part.type === 'binary' && part.mimeType.startsWith('image/')) {
-    return {
-      type: 'image',
-      source: part.url ? { type: 'url', url: part.url } : imageData(part.data, part.mimeType)
+    if (part.source.type === 'file') {
+      return { type: 'image', source: { type: 'file', file_id: part.source.value } }
     }
+    return { type: 'image', source: imageData(part.source.value, part.source.mimeType) }
   }
   throw new Error(`unsupported Anthropic input content: ${part.type}`)
 }
