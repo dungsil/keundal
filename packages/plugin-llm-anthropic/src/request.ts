@@ -1,6 +1,7 @@
 import type {
   Base64ImageSource,
   ContentBlockParam,
+  ImageBlockParam,
   MessageCountTokensParams,
   TextBlockParam,
   Tool
@@ -33,22 +34,16 @@ function imageData(data: string | undefined, mimeType: string): Base64ImageSourc
   return { type: 'base64', media_type: mimeType, data }
 }
 
-function convertContent(part: UserContent): ContentBlockParam {
+function convertContent(part: UserContent): TextBlockParam | ImageBlockParam {
   if (part.type === 'text') return { type: 'text', text: part.text }
   if (part.type === 'image') {
-    return {
-      type: 'image',
-      source:
-        part.source.type === 'url'
-          ? { type: 'url', url: part.source.value }
-          : imageData(part.source.value, part.source.mimeType)
+    if (part.source.type === 'url') {
+      return { type: 'image', source: { type: 'url', url: part.source.value } }
     }
-  }
-  if (part.type === 'binary' && part.mimeType.startsWith('image/')) {
-    return {
-      type: 'image',
-      source: part.url ? { type: 'url', url: part.url } : imageData(part.data, part.mimeType)
+    if (part.source.type === 'file') {
+      return { type: 'image', source: { type: 'file', file_id: part.source.value } }
     }
+    return { type: 'image', source: imageData(part.source.value, part.source.mimeType) }
   }
   throw new Error(`unsupported Anthropic input content: ${part.type}`)
 }
@@ -151,7 +146,13 @@ export function createInput(
       case 'tool':
         appendMessage(messages, {
           role: 'user',
-          content: [{ type: 'tool_result', tool_use_id: message.toolCallId, content: message.content }]
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: message.toolCallId,
+              content: typeof message.content === 'string' ? message.content : message.content.map(convertContent)
+            }
+          ]
         })
         break
       case 'reasoning':

@@ -185,8 +185,14 @@ test('생성에 사용하는 메시지, 시스템 지시문, 도구, 문맥, 이
             { type: 'text', text: 'What is shown?' },
             { type: 'image', source: { type: 'url', value: 'https://example.com/image.png' } },
             { type: 'image', source: { type: 'data', value: 'AA==', mimeType: 'image/png' } },
-            { type: 'binary', url: 'https://example.com/image.webp', mimeType: 'image/webp' },
-            { type: 'binary', data: 'AQ==', mimeType: 'image/jpeg' }
+            {
+              type: 'image',
+              source: { type: 'url', value: 'https://example.com/image.webp', mimeType: 'image/webp' }
+            },
+            {
+              type: 'image',
+              source: { type: 'file', value: 'file_1', provider: 'anthropic', mimeType: 'image/jpeg' }
+            }
           ]
         },
         {
@@ -223,7 +229,7 @@ test('생성에 사용하는 메시지, 시스템 지시문, 도구, 문맥, 이
           { type: 'image', source: { type: 'url', url: 'https://example.com/image.png' } },
           { type: 'image', source: { type: 'base64', data: 'AA==', media_type: 'image/png' } },
           { type: 'image', source: { type: 'url', url: 'https://example.com/image.webp' } },
-          { type: 'image', source: { type: 'base64', data: 'AQ==', media_type: 'image/jpeg' } }
+          { type: 'image', source: { type: 'file', file_id: 'file_1' } }
         ]
       },
       {
@@ -564,7 +570,6 @@ test.for([
     role: 'user',
     content: [{ type: 'audio', source: { type: 'url', value: 'https://example.com/audio.wav' } }]
   },
-  { id: 'file', role: 'user', content: [{ type: 'binary', id: 'file_1', mimeType: 'image/png' }] },
   {
     id: 'svg',
     role: 'user',

@@ -136,7 +136,7 @@ test('POST /runs는 잘못된 입력을 400으로 거부한다', async (t) => {
   const { requestJson } = await setup(t)
   const result = await requestJson('POST', '/runs', { unrelated: true })
   expect(result.status).toBe(400)
-  expect((result.json as { error: string }).error).toBeTruthy()
+  expect((result.json as { error: string }).error).toBe('invalid request')
 })
 
 test('GET 조회 경로와 404, recover를 노출한다', async (t) => {

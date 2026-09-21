@@ -147,7 +147,10 @@ test('생성과 동일하게 변환한 대화와 컨텍스트에 시스템 지�
             { type: 'text', text: 'What is shown?' },
             { type: 'image', source: { type: 'url', value: 'https://example.com/image.png' } },
             { type: 'image', source: { type: 'data', value: 'AA==', mimeType: 'image/png' } },
-            { type: 'binary', id: 'file_1', mimeType: 'image/png' }
+            {
+              type: 'image',
+              source: { type: 'file', value: 'file_1', provider: 'google', mimeType: 'image/png' }
+            }
           ]
         },
         {

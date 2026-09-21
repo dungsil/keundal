@@ -19,7 +19,8 @@
   "dependencies": {
     "@ag-ui/core": "catalog:",
     "@standard-schema/spec": "catalog:",
-    "cordis": "catalog:"
+    "cordis": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",

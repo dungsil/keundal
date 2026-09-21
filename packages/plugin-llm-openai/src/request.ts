@@ -10,19 +10,14 @@ type UserContent = Exclude<Extract<AgentMessage, { role: 'user' }>['content'], s
 function convertContent(part: UserContent): ResponseInputContent {
   if (part.type === 'text') return { type: 'input_text', text: part.text }
   if (part.type === 'image') {
+    if (part.source.type === 'file') {
+      return { type: 'input_image', detail: 'auto', file_id: part.source.value }
+    }
     return {
       type: 'input_image',
       detail: 'auto',
       image_url:
         part.source.type === 'url' ? part.source.value : `data:${part.source.mimeType};base64,${part.source.value}`
-    }
-  }
-  if (part.type === 'binary' && part.mimeType.startsWith('image/')) {
-    if (part.id) return { type: 'input_image', detail: 'auto', file_id: part.id }
-    return {
-      type: 'input_image',
-      detail: 'auto',
-      image_url: part.url ?? `data:${part.mimeType};base64,${part.data}`
     }
   }
   throw new Error(`unsupported OpenAI input content: ${part.type}`)
@@ -69,7 +64,13 @@ function convertMessage(message: AgentMessage): ResponseInput {
       return items
     }
     case 'tool':
-      return [{ type: 'function_call_output', call_id: message.toolCallId, output: message.content }]
+      return [
+        {
+          type: 'function_call_output',
+          call_id: message.toolCallId,
+          output: typeof message.content === 'string' ? message.content : message.content.map(convertContent)
+        }
+      ]
     case 'reasoning':
       // store: false로 요청할 때 추론 항목은 encrypted_content 없이 다시 보낼 수 없습니다. 스트림이
       // 끊겨 암호화 값을 받지 못한 추론을 요약만 담아 보내면 이후 요청이 모두 거부되므로 제외합니다.
