@@ -1,8 +1,8 @@
+import { EventType as UpstreamEventType } from '@ag-ui/core'
 import {
   EventSchemas as UpstreamEventSchemas,
-  EventType as UpstreamEventType,
   RunAgentInputSchema as UpstreamRunAgentInputSchema
-} from '@ag-ui/core'
+} from '@ag-ui/core/schemas'
 import type {
   AGUIEvent as UpstreamAGUIEvent,
   BaseEvent as UpstreamBaseEvent,
