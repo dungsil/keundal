@@ -5,12 +5,12 @@ runs:
   using: composite
   steps:
     - name: CodeQL 초기화
-      uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4
+      uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
       with:
         languages: javascript-typescript,actions
 
     - name: CodeQL 분석
-      uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4
+      uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
       with:
         # CI와 주간 감사가 같은 분석 설정으로 업로드해야 PR의 코드 스캔 병합 보호가 main과 비교할 수 있다.
         # 기존 main 분석과 이어지도록 CI의 기본 category 값을 유지한다.
