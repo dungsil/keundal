@@ -132,22 +132,25 @@ const failedPartialScenario = async (store: ConformanceStore): Promise<unknown> 
 
 const cancelledScenario = async (store: ConformanceStore): Promise<unknown> => {
   const controller = new globalThis.AbortController()
-  const collected = collect(
-    store.generation.run(request('r-cancel'), {
-      signal: controller.signal,
-      stream: async function* (_request, options) {
-        yield { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' }
-        const halted = Promise.withResolvers<void>()
-        options.signal.addEventListener('abort', () => halted.reject(options.signal.reason), { once: true })
-        await halted.promise
-      }
-    })
-  )
-  collected.catch(() => {})
-  await new Promise((resolve) => globalThis.setTimeout(resolve, 20))
-  controller.abort(new Error('client went away'))
+  const events = store.generation.run(request('r-cancel'), {
+    signal: controller.signal,
+    stream: async function* (_request, options) {
+      yield { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' }
+      const halted = Promise.withResolvers<void>()
+      if (options.signal.aborted) halted.reject(options.signal.reason)
+      else options.signal.addEventListener('abort', () => halted.reject(options.signal.reason), { once: true })
+      await halted.promise
+    }
+  })
+  try {
+    for await (const event of events) {
+      // 부분 응답이 소비자에게 전달된 뒤 취소해야 저장소 속도와 무관하게 같은 journal을 검증할 수 있습니다.
+      if (event.type === EventType.TEXT_MESSAGE_START) controller.abort(new Error('client went away'))
+    }
+  } catch {
+    // 취소된 실행은 순회 중 예외로 끝납니다.
+  }
   // 스트림이 끝난 뒤에도 취소 확정 커밋이 비동기로 진행될 수 있으므로 기다립니다.
-  await collected.catch(() => {})
   const run = await waitForTerminal(store, 'r-cancel')
   return { status: run?.status, journal: journalTypes(run) }
 }
