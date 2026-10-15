@@ -9,7 +9,7 @@
   "rules": {},
   "overrides": [
     {
-      "files": ["examples/**"],
+      "files": ["apps/**", "examples/**", "packages/*/tests/**"],
       "env": { "node": true }
     }
   ]
