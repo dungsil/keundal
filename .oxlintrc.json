@@ -6,5 +6,11 @@
     "correctness": "error",
     "nursery": "warn"
   },
-  "rules": {}
+  "rules": {},
+  "overrides": [
+    {
+      "files": ["apps/**", "examples/**", "packages/*/tests/**"],
+      "env": { "node": true }
+    }
+  ]
 }
