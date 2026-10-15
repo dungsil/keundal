@@ -4,14 +4,19 @@ on:
   push:
     branches: [main]
     paths:
+      - 'apps/**'
+      - 'examples/**'
       - 'packages/**'
       - 'tools/**'
+      - '!apps/**/*.md'
+      - '!examples/**/*.md'
       - '!packages/**/*.md'
       - '!tools/**/*.md'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'tsconfig*.json'
+      - 'turbo.json'
       - '.oxlintrc.json'
       - '.oxfmtrc.json'
   pull_request:
@@ -42,11 +47,12 @@ jobs:
         with:
           filters: |
             source:
-              - '{packages,tools}/**/!(*.md)'
+              - '{apps,examples,packages,tools}/**/!(*.md)'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
               - 'tsconfig*.json'
+              - 'turbo.json'
               - '.oxlintrc.json'
               - '.oxfmtrc.json'
               - '.github/workflows/**'
