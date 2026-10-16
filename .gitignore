@@ -11,7 +11,10 @@ dist/
 examples/basic/*.sqlite
 
 ### AI Agents ###
-.agents/
+.agents/*
+!.agents/setup
+!.agents/resume
+.amp/portals/
 .codex/
 .claude/
 .cursor/
