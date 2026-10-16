@@ -39,6 +39,18 @@ pnpm --filter @keundal/example-basic start
 
 예제는 [examples/basic](./examples/basic/README.md)에서 도구 실행과 두 턴 대화의 이력 병합을 보여줍니다. 다른 LLM 공급자나 저장소로 바꾸는 방법도 같은 문서에 정리되어 있습니다.
 
+## 웹 앱
+
+[apps/web](./apps/web/README.md)은 [Nuxt UI Chat](https://github.com/nuxt-ui-templates/chat) 템플릿을 수정 없이 사용합니다. 화면·문구·컴포넌트·서버 API·스타일과 에셋은 원본 그대로이며, 워크스페이스 통합을 위해 패키지 이름과 루트 도구 설정만 조정했습니다. 웹 소스는 원본 ESLint 설정으로 검사하고 루트 Oxfmt로 재포맷하지 않습니다.
+
+```sh
+pnpm install
+pnpm --filter @keundal/web db:migrate
+pnpm --filter @keundal/web dev
+```
+
+AI 응답에는 `AI_GATEWAY_API_KEY`가 필요하며, GitHub 로그인과 파일 업로드 설정은 [원본 템플릿 문서](./apps/web/README.md)를 따릅니다. 이전 Keundal 전용 AG-UI 어댑터와 커스텀 UI는 제거했으며, `apps/server`에는 연결하지 않습니다.
+
 ## 라이선스
 
 이 프로젝트는 [MIT License](./LICENSE)에 따라 배포됩니다.

@@ -15,3 +15,5 @@ examples/basic/*.sqlite
 .codex/
 .claude/
 .cursor/
+
+apps/web/.data

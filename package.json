@@ -9,8 +9,8 @@
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "lint": "oxlint && oxfmt --check",
-    "lintfix": "oxlint --fix && oxfmt",
+    "lint": "oxlint && oxfmt --check && pnpm --filter @keundal/web lint",
+    "lintfix": "oxlint --fix && oxfmt && pnpm --filter @keundal/web exec eslint . --fix",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {
