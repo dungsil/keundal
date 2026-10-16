@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+export PNPM_HOME="$HOME/.local/share/pnpm"
+export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH"
+package_manager="$(node -p 'require("./package.json").packageManager')"
+node_version="$(node -p 'require("./package.json").devEngines.runtime.version')"
+
+echo 'Preparing the pinned pnpm and Node.js toolchain'
+SECONDS=0
+if [[ ! -x "$PNPM_HOME/bin/pnpm" ]] ||
+  [[ "$("$PNPM_HOME/bin/pnpm" --version)" != "${package_manager#pnpm@}" ]]; then
+  npm install --global --prefix "$PNPM_HOME" "$package_manager" --no-audit --no-fund
+fi
+if [[ "$(node --version)" != "v$node_version" ]]; then
+  pnpm runtime set node "$node_version" --global
+fi
+
+# Login shells used by Amp and supervised services must use the same toolchain.
+profile_marker='# Keundal orb toolchain'
+if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
+  cat >> "$HOME/.bash_profile" <<'EOF'
+
+# Keundal orb toolchain
+export PNPM_HOME="$HOME/.local/share/pnpm"
+export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH"
+EOF
+fi
+echo "Toolchain ready in ${SECONDS}s: $(node --version), pnpm $(pnpm --version)"
+
+echo 'Installing workspace dependencies from the lockfile'
+SECONDS=0
+pnpm install --frozen-lockfile
+echo "Dependencies ready in ${SECONDS}s"
+
+echo 'Building workspace packages'
+SECONDS=0
+pnpm build
+echo "Build ready in ${SECONDS}s"
