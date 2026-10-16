@@ -3,12 +3,7 @@ import { convertToModelMessages, createUIMessageStream, createUIMessageStreamRes
 import { db, schema } from 'hub:db'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import type { AnthropicLanguageModelOptions } from '@ai-sdk/anthropic'
-import { anthropic } from '@ai-sdk/anthropic'
-import type { GoogleLanguageModelOptions } from '@ai-sdk/google'
-// import { google } from '@ai-sdk/google'
-import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai'
-import { openai } from '@ai-sdk/openai'
+import { createKeundalModel } from '../../llm/keundal'
 
 defineRouteMeta({
   openAPI: {
@@ -24,7 +19,7 @@ export default defineEventHandler(async (event) => {
     id: z.string()
   }).parse)
 
-  const { model, messages, webSearch, reasoning } = await readValidatedBody(event, z.object({
+  const { model, messages, reasoning } = await readValidatedBody(event, z.object({
     model: z.string().refine(value => MODELS.some(m => m.value === value), {
       message: 'Invalid model'
     }),
@@ -46,9 +41,20 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Chat not found' })
   }
 
+  const { model: llm, dispose } = await createKeundalModel(model)
+  const abortController = new AbortController()
+  // IncomingMessage.close may fire after the request body is consumed. Cancel only
+  // when the response closes, including disconnection while generating the title.
+  event.node.res.once('close', () => {
+    abortController.abort()
+    void dispose()
+  })
+
   if (!chat.title) {
     const { text: title } = await generateText({
-      model: 'openai/gpt-5-nano',
+      model: llm,
+      abortSignal: abortController.signal,
+      maxRetries: 0,
       instructions: `You are a title generator for a chat:
           - Generate a short title based on the first user's message
           - The title should be less than 30 characters long
@@ -71,35 +77,12 @@ export default defineEventHandler(async (event) => {
     }).onConflictDoUpdate({ target: schema.messages.id, set: { parts: lastMessage.parts } })
   }
 
-  // Web search is a provider-defined tool, only available on Anthropic and OpenAI models.
-  // TODO: enable Google once AI SDK supports combining provider-defined tools with custom tools
-  // ...(model.startsWith('google/') && { google_search: google.tools.googleSearch({}) })
-  const webSearchTool = webSearch
-    ? model.startsWith('anthropic/')
-      ? anthropic.tools.webSearch_20250305()
-      : model.startsWith('openai/')
-        ? openai.tools.webSearch()
-        : undefined
-    : undefined
-
-  const webSearchInstructions = webSearchTool
-    ? `**WEB SEARCH:**
-- You have access to a web search tool to find current, up-to-date information
-- Only use it when the user explicitly asks about recent events, real-time data, or current facts
-- Do NOT search proactively — rely on your knowledge first
-- Cite your sources when providing information from web search results
-
-`
-    : ''
-
-  const abortController = new AbortController()
-  event.node.req.on('close', () => abortController.abort())
-
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
       const result = streamText({
         abortSignal: abortController.signal,
-        model,
+        model: llm,
+        maxRetries: 0,
         instructions: `You are a knowledgeable and helpful AI assistant. ${session.user?.username ? `The user's name is ${session.user.username}.` : ''} Your goal is to provide clear, accurate, and well-structured responses.
 
 **FORMATTING RULES (CRITICAL):**
@@ -111,35 +94,16 @@ export default defineEventHandler(async (event) => {
   * Instead of "# Complete Guide", write "**Complete Guide**" or start directly with content
 - Start all responses with content, never with a heading
 
-${webSearchInstructions}**RESPONSE QUALITY:**
+**RESPONSE QUALITY:**
 - Be concise yet comprehensive
 - Use examples when helpful
 - Break down complex topics into digestible parts
-- Maintain a friendly, professional tone`,
+- Maintain a friendly, professional tone
+- You do not have a web search tool. Do not claim to have searched the web or verified live information.`,
         messages: await convertToModelMessages(messages),
         tools: {
           chart: chartTool,
-          weather: weatherTool,
-          ...(webSearchTool && { web_search: webSearchTool })
-        },
-        providerOptions: {
-          anthropic: {
-            thinking: reasoning
-              ? { type: 'enabled', budgetTokens: 2048 }
-              : { type: 'disabled' }
-          } satisfies AnthropicLanguageModelOptions,
-          google: {
-            // Gemini 3 always thinks, the toggle only controls whether the thoughts are shown
-            thinkingConfig: {
-              includeThoughts: reasoning,
-              thinkingLevel: 'low'
-            }
-          } satisfies GoogleLanguageModelOptions,
-          openai: {
-            // The web search tool is rejected at minimal effort
-            reasoningEffort: reasoning || webSearchTool ? 'low' : 'minimal',
-            ...(reasoning && { reasoningSummary: 'detailed' })
-          } satisfies OpenAILanguageModelResponsesOptions
+          weather: weatherTool
         },
         stopWhen: isStepCount(5),
         experimental_transform: smoothStream()

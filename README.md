@@ -41,7 +41,7 @@ pnpm --filter @keundal/example-basic start
 
 ## 웹 앱
 
-[apps/web](./apps/web/README.md)은 [Nuxt UI Chat](https://github.com/nuxt-ui-templates/chat) 템플릿을 수정 없이 사용합니다. 화면·문구·컴포넌트·서버 API·스타일과 에셋은 원본 그대로이며, 워크스페이스 통합을 위해 패키지 이름과 루트 도구 설정만 조정했습니다. 웹 소스는 원본 ESLint 설정으로 검사하고 루트 Oxfmt로 재포맷하지 않습니다.
+[apps/web](./apps/web/README.md)은 [Nuxt UI Chat](https://github.com/nuxt-ui-templates/chat)의 화면·문구·컴포넌트·스타일과 에셋을 그대로 사용합니다. 서버의 제목 생성과 대화 요청은 기존 Keundal LLM 플러그인으로 실행하며, AI SDK는 메시지 스트림과 도구 실행을 연결합니다. 웹 소스는 원본 ESLint 설정으로 검사하고 루트 Oxfmt로 재포맷하지 않습니다.
 
 ```sh
 pnpm install
@@ -49,7 +49,7 @@ pnpm --filter @keundal/web db:migrate
 pnpm --filter @keundal/web dev
 ```
 
-AI 응답에는 `AI_GATEWAY_API_KEY`가 필요하며, GitHub 로그인과 파일 업로드 설정은 [원본 템플릿 문서](./apps/web/README.md)를 따릅니다. 이전 Keundal 전용 AG-UI 어댑터와 커스텀 UI는 제거했으며, `apps/server`에는 연결하지 않습니다.
+선택한 모델에 맞는 `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`를 `apps/web/.env`에 설정합니다. Nuxt 서버에서 플러그인을 직접 사용하므로 `apps/server`를 따로 실행할 필요가 없습니다. 공급자 내장 웹 검색과 추론 강도 설정은 현재 Keundal 계약에서 지원하지 않습니다. 음성 받아쓰기는 기존 AI Gateway 경로를 유지합니다. 자세한 설정과 제한은 [웹 앱 문서](./apps/web/README.md)를 참고합니다.
 
 ## 라이선스
 
