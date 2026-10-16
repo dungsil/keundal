@@ -149,6 +149,12 @@ interface ConvertedConversation {
 }
 
 function convertConversation(request: LLMRequest): ConvertedConversation {
+  for (const key of ['webSearch', 'reasoning'] as const) {
+    if (request[key] !== undefined && typeof request[key] !== 'boolean') throw new Error(`${key} must be a boolean`)
+  }
+  if (request.reasoning && request.maxOutputTokens < 2)
+    throw new Error('Gemini reasoning requires maxOutputTokens >= 2')
+  if (request.webSearch) throw new Error('Gemini native web search is not supported with executable function tools')
   const parsed = parseRunAgentInput(request.input)
   const callNames = new Map<string, string>()
   const systemParts: Part[] = []

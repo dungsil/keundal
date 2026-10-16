@@ -93,6 +93,70 @@ async function setup(
   return { ctx, requests, counted, agent }
 }
 
+test.for([true, false])(
+  '검색·추론 %s 설정과 네이티브 문맥을 토큰 계산·도구 후속 생성·세션에 보존한다',
+  async (enabled, t) => {
+    const metadata = {
+      'openai.outputItems': [
+        { id: 'search', type: 'web_search_call', status: 'completed', action: { type: 'search', query: 'Keundal' } }
+      ]
+    }
+    let executed = 0
+    const { ctx, requests, counted } = await setup(
+      t,
+      [
+        [
+          { type: EventType.TEXT_MESSAGE_START, messageId: 'search', role: 'assistant' },
+          { type: EventType.TEXT_MESSAGE_END, messageId: 'search', metadata },
+          {
+            type: EventType.CUSTOM,
+            name: 'keundal.source',
+            value: { id: 'https://example.com', url: 'https://example.com' }
+          },
+          ...call()
+        ],
+        answer
+      ],
+      {
+        webSearch: enabled,
+        reasoning: enabled,
+        tools: [
+          tool(() => {
+            executed++
+            return 'result'
+          })
+        ]
+      }
+    )
+    const events = await collect(ctx.agent.run(input))
+    expect(executed).toBe(1)
+    expect(events.filter((event) => event.type === EventType.RUN_FINISHED)).toHaveLength(1)
+    expect(events).toContainEqual({
+      type: EventType.CUSTOM,
+      name: 'keundal.source',
+      value: { id: 'https://example.com', url: 'https://example.com' }
+    })
+    expect(requests).toHaveLength(2)
+    expect(counted).toHaveLength(2)
+    for (const request of [...requests, ...counted])
+      expect(request).toMatchObject({ webSearch: enabled, reasoning: enabled })
+    expect(requests[1]!.input.messages.find((message) => message.id === 'search')).toMatchObject({ metadata })
+    expect((await ctx.session.get(input.threadId))?.messages.find((message) => message.id === 'search')).toMatchObject({
+      metadata
+    })
+    expect((await ctx.generation.get(input.runId))?.request).toMatchObject({ webSearch: enabled, reasoning: enabled })
+  }
+)
+
+test.each(['webSearch', 'reasoning'] as const)('$0가 boolean이 아니면 에이전트 설정을 거부한다', async (key) => {
+  const result = await SimpleAgentConfigSchema['~standard'].validate({
+    model: 'test',
+    maxOutputTokens: 100,
+    [key]: 'true'
+  })
+  expect(result.issues).toBeDefined()
+})
+
 test('교차 수신한 호출 인자를 모아 순서대로 실행하고 결과와 추론 서명을 후속 생성에 전달한다', async (t) => {
   const executed: { args: Record<string, unknown>; context: ToolExecutionContext }[] = []
   const { ctx, requests, counted } = await setup(

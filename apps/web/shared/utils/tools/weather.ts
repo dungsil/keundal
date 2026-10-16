@@ -1,8 +1,7 @@
 import type { UIToolInvocation } from 'ai'
-import { tool } from 'ai'
 import { z } from 'zod'
 
-export type WeatherUIToolInvocation = UIToolInvocation<typeof weatherTool>
+export type WeatherUIToolInvocation = UIToolInvocation<{ input: z.infer<typeof weatherSchema>, output: Awaited<ReturnType<typeof weatherTool.execute>> }>
 
 const getWeatherData = (k: string) => ({
   'sunny': { text: 'Sunny', icon: 'i-lucide-sun' },
@@ -12,10 +11,12 @@ const getWeatherData = (k: string) => ({
   'foggy': { text: 'Foggy', icon: 'i-lucide-cloud-fog' }
 }[k] || { text: 'Sunny', icon: 'i-lucide-sun' })
 
-export const weatherTool = tool({
+const weatherSchema = z.object({ location: z.string().describe('Location for weather') })
+
+export const weatherTool = {
   description: 'Get weather info with 5-day forecast',
-  inputSchema: z.object({ location: z.string().describe('Location for weather') }),
-  execute: async ({ location }) => {
+  inputSchema: weatherSchema,
+  execute: async ({ location }: z.infer<typeof weatherSchema>) => {
     // Create a delay to simulate the input-available state
     await new Promise(resolve => setTimeout(resolve, 1500))
 
@@ -37,4 +38,4 @@ export const weatherTool = tool({
       }))
     }
   }
-})
+}

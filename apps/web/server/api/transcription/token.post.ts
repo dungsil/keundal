@@ -1,4 +1,5 @@
-import { gateway } from 'ai'
+import openaiTranscriptionPlugin from '@keundal/plugin-transcription-openai'
+import { Context } from 'cordis'
 
 defineRouteMeta({
   openAPI: {
@@ -10,10 +11,22 @@ defineRouteMeta({
 export default defineEventHandler(async (event) => {
   await requireUserSession(event)
 
-  // Each token lets the browser stream audio for up to 5 minutes on the project's gateway credit,
-  // consider rate limiting this route if your users are not trusted
-  return gateway.experimental_transcription.getToken({
-    model: TRANSCRIPTION_MODEL,
-    expiresAfterSeconds: 300
+  const ctx = new Context()
+  const abort = new AbortController()
+  const disconnected = () => abort.abort()
+  event.node.res.once('close', disconnected)
+  const fiber = ctx.plugin(openaiTranscriptionPlugin, {
+    apiKey: process.env.OPENAI_API_KEY ?? '',
+    baseURL: process.env.OPENAI_BASE_URL || undefined
   })
+  try {
+    await fiber
+    return await ctx.transcription.createSession({
+      model: 'gpt-4o-mini-transcribe',
+      expiresAfterSeconds: 300
+    }, { signal: abort.signal })
+  } finally {
+    event.node.res.removeListener('close', disconnected)
+    await fiber.dispose()
+  }
 })

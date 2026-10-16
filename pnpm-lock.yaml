@@ -281,9 +281,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@ai-sdk/provider':
-        specifier: ^4.0.27
-        version: 4.0.27
       '@ai-sdk/vue':
         specifier: ^4.0.137
         version: 4.0.141(vue@3.5.44(typescript@6.0.3))(zod@4.6.7)
@@ -302,6 +299,9 @@ importers:
       '@keundal/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@keundal/plugin-agent-simple':
+        specifier: workspace:*
+        version: link:../../packages/plugin-agent-simple
       '@keundal/plugin-llm-anthropic':
         specifier: workspace:*
         version: link:../../packages/plugin-llm-anthropic
@@ -311,6 +311,12 @@ importers:
       '@keundal/plugin-llm-openai':
         specifier: workspace:*
         version: link:../../packages/plugin-llm-openai
+      '@keundal/plugin-store-memory':
+        specifier: workspace:*
+        version: link:../../packages/plugin-store-memory
+      '@keundal/plugin-transcription-openai':
+        specifier: workspace:*
+        version: link:../../packages/plugin-transcription-openai
       '@libsql/client':
         specifier: ^0.18.0
         version: 0.18.0
@@ -742,6 +748,43 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/plugin-transcription-openai:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.10
+      openai:
+        specifier: 'catalog:'
+        version: 7.15.0(undici@8.12.1)(ws@8.21.3)(zod@4.6.7)
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      '@types/ws':
+        specifier: 8.18.2
+        version: 8.18.2
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(@volar/typescript@2.4.28(typescript@6.0.3))(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+      ws:
+        specifier: 8.21.3
+        version: 8.21.3
 
   tools/store-conformance:
     dependencies:
@@ -15416,6 +15459,12 @@ snapshots:
       undici: 8.12.1
       ws: 8.21.3
       zod: 3.25.76
+
+  openai@7.15.0(undici@8.12.1)(ws@8.21.3)(zod@4.6.7):
+    optionalDependencies:
+      undici: 8.12.1
+      ws: 8.21.3
+      zod: 4.6.7
 
   openid-client@6.8.8:
     dependencies:

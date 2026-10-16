@@ -1,8 +1,8 @@
-import { EventType, type LLMEvent } from '@keundal/core'
+import { EventType, LLM_SOURCE_EVENT, type LLMEvent } from '@keundal/core'
 import type { ResponseStreamEvent } from 'openai/resources/responses/responses'
 
 type Item = {
-  type: 'message' | 'function_call' | 'reasoning'
+  type: 'message' | 'function_call' | 'reasoning' | 'web_search_call'
   text: string
   callId?: string
   hostMessageId?: string
@@ -51,6 +51,11 @@ export class ResponseEvents {
           this.lastItemWasReasoning = true
           yield { type: EventType.REASONING_START, messageId: item.id }
           yield { type: EventType.REASONING_MESSAGE_START, messageId: item.id, role: 'reasoning' }
+        } else if (item.type === 'web_search_call') {
+          this.items.set(item.id, { type: item.type, text: '' })
+          this.hasAssistantHost = true
+          this.lastItemWasReasoning = true
+          yield { type: EventType.TEXT_MESSAGE_START, messageId: item.id, role: 'assistant' }
         } else {
           throw new Error(`unsupported OpenAI output item: ${item.type}`)
         }
@@ -72,6 +77,18 @@ export class ResponseEvents {
         const tracked = this.items.get(item.id)
         if (!tracked || tracked.type !== item.type) throw new Error('unexpected OpenAI output item completion')
         if (item.type === 'message') {
+          const citations = item.content.flatMap((part) =>
+            part.type === 'output_text'
+              ? part.annotations.filter((annotation) => annotation.type === 'url_citation')
+              : []
+          )
+          for (const citation of citations) {
+            yield {
+              type: EventType.CUSTOM,
+              name: LLM_SOURCE_EVENT,
+              value: { id: citation.url, url: citation.url, title: citation.title }
+            }
+          }
           yield* this.finishText(
             item.id,
             item.content.map((part) => (part.type === 'output_text' ? part.text : part.refusal)).join('')
@@ -79,7 +96,14 @@ export class ResponseEvents {
           yield {
             type: EventType.TEXT_MESSAGE_END,
             messageId: item.id,
-            ...(item.phase ? { metadata: { 'openai.phase': item.phase } } : {})
+            ...(item.phase || citations.length
+              ? {
+                  metadata: {
+                    ...(item.phase ? { 'openai.phase': item.phase } : {}),
+                    ...(citations.length ? { 'openai.outputItems': [item] } : {})
+                  }
+                }
+              : {})
           }
         } else if (item.type === 'function_call') {
           if (item.call_id !== tracked.callId) throw new Error('OpenAI tool call identity changed')
@@ -88,6 +112,8 @@ export class ResponseEvents {
           if (tracked.hostMessageId !== undefined) {
             yield { type: EventType.TEXT_MESSAGE_END, messageId: tracked.hostMessageId }
           }
+        } else if (item.type === 'web_search_call') {
+          yield { type: EventType.TEXT_MESSAGE_END, messageId: item.id, metadata: { 'openai.outputItems': [item] } }
         } else if (item.type === 'reasoning') {
           yield* this.finishText(item.id, item.summary.map((part) => part.text).join(''))
           if (item.encrypted_content) {
@@ -113,7 +139,8 @@ export class ResponseEvents {
 
   *finish(): Generator<LLMEvent> {
     for (const item of this.items.values()) {
-      if (item.type === 'function_call') throw new Error('OpenAI stream ended with unfinished tool calls')
+      if (item.type === 'function_call' || item.type === 'web_search_call')
+        throw new Error('OpenAI stream ended with unfinished tool calls')
     }
     for (const [id, item] of this.items) {
       if (item.type === 'message') {

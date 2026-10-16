@@ -19,10 +19,10 @@ Full-featured AI Chatbot Nuxt application with authentication, chat history, col
 
 ## Features
 
-- ⚡️ **Streaming AI messages** powered by the [AI SDK](https://ai-sdk.dev) with thinking/reasoning support
+- ⚡️ **Streaming AI messages** powered by Keundal with the original AI SDK client transport and thinking/reasoning support
 - 🤖 **Multiple model support** — Claude Haiku 4.5, Gemini 3 Flash and GPT-5 Nano through the existing Keundal LLM plugins
-- 🔍 Original web search and extended thinking controls are preserved visually; see the limitations below
-- 🎤 **Dictation** in the prompt with live streaming transcription over WebSocket through [AI Gateway](https://vercel.com/docs/ai-gateway)
+- 🔍 **Web search and extended thinking** through Keundal provider options; see provider-specific limitations below
+- 🎤 **Dictation** in the prompt with live streaming transcription over WebSocket through `@keundal/plugin-transcription-openai`
 - 📊 **Charts and weather** tool calling with rich UI rendering
 - 🔐 **Authentication** via GitHub OAuth using [nuxt-auth-utils](https://github.com/atinux/nuxt-auth-utils)
 - 💾 **Chat history persistence** using SQLite database ([Turso](https://turso.tech) in production) and [Drizzle ORM](https://orm.drizzle.team)
@@ -58,7 +58,7 @@ pnpm db:migrate
 
 ### AI Integration
 
-화면과 클라이언트 코드는 Nuxt UI Chat 원본을 유지합니다. 서버의 제목 생성과 대화 요청은 `@keundal/plugin-llm-openai`, `@keundal/plugin-llm-gemini`, `@keundal/plugin-llm-anthropic`으로 실행합니다. AI SDK는 UI 메시지 스트림 변환과 chart/weather 도구 실행 및 후속 요청만 담당하며, 텍스트 생성에 AI Gateway를 사용하지 않습니다. Nuxt 서버에서 플러그인을 직접 조합하므로 `apps/server`를 별도로 실행하지 않아도 됩니다.
+Nuxt UI Chat 원본의 화면·컴포넌트·스타일을 유지합니다. 제목 생성은 Keundal LLM 플러그인, 대화·입력 예산 검사·chart/weather 실행·후속 요청은 `@keundal/plugin-agent-simple`과 메모리 저장소로 실행합니다. 서버는 AG-UI 이벤트를 원본 클라이언트의 UIMessage SSE 규격으로 전달하며 AI SDK 생성·도구 실행 API와 AI Gateway를 사용하지 않습니다. `@ai-sdk/vue`, `DefaultChatTransport`, UIMessage 타입은 템플릿 클라이언트 호환용으로 남아 있습니다. Nuxt 서버에서 플러그인을 직접 조합하므로 `apps/server`를 별도로 실행하지 않아도 됩니다.
 
 선택한 모델의 API 키를 `apps/web/.env`에 설정합니다. 제목도 선택한 모델로 생성하므로 Gemini나 Anthropic만 사용할 때 OpenAI 키는 필요하지 않습니다.
 
@@ -70,13 +70,14 @@ pnpm db:migrate
 
 필요하면 `OPENAI_BASE_URL`, `GEMINI_BASE_URL`, `ANTHROPIC_BASE_URL`로 공급자 API 주소를 지정할 수 있습니다. 출력 예산은 4096 토큰이며, 공급자의 오류를 자동 재시도하지 않습니다. 연결 종료와 Stop 요청은 진행 중인 공급자 요청에 전달합니다.
 
-**현재 제한:**
+**검색·추론·받아쓰기와 저장:**
 
-- Keundal 계약에는 공급자 내장 웹 검색이 없어, 원본 Web search 스위치는 실제 검색을 활성화하지 않습니다. 모델에는 검색 도구가 없음을 안내합니다.
-- Extended thinking 스위치는 UI에 추론을 표시할지만 제어하며, 추론 활성화·강도는 기존 Keundal 공급자 구현의 기본 동작을 따릅니다.
+- Web search 스위치는 OpenAI/Anthropic의 공급자 내장 검색을 활성화합니다. URL 출처와 후속 요청에 필요한 검색 블록을 보존합니다. 원본 템플릿과 마찬가지로 Gemini에는 함수 도구와 함께 검색을 등록하지 않습니다.
+- Extended thinking 스위치는 Keundal의 `reasoning` 옵션으로 전달합니다. 켜면 OpenAI medium, Anthropic 명시적 thinking 예산, Gemini 3 high를 사용합니다. 끄면 Anthropic은 disabled, GPT-5 Nano는 minimal(검색 시 low), Gemini 3 Flash는 minimal을 사용하고 요약을 요청하지 않습니다. 후자의 두 모델은 추론을 완전히 끌 수 없습니다. 암호화된 추론·thought 서명과 검색 블록은 저장 후 다음 턴에도 유지하며 다른 모델로 전환할 때 공급자 전용 상태를 제거합니다.
 - 텍스트·이미지 입력과 chart/weather 도구를 지원합니다. PDF 등 Keundal이 지원하지 않는 첨부 형식은 명시적인 오류로 처리합니다. 원본 weather 도구는 실시간 날씨 API가 아닌 데모 데이터를 반환합니다.
-- 음성 받아쓰기는 LLM 플러그인의 범위 밖이므로 기존 AI Gateway 경로를 유지하며, 이 기능에만 `AI_GATEWAY_API_KEY`와 로그인이 필요합니다.
-- 대화 저장은 원본 NuxtHub SQLite를 유지합니다. Keundal의 session/generation 저장소나 복구 API로 교체하는 변경은 포함하지 않습니다.
+- 받아쓰기는 `@keundal/plugin-transcription-openai`로 OpenAI 단기 자격 증명을 발급하고 브라우저에서 PCM16 24kHz를 직접 스트리밍합니다. `OPENAI_API_KEY`와 로그인이 필요하며 `AI_GATEWAY_API_KEY`는 필요하지 않습니다. 전사 모델은 `gpt-4o-mini-transcribe`입니다.
+- Keundal session/generation 메모리 저장소는 요청 수명 동안 도구 실행 전체를 기록합니다. 요청 사이의 대화·도구 결과·공급자 상태는 원본 NuxtHub SQLite의 메시지 parts에 보존합니다. 서버 재시작 시 미완료 실행을 복구하는 내구성 generation 저장소로 구성한 것은 아닙니다.
+- 로컬 HTTP/WebSocket fixture로 공급자 프로토콜, 원본 클라이언트의 SSE 해석, 도구 후속 실행, 저장 후 재생, 취소·오류·전사 정리를 검증합니다. 실제 유료 API의 모델 접근 권한·검색 결과·음성 인식 품질은 별도 확인이 필요합니다.
 
 ### Authentication (Optional)
 

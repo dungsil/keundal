@@ -1,10 +1,9 @@
-import type { StreamTranscriptionResult } from 'ai'
+import type { TranscriptionSession } from '@keundal/core'
 import {
-  createGateway,
-  experimental_encodeRealtimeAudio as encodeRealtimeAudio,
-  experimental_resampleAudio as resampleAudio,
-  experimental_streamTranscribe as streamTranscribe
-} from 'ai'
+  encodeRealtimeAudio,
+  resampleAudio,
+  streamTranscription
+} from '@keundal/plugin-transcription-openai/client'
 
 const SAMPLE_RATE = 24_000
 // Recordings stop on their own after this long.
@@ -13,6 +12,7 @@ const MAX_DURATION = 120_000
 export function isDictationSupported() {
   return typeof window !== 'undefined'
     && typeof AudioContext !== 'undefined'
+    && typeof WebSocket !== 'undefined'
     && !!navigator.mediaDevices?.getUserMedia
 }
 
@@ -23,7 +23,7 @@ interface Session {
   processor: ScriptProcessorNode
   audio: ReadableStreamDefaultController<string>
   abort: AbortController
-  result: StreamTranscriptionResult
+  result: ReturnType<typeof streamTranscription>
   finals: string[]
   partial: string
   timeout: ReturnType<typeof setTimeout>
@@ -53,6 +53,7 @@ export function useDictation() {
   let finalizingSession: Session | null = null
   let starting = false
   let cancelled = false
+  let startingAbort: AbortController | null = null
 
   onMounted(() => {
     supported.value = isDictationSupported()
@@ -68,8 +69,6 @@ export function useDictation() {
         } else if (part.type === 'transcript-final') {
           current.finals.push(part.text)
           current.partial = ''
-        } else if (part.type === 'error') {
-          throw part.error
         }
 
         if (session === current) {
@@ -105,7 +104,7 @@ export function useDictation() {
    * `onMaxDuration` is called when the recording hits its time limit, as if the user stopped it.
    */
   async function start(options: { onMaxDuration?: () => void } = {}) {
-    if (session || starting) return
+    if (session || starting || finalizingSession) return
 
     starting = true
     cancelled = false
@@ -113,17 +112,20 @@ export function useDictation() {
     transcript.value = ''
 
     const abort = new AbortController()
+    startingAbort = abort
 
     try {
       await open(abort, options)
     } finally {
       starting = false
+      startingAbort = null
     }
   }
 
   async function open(abort: AbortController, { onMaxDuration }: { onMaxDuration?: () => void }) {
-    const { token } = await $fetch<{ token: string }>('/api/transcription/token', {
+    const credentials = await $fetch<TranscriptionSession>('/api/transcription/token', {
       method: 'POST',
+      signal: abort.signal,
       headers: { [headerName]: csrf }
     })
     if (cancelled) return
@@ -136,12 +138,14 @@ export function useDictation() {
       }
     })
 
-    const model = createGateway({ apiKey: token }).experimental_transcription(TRANSCRIPTION_MODEL)
-    const result = streamTranscribe({
-      model,
+    const result = streamTranscription({
+      session: credentials,
       audio,
-      inputAudioFormat: { type: 'audio/pcm', rate: SAMPLE_RATE },
-      abortSignal: abort.signal
+      signal: abort.signal
+    })
+    let connectionError: unknown
+    void result.text.catch((cause) => {
+      connectionError = cause
     })
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch((cause: Error) => {
@@ -153,6 +157,13 @@ export function useDictation() {
       abort.abort()
       stream.getTracks().forEach(track => track.stop())
       return
+    }
+
+    // A failed handshake while the permission prompt was open must not leave a microphone running.
+    if (connectionError) {
+      abort.abort()
+      stream.getTracks().forEach(track => track.stop())
+      throw connectionError
     }
 
     let audioContext: AudioContext | undefined
@@ -202,7 +213,12 @@ export function useDictation() {
       result,
       finals: [],
       partial: '',
-      timeout: setTimeout(() => onMaxDuration?.(), MAX_DURATION)
+      timeout: setTimeout(() => {
+        if (onMaxDuration) onMaxDuration()
+        else void stop().catch((cause) => {
+          error.value = cause instanceof Error ? cause : new Error(String(cause))
+        })
+      }, MAX_DURATION)
     }
     recording.value = true
 
@@ -235,6 +251,7 @@ export function useDictation() {
   /** Stop recording and discard the transcript, or drop a pending final transcript. */
   function cancel() {
     cancelled = true
+    startingAbort?.abort()
     finalizingSession?.abort.abort()
     const current = session
     if (!current) return

@@ -90,7 +90,11 @@ const collect = async (stream: AsyncIterable<LLMEvent>) => {
   return events
 }
 
-async function setup(t: TestContext, handle: (request: Received, response: ServerResponse) => void | Promise<void>) {
+async function setup(
+  t: TestContext,
+  handle: (request: Received, response: ServerResponse) => void | Promise<void>,
+  modelLimits = limits
+) {
   const requests: Received[] = []
   const server = createServer((incoming, response) => {
     void (async () => {
@@ -117,7 +121,7 @@ async function setup(t: TestContext, handle: (request: Received, response: Serve
   const fiber = await ctx.plugin(anthropicLLMPlugin, {
     apiKey: 'test-api-key',
     baseURL: `http://127.0.0.1:${address.port}`,
-    models: { 'test-model': limits }
+    models: { 'test-model': modelLimits }
   })
   t.onTestFinished(async () => {
     await fiber.dispose()
@@ -126,6 +130,126 @@ async function setup(t: TestContext, handle: (request: Received, response: Serve
   })
   return { ctx, fiber, requests }
 }
+
+test('네이티브 검색 블록과 인용 및 추론 서명을 함수 결과 앞에 그대로 복원한다', async (t) => {
+  const search = { type: 'server_tool_use', id: 'srv_1', name: 'web_search', input: { query: 'Keundal' } }
+  const result = {
+    type: 'web_search_tool_result',
+    tool_use_id: 'srv_1',
+    content: [
+      {
+        type: 'web_search_result',
+        url: 'https://example.com',
+        title: 'Example',
+        encrypted_content: 'encrypted',
+        page_age: null
+      }
+    ]
+  }
+  const citation = {
+    type: 'web_search_result_location',
+    url: 'https://example.com',
+    title: 'Example',
+    encrypted_index: 'index',
+    cited_text: '출처'
+  }
+  const cited = { type: 'text', text: '출처', citations: [citation] }
+  const thinking = { type: 'thinking', thinking: '생각', signature: 'signature' }
+  const call = { type: 'tool_use', id: 'call_1', name: 'lookup', input: {} }
+  const frames = [
+    start,
+    blockStart(0, { ...search, input: {} }),
+    blockDelta(0, { type: 'input_json_delta', partial_json: '{"query":"Keundal"}' }),
+    blockStop(0),
+    blockStart(1, result),
+    blockStop(1),
+    blockStart(2, { type: 'text', text: '' }),
+    blockDelta(2, { type: 'text_delta', text: '출처' }),
+    blockDelta(2, { type: 'citations_delta', citation }),
+    blockStop(2),
+    blockStart(3, thinking),
+    blockStop(3),
+    blockStart(4, call),
+    blockStop(4),
+    finish('tool_use'),
+    stop
+  ]
+  let generations = 0
+  const { ctx, requests } = await setup(
+    t,
+    (received, response) => {
+      if (received.path?.endsWith('/count_tokens')) {
+        response.writeHead(200, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ input_tokens: 8 }))
+        return
+      }
+      send(response, generations++ ? textFrames : frames)
+    },
+    { contextWindow: 10000, maxOutputTokens: 4096 }
+  )
+  const enabled = {
+    ...request,
+    maxOutputTokens: 2048,
+    webSearch: true,
+    reasoning: true,
+    input: { ...request.input, tools: [{ name: 'lookup', description: 'Lookup', parameters: { type: 'object' } }] }
+  }
+  const events = await collect(ctx.llm.stream(enabled))
+  expect(events.filter((event) => event.type === EventType.TOOL_CALL_START)).toEqual([
+    { type: EventType.TOOL_CALL_START, toolCallId: 'call_1', toolCallName: 'lookup' }
+  ])
+  expect(events).toContainEqual({
+    type: EventType.CUSTOM,
+    name: 'keundal.source',
+    value: { id: 'https://example.com', url: 'https://example.com', title: 'Example' }
+  })
+  const assembly = new MessageAssembly()
+  for (const event of events) assembly.apply(event)
+  assembly.apply({
+    type: EventType.TOOL_CALL_RESULT,
+    messageId: 'result',
+    toolCallId: 'call_1',
+    role: 'tool',
+    content: 'ok'
+  })
+  await ctx.llm.countTokens({
+    ...enabled,
+    input: { ...enabled.input, messages: [...request.input.messages, ...assembly.messages] }
+  })
+  expect(requests[0]!.body.thinking).toEqual({ type: 'enabled', budget_tokens: 1024 })
+  expect(requests[0]!.body.tools).toEqual([
+    { name: 'lookup', description: 'Lookup', input_schema: { type: 'object' } },
+    { type: 'web_search_20250305', name: 'web_search' }
+  ])
+  expect(requests[1]!.body.messages).toEqual([
+    { role: 'user', content: [{ type: 'text', text: 'Hello' }] },
+    { role: 'assistant', content: [search, result, cited, thinking, call] },
+    { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call_1', content: 'ok' }] }
+  ])
+  expect(requests[1]!.body.tools).toEqual(requests[0]!.body.tools)
+  expect(requests[1]!.body.thinking).toEqual(requests[0]!.body.thinking)
+  await collect(
+    ctx.llm.stream({
+      ...enabled,
+      input: { ...enabled.input, messages: [...request.input.messages, ...assembly.messages] }
+    })
+  )
+  expect(requests[2]!.body.messages).toEqual(requests[1]!.body.messages)
+  await ctx.llm.countTokens({ ...request, webSearch: false, reasoning: false })
+  expect(requests[3]!.body.tools).toBeUndefined()
+  expect(requests[3]!.body.thinking).toEqual({ type: 'disabled' })
+  await expect(ctx.llm.countTokens({ ...request, reasoning: true })).rejects.toThrow('maxOutputTokens > 1024')
+})
+
+test.for(['webSearch', 'reasoning'] as const)('%s가 boolean이 아니면 공급자 호출 전에 거부한다', async (key, t) => {
+  const { ctx, requests } = await setup(t, () => {
+    throw new Error('unexpected HTTP call')
+  })
+  const invalid = { ...request, [key]: 'true' } as LLMRequest
+  await expect(ctx.llm.countTokens(invalid)).rejects.toThrow('must be a boolean')
+  await expect(collect(ctx.llm.stream(invalid))).rejects.toThrow('must be a boolean')
+  expect(requests).toHaveLength(0)
+})
 
 test('Messages 요청을 보내고 분할된 UTF-8 SSE를 실행 수명 이벤트 없이 변환한다', async (t) => {
   const { ctx, requests } = await setup(t, async (_request, response) => {
