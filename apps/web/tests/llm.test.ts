@@ -1,23 +1,21 @@
 import { Buffer } from 'node:buffer'
-import { createServer, type ServerResponse } from 'node:http'
+import { createServer, type ServerResponse, type IncomingMessage } from 'node:http'
 import { DefaultChatTransport, type UIMessage, type UIMessageChunk } from 'ai'
 import { expect, test, onTestFinished } from 'vitest'
 import { Context } from 'cordis'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
-import openaiLLMPlugin from '@keundal/plugin-llm-openai'
-import anthropicLLMPlugin from '@keundal/plugin-llm-anthropic'
-import geminiLLMPlugin from '@keundal/plugin-llm-gemini'
+import { browserLLMPlugin } from '../shared/utils/browser-llm'
 import { createKeundalChat as createChat } from '../shared/utils/keundal'
+import { ChatStore } from '../shared/utils/chat-store'
+import { defaultLLMSettings } from '../shared/utils/llm-settings'
 
 async function createKeundalChat(name: string, options: { webSearch?: boolean, reasoning?: boolean }, env: Record<string, string>) {
-  const providers = {
-    'openai/gpt-5-nano': { plugin: openaiLLMPlugin, id: 'gpt-5-nano', key: 'OPENAI_API_KEY', url: 'OPENAI_BASE_URL' },
-    'anthropic/claude-haiku-4.5': { plugin: anthropicLLMPlugin, id: 'claude-haiku-4-5', key: 'ANTHROPIC_API_KEY', url: 'ANTHROPIC_BASE_URL' },
-    'google/gemini-3-flash': { plugin: geminiLLMPlugin, id: 'gemini-3-flash-preview', key: 'GEMINI_API_KEY', url: 'GEMINI_BASE_URL' }
-  }
-  const provider = providers[name as keyof typeof providers]
   const ctx = new Context()
-  const llm = ctx.plugin(provider.plugin, { apiKey: env[provider.key]!, baseURL: env[provider.url], models: { [provider.id]: { contextWindow: 128_000, maxOutputTokens: 4096 } } })
+  const llm = ctx.plugin(browserLLMPlugin, { getSettings: () => ({
+    openai: { apiKey: env.OPENAI_API_KEY ?? '', baseURL: env.OPENAI_BASE_URL ?? '' },
+    anthropic: { apiKey: env.ANTHROPIC_API_KEY ?? '', baseURL: env.ANTHROPIC_BASE_URL ?? '' },
+    google: { apiKey: env.GEMINI_API_KEY ?? '', baseURL: env.GEMINI_BASE_URL ?? '' }
+  }) })
   await llm
   const store = ctx.plugin(memoryStorePlugin)
   await store
@@ -57,7 +55,7 @@ function send(response: ServerResponse, frames: Frame[]) {
   response.end(frames.map(frame => `${frame.type ? `event: ${frame.type}\n` : ''}data: ${JSON.stringify(frame)}\n\n`).join(''))
 }
 
-async function setup(handle: (body: Record<string, unknown>, response: ServerResponse) => void) {
+async function setup(handle: (body: Record<string, unknown>, response: ServerResponse, request: IncomingMessage) => void) {
   const server = createServer(async (request, response) => {
     const chunks: Buffer[] = []
     for await (const chunk of request) chunks.push(Buffer.from(chunk))
@@ -66,7 +64,7 @@ async function setup(handle: (body: Record<string, unknown>, response: ServerRes
       response.end(JSON.stringify({ input_tokens: 15, totalTokens: 15 }))
       return
     }
-    handle(JSON.parse(Buffer.concat(chunks).toString()), response)
+    handle(JSON.parse(Buffer.concat(chunks).toString()), response, request)
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   onTestFinished(() => new Promise<void>((resolve, reject) => {
@@ -215,9 +213,53 @@ test('공급자 오류를 성공 응답으로 바꾸거나 자동 재시도하�
   const chat = await createKeundalChat('openai/gpt-5-nano', {}, { OPENAI_API_KEY: 'local-test-key', OPENAI_BASE_URL: baseURL })
   onTestFinished(chat.dispose)
   const chunks = await decode(chat.respond({ threadId: 'chat', messages: [user], instructions: '' }))
-  expect(chunks).toContainEqual({ type: 'error', errorText: expect.stringContaining('Rate limited') })
+  expect(chunks).toContainEqual({ type: 'error', errorText: expect.stringContaining('HTTP 429') })
   expect(chunks.some(chunk => chunk.type === 'finish')).toBe(false)
   expect(calls).toBe(1)
+})
+
+test('키와 API URL 변경을 재시작 없이 적용하고 삭제한 키와 공급자가 반사한 키를 실행 이력에 남기지 않는다', async () => {
+  const authorizations: (string | undefined)[] = []
+  const firstURL = await setup((_body, response, request) => {
+    authorizations.push(request.headers.authorization)
+    send(response, openaiText('첫 번째 설정'))
+  })
+  let rejected = false
+  const secondURL = await setup((_body, response, request) => {
+    authorizations.push(request.headers.authorization)
+    if (!rejected) return send(response, openaiText('변경한 설정'))
+    response.writeHead(401, { 'content-type': 'application/json' })
+    response.end(JSON.stringify({ error: { message: 'Incorrect API key: second-private-key', type: 'authentication_error' } }))
+  })
+  const settings = defaultLLMSettings()
+  settings.openai = { apiKey: 'first-private-key', baseURL: firstURL }
+  const ctx = new Context()
+  const llm = ctx.plugin(browserLLMPlugin, { getSettings: () => settings })
+  await llm
+  const store = ctx.plugin(memoryStorePlugin)
+  await store
+  const chats = new ChatStore(ctx)
+  onTestFinished(async () => {
+    await chats.stop()
+    await store.dispose()
+    await llm.dispose()
+  })
+  await chats.create('settings', user, 'openai/gpt-5-nano')
+  expect(await (await chats.respond('settings', { model: 'openai/gpt-5-nano', messages: [user] })).text()).toContain('첫 번째 설정')
+  settings.openai = { apiKey: 'second-private-key', baseURL: secondURL }
+  const followup: UIMessage = { id: 'followup', role: 'user', parts: [{ type: 'text', text: '설정 변경 후 요청' }] }
+  const messages = [...(await chats.get('settings'))!.messages, followup]
+  expect(await (await chats.respond('settings', { model: 'openai/gpt-5-nano', messages })).text()).toContain('변경한 설정')
+  rejected = true
+  const failed = await (await chats.respond('settings', { model: 'openai/gpt-5-nano', messages })).text()
+  expect(failed).toContain('HTTP 401')
+  expect(failed).not.toContain('second-private-key')
+  expect(authorizations).toEqual(['Bearer first-private-key', 'Bearer first-private-key', 'Bearer second-private-key', 'Bearer second-private-key'])
+  const persisted = JSON.stringify({ session: await ctx.session.get('settings'), runs: await ctx.generation.list() })
+  for (const value of ['first-private-key', 'second-private-key', firstURL, secondURL]) expect(persisted).not.toContain(value)
+  settings.openai = { apiKey: '', baseURL: '' }
+  await expect(ctx.llm.countTokens({ model: 'gpt-5-nano', maxOutputTokens: 4096, input: { threadId: 'settings', runId: 'forgotten', messages: [], tools: [], context: [], state: {} } })).rejects.toThrow('add your openai API key')
+  expect(authorizations).toHaveLength(4)
 })
 
 test('Anthropic 추론 중 중단한 대화를 다시 보내도 서명 없는 부분 추론을 재생하지 않는다', async () => {

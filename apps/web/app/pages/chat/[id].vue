@@ -7,6 +7,7 @@ const route = useRoute()
 const toast = useToast()
 const { model } = useModels()
 const { webSearch, reasoning } = useChatSettings()
+const { ensureConfigured } = useLLMSettings()
 const { $chatStore } = useNuxtApp()
 
 const { data } = await useAsyncData(`chat-${route.params.id}`, () => $chatStore.get(route.params.id as string), { server: false })
@@ -80,6 +81,7 @@ const { messages, status, error, sendMessage, regenerate, stop } = useChat({
 async function handleSubmit(e: Event) {
   e.preventDefault()
   if (input.value.trim() && !uploading.value) {
+    if (!ensureConfigured(model.value)) return
     sendMessage({
       text: input.value,
       files: uploadedFiles.value.length > 0 ? uploadedFiles.value : undefined

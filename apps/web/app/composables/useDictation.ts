@@ -1,4 +1,7 @@
 import type { TranscriptionSession } from '@keundal/core'
+import openaiTranscriptionPlugin from '@keundal/plugin-transcription-openai'
+import { Context } from 'cordis'
+import { providerCredentials, providerError } from '#shared/utils/llm-settings'
 import {
   encodeRealtimeAudio,
   resampleAudio,
@@ -34,7 +37,7 @@ interface Session {
  * from the browser with a short-lived token, and exposes the transcript as it arrives.
  */
 export function useDictation() {
-  const { csrf, headerName } = useCsrf()
+  const { settings } = useLLMSettings()
 
   // Assumed on the server so the button renders in the SSR output, checked once mounted
   const supported = ref(true)
@@ -123,11 +126,21 @@ export function useDictation() {
   }
 
   async function open(abort: AbortController, { onMaxDuration }: { onMaxDuration?: () => void }) {
-    const credentials = await $fetch<TranscriptionSession>('/api/transcription/token', {
-      method: 'POST',
-      signal: abort.signal,
-      headers: { [headerName]: csrf }
+    const context = new Context()
+    const fiber = context.plugin(openaiTranscriptionPlugin, {
+      ...providerCredentials(settings.value, 'openai'),
+      dangerouslyAllowBrowser: true
     })
+    let credentials: TranscriptionSession
+    try {
+      await fiber
+      credentials = await context.transcription.createSession({ model: 'gpt-4o-mini-transcribe', expiresAfterSeconds: 300 }, { signal: abort.signal })
+    } catch (error) {
+      abort.signal.throwIfAborted()
+      throw providerError('openai', error)
+    } finally {
+      await fiber.dispose()
+    }
     if (cancelled) return
 
     // Open the transcription stream first so the WebSocket handshake overlaps the microphone setup

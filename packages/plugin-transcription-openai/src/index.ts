@@ -10,6 +10,7 @@ import OpenAI from 'openai'
 export interface OpenAITranscriptionConfig {
   apiKey: string
   baseURL?: string
+  dangerouslyAllowBrowser?: boolean
 }
 
 export class OpenAITranscriptionService extends TranscriptionService {
@@ -21,6 +22,8 @@ export class OpenAITranscriptionService extends TranscriptionService {
   constructor(ctx: Context, config: OpenAITranscriptionConfig) {
     super(ctx)
     if (!config.apiKey?.trim()) throw new Error('OpenAI API key is required')
+    if (config.dangerouslyAllowBrowser !== undefined && typeof config.dangerouslyAllowBrowser !== 'boolean')
+      throw new Error('dangerouslyAllowBrowser must be a boolean')
     this.client = new OpenAI({ ...config, maxRetries: 0 })
     const url = new globalThis.URL(`${(config.baseURL ?? 'https://api.openai.com/v1').replace(/\/$/, '')}/realtime`)
     url.protocol = url.protocol === 'http:' ? 'ws:' : 'wss:'

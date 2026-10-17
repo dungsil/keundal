@@ -31,9 +31,11 @@ const {
 
 const { $chatStore } = useNuxtApp()
 const { model } = useModels()
+const { ensureConfigured } = useLLMSettings()
 
 async function createChat(prompt: string) {
   input.value = prompt
+  if (!ensureConfigured(model.value)) return
   loading.value = true
 
   const parts: UIMessage['parts'] = [{ type: 'text', text: prompt }]
@@ -46,14 +48,14 @@ async function createChat(prompt: string) {
     const chat = await $chatStore.create(chatId, { id: crypto.randomUUID(), role: 'user', parts }, model.value)
     await refreshNuxtData('chats')
     await navigateTo(`/chat/${chat.id}`)
+    return true
   } finally {
     loading.value = false
   }
 }
 
 async function onSubmit() {
-  await createChat(input.value)
-  clearFiles()
+  if (await createChat(input.value)) clearFiles()
 }
 
 const quickChats = [

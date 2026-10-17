@@ -151,6 +151,9 @@ defineShortcuts({
       </template>
 
       <template #footer="{ collapsed }">
+        <ClientOnly>
+          <LLMSettings :collapsed="collapsed" />
+        </ClientOnly>
         <UserMenu v-if="loggedIn" :collapsed="collapsed" />
         <UButton
           v-else

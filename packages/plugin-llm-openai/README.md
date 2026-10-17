@@ -14,6 +14,8 @@
 
 `countTokens()`는 [Responses 입력 토큰 계산 API](https://developers.openai.com/api/reference/typescript/resources/responses/subresources/input_tokens/methods/count)를 호출합니다. 메시지, 부가 문맥, 도구 정의를 생성 요청과 동일하게 변환하며, 로컬 추정값으로 대체하지 않습니다.
 
+브라우저에서 실행하려면 `apiKey`와 `dangerouslyAllowBrowser: true`를 명시합니다. 생략하면 SDK의 브라우저 실행 차단을 유지합니다. 브라우저 키는 사용자·스크립트·확장 기능에 노출될 수 있으므로 서버 소유 비밀 키를 번들에 넣지 마세요. 사용자 자신의 키를 사용하는 앱에서만 위험을 안내하고 opt-in하며, 엔드포인트의 CORS 지원도 필요합니다.
+
 ## 직접 호출
 
 워크스페이스에서 `pnpm build`를 실행한 뒤 사용할 수 있습니다. 아래 코드의 `OPENAI_MODEL`, `OPENAI_CONTEXT_WINDOW`, `OPENAI_MAX_OUTPUT_TOKENS`는 호출하는 애플리케이션에서 플러그인 설정을 만드는 예시 환경 변수입니다. `OPENAI_API_KEY`도 설정해야 합니다.

@@ -5,8 +5,7 @@ export default defineNuxtConfig({
     '@nuxt/ui',
     '@comark/nuxt',
     'nuxt-auth-utils',
-    'nuxt-charts',
-    'nuxt-csurf'
+    'nuxt-charts'
   ],
 
   devtools: {

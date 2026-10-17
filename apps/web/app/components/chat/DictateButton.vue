@@ -13,7 +13,7 @@ const state = defineModel<'idle' | 'recording' | 'transcribing'>('state', { defa
 const preview = defineModel<string>('preview', { default: '' })
 
 const toast = useToast()
-const { loggedIn } = useUserSession()
+const { ensureConfigured } = useLLMSettings()
 const { supported, recording, finalizing, level, transcript, error, start, stop, cancel } = useDictation()
 
 // Rolling input levels rendered as a small waveform while recording
@@ -45,7 +45,6 @@ watch(error, (value) => {
 
 const tooltip = computed(() => {
   if (!supported.value) return 'Dictation is not supported in this browser'
-  if (!loggedIn.value) return 'You need to be logged in to dictate'
   return 'Dictate'
 })
 
@@ -59,10 +58,11 @@ function fail(cause: Error) {
 }
 
 async function record() {
-  if (!supported.value || !loggedIn.value) {
+  if (!supported.value) {
     toast.add({ description: tooltip.value, icon: 'i-lucide-info', color: 'neutral' })
     return
   }
+  if (!ensureConfigured('openai/gpt-5-nano')) return
 
   try {
     await start({ onMaxDuration: finish })

@@ -1,14 +1,17 @@
 import { Context } from 'cordis'
+import { useLocalStorage } from '@vueuse/core'
 import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
 import { ChatStore } from '../../shared/utils/chat-store'
-import { remoteLLMPlugin } from '../../shared/utils/remote-llm'
+import { browserLLMPlugin } from '../../shared/utils/browser-llm'
+import { defaultLLMSettings } from '../../shared/utils/llm-settings'
 
 export default defineNuxtPlugin(async () => {
   const ctx = new Context()
-  const { csrf, headerName } = useCsrf()
-  const llm = ctx.plugin(remoteLLMPlugin, {
-    fetch: (url, init) => globalThis.fetch(url, { ...init, headers: { ...init?.headers, [headerName]: csrf } })
+  const settings = useLocalStorage('keundal:llm-settings', defaultLLMSettings(), {
+    writeDefaults: false,
+    mergeDefaults: true
   })
+  const llm = ctx.plugin(browserLLMPlugin, { getSettings: () => settings.value })
   await llm
   const store = ctx.plugin(indexedDBStorePlugin, { databaseName: 'keundal-web' })
   await store
@@ -19,5 +22,5 @@ export default defineNuxtPlugin(async () => {
     await store.dispose()
     await llm.dispose()
   })
-  return { provide: { chatStore } }
+  return { provide: { chatStore, llmSettings: settings } }
 })
