@@ -133,6 +133,36 @@ pnpm preview
 
 Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
 
+### Cloudflare Workers
+
+Workers의 module preset과 D1·R2를 사용합니다. 아래 명령은 저장소 루트에서 실행합니다.
+
+```bash
+pnpm --filter @keundal/web exec wrangler login
+pnpm --filter @keundal/web exec wrangler d1 create keundal-web
+pnpm --filter @keundal/web exec wrangler r2 bucket create keundal-web-blobs
+```
+
+반환된 D1 ID와 R2 버킷 이름을 `apps/web/.env`의 `CLOUDFLARE_D1_DATABASE_ID`, `CLOUDFLARE_R2_BUCKET_NAME`에 설정합니다. API 토큰 방식이면 셸/CI의 비밀 환경 변수에 `CLOUDFLARE_API_TOKEN`과 계정 선택용 `CLOUDFLARE_ACCOUNT_ID`를 설정하며 저장소에 커밋하지 않습니다. Worker 이름은 `keundal-web`입니다. 기존 서비스가 있다면 덮어쓰기 전에 계정과 이름을 확인하세요.
+
+```bash
+pnpm build
+pnpm --filter @keundal/web build:cloudflare
+pnpm --filter @keundal/web db:migrate:cloudflare
+pnpm --filter @keundal/web deploy:cloudflare
+```
+
+NuxtHub가 `.output/server/wrangler.json`에 D1 `DB`·R2 `BLOB` 바인딩과 마이그레이션 경로를 생성합니다. `db:migrate:cloudflare`는 **원격 D1을 변경**합니다. 기존 운영 DB에는 먼저 백업과 마이그레이션 검토가 필요합니다. `wrangler deploy`는 마이그레이션을 자동 실행하지 않습니다. 로컬 SQLite 데이터는 자동 이전되지 않습니다.
+
+런타임 비밀 값은 로컬 `.env`와 별개입니다. 다음 명령의 비공개 프롬프트에서 `NUXT_SESSION_PASSWORD`(32자 이상)와 사용할 공급자의 키를 등록합니다. OAuth와 받아쓰기를 쓰려면 앞 절의 해당 키도 등록해야 합니다.
+
+```bash
+pnpm --filter @keundal/web exec wrangler secret put NUXT_SESSION_PASSWORD --config .output/server/wrangler.json
+pnpm --filter @keundal/web exec wrangler secret put OPENAI_API_KEY --config .output/server/wrangler.json
+```
+
+GitHub OAuth callback URL은 배포된 도메인의 `/auth/github`로 지정합니다. 원본 템플릿은 비로그인 대화도 허용하므로 공개 서비스에 공급자 키를 등록하기 전에 Cloudflare Access 등으로 접근과 비용을 통제하세요. D1/R2 사용은 계정의 요금제에 따라 비용이 발생할 수 있습니다.
+
 ## Renovate integration
 
 Install [Renovate GitHub app](https://github.com/apps/renovate/installations/select_target) on your repository and you are good to go.

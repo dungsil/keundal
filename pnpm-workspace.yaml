@@ -5,6 +5,7 @@ allowBuilds:
   simple-git-hooks: true
   unrs-resolver: false
   vue-demi: true
+  workerd: true
 
 overrides:
   # nuxt-csurf는 아직 h3 v1 이벤트 API를 사용합니다. 원본 템플릿의 고정을 유지합니다.

@@ -23,14 +23,27 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-06-30',
 
   nitro: {
+    cloudflare: {
+      wrangler: {
+        name: 'keundal-web'
+      }
+    },
     experimental: {
       openAPI: true
     }
   },
 
   hub: {
-    db: 'sqlite',
-    blob: true
+    db: process.env.CLOUDFLARE_D1_DATABASE_ID
+      ? {
+          dialect: 'sqlite',
+          driver: 'd1',
+          connection: { databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID }
+        }
+      : 'sqlite',
+    blob: process.env.CLOUDFLARE_R2_BUCKET_NAME
+      ? { driver: 'cloudflare-r2', binding: 'BLOB', bucketName: process.env.CLOUDFLARE_R2_BUCKET_NAME }
+      : true
   },
 
   vite: {

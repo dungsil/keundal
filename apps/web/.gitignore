@@ -27,3 +27,6 @@ logs
 .history
 .vercel
 .env*.local
+.wrangler
+.dev.vars
+.dev.vars.*

@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
+    "build:cloudflare": "nuxt build --preset=cloudflare_module",
+    "deploy:cloudflare": "wrangler deploy --config .output/server/wrangler.json",
     "dev": "nuxt dev",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
@@ -11,7 +13,8 @@
     "test": "vitest run",
     "typecheck": "nuxt typecheck && tsc -p tsconfig.test.json",
     "db:generate": "nuxt db generate",
-    "db:migrate": "nuxt db migrate"
+    "db:migrate": "nuxt db migrate",
+    "db:migrate:cloudflare": "wrangler d1 migrations apply DB --remote --config .output/server/wrangler.json"
   },
   "dependencies": {
     "@ai-sdk/vue": "^4.0.137",
@@ -54,6 +57,7 @@
     "eslint-plugin-better-tailwindcss": "^4.9.0",
     "typescript": "^6.0.3",
     "vitest": "catalog:",
-    "vue-tsc": "^3.3.13"
+    "vue-tsc": "^3.3.13",
+    "wrangler": "4.151.1"
   }
 }
