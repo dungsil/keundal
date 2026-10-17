@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-
 import { FinishReason } from '@google/genai'
 import type { Candidate, GenerateContentResponse, Part } from '@google/genai'
 import { EventType, type LLMEvent } from '@keundal/core'
@@ -163,7 +161,7 @@ export class ContentsEvents {
 
   private get prefix(): string {
     if (this.responseId) return this.responseId
-    return (this.idPrefix ??= randomUUID())
+    return (this.idPrefix ??= globalThis.crypto.randomUUID())
   }
 
   private trackResponseId(value: string | undefined): void {

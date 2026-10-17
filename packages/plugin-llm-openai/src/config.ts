@@ -4,6 +4,7 @@ import type { StandardSchemaV1 } from '@standard-schema/spec'
 export interface OpenAILLMConfig {
   readonly apiKey?: string
   readonly baseURL?: string
+  readonly dangerouslyAllowBrowser?: boolean
   readonly models: Readonly<Record<string, LLMModel>>
 }
 
@@ -20,6 +21,8 @@ export function parseConfig(value: unknown): OpenAILLMConfig {
       throw new Error(`${key} must be a non-empty string`)
     }
   }
+  if (value.dangerouslyAllowBrowser !== undefined && typeof value.dangerouslyAllowBrowser !== 'boolean')
+    throw new Error('dangerouslyAllowBrowser must be a boolean')
   const models: Record<string, LLMModel> = Object.create(null)
   for (const [name, limits] of Object.entries(value.models)) {
     if (
@@ -35,7 +38,12 @@ export function parseConfig(value: unknown): OpenAILLMConfig {
       throw new Error(`invalid model limits for ${name}`)
     models[name] = { contextWindow: limits.contextWindow, maxOutputTokens: limits.maxOutputTokens }
   }
-  return { apiKey: value.apiKey as string | undefined, baseURL: value.baseURL as string | undefined, models }
+  return {
+    apiKey: value.apiKey as string | undefined,
+    baseURL: value.baseURL as string | undefined,
+    dangerouslyAllowBrowser: value.dangerouslyAllowBrowser as boolean | undefined,
+    models
+  }
 }
 
 export const OpenAILLMConfigSchema: StandardSchemaV1<OpenAILLMConfig, OpenAILLMConfig> = {

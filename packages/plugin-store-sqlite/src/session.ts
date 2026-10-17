@@ -116,13 +116,23 @@ export class SqliteSessionService extends SessionService {
       }
       const next: StoredThread = {
         revision: current.revision + 1,
-        messages: mergeMessages(current.messages, change.messages),
+        messages: change.mode === 'replace' ? [...change.messages] : mergeMessages(current.messages, change.messages),
         state: change.state ?? current.state
       }
       this.store.writeThread(change.threadId, next.revision, next.state)
+      if (change.mode === 'replace') this.store.clearThreadMessages(change.threadId)
       this.store.writeThreadMessages(change.threadId, change.messages)
       return snapshot(change.threadId, next)
     })
+  }
+
+  async delete(threadId: string, expectedRevision: number, options?: ExecutionOptions): Promise<void> {
+    this.assertOpen()
+    options?.signal?.throwIfAborted()
+    if (typeof threadId !== 'string' || !threadId.trim()) throw new Error('delete requires a non-empty threadId')
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)
+      throw new Error('delete requires a non-negative expectedRevision')
+    this.store.deleteThread(threadId, expectedRevision)
   }
 
   private assertOpen(): void {

@@ -109,6 +109,111 @@ async function setup(t: TestContext, handle: (request: Received, response: Serve
   return { ctx, fiber, requests }
 }
 
+test('네이티브 검색과 인용 뒤의 함수 호출을 로컬 호출과 구분하고 후속 요청에 순서대로 보존한다', async (t) => {
+  const search = {
+    id: 'ws_1',
+    type: 'web_search_call',
+    status: 'completed',
+    action: { type: 'search', query: 'Keundal' }
+  }
+  const cited = {
+    ...message,
+    phase: 'commentary',
+    status: 'completed',
+    content: [
+      {
+        type: 'output_text',
+        text: '출처',
+        annotations: [
+          { type: 'url_citation', url: 'https://example.com', title: 'Example', start_index: 0, end_index: 2 }
+        ]
+      }
+    ]
+  }
+  const reason = { id: 'rs_1', type: 'reasoning', summary: [], encrypted_content: 'opaque' }
+  const call = { id: 'fc_1', type: 'function_call', call_id: 'call_1', name: 'lookup', arguments: '{}' }
+  const frames = [search, cited, reason, call].flatMap((item, output_index) => [
+    {
+      type: 'response.output_item.added',
+      output_index,
+      item: item.type === 'message' ? { ...item, content: [] } : item
+    },
+    { type: 'response.output_item.done', output_index, item }
+  ])
+  let generations = 0
+  const { ctx, requests } = await setup(t, (received, response) => {
+    if (received.path?.endsWith('/input_tokens')) {
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ input_tokens: 8 }))
+      return
+    }
+    send(response, generations++ ? textFrames : [...frames, completed])
+  })
+  const enabled = {
+    ...request,
+    webSearch: true,
+    reasoning: true,
+    input: { ...request.input, tools: [{ name: 'lookup', description: 'Lookup', parameters: { type: 'object' } }] }
+  }
+  const events = await collect(ctx.llm.stream(enabled))
+  expect(events.filter((event) => event.type === EventType.TOOL_CALL_START)).toEqual([
+    { type: EventType.TOOL_CALL_START, toolCallId: 'call_1', toolCallName: 'lookup' }
+  ])
+  expect(events).toContainEqual({
+    type: EventType.CUSTOM,
+    name: 'keundal.source',
+    value: { id: 'https://example.com', url: 'https://example.com', title: 'Example' }
+  })
+  const assembly = new MessageAssembly()
+  for (const event of events) assembly.apply(event)
+  assembly.apply({
+    type: EventType.TOOL_CALL_RESULT,
+    messageId: 'result',
+    toolCallId: 'call_1',
+    role: 'tool',
+    content: 'ok'
+  })
+  await ctx.llm.countTokens({
+    ...enabled,
+    input: { ...enabled.input, messages: [...request.input.messages, ...assembly.messages] }
+  })
+  expect(requests[0]!.body.tools).toEqual([
+    { type: 'function', name: 'lookup', description: 'Lookup', parameters: { type: 'object' }, strict: false },
+    { type: 'web_search' }
+  ])
+  expect(requests[0]!.body.reasoning).toEqual({ effort: 'medium', summary: 'auto' })
+  expect(requests[1]!.body.input).toEqual([
+    { role: 'user', content: 'Hello' },
+    search,
+    cited,
+    reason,
+    { type: 'function_call', call_id: 'call_1', name: 'lookup', arguments: '{}' },
+    { type: 'function_call_output', call_id: 'call_1', output: 'ok' }
+  ])
+  expect(requests[1]!.body.tools).toEqual(requests[0]!.body.tools)
+  expect(requests[1]!.body.reasoning).toEqual(requests[0]!.body.reasoning)
+  await collect(
+    ctx.llm.stream({
+      ...enabled,
+      input: { ...enabled.input, messages: [...request.input.messages, ...assembly.messages] }
+    })
+  )
+  expect(requests[2]!.body.input).toEqual(requests[1]!.body.input)
+  await ctx.llm.countTokens({ ...request, webSearch: false, reasoning: false })
+  expect(requests[3]!.body.tools).toEqual([])
+  expect(requests[3]!.body.reasoning).toEqual({ effort: 'none' })
+})
+
+test.for(['webSearch', 'reasoning'] as const)('%s가 boolean이 아니면 공급자 호출 전에 거부한다', async (key, t) => {
+  const { ctx, requests } = await setup(t, () => {
+    throw new Error('unexpected HTTP call')
+  })
+  const invalid = { ...request, [key]: 'true' } as LLMRequest
+  await expect(ctx.llm.countTokens(invalid)).rejects.toThrow('must be a boolean')
+  await expect(collect(ctx.llm.stream(invalid))).rejects.toThrow('must be a boolean')
+  expect(requests).toHaveLength(0)
+})
+
 test('Responses 요청을 보내고 분할된 UTF-8 SSE를 실행 수명 이벤트 없이 변환한다', async (t) => {
   const { ctx, requests } = await setup(t, async (_request, response) => {
     const bytes = Buffer.from(wire(textFrames))

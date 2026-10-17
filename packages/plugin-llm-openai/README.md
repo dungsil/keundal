@@ -14,6 +14,8 @@
 
 `countTokens()`는 [Responses 입력 토큰 계산 API](https://developers.openai.com/api/reference/typescript/resources/responses/subresources/input_tokens/methods/count)를 호출합니다. 메시지, 부가 문맥, 도구 정의를 생성 요청과 동일하게 변환하며, 로컬 추정값으로 대체하지 않습니다.
 
+브라우저에서 실행하려면 `apiKey`와 `dangerouslyAllowBrowser: true`를 명시합니다. 생략하면 SDK의 브라우저 실행 차단을 유지합니다. 브라우저 키는 사용자·스크립트·확장 기능에 노출될 수 있으므로 서버 소유 비밀 키를 번들에 넣지 마세요. 사용자 자신의 키를 사용하는 앱에서만 위험을 안내하고 opt-in하며, 엔드포인트의 CORS 지원도 필요합니다.
+
 ## 직접 호출
 
 워크스페이스에서 `pnpm build`를 실행한 뒤 사용할 수 있습니다. 아래 코드의 `OPENAI_MODEL`, `OPENAI_CONTEXT_WINDOW`, `OPENAI_MAX_OUTPUT_TOKENS`는 호출하는 애플리케이션에서 플러그인 설정을 만드는 예시 환경 변수입니다. `OPENAI_API_KEY`도 설정해야 합니다.
@@ -60,6 +62,10 @@ try {
 
 ## 입력과 이벤트
 
+- `LLMRequest.webSearch: true`는 함수 도구와 함께 네이티브 `{ type: 'web_search' }` 도구를 등록합니다. false/생략은 등록하지 않습니다. 검색 호출은 로컬 실행용 `TOOL_CALL_*`로 내보내지 않습니다.
+- `reasoning: true`는 `{ effort: 'medium', summary: 'auto' }`를 전송합니다. false는 GPT-5/mini/nano(날짜 snapshot 포함)에 `minimal`(검색 시 `low`), 그 외 모델에는 `none`을 전송하고 요약을 요청하지 않습니다. 초기 GPT-5 계열은 추론을 완전히 끌 수 없습니다. 생략하면 공급자 기본값을 유지합니다. 추론 토큰도 기존 `max_output_tokens` 예산 안에서 사용하며, 모델이 해당 옵션과 검색을 지원해야 합니다. 지원하지 않는 모델의 API 오류는 그대로 전달합니다. 토큰 계산에도 같은 도구·추론 설정을 사용합니다.
+- URL 인용은 `{ type: 'CUSTOM', name: 'keundal.source', value: { id, url, title? } }`로 전달하며 `id`는 URL입니다. 같은 URL이 여러 번 인용되면 이벤트도 반복될 수 있습니다.
+- 네이티브 문맥은 `TEXT_MESSAGE_END.metadata['openai.outputItems']`에 **SDK의 완료된 출력 항목 배열**로 보존합니다. 각 검색 전용 어시스턴트 호스트에는 `[ResponseFunctionWebSearch]`(원래 `id`, `status`, `action` 포함), 인용 텍스트 호스트에는 `[ResponseOutputMessage]`(원래 `phase`, `content[].annotations` 포함)를 담습니다. 후속 변환은 이 배열을 텍스트 대신 재생하고 로컬 함수 호출을 뒤에 추가합니다. 메시지 순서와 메타데이터를 수정하지 말고 보존해야 검색·텍스트·추론·함수 호출 순서가 유지됩니다. 추론 암호화 값은 기존 `reasoning.encryptedValue`에 따로 유지합니다.
 - 시스템·개발자·사용자·어시스턴트 메시지, 함수 호출과 결과, 추론 메시지를 변환합니다. 사용자 입력은 텍스트와 이미지 URL·base64·파일 ID를 지원합니다. 문서·음성·동영상 입력과 `activity` 메시지는 오류로 알립니다.
 - `input.context`는 사용자 역할의 JSON 메시지로 전달합니다. `state`와 `forwardedProps`는 공급자 요청에 자동으로 포함하지 않습니다.
 - 텍스트, 거절 응답, 함수 호출 인자, 추론 요약을 AG-UI 이벤트로 전달합니다. 함수 호출은 요청 이벤트까지 전달하며 도구를 실행하지 않습니다.

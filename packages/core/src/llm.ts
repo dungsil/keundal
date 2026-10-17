@@ -6,6 +6,14 @@ import type { AGUIEvent, RunAgentInput } from './protocol.js'
 
 export type LLMEvent = Exclude<AGUIEvent, { type: 'RUN_STARTED' | 'RUN_FINISHED' | 'RUN_ERROR' }>
 
+export const LLM_SOURCE_EVENT = 'keundal.source'
+
+export interface LLMSource {
+  readonly id: string
+  readonly url: string
+  readonly title?: string
+}
+
 export interface LLMModel {
   readonly contextWindow: number
   readonly maxOutputTokens: number
@@ -15,6 +23,8 @@ export interface LLMRequest {
   readonly input: RunAgentInput
   readonly model: string
   readonly maxOutputTokens: number
+  readonly webSearch?: boolean
+  readonly reasoning?: boolean
 }
 
 export abstract class LLMService extends Service {

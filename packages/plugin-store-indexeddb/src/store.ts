@@ -241,7 +241,7 @@ export class IndexedDBStore {
         const next: StoredThread = {
           threadId: change.threadId,
           revision: current.revision + 1,
-          messages: mergeMessages(current.messages, change.messages),
+          messages: change.mode === 'replace' ? [...change.messages] : mergeMessages(current.messages, change.messages),
           state: change.state ?? current.state
         }
         threads.put(next)
@@ -257,6 +257,31 @@ export class IndexedDBStore {
       const run = await request<StoredRun | undefined>(runs.get(runId))
       if (run?.status === 'running') runs.put({ ...run, status: 'interrupted' } satisfies StoredRun)
     })
+  }
+
+  async deleteThread(threadId: string, expectedRevision: number, signal?: AbortSignal): Promise<void> {
+    await this.transaction(
+      [THREADS, RUNS, JOURNAL],
+      'readwrite',
+      async (transaction) => {
+        const threads = transaction.objectStore(THREADS)
+        const revision = (await request<StoredThread | undefined>(threads.get(threadId)))?.revision ?? 0
+        if (revision !== expectedRevision)
+          throw new Error(`session revision conflict for ${threadId}: expected ${expectedRevision}, stored ${revision}`)
+        const runs = transaction.objectStore(RUNS)
+        const matching = (await request<StoredRun[]>(runs.getAll())).filter((run) => run.threadId === threadId)
+        if (matching.some((run) => run.status === 'running'))
+          throw new Error(`cannot delete session with running generation: ${threadId}`)
+        const journal = transaction.objectStore(JOURNAL)
+        for (const run of matching) {
+          const keys = await request<IDBValidKey[]>(journal.index('by-run').getAllKeys(run.runId))
+          for (const key of keys) journal.delete(key)
+          runs.delete(run.runId)
+        }
+        threads.delete(threadId)
+      },
+      signal
+    )
   }
 
   async withRunLock<T>(

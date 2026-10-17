@@ -16,6 +16,8 @@ export type { ExecutableTool, ToolExecutionContext } from './tools.js'
 export interface SimpleAgentConfig {
   readonly model: string
   readonly maxOutputTokens: number
+  readonly webSearch?: boolean
+  readonly reasoning?: boolean
   readonly compaction?: SummaryCompactionConfig
   readonly tools?: readonly ExecutableTool[]
   /** 도구를 실행하고 후속 생성을 요청할 최대 횟수입니다. 기본값은 8입니다. */
@@ -45,6 +47,12 @@ const simpleAgentConfigSchema: StandardSchemaV1<SimpleAgentConfig, SimpleAgentCo
         )
         if (compaction.issues) return { issues: compaction.issues }
         try {
+          for (const key of ['webSearch', 'reasoning'] as const) {
+            const option = (value as Record<string, unknown>)[key]
+            if (option !== undefined && typeof option !== 'boolean') {
+              throw new Error(`${key} must be a boolean`)
+            }
+          }
           const tools = parseTools('tools' in value ? value.tools : undefined)
           const maxToolRounds = 'maxToolRounds' in value ? value.maxToolRounds : 8
           if (typeof maxToolRounds !== 'number' || !Number.isSafeInteger(maxToolRounds) || maxToolRounds <= 0) {
@@ -56,6 +64,8 @@ const simpleAgentConfigSchema: StandardSchemaV1<SimpleAgentConfig, SimpleAgentCo
             value: {
               model: value.model,
               maxOutputTokens: value.maxOutputTokens,
+              ...('webSearch' in value ? { webSearch: value.webSearch as boolean | undefined } : {}),
+              ...('reasoning' in value ? { reasoning: value.reasoning as boolean | undefined } : {}),
               compaction: compaction.value,
               tools,
               maxToolRounds,
@@ -168,6 +178,8 @@ export class SimpleAgent extends Service {
           input: fitted.input,
           model: this.config.model,
           maxOutputTokens,
+          ...(this.config.webSearch === undefined ? {} : { webSearch: this.config.webSearch }),
+          ...(this.config.reasoning === undefined ? {} : { reasoning: this.config.reasoning }),
           sessionRevision: prepared.revision,
           ...(fitted.compaction ? { compaction: fitted.compaction } : {})
         },
@@ -207,7 +219,9 @@ export class SimpleAgent extends Service {
         {
           input: candidate,
           model: this.config.model,
-          maxOutputTokens: this.config.maxOutputTokens
+          maxOutputTokens: this.config.maxOutputTokens,
+          ...(this.config.webSearch === undefined ? {} : { webSearch: this.config.webSearch }),
+          ...(this.config.reasoning === undefined ? {} : { reasoning: this.config.reasoning })
         },
         { signal }
       )
@@ -229,8 +243,14 @@ export class SimpleAgent extends Service {
       { ...this.config.compaction, signal, inputTokens: count }
     )
     signal.throwIfAborted()
-    // compact()가 반환하는 메시지는 내부에서 이미 검증된 객체다. 최종 예산 초과는 compact()가 검사한다.
-    return { input: { ...input, messages: compaction.messages }, compaction }
+    const compacted = { ...input, messages: compaction.messages }
+    // 축약기의 기본 계산과 달리 네이티브 검색 도구의 입력 비용까지 포함해 다시 검사합니다.
+    if (
+      (this.config.webSearch !== undefined || this.config.reasoning !== undefined) &&
+      (await countTokens(compacted)) > maxInputTokens
+    )
+      throw new Error('compacted input exceeds the model input budget')
+    return { input: compacted, compaction }
   }
 }
 

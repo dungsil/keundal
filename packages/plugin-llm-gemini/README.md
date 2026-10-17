@@ -58,6 +58,8 @@ try {
 
 ## 입력과 이벤트
 
+- `LLMRequest.reasoning`을 생략하면 기존 `{ includeThoughts: true }`를 유지합니다. Gemini 3 계열은 true에 `thinkingLevel: HIGH`, false에 Flash는 `MINIMAL`, 그 외에는 `LOW`를 지정합니다(완전 비활성화 불가). 이전 모델은 true에 `thinkingBudget: Math.min(24576, Math.floor(maxOutputTokens / 2))`, false에 `thinkingBudget: 0`을 지정합니다. `includeThoughts`도 같은 boolean으로 전달하며 출력 예산을 늘리지 않습니다. thinking 범위와 비활성화 지원은 모델에 따라 다르므로 지원 모델·출력 예산을 선택해야 하며 API 오류는 그대로 전달합니다.
+- `webSearch: true`는 토큰 계산·생성 전에 명시적인 오류로 거부합니다. Google 네이티브 검색은 함수 도구와의 호환성 때문에 추가하지 않습니다. false/생략은 기존 동작입니다. 토큰 계산 API에는 thinking 설정 필드가 없으므로 추론 옵션은 검증하지만 전송하지 않습니다.
 - 시스템·개발자 메시지는 `systemInstruction`으로, 사용자와 모델 차례는 `contents`로 변환합니다. 사용자 입력은 텍스트와 이미지를 지원하며, 이미지는 URL과 파일 식별자를 `fileData`로, base64 데이터를 `inlineData`로 전달합니다. 문서·음성·동영상 입력과 `activity` 메시지는 오류로 알립니다.
 - `input.context`는 사용자 차례의 JSON 메시지로 전달합니다. `state`와 `forwardedProps`는 공급자 요청에 자동으로 포함하지 않습니다.
 - 어시스턴트 메시지는 텍스트와 함수 호출 파트로 변환합니다. 함수 호출 인자는 JSON 객체여야 하고, 도구 결과는 함수 이름과 짝이 맞아야 합니다. 도구 결과가 JSON 객체가 아니면 `output` 키로 감싸 전달합니다.

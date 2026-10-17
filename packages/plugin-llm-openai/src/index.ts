@@ -18,7 +18,12 @@ export class OpenAILLMService extends LLMService {
     super(ctx)
     const parsed = parseConfig(config)
     this.models = parsed.models
-    this.client = new OpenAI({ apiKey: parsed.apiKey, baseURL: parsed.baseURL, maxRetries: 0 })
+    this.client = new OpenAI({
+      apiKey: parsed.apiKey,
+      baseURL: parsed.baseURL,
+      dangerouslyAllowBrowser: parsed.dangerouslyAllowBrowser,
+      maxRetries: 0
+    })
     ctx.fiber.effect(() => () => {
       this.closed = true
       for (const controller of this.active) controller.abort(new Error('OpenAI LLM service disposed'))

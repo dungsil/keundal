@@ -1,13 +1,17 @@
 import type {
+  TextBlock,
+  ServerToolUseBlock,
+  WebSearchToolResultBlock,
   RawContentBlockDelta,
   RawContentBlockStartEvent,
   RawMessageStreamEvent,
   StopReason
 } from '@anthropic-ai/sdk/resources/messages'
-import { EventType, type LLMEvent } from '@keundal/core'
+import { EventType, LLM_SOURCE_EVENT, type LLMEvent } from '@keundal/core'
 
 type Item =
-  | { type: 'text'; id: string }
+  | { type: 'text'; id: string; block: TextBlock }
+  | { type: 'native'; id: string; block: ServerToolUseBlock | WebSearchToolResultBlock; arguments: string }
   | { type: 'tool_use'; id: string; arguments: string; initialInput: Record<string, unknown>; hostMessageId?: string }
   | { type: 'thinking'; id: string; signature: string }
   | { type: 'redacted_thinking'; id: string; data: string }
@@ -78,12 +82,26 @@ export class MessageEvents {
     const block = event.content_block
     const id = `${this.messageId}-${event.index}`
     if (block.type === 'text') {
-      if (block.citations?.length) throw new Error('unsupported Anthropic text citations')
-      this.items.set(event.index, { type: 'text', id })
+      this.items.set(event.index, { type: 'text', id, block: { ...block, citations: [...(block.citations ?? [])] } })
       this.hasAssistantHost = true
       this.lastBlockWasReasoning = false
       yield { type: EventType.TEXT_MESSAGE_START, messageId: id, role: 'assistant' }
       if (block.text) yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: id, delta: block.text }
+      for (const citation of block.citations ?? []) {
+        if (citation.type === 'web_search_result_location')
+          yield {
+            type: EventType.CUSTOM,
+            name: LLM_SOURCE_EVENT,
+            value: { id: citation.url, url: citation.url, title: citation.title }
+          }
+      }
+    } else if (block.type === 'server_tool_use' || block.type === 'web_search_tool_result') {
+      if (block.type === 'server_tool_use' && block.name !== 'web_search')
+        throw new Error(`unsupported Anthropic server tool: ${block.name}`)
+      this.items.set(event.index, { type: 'native', id, block: { ...block }, arguments: '' })
+      this.hasAssistantHost = true
+      this.lastBlockWasReasoning = true
+      yield { type: EventType.TEXT_MESSAGE_START, messageId: id, role: 'assistant' }
     } else if (block.type === 'tool_use') {
       if (!block.id || !block.name || this.seenToolIds.has(block.id))
         throw new Error('invalid or duplicate Anthropic tool call')
@@ -128,7 +146,21 @@ export class MessageEvents {
     const item = this.items.get(index)
     if (!item) throw new Error('Anthropic delta has no matching content block')
     if (item.type === 'text' && delta.type === 'text_delta') {
+      item.block.text += delta.text
       if (delta.text) yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: item.id, delta: delta.text }
+    } else if (item.type === 'text' && delta.type === 'citations_delta') {
+      item.block.citations ??= []
+      item.block.citations.push(delta.citation)
+      if (delta.citation.type === 'web_search_result_location') {
+        const citation = delta.citation
+        yield {
+          type: EventType.CUSTOM,
+          name: LLM_SOURCE_EVENT,
+          value: { id: citation.url, url: citation.url, title: citation.title }
+        }
+      }
+    } else if (item.type === 'native' && item.block.type === 'server_tool_use' && delta.type === 'input_json_delta') {
+      item.arguments += delta.partial_json
     } else if (item.type === 'tool_use' && delta.type === 'input_json_delta') {
       if (Object.keys(item.initialInput).length)
         throw new Error('Anthropic tool call contains both initial input and JSON deltas')
@@ -147,7 +179,18 @@ export class MessageEvents {
     const item = this.items.get(index)
     if (!item) throw new Error('Anthropic completion has no matching content block')
     if (item.type === 'text') {
-      yield { type: EventType.TEXT_MESSAGE_END, messageId: item.id }
+      yield {
+        type: EventType.TEXT_MESSAGE_END,
+        messageId: item.id,
+        ...(item.block.citations?.length ? { metadata: { 'anthropic.contentBlocks': [item.block] } } : {})
+      }
+    } else if (item.type === 'native') {
+      if (item.block.type === 'server_tool_use' && item.arguments) item.block.input = JSON.parse(item.arguments)
+      yield {
+        type: EventType.TEXT_MESSAGE_END,
+        messageId: item.id,
+        metadata: { 'anthropic.contentBlocks': [item.block] }
+      }
     } else if (item.type === 'tool_use') {
       if (item.arguments) {
         let parsed: unknown

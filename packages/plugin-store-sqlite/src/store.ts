@@ -261,6 +261,29 @@ export class SqliteStore {
     this.writeMessages(WRITE_THREAD_MESSAGE, threadId, messages)
   }
 
+  clearThreadMessages(threadId: string): void {
+    this.statement('DELETE FROM thread_messages WHERE thread_id = ?').run(threadId)
+  }
+
+  deleteThread(threadId: string, expectedRevision: number): void {
+    this.transaction(() => {
+      const revision = this.row<ThreadRow>(READ_THREAD, threadId)?.revision ?? 0
+      if (revision !== expectedRevision)
+        throw new Error(`session revision conflict for ${threadId}: expected ${expectedRevision}, stored ${revision}`)
+      if (this.statement("SELECT 1 FROM runs WHERE thread_id = ? AND status = 'running'").get(threadId))
+        throw new Error(`cannot delete session with running generation: ${threadId}`)
+      this.statement('DELETE FROM run_journal WHERE run_id IN (SELECT run_id FROM runs WHERE thread_id = ?)').run(
+        threadId
+      )
+      this.statement('DELETE FROM run_messages WHERE run_id IN (SELECT run_id FROM runs WHERE thread_id = ?)').run(
+        threadId
+      )
+      this.statement('DELETE FROM runs WHERE thread_id = ?').run(threadId)
+      this.clearThreadMessages(threadId)
+      this.statement('DELETE FROM threads WHERE thread_id = ?').run(threadId)
+    })
+  }
+
   /**
    * 실행을 running으로 등록합니다. 같은 runId의 기록이 이미 있으면 아무것도 바꾸지 않고 false를
    * 돌려줍니다.

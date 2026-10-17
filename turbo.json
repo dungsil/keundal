@@ -5,6 +5,10 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "@keundal/web#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".nuxt/**", ".output/**"]
+    },
     "typecheck": {},
     "test": {
       "dependsOn": ["build"]
