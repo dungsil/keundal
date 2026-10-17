@@ -2,7 +2,31 @@ import { Buffer } from 'node:buffer'
 import { createServer, type ServerResponse } from 'node:http'
 import { DefaultChatTransport, type UIMessage, type UIMessageChunk } from 'ai'
 import { expect, test, onTestFinished } from 'vitest'
-import { createKeundalChat } from '../server/llm/keundal'
+import { Context } from 'cordis'
+import memoryStorePlugin from '@keundal/plugin-store-memory'
+import openaiLLMPlugin from '@keundal/plugin-llm-openai'
+import anthropicLLMPlugin from '@keundal/plugin-llm-anthropic'
+import geminiLLMPlugin from '@keundal/plugin-llm-gemini'
+import { createKeundalChat as createChat } from '../shared/utils/keundal'
+
+async function createKeundalChat(name: string, options: { webSearch?: boolean, reasoning?: boolean }, env: Record<string, string>) {
+  const providers = {
+    'openai/gpt-5-nano': { plugin: openaiLLMPlugin, id: 'gpt-5-nano', key: 'OPENAI_API_KEY', url: 'OPENAI_BASE_URL' },
+    'anthropic/claude-haiku-4.5': { plugin: anthropicLLMPlugin, id: 'claude-haiku-4-5', key: 'ANTHROPIC_API_KEY', url: 'ANTHROPIC_BASE_URL' },
+    'google/gemini-3-flash': { plugin: geminiLLMPlugin, id: 'gemini-3-flash-preview', key: 'GEMINI_API_KEY', url: 'GEMINI_BASE_URL' }
+  }
+  const provider = providers[name as keyof typeof providers]
+  const ctx = new Context()
+  const llm = ctx.plugin(provider.plugin, { apiKey: env[provider.key]!, baseURL: env[provider.url], models: { [provider.id]: { contextWindow: 128_000, maxOutputTokens: 4096 } } })
+  await llm
+  const store = ctx.plugin(memoryStorePlugin)
+  await store
+  onTestFinished(async () => {
+    await store.dispose()
+    await llm.dispose()
+  })
+  return createChat(ctx, name, options)
+}
 
 type Frame = Record<string, unknown>
 const user: UIMessage = { id: 'user-1', role: 'user', parts: [{ type: 'text', text: '서울 날씨' }, { type: 'file', url: 'data:image/png;base64,iVBORw==', mediaType: 'image/png' }] }

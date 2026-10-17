@@ -5,7 +5,6 @@ const props = defineProps<{
   open: () => void
 }>()
 
-const { loggedIn } = useUserSession()
 const { model } = useModels()
 const { webSearch, reasoning } = useChatSettings()
 
@@ -16,9 +15,7 @@ defineShortcuts({
   meta_u: {
     usingInput: true,
     handler: () => {
-      if (loggedIn.value) {
-        props.open()
-      }
+      props.open()
     }
   }
 })
@@ -27,8 +24,6 @@ const items = computed<DropdownMenuItem[][]>(() => [[{
   label: 'Add files or photos',
   icon: 'i-lucide-paperclip',
   kbds: ['meta', 'U'],
-  disabled: !loggedIn.value,
-  description: loggedIn.value ? undefined : 'Login required',
   onSelect: () => props.open()
 }], [{
   label: 'Web search',

@@ -42,15 +42,14 @@ pnpm --filter @keundal/example-basic start
 
 ## 웹 앱
 
-[apps/web](./apps/web/README.md)은 [Nuxt UI Chat](https://github.com/nuxt-ui-templates/chat)의 화면·문구·컴포넌트·스타일과 에셋을 그대로 사용합니다. 서버의 제목·대화·도구 실행·웹 검색·추론·받아쓰기는 Keundal 플러그인으로 실행합니다. AI SDK는 원본 클라이언트와 메시지 타입 호환용으로만 사용합니다. 웹 소스는 원본 ESLint 설정으로 검사하고 루트 Oxfmt로 재포맷하지 않습니다.
+[apps/web](./apps/web/README.md)은 [Nuxt UI Chat](https://github.com/nuxt-ui-templates/chat)의 화면·컴포넌트·스타일과 에셋을 사용합니다. 제목·대화·도구 실행·웹 검색·추론·받아쓰기는 Keundal 플러그인으로 실행하며 대화·이미지·실행 journal은 `plugin-store-indexeddb`로 브라우저에 저장합니다. AI SDK는 원본 클라이언트와 메시지 타입 호환용으로만 사용합니다. 웹 소스는 원본 ESLint 설정으로 검사하고 루트 Oxfmt로 재포맷하지 않습니다.
 
 ```sh
 pnpm install
-pnpm --filter @keundal/web db:migrate
 pnpm --filter @keundal/web dev
 ```
 
-선택한 모델에 맞는 `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`를 `apps/web/.env`에 설정합니다. 받아쓰기는 별도로 OpenAI 키와 로그인이 필요합니다. Nuxt 서버에서 플러그인을 직접 사용하므로 `apps/server`를 따로 실행할 필요가 없으며 AI Gateway 키도 사용하지 않습니다. 자세한 설정과 모델별 제한은 [웹 앱 문서](./apps/web/README.md)를 참고합니다.
+선택한 모델에 맞는 `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`를 `apps/web/.env`에 설정합니다. 받아쓰기는 별도로 OpenAI 키와 로그인이 필요합니다. `apps/server`·AI Gateway·D1·R2는 필요하지 않습니다. 로컬 대화는 계정/기기 간 동기화되지 않으며 공개 공유는 비활성화합니다. 저장소 교체 계약과 Cloudflare 배포 방법은 [웹 앱 문서](./apps/web/README.md)를 참고합니다.
 
 ## 라이선스
 

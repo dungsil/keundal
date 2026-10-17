@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { UIMessage } from 'ai'
+
 const input = ref('')
 const loading = ref(false)
 const chatId = crypto.randomUUID()
@@ -25,34 +27,28 @@ const {
   uploadedFiles,
   removeFile,
   clearFiles
-} = useFileUploadWithStatus(chatId)
+} = useFileUploadWithStatus()
 
-const { csrf, headerName } = useCsrf()
+const { $chatStore } = useNuxtApp()
+const { model } = useModels()
 
 async function createChat(prompt: string) {
   input.value = prompt
   loading.value = true
 
-  const parts: Array<{ type: string, text?: string, mediaType?: string, url?: string }> = [{ type: 'text', text: prompt }]
+  const parts: UIMessage['parts'] = [{ type: 'text', text: prompt }]
 
   if (uploadedFiles.value.length > 0) {
     parts.push(...uploadedFiles.value)
   }
 
-  const chat = await $fetch('/api/chats', {
-    method: 'POST',
-    headers: { [headerName]: csrf },
-    body: {
-      id: chatId,
-      message: {
-        role: 'user',
-        parts
-      }
-    }
-  })
-
-  refreshNuxtData('chats')
-  navigateTo(`/chat/${chat?.id}`)
+  try {
+    const chat = await $chatStore.create(chatId, { id: crypto.randomUUID(), role: 'user', parts }, model.value)
+    await refreshNuxtData('chats')
+    await navigateTo(`/chat/${chat.id}`)
+  } finally {
+    loading.value = false
+  }
 }
 
 async function onSubmit() {

@@ -1,42 +1,12 @@
-interface BlobResult {
-  pathname: string
-  url?: string
-  contentType?: string
-  size: number
-}
-
 function createObjectUrl(file: File): string {
   return URL.createObjectURL(file)
 }
 
-function fileToInput(file: File): HTMLInputElement {
-  const dataTransfer = new DataTransfer()
-  dataTransfer.items.add(file)
-
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.files = dataTransfer.files
-
-  return input
-}
-
-export function useFileUploadWithStatus(chatId: string) {
+export function useFileUploadWithStatus() {
   const files = ref<FileWithStatus[]>([])
   const toast = useToast()
-  const { loggedIn } = useUserSession()
-
-  const { csrf, headerName } = useCsrf()
-
-  const upload = useUpload(`/api/upload/${chatId}`, {
-    method: 'PUT',
-    headers: { [headerName]: csrf }
-  })
 
   async function uploadFiles(newFiles: File[]) {
-    if (!loggedIn.value) {
-      return
-    }
-
     const filesWithStatus: FileWithStatus[] = newFiles.map(file => ({
       file,
       id: crypto.randomUUID(),
@@ -51,25 +21,20 @@ export function useFileUploadWithStatus(chatId: string) {
       if (index === -1) return
 
       try {
-        const input = fileToInput(fileWithStatus.file)
-        const response = await upload(input) as BlobResult | BlobResult[] | undefined
-
-        if (!response) {
-          throw new Error('Upload failed')
-        }
-
-        const result = Array.isArray(response) ? response[0] : response
-
-        if (!result) {
-          throw new Error('Upload failed')
-        }
-
-        files.value[index] = {
-          ...files.value[index]!,
+        if (!fileWithStatus.file.type.startsWith('image/')) throw new Error('Keundal currently supports image attachments only')
+        if (fileWithStatus.file.size > 8 * 1024 * 1024) throw new Error('File exceeds 8MB')
+        const url = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = () => reject(reader.error)
+          reader.readAsDataURL(fileWithStatus.file)
+        })
+        const current = files.value.find(f => f.id === fileWithStatus.id)
+        if (!current) return
+        Object.assign(current, {
           status: 'uploaded',
-          uploadedUrl: result.url,
-          uploadedPathname: result.pathname
-        }
+          uploadedUrl: url
+        })
       } catch (error) {
         const errorMessage = (error as { data?: { message?: string } }).data?.message
           || (error as Error).message
@@ -107,6 +72,7 @@ export function useFileUploadWithStatus(chatId: string) {
       .map(f => ({
         type: 'file' as const,
         mediaType: f.file.type,
+        filename: f.file.name,
         url: f.uploadedUrl!
       }))
   )
@@ -117,15 +83,6 @@ export function useFileUploadWithStatus(chatId: string) {
 
     URL.revokeObjectURL(file.previewUrl)
     files.value = files.value.filter(f => f.id !== id)
-
-    if (file.status === 'uploaded' && file.uploadedPathname) {
-      $fetch(`/api/upload/${file.uploadedPathname}` as string, {
-        method: 'DELETE',
-        headers: { [headerName]: csrf }
-      }).catch((error) => {
-        console.error('Failed to delete file from blob:', error)
-      })
-    }
   }
 
   function clearFiles() {

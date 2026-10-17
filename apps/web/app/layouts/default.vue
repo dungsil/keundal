@@ -6,9 +6,10 @@ const { renameChat, deleteChat } = useChatActions()
 
 const sidebarOpen = ref(false)
 const searchOpen = ref(false)
+const { $chatStore } = useNuxtApp()
 
-const { data: chats, refresh: refreshChats } = await useFetch('/api/chats', {
-  key: 'chats',
+const { data: chats, refresh: refreshChats } = await useAsyncData('chats', () => $chatStore.list(), {
+  server: false,
   transform: data => data.map(chat => ({
     id: chat.id,
     label: chat.title || 'Untitled',
@@ -16,14 +17,6 @@ const { data: chats, refresh: refreshChats } = await useFetch('/api/chats', {
     icon: 'i-lucide-message-circle',
     createdAt: chat.createdAt
   }))
-})
-
-onNuxtReady(async () => {
-  const first10 = (chats.value || []).slice(0, 10)
-  for (const chat of first10) {
-    // prefetch the chat and let the browser cache it
-    await $fetch(`/api/chats/${chat.id}`)
-  }
 })
 
 watch(loggedIn, () => {

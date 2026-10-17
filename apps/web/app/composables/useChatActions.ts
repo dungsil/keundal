@@ -12,7 +12,7 @@ export function useChatActions() {
   const route = useRoute()
   const toast = useToast()
   const overlay = useOverlay()
-  const { csrf, headerName } = useCsrf()
+  const { $chatStore } = useNuxtApp()
 
   const renameModal = overlay.create(LazyModalRename)
   const deleteModal = overlay.create(LazyModalConfirm, {
@@ -30,11 +30,7 @@ export function useChatActions() {
     if (!result || result === currentTitle) return null
 
     try {
-      await $fetch(`/api/chats/${id}/title`, {
-        method: 'PATCH',
-        headers: { [headerName]: csrf },
-        body: { title: result }
-      })
+      await $chatStore.rename(id, result)
 
       const chatsCache = useNuxtData<ChatListItem[]>('chats')
       if (chatsCache.data.value) {
@@ -67,10 +63,7 @@ export function useChatActions() {
     if (!result) return false
 
     try {
-      await $fetch(`/api/chats/${id}`, {
-        method: 'DELETE',
-        headers: { [headerName]: csrf }
-      })
+      await $chatStore.delete(id)
 
       toast.add({
         title: 'Chat deleted',

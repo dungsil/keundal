@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { Motion } from 'motion-v'
 
-const { loggedIn } = useUserSession()
-
 defineProps<{
   show: boolean
 }>()
@@ -10,7 +8,7 @@ defineProps<{
 
 <template>
   <div
-    v-if="show && loggedIn"
+    v-if="show"
     class="absolute inset-0 z-50 flex items-center justify-center backdrop-blur-lg rounded-lg pointer-events-none"
   >
     <div class="absolute text-center">

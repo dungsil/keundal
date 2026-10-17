@@ -1,25 +1,21 @@
-import { randomUUID } from 'node:crypto'
 import type { UIMessage, UIMessageChunk } from 'ai'
-import { EventType, LLM_SOURCE_EVENT, MessageAssembly, parseRunAgentInput, type AgentMessage, type LLMSource } from '@keundal/core'
+import { EventType, LLM_SOURCE_EVENT, MessageAssembly, parseRunAgentInput, type AgentMessage, type LLMSource, type AGUIEvent } from '@keundal/core'
 import simpleAgentPlugin from '@keundal/plugin-agent-simple'
-import memoryStorePlugin from '@keundal/plugin-store-memory'
-import openaiLLMPlugin from '@keundal/plugin-llm-openai'
-import anthropicLLMPlugin from '@keundal/plugin-llm-anthropic'
-import geminiLLMPlugin from '@keundal/plugin-llm-gemini'
-import { Context } from 'cordis'
+import type { Context } from 'cordis'
 import { z } from 'zod'
-import { chartTool } from '../../shared/utils/tools/chart'
-import { weatherTool } from '../../shared/utils/tools/weather'
+import { chartTool } from './tools/chart'
+import { weatherTool } from './tools/weather'
 
 const models = {
-  'openai/gpt-5-nano': { plugin: openaiLLMPlugin, id: 'gpt-5-nano', key: 'OPENAI_API_KEY', url: 'OPENAI_BASE_URL' },
-  'anthropic/claude-haiku-4.5': { plugin: anthropicLLMPlugin, id: 'claude-haiku-4-5', key: 'ANTHROPIC_API_KEY', url: 'ANTHROPIC_BASE_URL' },
-  'google/gemini-3-flash': { plugin: geminiLLMPlugin, id: 'gemini-3-flash-preview', key: 'GEMINI_API_KEY', url: 'GEMINI_BASE_URL' }
+  'openai/gpt-5-nano': { id: 'gpt-5-nano' },
+  'anthropic/claude-haiku-4.5': { id: 'claude-haiku-4-5' },
+  'google/gemini-3-flash': { id: 'gemini-3-flash-preview' }
 }
 
-const input = (messages: AgentMessage[], threadId: string = randomUUID()) => ({ threadId, runId: randomUUID(), state: {}, context: [], tools: [], messages })
+const randomUUID = () => globalThis.crypto.randomUUID()
+const input = (messages: AgentMessage[], threadId: string = randomUUID(), runId: string = randomUUID(), state: unknown = {}) => ({ threadId, runId, state, context: [], tools: [], messages })
 
-function toMessages(messages: UIMessage[], model: string): AgentMessage[] {
+export function toMessages(messages: UIMessage[], model: string): AgentMessage[] {
   return messages.flatMap((message): AgentMessage[] => {
     // Persist the AG-UI conversation, including opaque reasoning and native search
     // blocks, in an invisible data part. Never send one provider's state to another.
@@ -68,17 +64,10 @@ function toMessages(messages: UIMessage[], model: string): AgentMessage[] {
   })
 }
 
-export async function createKeundalChat(name: string, options: { webSearch?: boolean, reasoning?: boolean } = {}, env: NodeJS.ProcessEnv = process.env) {
+export async function createKeundalChat(context: Context, name: string, options: { webSearch?: boolean, reasoning?: boolean } = {}) {
   if (!Object.hasOwn(models, name)) throw new Error(`Unknown chat model: ${name}`)
   const config = models[name as keyof typeof models]
-  if (!env[config.key]) throw new Error(`Set ${config.key} to use ${name}`)
-  const ctx = new Context()
-  const provider = ctx.plugin(config.plugin, {
-    apiKey: env[config.key],
-    baseURL: env[config.url] || undefined,
-    models: { [config.id]: { contextWindow: 128_000, maxOutputTokens: 4096 } }
-  })
-  const store = ctx.plugin(memoryStorePlugin)
+  const ctx = context.isolate('agent')
   const agent = ctx.plugin(simpleAgentPlugin, {
     model: config.id,
     maxOutputTokens: 4096,
@@ -95,11 +84,9 @@ export async function createKeundalChat(name: string, options: { webSearch?: boo
   })
   const dispose = async () => {
     await agent.dispose()
-    await store.dispose()
-    await provider.dispose()
   }
   try {
-    await Promise.all([provider, store, agent])
+    await agent
   } catch (error) {
     await dispose()
     throw error
@@ -125,12 +112,17 @@ export async function createKeundalChat(name: string, options: { webSearch?: boo
       messages: UIMessage[]
       instructions: string
       signal?: AbortSignal
+      runId?: string
+      state?: unknown
+      /** A stored journal may be rendered without rerunning the agent or provider. */
+      events?: AsyncIterable<AGUIEvent>
       titleGenerated?: boolean
       onFinish?: (message: UIMessage) => Promise<void>
     }): Response {
       const controller = new AbortController()
       const signal = request.signal ? AbortSignal.any([request.signal, controller.signal]) : controller.signal
-      const message: UIMessage = { id: randomUUID(), role: 'assistant', parts: [] }
+      const runId = request.runId ?? randomUUID()
+      const message: UIMessage = { id: runId, role: 'assistant', parts: [] }
       const assembly = new MessageAssembly()
       const texts = new Map<string, Extract<UIMessage['parts'][number], { type: 'text' | 'reasoning' }>>()
       const calls = new Map<string, { name: string, args: string, part: Extract<UIMessage['parts'][number], { type: `tool-${string}` }> }>()
@@ -147,10 +139,10 @@ export async function createKeundalChat(name: string, options: { webSearch?: boo
           try {
             write({ type: 'start', messageId: message.id })
             if (request.titleGenerated) write({ type: 'data-chat-title', data: {}, transient: true })
-            for await (const event of ctx.agent.run(input([
+            for await (const event of request.events ?? ctx.agent.run(input([
               { id: randomUUID(), role: 'system', content: request.instructions },
               ...toMessages(request.messages, name)
-            ], request.threadId), { signal })) {
+            ], request.threadId, runId, request.state), { signal })) {
               assembly.apply(event)
               switch (event.type) {
                 case EventType.TEXT_MESSAGE_START:

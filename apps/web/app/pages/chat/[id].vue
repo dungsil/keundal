@@ -7,12 +7,9 @@ const route = useRoute()
 const toast = useToast()
 const { model } = useModels()
 const { webSearch, reasoning } = useChatSettings()
-const { csrf, headerName } = useCsrf()
+const { $chatStore } = useNuxtApp()
 
-const { data } = await useFetch(`/api/chats/${route.params.id}`, {
-  key: `chat-${route.params.id}`,
-  cache: 'force-cache'
-})
+const { data } = await useAsyncData(`chat-${route.params.id}`, () => $chatStore.get(route.params.id as string), { server: false })
 
 const isOwner = computed(() => data.value?.isOwner ?? false)
 const visibility = ref<'public' | 'private'>(data.value?.visibility ?? 'private')
@@ -31,20 +28,17 @@ const {
   uploadedFiles,
   removeFile,
   clearFiles
-} = useFileUploadWithStatus(route.params.id as string)
+} = useFileUploadWithStatus()
 
-const { data: votes } = await useLazyFetch(`/api/chats/${route.params.id}/votes`, {
-  immediate: isOwner.value
-})
+const votes = ref<NonNullable<typeof data.value>['votes']>([])
 
 const input = ref('')
 
 const { messages, status, error, sendMessage, regenerate, stop } = useChat({
-  id: data.value?.id,
+  id: route.params.id as string,
   messages: data.value?.messages,
   transport: new DefaultChatTransport({
-    api: `/api/chats/${data.value?.id}`,
-    headers: { [headerName]: csrf },
+    fetch: async (_url, init) => $chatStore.respond(route.params.id as string, JSON.parse(init!.body as string), init?.signal ?? undefined),
     body: () => ({
       model: model.value,
       webSearch: webSearch.value,
@@ -60,6 +54,9 @@ const { messages, status, error, sendMessage, regenerate, stop } = useChat({
         title.value = updated.label
       }
     }
+  },
+  onFinish: async () => {
+    await refreshNuxtData('chats')
   },
   onError(error) {
     let message = error.message
@@ -102,11 +99,7 @@ function startEdit(message: UIMessage) {
 
 async function saveEdit(message: UIMessage, text: string) {
   try {
-    await $fetch(`/api/chats/${data.value!.id}/messages`, {
-      method: 'DELETE',
-      headers: { [headerName]: csrf },
-      body: { messageId: message.id, type: 'edit' }
-    })
+    await $chatStore.truncate(data.value!.id, message.id, 'edit')
   } catch {
     toast.add({ description: 'Failed to save edit.', icon: 'i-lucide-alert-circle', color: 'error' })
     return
@@ -118,11 +111,7 @@ async function saveEdit(message: UIMessage, text: string) {
 
 async function regenerateMessage(message: UIMessage) {
   try {
-    await $fetch(`/api/chats/${data.value!.id}/messages`, {
-      method: 'DELETE',
-      headers: { [headerName]: csrf },
-      body: { messageId: message.id, type: 'regenerate' }
-    })
+    await $chatStore.truncate(data.value!.id, message.id, 'regenerate')
   } catch {
     toast.add({ description: 'Failed to regenerate.', icon: 'i-lucide-alert-circle', color: 'error' })
     return
@@ -150,11 +139,7 @@ async function vote(message: UIMessage, isUpvoted: boolean) {
       ]
 
   try {
-    await $fetch(`/api/chats/${data.value!.id}/votes`, {
-      method: 'POST',
-      headers: { [headerName]: csrf },
-      body: next === null ? { messageId: message.id } : { messageId: message.id, isUpvoted: next }
-    })
+    await $chatStore.vote(data.value!.id, message.id, next ?? undefined)
   } catch {
     votes.value = snapshot
     toast.add({
@@ -165,10 +150,17 @@ async function vote(message: UIMessage, isUpvoted: boolean) {
   }
 }
 
-onMounted(() => {
-  if (isOwner.value && data.value?.messages.length === 1) {
-    regenerate()
-  }
+let initialized = false
+watch(data, async (chat) => {
+  if (!chat || initialized) return
+  initialized = true
+  messages.value = chat.messages
+  votes.value = chat.votes
+  if (!chat.started && chat.messages.length === 1) await regenerate()
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  void stop()
 })
 </script>
 
@@ -223,7 +215,7 @@ onMounted(() => {
               <ChatFilePreview
                 v-for="(part, index) in parts"
                 :key="`${message.id}-${index}`"
-                :name="getFileName(part.url)"
+                :name="part.filename || 'Attachment'"
                 :type="part.mediaType"
                 :preview-url="part.url"
                 size="3xl"

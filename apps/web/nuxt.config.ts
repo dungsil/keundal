@@ -4,7 +4,6 @@ export default defineNuxtConfig({
     '@nuxt/eslint',
     '@nuxt/ui',
     '@comark/nuxt',
-    '@nuxthub/core',
     'nuxt-auth-utils',
     'nuxt-charts',
     'nuxt-csurf'
@@ -24,6 +23,8 @@ export default defineNuxtConfig({
 
   nitro: {
     cloudflare: {
+      nodeCompat: true,
+      deployConfig: true,
       wrangler: {
         name: 'keundal-web'
       }
@@ -31,19 +32,6 @@ export default defineNuxtConfig({
     experimental: {
       openAPI: true
     }
-  },
-
-  hub: {
-    db: process.env.CLOUDFLARE_D1_DATABASE_ID
-      ? {
-          dialect: 'sqlite',
-          driver: 'd1',
-          connection: { databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID }
-        }
-      : 'sqlite',
-    blob: process.env.CLOUDFLARE_R2_BUCKET_NAME
-      ? { driver: 'cloudflare-r2', binding: 'BLOB', bucketName: process.env.CLOUDFLARE_R2_BUCKET_NAME }
-      : true
   },
 
   vite: {
