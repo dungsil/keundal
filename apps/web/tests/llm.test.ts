@@ -91,7 +91,9 @@ async function decode(response: Response, onChunk?: (chunk: UIMessageChunk) => v
 test.each([
   { name: 'openai/gpt-5-nano', key: 'OPENAI_API_KEY', url: 'OPENAI_BASE_URL', id: 'gpt-5-nano', frames: openaiText('서울은 맑아요') },
   { name: 'anthropic/claude-haiku-4.5', key: 'ANTHROPIC_API_KEY', url: 'ANTHROPIC_BASE_URL', id: 'claude-haiku-4-5', frames: anthropicText('서울은 맑아요') },
-  { name: 'google/gemini-3-flash', key: 'GEMINI_API_KEY', url: 'GEMINI_BASE_URL', id: 'gemini-3-flash-preview', frames: [{ responseId: 'gemini-answer', candidates: [{ content: { role: 'model', parts: [{ text: '서울은 맑아요' }] }, finishReason: 'STOP' }] }] }
+  { name: 'google/gemini-3-flash', key: 'GEMINI_API_KEY', url: 'GEMINI_BASE_URL', id: 'gemini-3-flash-preview', frames: [{ responseId: 'gemini-answer', candidates: [{ content: { role: 'model', parts: [{ text: '서울은 맑아요' }] }, finishReason: 'STOP' }] }] },
+  { name: 'openai/shared-model', key: 'OPENAI_API_KEY', url: 'OPENAI_BASE_URL', id: 'shared-model', frames: openaiText('서울은 맑아요') },
+  { name: 'anthropic/shared-model', key: 'ANTHROPIC_API_KEY', url: 'ANTHROPIC_BASE_URL', id: 'shared-model', frames: anthropicText('서울은 맑아요') }
 ])('$name: 제목과 이미지 대화를 Keundal로 실행하고 원본 클라이언트 스트림으로 저장한다', async ({ name, key, url, id, frames }) => {
   const received: Record<string, unknown>[] = []
   const baseURL = await setup((body, response) => {
@@ -112,7 +114,8 @@ test.each([
   expect(JSON.stringify(received[1])).toContain('iVBORw==')
   expect(JSON.stringify(received[1])).toContain('image/png')
   if (key !== 'GEMINI_API_KEY') expect(received.every(body => body.model === id)).toBe(true)
-  if (key === 'OPENAI_API_KEY') expect(received[1]!.reasoning).toEqual({ effort: 'minimal' })
+  if (id === 'gpt-5-nano') expect(received[1]!.reasoning).toEqual({ effort: 'minimal' })
+  if (key === 'OPENAI_API_KEY' && id === 'shared-model') expect(received[1]).not.toHaveProperty('reasoning')
   if (key === 'GEMINI_API_KEY') expect(received[1]!.generationConfig).toMatchObject({ thinkingConfig: { thinkingLevel: 'MINIMAL', includeThoughts: false } })
 })
 
@@ -220,13 +223,16 @@ test('공급자 오류를 성공 응답으로 바꾸거나 자동 재시도하�
 
 test('키와 API URL 변경을 재시작 없이 적용하고 삭제한 키와 공급자가 반사한 키를 실행 이력에 남기지 않는다', async () => {
   const authorizations: (string | undefined)[] = []
-  const firstURL = await setup((_body, response, request) => {
+  const budgets: unknown[] = []
+  const firstURL = await setup((body, response, request) => {
     authorizations.push(request.headers.authorization)
+    budgets.push(body.max_output_tokens)
     send(response, openaiText('첫 번째 설정'))
   })
   let rejected = false
-  const secondURL = await setup((_body, response, request) => {
+  const secondURL = await setup((body, response, request) => {
     authorizations.push(request.headers.authorization)
+    budgets.push(body.max_output_tokens)
     if (!rejected) return send(response, openaiText('변경한 설정'))
     response.writeHead(401, { 'content-type': 'application/json' })
     response.end(JSON.stringify({ error: { message: 'Incorrect API key: second-private-key', type: 'authentication_error' } }))
@@ -234,7 +240,10 @@ test('키와 API URL 변경을 재시작 없이 적용하고 삭제한 키와 �
   const settings = defaultLLMSettings()
   settings.openai = { apiKey: 'first-private-key', baseURL: firstURL }
   const ctx = new Context()
-  const llm = ctx.plugin(browserLLMPlugin, { getSettings: () => settings })
+  const llm = ctx.plugin(browserLLMPlugin, {
+    getSettings: () => settings,
+    getModels: () => [{ value: 'openai/gpt-5-nano', label: 'GPT-5 Nano', icon: '', contextWindow: 32768, maxOutputTokens: 1024 }]
+  })
   await llm
   const store = ctx.plugin(memoryStorePlugin)
   await store
@@ -255,10 +264,11 @@ test('키와 API URL 변경을 재시작 없이 적용하고 삭제한 키와 �
   expect(failed).toContain('HTTP 401')
   expect(failed).not.toContain('second-private-key')
   expect(authorizations).toEqual(['Bearer first-private-key', 'Bearer first-private-key', 'Bearer second-private-key', 'Bearer second-private-key'])
+  expect(budgets).toEqual([1024, 1024, 1024, 1024])
   const persisted = JSON.stringify({ session: await ctx.session.get('settings'), runs: await ctx.generation.list() })
   for (const value of ['first-private-key', 'second-private-key', firstURL, secondURL]) expect(persisted).not.toContain(value)
   settings.openai = { apiKey: '', baseURL: '' }
-  await expect(ctx.llm.countTokens({ model: 'gpt-5-nano', maxOutputTokens: 4096, input: { threadId: 'settings', runId: 'forgotten', messages: [], tools: [], context: [], state: {} } })).rejects.toThrow('add your openai API key')
+  await expect(ctx.llm.countTokens({ model: 'openai/gpt-5-nano', maxOutputTokens: 4096, input: { threadId: 'settings', runId: 'forgotten', messages: [], tools: [], context: [], state: {} } })).rejects.toThrow('add your openai API key')
   expect(authorizations).toHaveLength(4)
 })
 

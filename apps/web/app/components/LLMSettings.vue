@@ -85,7 +85,7 @@ async function save(forget = false) {
           />
         </UFormField>
         <p class="text-sm text-muted">
-          Model: <span class="text-highlighted">{{ current.model }}</span>. Choose the active model in the chat composer.
+          Models are loaded automatically from this provider after saving. Choose the active model in the chat composer.
         </p>
         <UFormField label="API key" name="apiKey">
           <UInput

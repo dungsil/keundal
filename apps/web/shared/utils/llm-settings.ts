@@ -1,9 +1,9 @@
 import { z } from 'zod'
 
 export const LLM_PROVIDERS = [
-  { id: 'anthropic', label: 'Anthropic', model: 'claude-haiku-4-5', baseURL: 'https://api.anthropic.com' },
-  { id: 'google', label: 'Google Gemini', model: 'gemini-3-flash-preview', baseURL: 'https://generativelanguage.googleapis.com' },
-  { id: 'openai', label: 'OpenAI', model: 'gpt-5-nano', baseURL: 'https://api.openai.com/v1' }
+  { id: 'anthropic', label: 'Anthropic', baseURL: 'https://api.anthropic.com' },
+  { id: 'google', label: 'Google Gemini', baseURL: 'https://generativelanguage.googleapis.com' },
+  { id: 'openai', label: 'OpenAI', baseURL: 'https://api.openai.com/v1' }
 ] as const
 
 export type LLMProvider = typeof LLM_PROVIDERS[number]['id']

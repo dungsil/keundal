@@ -3,26 +3,28 @@ import openaiLLMPlugin from '@keundal/plugin-llm-openai'
 import anthropicLLMPlugin from '@keundal/plugin-llm-anthropic'
 import geminiLLMPlugin from '@keundal/plugin-llm-gemini'
 import { Context, type Fiber } from 'cordis'
-import { LLM_PROVIDERS, providerCredentials, providerError, type LLMSettings } from './llm-settings'
+import { providerCredentials, providerError, type LLMSettings } from './llm-settings'
+import { resolveModel, type ModelOption } from './models'
 
 const plugins = { openai: openaiLLMPlugin, anthropic: anthropicLLMPlugin, google: geminiLLMPlugin }
 
 /** Resolves browser-owned settings at call time; credentials never enter generation requests. */
-export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMSettings }) {
+export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMSettings, getModels?: () => ModelOption[] }) {
   const active = new Set<Fiber>()
   ctx.fiber.effect(() => async () => {
     await Promise.all([...active].map(fiber => fiber.dispose()))
   })
 
   async function open(model: string) {
-    const provider = LLM_PROVIDERS.find(item => item.model === model)
-    if (!provider) throw new Error('Unknown chat model')
-    const credentials = providerCredentials(config.getSettings(), provider.id)
+    const { provider, id, value } = resolveModel(model)
+    const credentials = providerCredentials(config.getSettings(), provider)
+    const metadata = config.getModels?.().find(item => item.value === value)
     const context = new Context()
-    const fiber = context.plugin(plugins[provider.id], {
+    const fiber = context.plugin(plugins[provider], {
       ...credentials,
       dangerouslyAllowBrowser: true,
-      models: { [model]: { contextWindow: 128_000, maxOutputTokens: 4096 } }
+      // App budgets are upper bounds, not advertised limits for APIs without model metadata.
+      models: { [id]: { contextWindow: Math.min(128_000, metadata?.contextWindow ?? 128_000), maxOutputTokens: Math.min(4096, metadata?.maxOutputTokens ?? 4096, (metadata?.contextWindow ?? 128_000) - 1) } }
     })
     active.add(fiber)
     const dispose = async () => {
@@ -33,9 +35,9 @@ export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMS
       await fiber
     } catch (error) {
       await dispose()
-      throw providerError(provider.id, error)
+      throw providerError(provider, error)
     }
-    return { llm: context.llm, provider: provider.id, dispose }
+    return { llm: context.llm, provider, id, dispose }
   }
 
   class BrowserLLM extends LLMService {
@@ -43,7 +45,7 @@ export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMS
       options?.signal?.throwIfAborted()
       const service = await open(model)
       try {
-        return await service.llm.getModel(model, options)
+        return await service.llm.getModel(service.id, options)
       } finally {
         await service.dispose()
       }
@@ -53,7 +55,7 @@ export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMS
       options?.signal?.throwIfAborted()
       const service = await open(request.model)
       try {
-        return await service.llm.countTokens(request, options)
+        return await service.llm.countTokens({ ...request, model: service.id }, options)
       } catch (error) {
         options?.signal?.throwIfAborted()
         throw providerError(service.provider, error)
@@ -66,7 +68,7 @@ export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMS
       options?.signal?.throwIfAborted()
       const service = await open(request.model)
       try {
-        yield* service.llm.stream(request, options)
+        yield* service.llm.stream({ ...request, model: service.id }, options)
       } catch (error) {
         options?.signal?.throwIfAborted()
         throw providerError(service.provider, error)

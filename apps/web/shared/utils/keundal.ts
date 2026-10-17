@@ -5,12 +5,7 @@ import type { Context } from 'cordis'
 import { z } from 'zod'
 import { chartTool } from './tools/chart'
 import { weatherTool } from './tools/weather'
-
-const models = {
-  'openai/gpt-5-nano': { id: 'gpt-5-nano' },
-  'anthropic/claude-haiku-4.5': { id: 'claude-haiku-4-5' },
-  'google/gemini-3-flash': { id: 'gemini-3-flash-preview' }
-}
+import { resolveModel } from './models'
 
 const randomUUID = () => globalThis.crypto.randomUUID()
 const input = (messages: AgentMessage[], threadId: string = randomUUID(), runId: string = randomUUID(), state: unknown = {}) => ({ threadId, runId, state, context: [], tools: [], messages })
@@ -24,7 +19,7 @@ export function toMessages(messages: UIMessage[], model: string): AgentMessage[]
       const data = saved.data as { model: string, messages: AgentMessage[] }
       const parsed = parseRunAgentInput(input(data.messages)).messages
       return parsed.flatMap((item): AgentMessage[] => {
-        if (data.model === model) return [item]
+        if (resolveModel(data.model).value === resolveModel(model).value) return [item]
         if (item.role === 'reasoning') return []
         if (item.role !== 'assistant') return [item]
         return [{ ...item, metadata: undefined, toolCalls: item.toolCalls?.map(({ encryptedValue: _value, ...call }) => call) }]
@@ -64,16 +59,17 @@ export function toMessages(messages: UIMessage[], model: string): AgentMessage[]
   })
 }
 
-export async function createKeundalChat(context: Context, name: string, options: { webSearch?: boolean, reasoning?: boolean } = {}) {
-  if (!Object.hasOwn(models, name)) throw new Error(`Unknown chat model: ${name}`)
-  const config = models[name as keyof typeof models]
+export async function createKeundalChat(context: Context, name: string, options: { webSearch?: boolean, reasoning?: boolean, maxOutputTokens?: number } = {}) {
+  const config = resolveModel(name)
+  const maxOutputTokens = options.maxOutputTokens ?? 4096
   const ctx = context.isolate('agent')
   const agent = ctx.plugin(simpleAgentPlugin, {
-    model: config.id,
-    maxOutputTokens: 4096,
+    model: config.value,
+    maxOutputTokens,
     // The original template offers native search only on OpenAI and Anthropic.
-    webSearch: !!options.webSearch && name !== 'google/gemini-3-flash',
-    reasoning: options.reasoning,
+    webSearch: !!options.webSearch && config.provider !== 'google',
+    // Non-reasoning OpenAI models (e.g. GPT-4.1) do not accept a reasoning parameter.
+    reasoning: options.reasoning === false && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id) ? undefined : options.reasoning,
     maxToolRounds: 4,
     tools: Object.entries({ chart: chartTool, weather: weatherTool }).map(([name, tool]) => ({
       name,
@@ -96,8 +92,8 @@ export async function createKeundalChat(context: Context, name: string, options:
     async title(message: UIMessage, signal?: AbortSignal) {
       let title = ''
       for await (const event of ctx.llm.stream({
-        model: config.id,
-        maxOutputTokens: 4096,
+        model: config.value,
+        maxOutputTokens,
         input: input([
           { id: randomUUID(), role: 'system', content: 'Generate a chat title under 30 characters from the first user message. No quotes, punctuation, markdown, or commentary. Return only the title.' },
           { id: message.id, role: 'user', content: JSON.stringify(message) }

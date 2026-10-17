@@ -121,10 +121,11 @@ export class ChatStore {
       const snapshot = await this.ctx.session.get(id)
       const current = this.chat(snapshot)
       if (!current) throw new Error('Chat not found')
+      const limits = await this.ctx.llm.getModel(request.model, { signal: combined })
       const runId = crypto.randomUUID()
       let chat = { ...current, messages: request.messages, model: request.model, started: true, pendingRunId: runId }
       const saved = await this.save(snapshot, chat)
-      runtime = await createKeundalChat(this.ctx, request.model, request)
+      runtime = await createKeundalChat(this.ctx, request.model, { ...request, maxOutputTokens: Math.min(4096, limits.maxOutputTokens, limits.contextWindow - 1) })
       const titleGenerated = !chat.title
       if (titleGenerated) {
         chat = { ...chat, title: await runtime.title(chat.messages[0]!, combined) }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
-const { loggedIn, openInPopup } = useUserSession()
+const { loggedIn } = useUserSession()
 const { renameChat, deleteChat } = useChatActions()
 
 const sidebarOpen = ref(false)
@@ -155,15 +155,6 @@ defineShortcuts({
           <LLMSettings :collapsed="collapsed" />
         </ClientOnly>
         <UserMenu v-if="loggedIn" :collapsed="collapsed" />
-        <UButton
-          v-else
-          :label="collapsed ? '' : 'Login with GitHub'"
-          icon="i-simple-icons-github"
-          color="neutral"
-          variant="ghost"
-          class="w-full"
-          @click="openInPopup('/auth/github')"
-        />
       </template>
     </UDashboardSidebar>
 

@@ -15,13 +15,17 @@ pnpm --filter @keundal/web dev
 
 `NUXT_SESSION_PASSWORD`는 32자 이상이어야 합니다. 사이드바 **LLM settings**에서 공급자를 선택하고 API 키를 입력한 뒤 **Save in this browser**로 저장합니다. 채팅 입력창에서 사용할 모델을 선택합니다. 선택한 모델의 키만 있으면 제목과 답변을 모두 생성할 수 있습니다. `apps/server`를 별도로 실행하거나 데이터베이스를 마이그레이션할 필요는 없습니다.
 
-| 화면의 모델 | Keundal 모델 ID | 설정의 공급자 |
-| --- | --- | --- |
-| Claude Haiku 4.5 | `claude-haiku-4-5` | Anthropic |
-| Gemini 3 Flash | `gemini-3-flash-preview` | Google Gemini |
-| GPT-5 Nano | `gpt-5-nano` | OpenAI |
+| 모델 목록 API | 설정의 공급자 |
+| --- | --- |
+| `/v1/models` | Anthropic |
+| `/v1beta/models` | Google Gemini |
+| `/models` (기본 base URL은 `/v1` 포함) | OpenAI |
 
-공급자마다 API 키와 선택적인 API base URL을 설정할 수 있습니다. 빈 URL은 공식 엔드포인트를 사용하며, 사용자 지정 주소는 HTTPS(로컬 개발은 HTTP loopback 허용)와 브라우저 CORS를 지원해야 합니다. 설정 저장·삭제는 진행 중 채팅을 중단하며 다음 요청부터 즉시 반영됩니다. **Forget provider**는 해당 공급자의 키·URL을 삭제합니다. 출력 예산은 4096 토큰이며 공급자 오류를 자동 재시도하지 않습니다. Stop과 연결 종료는 공급자 요청에 취소 신호를 전달합니다.
+키를 설정한 공급자의 모델 목록을 시작 시·설정 변경 시·선택기를 열 때 자동으로 불러옵니다. 공급자별 모델 메타데이터는 localStorage에 1시간 캐시하며 키·API 주소의 SHA-256 식별자로 범위를 구분합니다. 캐시에 키를 복제하지 않으며 다른 설정의 목록을 재사용하지 않습니다. **Refresh models**는 유효기간과 관계없이 새로 불러옵니다. Anthropic·Gemini는 모든 페이지를 합치고 Gemini의 embedding 전용 모델은 제외합니다. 조회 실패는 선택기에 안내하며, 저장한 선택은 유지합니다. 미설정 상태에서는 기본 선택만 보이고, 실제 목록은 API 키 설정 후 표시됩니다.
+
+공급자마다 API 키와 선택적인 API base URL을 설정할 수 있습니다. 빈 URL은 공식 엔드포인트를 사용하며, 사용자 지정 주소는 HTTPS(로컬 개발은 HTTP loopback 허용)와 브라우저 CORS를 지원해야 합니다. 설정 저장·삭제는 진행 중 채팅을 중단하며 다음 요청부터 즉시 반영됩니다. **Forget provider**는 해당 공급자의 키·URL과 모델 캐시를 삭제합니다. 앱 예산의 상한은 컨텍스트 128,000·출력 4096 토큰이며, 모델 목록이 더 작은 한도를 제공하면 제목과 답변에도 적용합니다. 한도를 제공하지 않는 OpenAI 등은 이 앱 예산을 사용하며 실제 모델 한도를 보장하지 않습니다. 공급자 오류를 자동 재시도하지 않습니다. Stop과 연결 종료는 공급자 요청에 취소 신호를 전달합니다.
+
+목록에 나온 모델이라고 모든 채팅 기능을 지원하는 것은 아닙니다. OpenAI는 Responses API·입력 토큰 계산, Anthropic은 Messages API·토큰 계산, Gemini는 generateContent·토큰 계산을 지원해야 하며 도구·검색·추론 호환성도 모델마다 다릅니다. 이미지·음성·embedding 전용 모델 등은 현재 텍스트 채팅에 사용할 수 없습니다. 기존 대화의 모델 별칭은 계속 처리합니다.
 
 키·URL은 현재 origin의 `localStorage`에 **암호화 없이** 저장합니다. 같은 사이트의 스크립트나 브라우저 확장 기능이 읽을 수 있으므로 공용 브라우저에서 사용하지 마세요. 선택한 모델도 브라우저에 저장하며, 설정은 계정에 동기화하지 않습니다. 앱 서버의 환경 변수·쿠키·SSR payload에는 키를 넣지 않습니다. 브라우저가 공급자 또는 설정한 엔드포인트로 직접 키와 대화를 전송하므로 신뢰할 수 있는 주소만 사용하세요. CORS가 차단되면 오류로 알리며 서버 프록시로 우회하지 않습니다.
 
@@ -52,7 +56,7 @@ pnpm --filter @keundal/web dev
 
 ## GitHub 로그인 (선택)
 
-쿠키의 사용자 프로필만 사용하며 로그인해도 로컬 대화를 서버로 올리거나 동기화하지 않습니다. GitHub OAuth 앱과 아래 비밀 값을 설정합니다.
+사이드바의 로그인 진입 버튼은 표시하지 않습니다. 기존 로그인 세션과 선택적인 OAuth 경로는 유지하며, 로그인해도 로컬 대화를 서버로 올리거나 동기화하지 않습니다. OAuth 경로를 사용하려면 GitHub OAuth 앱과 아래 비밀 값을 설정합니다.
 
 ```dotenv
 NUXT_OAUTH_GITHUB_CLIENT_ID=

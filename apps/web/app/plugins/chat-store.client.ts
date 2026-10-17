@@ -11,7 +11,8 @@ export default defineNuxtPlugin(async () => {
     writeDefaults: false,
     mergeDefaults: true
   })
-  const llm = ctx.plugin(browserLLMPlugin, { getSettings: () => settings.value })
+  const modelCatalog = useModelCatalog(settings)
+  const llm = ctx.plugin(browserLLMPlugin, { getSettings: () => settings.value, getModels: () => modelCatalog.models.value })
   await llm
   const store = ctx.plugin(indexedDBStorePlugin, { databaseName: 'keundal-web' })
   await store
@@ -22,5 +23,5 @@ export default defineNuxtPlugin(async () => {
     await store.dispose()
     await llm.dispose()
   })
-  return { provide: { chatStore, llmSettings: settings } }
+  return { provide: { chatStore, llmSettings: settings, modelCatalog } }
 })
