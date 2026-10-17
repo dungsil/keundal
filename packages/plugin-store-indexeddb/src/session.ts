@@ -67,4 +67,13 @@ export class IndexedDBSessionService extends SessionService {
   private assertOpen(): void {
     if (this.closed) throw new Error('indexeddb session service disposed')
   }
+
+  async delete(threadId: string, expectedRevision: number, options?: ExecutionOptions): Promise<void> {
+    this.assertOpen()
+    options?.signal?.throwIfAborted()
+    if (typeof threadId !== 'string' || !threadId.trim()) throw new Error('delete requires a non-empty threadId')
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)
+      throw new Error('delete requires a non-negative expectedRevision')
+    await this.store.deleteThread(threadId, expectedRevision, options?.signal)
+  }
 }

@@ -20,6 +20,8 @@ export interface PreparedSession {
 export interface SessionCommit {
   readonly threadId: string
   readonly expectedRevision: number
+  /** 기본값은 merge이며 replace는 빈 배열을 포함해 전체 메시지를 교체합니다. */
+  readonly mode?: 'merge' | 'replace'
   readonly messages: AgentMessage[]
   readonly state: RunAgentInput['state']
   readonly generation?: TerminalGeneration
@@ -39,6 +41,14 @@ export abstract class SessionService extends Service {
 
   /** 저장된 모든 스레드의 스냅숏을 저장소가 정한 안정적인 순서로 돌려줍니다. */
   abstract list(options?: ExecutionOptions): Promise<SessionSnapshot[]>
+
+  /**
+   * revision(없는 스레드는 0)을 검사하고 스레드와 모든 실행·journal을 원자적으로 삭제합니다.
+   * running 실행이 있으면 거부하며 작업을 취소하지 않습니다. 호출자가 먼저 중단해야 합니다.
+   * 영구 tombstone은 남기지 않으므로 준비된 입력과 새로운 동시 실행에는 기존 실행·revision
+   * 계약이 적용됩니다.
+   */
+  abstract delete(threadId: string, expectedRevision: number, options?: ExecutionOptions): Promise<void>
 
   abstract prepare(input: RunAgentInput, options?: ExecutionOptions): Promise<PreparedSession>
 
