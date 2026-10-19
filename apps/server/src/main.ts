@@ -17,6 +17,7 @@ const sqlitePath = process.env.KEUNDAL_SQLITE_PATH ?? 'keundal-server.sqlite'
 const model = process.env.KEUNDAL_MODEL
 const contextWindow = Number(process.env.KEUNDAL_CONTEXT_WINDOW ?? 128_000)
 const maxOutputTokens = Number(process.env.KEUNDAL_MAX_OUTPUT_TOKENS ?? 4_096)
+const maxRequestBodyBytes = process.env.KEUNDAL_MAX_REQUEST_BODY_BYTES
 if (!model?.trim()) {
   console.error('KEUNDAL_MODEL 환경 변수를 설정하세요. 예: gpt-4.1-mini, gemini-2.5-flash, claude-sonnet-4-5')
   process.exit(1)
@@ -37,7 +38,10 @@ const app = createAgentApp(
       recover: (options) => ctx.generation.recover(options)
     }
   },
-  { token: process.env.KEUNDAL_API_TOKEN ?? '' }
+  {
+    token: process.env.KEUNDAL_API_TOKEN ?? '',
+    maxRequestBodyBytes: maxRequestBodyBytes === undefined ? undefined : Number(maxRequestBodyBytes)
+  }
 )
 
 if (process.env.OPENAI_API_KEY) {

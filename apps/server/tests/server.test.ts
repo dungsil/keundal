@@ -1,7 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { createServer } from 'node:http'
+import { createServer, request as httpRequest } from 'node:http'
 import { connect } from 'node:net'
 import { networkInterfaces, tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -19,7 +19,7 @@ import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { Context, type Fiber } from 'cordis'
 
 const fetch = globalThis.fetch
-import { createAgentApp, type AgentAppServices } from '@keundal/server'
+import { createAgentApp, type AgentAppOptions, type AgentAppServices } from '@keundal/server'
 import { expect, onTestFinished, test, type TestContext } from 'vitest'
 
 const token = 'test-only-server-token'
@@ -39,7 +39,7 @@ const reply: LLMEvent[] = [
   { type: EventType.TEXT_MESSAGE_END, messageId: 'reply' }
 ]
 
-const setup = async (t: TestContext) => {
+const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {}) => {
   const ctx = new Context()
   class LLM extends LLMService {
     async getModel() {
@@ -58,8 +58,12 @@ const setup = async (t: TestContext) => {
   fibers.push(await ctx.plugin(memoryStorePlugin))
   fibers.push(await ctx.plugin(agentPlugin, { model: 'test', maxOutputTokens: 100 }))
 
+  let agentCalls = 0
   const services: AgentAppServices = {
-    agent: (run, options?: ExecutionOptions) => ctx.agent.run(run, options),
+    agent: (run, options?: ExecutionOptions) => {
+      agentCalls++
+      return ctx.agent.run(run, options)
+    },
     session: {
       get: (threadId, options) => ctx.session.get(threadId, options),
       list: (options) => ctx.session.list(options)
@@ -70,7 +74,7 @@ const setup = async (t: TestContext) => {
       recover: (options) => ctx.generation.recover(options)
     }
   }
-  const app = createAgentApp(services, { token })
+  const app = createAgentApp(services, { token, ...options })
   const server = createServer(app)
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
@@ -115,7 +119,15 @@ const setup = async (t: TestContext) => {
       contentType: response.headers.get('content-type') ?? ''
     }
   }
-  return { base, services, requestJson, requestText }
+  return {
+    base,
+    services,
+    requestJson,
+    requestText,
+    get agentCalls() {
+      return agentCalls
+    }
+  }
 }
 
 const parseSse = (text: string): AGUIEvent[] =>
@@ -297,6 +309,119 @@ test.each([undefined, '0.0.0.0'])('실행 파일은 기본 loopback과 명시적
     }
   }
 })
+test.for(['content-length', 'chunked'] as const)(
+  '%s 요청은 UTF-8 바이트 상한 이내와 경계값을 허용하고 1바이트 초과는 agent 실행 없이 거부한다',
+  async (transfer, t) => {
+    const body = JSON.stringify({ ...input, messages: [{ id: 'q1', role: 'user', content: '안녕하세요' }] })
+    const limit = Buffer.byteLength(body)
+    const app = await setup(t, { maxRequestBodyBytes: limit })
+
+    for (const padding of [-1, 0, 1]) {
+      // JSON 끝의 공백으로 유효한 입력을 유지하면서 정확히 limit-1, limit, limit+1 바이트를 만듭니다.
+      const payload = Buffer.from(
+        body.replace('안녕하세요', '안녕하세').replace('r1', `r${padding + 2}`) + ' '.repeat(3 + padding)
+      )
+      expect(payload.length).toBe(limit + padding)
+      const result = await new Promise<{ status: number; text: string; connection?: string }>((resolve, reject) => {
+        const request = httpRequest(
+          `${app.base}/runs`,
+          {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${token}`,
+              ...(transfer === 'chunked' ? { 'transfer-encoding': 'chunked' } : { 'content-length': payload.length })
+            }
+          },
+          (response) => {
+            let text = ''
+            response.setEncoding('utf8')
+            response.on('data', (chunk) => {
+              text += chunk
+            })
+            response.on('error', reject)
+            response.on('end', () =>
+              resolve({ status: response.statusCode!, text, connection: response.headers.connection })
+            )
+          }
+        )
+        request.on('error', reject)
+        request.write(payload.subarray(0, 50))
+        request.end(payload.subarray(50))
+      })
+      if (padding <= 0) {
+        expect(result.status).toBe(200)
+        expect(parseSse(result.text).at(-1)?.type).toBe(EventType.RUN_FINISHED)
+      } else {
+        expect(result.status).toBe(413)
+        expect(JSON.parse(result.text)).toEqual({ error: 'request body too large' })
+        expect(result.connection).toBe('close')
+      }
+    }
+    expect(app.agentCalls).toBe(2)
+    expect((await app.requestJson('GET', '/runs/r1')).status).toBe(200)
+  }
+)
+
+test.for(['content-length', 'chunked'] as const)(
+  '%s 초과 업로드는 본문 종료를 기다리지 않고 413 응답 후 소켓을 닫으며 정상 요청은 계속 처리한다',
+  async (transfer, t) => {
+    const app = await setup(t, { maxRequestBodyBytes: 256 })
+    await new Promise<void>((resolve, reject) => {
+      let received = false
+      const request = httpRequest(
+        `${app.base}/runs`,
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${token}`,
+            ...(transfer === 'chunked'
+              ? { 'transfer-encoding': 'chunked', connection: 'keep-alive' }
+              : { 'content-length': '257', connection: 'keep-alive' })
+          }
+        },
+        (response) => {
+          let text = ''
+          response.setEncoding('utf8')
+          response.on('data', (chunk) => {
+            text += chunk
+          })
+          response.on('error', reject)
+          response.on('end', () => {
+            try {
+              expect(response.statusCode).toBe(413)
+              expect(JSON.parse(text)).toEqual({ error: 'request body too large' })
+              expect(response.headers.connection).toBe('close')
+              received = true
+            } catch (error) {
+              reject(error)
+            }
+          })
+        }
+      )
+      request.on('error', reject)
+      request.on('socket', (socket) =>
+        socket.on('close', () => {
+          if (received) resolve()
+          else reject(new Error('413 응답 전에 소켓이 닫혔습니다'))
+        })
+      )
+      t.onTestFinished(() => {
+        request.destroy()
+      })
+      request.flushHeaders()
+      // Content-Length 사전 검사는 본문 없이, chunked 검사는 종료 청크 없이 거부되어야 합니다.
+      if (transfer === 'chunked') {
+        request.write(Buffer.alloc(128, ' '))
+        request.write(Buffer.alloc(129, ' '))
+      }
+    })
+    expect(app.agentCalls).toBe(0)
+    const normal = await app.requestText('POST', '/runs', input)
+    expect(normal.status).toBe(200)
+    expect(parseSse(normal.text).at(-1)?.type).toBe(EventType.RUN_FINISHED)
+    expect(app.agentCalls).toBe(1)
+  }
+)
 
 test('잘못된 raw request target은 400을 반환하고 서버 프로세스와 후속 정상 요청을 유지한다', async (t) => {
   const child = spawn(
