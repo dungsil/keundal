@@ -61,6 +61,14 @@ jobs:
             apps/desktop/src-tauri/target
           key: desktop-${{ matrix.name }}-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
 
+      - name: GLib 보안 수정 검증
+        if: runner.os == 'Linux'
+        run: >-
+          cargo test --release
+          --manifest-path apps/desktop/src-tauri/vendor/glib-0.18.5/Cargo.toml
+          --target-dir apps/desktop/src-tauri/target
+          --lib variant_iter::tests
+
       - name: 공유 패키지 빌드
         run: pnpm exec turbo run build --filter='@keundal/web^...'
 
