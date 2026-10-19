@@ -9,7 +9,7 @@ export function useModels() {
   const models = computed<ModelOption[]>(() => {
     const available = catalog?.models.value ?? []
     const selected = resolveModel(model.value)
-    if (available.some((item) => item.value === selected.value)) return available
+    if (available.some(item => item.value === selected.value)) return available
     // Keep saved conversations usable even when discovery fails or a model is no longer listed.
     return [
       {

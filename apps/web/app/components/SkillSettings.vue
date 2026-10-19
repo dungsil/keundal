@@ -84,18 +84,18 @@ function save() {
     error.value = parsed.error.issues[0]!.message
     return
   }
-  if (settings.value.skills.some((skill) => skill.name === parsed.data.name && skill.name !== originalName.value)) {
+  if (settings.value.skills.some(skill => skill.name === parsed.data.name && skill.name !== originalName.value)) {
     error.value = `A skill named "${parsed.data.name}" already exists.`
     return
   }
-  const skills = settings.value.skills.filter((skill) => skill.name !== originalName.value)
+  const skills = settings.value.skills.filter(skill => skill.name !== originalName.value)
   if (persist({ ...settings.value, skills: [...skills, parsed.data].sort((a, b) => a.name.localeCompare(b.name)) }))
     editing.value = false
 }
 
 function remove() {
   if (
-    persist({ ...settings.value, skills: settings.value.skills.filter((skill) => skill.name !== originalName.value) })
+    persist({ ...settings.value, skills: settings.value.skills.filter(skill => skill.name !== originalName.value) })
   )
     editing.value = false
 }
@@ -116,7 +116,7 @@ async function importFile(event: Event) {
 }
 
 function toggleFile(path: string, enabled: boolean) {
-  const disabledFiles = settings.value.disabledFiles.filter((file) => file !== path)
+  const disabledFiles = settings.value.disabledFiles.filter(file => file !== path)
   if (!enabled) disabledFiles.push(path)
   persist({ ...settings.value, disabledFiles })
 }
@@ -157,7 +157,12 @@ function toggleFile(path: string, enabled: boolean) {
               color="neutral"
               @click="backToSkills"
             />
-            <UBadge v-if="selectedFile" label="Local file · read only" variant="subtle" color="neutral" />
+            <UBadge
+              v-if="selectedFile"
+              label="Local file · read only"
+              variant="subtle"
+              color="neutral"
+            />
             <span v-else class="text-sm text-muted">{{ originalName ? 'Edit skill' : 'New skill' }}</span>
           </div>
           <p v-if="selectedFile" class="text-xs text-muted break-all">
@@ -208,9 +213,16 @@ function toggleFile(path: string, enabled: boolean) {
             v-if="deleting"
             class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-error/30 p-3"
           >
-            <p class="text-sm">Delete {{ originalName }}? This cannot be undone.</p>
+            <p class="text-sm">
+              Delete {{ originalName }}? This cannot be undone.
+            </p>
             <div class="flex gap-2">
-              <UButton label="Keep skill" color="neutral" variant="ghost" @click="deleting = false" />
+              <UButton
+                label="Keep skill"
+                color="neutral"
+                variant="ghost"
+                @click="deleting = false"
+              />
               <UButton label="Confirm delete" color="error" @click="remove" />
             </div>
           </div>
@@ -218,7 +230,9 @@ function toggleFile(path: string, enabled: boolean) {
 
         <template v-else>
           <div class="flex flex-wrap items-center justify-between gap-3">
-            <h3 class="text-sm font-semibold">Saved in this {{ desktop ? 'app' : 'browser' }}</h3>
+            <h3 class="text-sm font-semibold">
+              Saved in this {{ desktop ? 'app' : 'browser' }}
+            </h3>
             <div class="flex gap-2">
               <input
                 ref="importInput"
@@ -227,7 +241,7 @@ function toggleFile(path: string, enabled: boolean) {
                 aria-label="Import skill file"
                 class="hidden"
                 @change="importFile"
-              />
+              >
               <UButton
                 label="Import SKILL.md"
                 icon="i-lucide-upload"
@@ -243,8 +257,12 @@ function toggleFile(path: string, enabled: boolean) {
             class="rounded-lg border border-dashed border-default px-4 py-8 text-center"
           >
             <UIcon name="i-lucide-book-open" class="size-7 text-dimmed" />
-            <p class="mt-2 text-sm font-medium">No saved skills yet</p>
-            <p class="mt-1 text-sm text-muted">Create a skill or import a SKILL.md file to get started.</p>
+            <p class="mt-2 text-sm font-medium">
+              No saved skills yet
+            </p>
+            <p class="mt-1 text-sm text-muted">
+              Create a skill or import a SKILL.md file to get started.
+            </p>
           </div>
           <ul v-else class="divide-y divide-default rounded-lg border border-default">
             <li v-for="skill in settings.skills" :key="skill.name" class="flex items-center gap-3 p-3">
@@ -304,7 +322,12 @@ function toggleFile(path: string, enabled: boolean) {
             <p v-for="root in roots" :key="root" class="text-xs text-muted break-all">
               {{ root }}
             </p>
-            <UAlert v-if="fileError" color="error" title="Could not load local skills" :description="fileError" />
+            <UAlert
+              v-if="fileError"
+              color="error"
+              title="Could not load local skills"
+              :description="fileError"
+            />
             <p v-else-if="!loading && !files.length" class="text-sm text-muted">
               No local SKILL.md files found. Add &lt;name&gt;/SKILL.md inside .agents/skills, then refresh.
             </p>
@@ -373,7 +396,12 @@ function toggleFile(path: string, enabled: boolean) {
             variant="ghost"
             @click="editing ? (editing = false) : (open = false)"
           />
-          <UButton v-if="editing && !selectedFile" label="Save skill" type="submit" form="skill-editor" />
+          <UButton
+            v-if="editing && !selectedFile"
+            label="Save skill"
+            type="submit"
+            form="skill-editor"
+          />
         </div>
       </div>
     </template>

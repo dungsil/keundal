@@ -7,7 +7,7 @@ export function useFileUploadWithStatus() {
   const toast = useToast()
 
   async function uploadFiles(newFiles: File[]) {
-    const filesWithStatus: FileWithStatus[] = newFiles.map((file) => ({
+    const filesWithStatus: FileWithStatus[] = newFiles.map(file => ({
       file,
       id: crypto.randomUUID(),
       previewUrl: createObjectUrl(file),
@@ -17,7 +17,7 @@ export function useFileUploadWithStatus() {
     files.value = [...files.value, ...filesWithStatus]
 
     const uploadPromises = filesWithStatus.map(async (fileWithStatus) => {
-      const index = files.value.findIndex((f) => f.id === fileWithStatus.id)
+      const index = files.value.findIndex(f => f.id === fileWithStatus.id)
       if (index === -1) return
 
       try {
@@ -30,15 +30,15 @@ export function useFileUploadWithStatus() {
           reader.onerror = () => reject(reader.error)
           reader.readAsDataURL(fileWithStatus.file)
         })
-        const current = files.value.find((f) => f.id === fileWithStatus.id)
+        const current = files.value.find(f => f.id === fileWithStatus.id)
         if (!current) return
         Object.assign(current, {
           status: 'uploaded',
           uploadedUrl: url
         })
       } catch (error) {
-        const errorMessage =
-          (error as { data?: { message?: string } }).data?.message || (error as Error).message || 'Upload failed'
+        const errorMessage
+          = (error as { data?: { message?: string } }).data?.message || (error as Error).message || 'Upload failed'
         toast.add({
           title: 'Upload failed',
           description: errorMessage,
@@ -62,12 +62,12 @@ export function useFileUploadWithStatus() {
     onUpdate: uploadFiles
   })
 
-  const uploading = computed(() => files.value.some((f) => f.status === 'uploading'))
+  const uploading = computed(() => files.value.some(f => f.status === 'uploading'))
 
   const uploadedFiles = computed(() =>
     files.value
-      .filter((f) => f.status === 'uploaded' && f.uploadedUrl)
-      .map((f) => ({
+      .filter(f => f.status === 'uploaded' && f.uploadedUrl)
+      .map(f => ({
         type: 'file' as const,
         mediaType: f.file.type,
         filename: f.file.name,
@@ -76,16 +76,16 @@ export function useFileUploadWithStatus() {
   )
 
   function removeFile(id: string) {
-    const file = files.value.find((f) => f.id === id)
+    const file = files.value.find(f => f.id === id)
     if (!file) return
 
     URL.revokeObjectURL(file.previewUrl)
-    files.value = files.value.filter((f) => f.id !== id)
+    files.value = files.value.filter(f => f.id !== id)
   }
 
   function clearFiles() {
     if (files.value.length === 0) return
-    files.value.forEach((fileWithStatus) => URL.revokeObjectURL(fileWithStatus.previewUrl))
+    files.value.forEach(fileWithStatus => URL.revokeObjectURL(fileWithStatus.previewUrl))
     files.value = []
   }
 

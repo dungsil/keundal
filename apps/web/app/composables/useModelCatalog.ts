@@ -30,7 +30,7 @@ export function useModelCatalog(settings: Ref<LLMSettings>) {
         } catch (cause) {
           if (!controller.signal.aborted)
             error.value += `${cause instanceof Error ? cause.message : 'Could not load models'} `
-          return models.value.filter((model) => model.value.startsWith(`${provider.id}/`))
+          return models.value.filter(model => model.value.startsWith(`${provider.id}/`))
         }
       })
     )

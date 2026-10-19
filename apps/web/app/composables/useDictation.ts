@@ -11,10 +11,10 @@ const MAX_DURATION = 120_000
 
 export function isDictationSupported() {
   return (
-    typeof window !== 'undefined' &&
-    typeof AudioContext !== 'undefined' &&
-    typeof WebSocket !== 'undefined' &&
-    !!navigator.mediaDevices?.getUserMedia
+    typeof window !== 'undefined'
+    && typeof AudioContext !== 'undefined'
+    && typeof WebSocket !== 'undefined'
+    && !!navigator.mediaDevices?.getUserMedia
   )
 }
 
@@ -91,7 +91,7 @@ export function useDictation() {
     current.processor.disconnect()
     current.source.disconnect()
     current.audioContext.close().catch(() => {})
-    current.stream.getTracks().forEach((track) => track.stop())
+    current.stream.getTracks().forEach(track => track.stop())
     try {
       current.audio.close()
     } catch {
@@ -171,14 +171,14 @@ export function useDictation() {
     if (cancelled) {
       // Cancelled while the permission prompt was open
       abort.abort()
-      stream.getTracks().forEach((track) => track.stop())
+      stream.getTracks().forEach(track => track.stop())
       return
     }
 
     // A failed handshake while the permission prompt was open must not leave a microphone running.
     if (connectionError) {
       abort.abort()
-      stream.getTracks().forEach((track) => track.stop())
+      stream.getTracks().forEach(track => track.stop())
       throw connectionError
     }
 
@@ -200,8 +200,8 @@ export function useDictation() {
         }
         level.value = Math.min(1, Math.sqrt(sum / input.length) * 5)
 
-        const samples =
-          context.sampleRate === SAMPLE_RATE
+        const samples
+          = context.sampleRate === SAMPLE_RATE
             ? new Float32Array(input)
             : resampleAudio(new Float32Array(input), context.sampleRate, SAMPLE_RATE)
         controller.enqueue(encodeRealtimeAudio(samples))
@@ -216,7 +216,7 @@ export function useDictation() {
       // The microphone is open and the transcription stream is connected, tear everything down
       abort.abort()
       audioContext?.close().catch(() => {})
-      stream.getTracks().forEach((track) => track.stop())
+      stream.getTracks().forEach(track => track.stop())
       throw cause
     }
 

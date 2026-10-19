@@ -16,7 +16,7 @@ export function useKeundalChat(options: {
   const messages = shallowRef<ChatMessage[]>([])
   const status = shallowRef<ChatStatus>('ready')
   const error = shallowRef<Error>()
-  let active: { abort: AbortController; done: Promise<void> } | undefined
+  let active: { abort: AbortController, done: Promise<void> } | undefined
 
   async function run() {
     if (active) return
@@ -29,11 +29,11 @@ export function useKeundalChat(options: {
         for await (const event of options.respond(
           messages.value,
           (message) => {
-            const index = messages.value.findIndex((item) => item.id === message.id)
-            messages.value =
-              index < 0
+            const index = messages.value.findIndex(item => item.id === message.id)
+            messages.value
+              = index < 0
                 ? [...messages.value, message]
-                : messages.value.map((item) => (item.id === message.id ? message : item))
+                : messages.value.map(item => (item.id === message.id ? message : item))
             if (!abort.signal.aborted) status.value = 'streaming'
           },
           abort.signal
@@ -65,7 +65,7 @@ export function useKeundalChat(options: {
     await current?.done
   }
 
-  async function sendMessage(input: { text: string; files?: FilePart[]; messageId?: string }) {
+  async function sendMessage(input: { text: string, files?: FilePart[], messageId?: string }) {
     if (active) return
     const message: ChatMessage = {
       id: input.messageId ?? crypto.randomUUID(),
@@ -73,7 +73,7 @@ export function useKeundalChat(options: {
       parts: [{ type: 'text', text: input.text }, ...(input.files ?? [])]
     }
     if (input.messageId) {
-      const index = messages.value.findIndex((item) => item.id === input.messageId && item.role === 'user')
+      const index = messages.value.findIndex(item => item.id === input.messageId && item.role === 'user')
       if (index < 0) throw new Error('User message not found')
       messages.value = [...messages.value.slice(0, index), message]
     } else messages.value = [...messages.value, message]
@@ -83,7 +83,7 @@ export function useKeundalChat(options: {
   async function regenerate(input?: { messageId: string }) {
     if (active) return
     if (input) {
-      const index = messages.value.findIndex((item) => item.id === input.messageId && item.role === 'assistant')
+      const index = messages.value.findIndex(item => item.id === input.messageId && item.role === 'assistant')
       if (index < 0) throw new Error('Assistant message not found')
       messages.value = messages.value.slice(0, index)
     } else if (messages.value.at(-1)?.role === 'assistant') messages.value = messages.value.slice(0, -1)
