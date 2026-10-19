@@ -1,4 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { listAnthropicModels } from '@keundal/plugin-llm-anthropic'
+import { listGeminiModels } from '@keundal/plugin-llm-gemini'
+import { listOpenAIModels } from '@keundal/plugin-llm-openai'
 import { expect, test, onTestFinished, vi } from 'vitest'
 import { loadModels, MODEL_CACHE_TTL } from '../shared/utils/models'
 import { defaultLLMSettings } from '../shared/utils/llm-settings'
@@ -27,6 +30,23 @@ async function fixture(handler: (req: IncomingMessage, res: ServerResponse) => v
   for (const provider of ['openai', 'anthropic', 'google'] as const) settings[provider] = { apiKey: `private-${provider}`, baseURL: `http://127.0.0.1:${address.port}/gateway` }
   return { requests, settings, storage, values }
 }
+
+test.each([
+  { provider: 'openai' as const, list: listOpenAIModels, suffix: '/models' },
+  { provider: 'anthropic' as const, list: listAnthropicModels, suffix: '/v1/models?limit=1000' },
+  { provider: 'google' as const, list: listGeminiModels, suffix: '/v1beta/models' }
+])('$provider 모델 조회는 경로 내부의 슬래시를 보존하고 끝의 슬래시만 모두 제거한다', async ({ provider, list, suffix }) => {
+  const { requests, settings } = await fixture((_req, res) => {
+    res.end(JSON.stringify(provider === 'google'
+      ? { models: [{ name: 'models/test-model', displayName: 'Test Model', supportedGenerationMethods: ['generateContent'] }] }
+      : { data: [{ id: 'test-model', display_name: 'Test Model' }] }))
+  })
+  for (const trailing of ['', '/', '///']) {
+    const models = await list({ ...settings[provider], baseURL: `${settings[provider].baseURL}/nested///path${trailing}` })
+    expect(requests.at(-1)!.url).toBe(`/gateway/nested///path${suffix}`)
+    expect(models).toEqual([{ id: 'test-model', name: 'Test Model', contextWindow: undefined, maxOutputTokens: undefined }])
+  }
+})
 
 test('모델 캐시는 한 시간 미만에 재사용하고 만료·강제 갱신·키·주소 변경 시 다시 불러온다', async () => {
   const { settings, storage, requests, values } = await fixture((req, res) => {

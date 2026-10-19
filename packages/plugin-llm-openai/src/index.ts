@@ -7,6 +7,7 @@ import { ResponseEvents } from './events.js'
 import { createInput } from './request.js'
 
 export { OpenAILLMConfigSchema, type OpenAILLMConfig } from './config.js'
+export { listOpenAIModels } from './models.js'
 
 export class OpenAILLMService extends LLMService {
   private readonly client: OpenAI

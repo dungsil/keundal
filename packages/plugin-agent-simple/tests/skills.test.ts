@@ -11,7 +11,7 @@ import {
   type RunAgentInput,
   type SkillProvider
 } from '@keundal/core'
-import simpleAgentPlugin, { SimpleAgentConfigSchema } from '@keundal/plugin-agent-simple'
+import simpleAgentPlugin, { SimpleAgentConfigSchema, type SimpleAgentConfig } from '@keundal/plugin-agent-simple'
 import skillPlugin from '@keundal/plugin-skill'
 import filesystemSkillPlugin from '@keundal/plugin-skill-filesystem'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
@@ -41,7 +41,12 @@ async function collect(stream: AsyncIterable<AGUIEvent>) {
   for await (const event of stream) events.push(event)
   return events
 }
-async function setup(t: TestContext, scripts: LLMEvent[][] = [answer], count?: (request: LLMRequest) => number) {
+async function setup(
+  t: TestContext,
+  scripts: LLMEvent[][] = [answer],
+  count?: (request: LLMRequest) => number,
+  tools?: SimpleAgentConfig['tools']
+) {
   const ctx = new Context()
   const requests: LLMRequest[] = []
   const counted: LLMRequest[] = []
@@ -68,7 +73,7 @@ async function setup(t: TestContext, scripts: LLMEvent[][] = [answer], count?: (
     await store.dispose()
     await llm.dispose()
   })
-  const agent = await ctx.plugin(simpleAgentPlugin, { model: 'test', maxOutputTokens: 100, skills: true })
+  const agent = await ctx.plugin(simpleAgentPlugin, { model: 'test', maxOutputTokens: 100, skills: true, tools })
   t.onTestFinished(() => agent.dispose())
   return { ctx, requests, counted, registry, agent }
 }
@@ -238,4 +243,48 @@ test('스킬 설정은 boolean만 받고 자동 로더와 같은 이름의 도�
       })
     ).issues
   ).toBeDefined()
+})
+
+test('동적 공급자의 도구와 스킬을 함께 실행하고 후속 요청에도 같은 목록을 전달한다', async (t) => {
+  const externalCall: LLMEvent[] = [
+    { type: EventType.TOOL_CALL_START, toolCallId: 'external', toolCallName: 'lookup' },
+    { type: EventType.TOOL_CALL_ARGS, toolCallId: 'external', delta: '{}' },
+    { type: EventType.TOOL_CALL_END, toolCallId: 'external' }
+  ]
+  const { ctx, requests } = await setup(t, [[...call('review'), ...externalCall], answer], undefined, async () => [
+    { name: 'lookup', description: 'External lookup', parameters: {}, execute: () => 'External result' }
+  ])
+  ctx.skills.registerProvider(
+    provider(async () => ({
+      skills: [{ name: 'review', description: 'Review changes' }],
+      async load(name) {
+        return { name, description: 'Review changes', content: 'Check public behavior.' }
+      }
+    }))
+  )
+  const events = await collect(ctx.agent.run(input))
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(requests.map((request) => request.input.tools.map((tool) => tool.name))).toEqual([
+    ['lookup', 'skill'],
+    ['lookup', 'skill']
+  ])
+  expect(requests[1].input.messages).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ role: 'tool', toolCallId: 'external', content: 'External result' }),
+      expect.objectContaining({
+        role: 'tool',
+        toolCallId: 'load',
+        content: '<skill_content name="review">\nCheck public behavior.\n</skill_content>'
+      })
+    ])
+  )
+})
+
+test('동적 도구 공급자가 스킬 예약 이름을 반환하면 생성 전에 거부한다', async (t) => {
+  const { ctx, requests } = await setup(t, [], undefined, async () => [
+    { name: 'skill', description: 'External skill', parameters: {}, execute: () => 'Must not run' }
+  ])
+  await expect(collect(ctx.agent.run(input))).rejects.toThrow('skill tool name is reserved')
+  expect(requests).toEqual([])
+  expect(await ctx.generation.get('run')).toBeUndefined()
 })

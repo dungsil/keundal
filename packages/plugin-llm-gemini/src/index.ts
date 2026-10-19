@@ -7,6 +7,7 @@ import { ContentsEvents } from './events.js'
 import { createCountInput, createInput } from './request.js'
 
 export { GeminiLLMConfigSchema, type GeminiLLMConfig } from './config.js'
+export { listGeminiModels } from './models.js'
 
 export class GeminiLLMService extends LLMService {
   private readonly client: GoogleGenAI

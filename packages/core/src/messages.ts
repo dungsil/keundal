@@ -3,6 +3,28 @@ import { EventType, type AGUIEvent, type AgentMessage } from './protocol.js'
 type AssistantMessage = Extract<AgentMessage, { role: 'assistant' }>
 type AssistantToolCall = NonNullable<AssistantMessage['toolCalls']>[number]
 
+/** 결과 없는 도구 호출과 서명 없는 추론을 제외합니다. 모델을 바꾸면 공급자 전용 상태도 제거합니다. */
+export function prepareReplayMessages(
+  messages: readonly AgentMessage[],
+  sourceModel: string,
+  targetModel: string
+): AgentMessage[] {
+  const sameModel = sourceModel === targetModel
+  const results = new Set(messages.flatMap((message) => (message.role === 'tool' ? [message.toolCallId] : [])))
+  return messages
+    .filter((message) => message.role !== 'reasoning' || (sameModel && !!message.encryptedValue))
+    .map((message) => {
+      if (message.role !== 'assistant') return message
+      const toolCalls = message.toolCalls?.filter((call) => results.has(call.id))
+      if (sameModel) return { ...message, toolCalls }
+      return {
+        ...message,
+        metadata: undefined,
+        toolCalls: toolCalls?.map(({ encryptedValue: _value, ...call }) => call)
+      }
+    })
+}
+
 /**
  * 저장된 대화와 새 메시지를 하나의 대화로 병합합니다. 저장된 순서를 유지하고, 같은 id의 새
  * 메시지는 저장된 위치를 대체하므로 재전송된 요청이 중복으로 쌓이지 않습니다.

@@ -20,7 +20,8 @@
     "@google/genai": "catalog:",
     "@keundal/core": "workspace:*",
     "@standard-schema/spec": "catalog:",
-    "cordis": "catalog:"
+    "cordis": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@keundal/plugin-store-indexeddb": "workspace:*",
