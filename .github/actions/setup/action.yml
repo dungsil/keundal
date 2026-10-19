@@ -46,7 +46,7 @@ runs:
       run: pnpm install --frozen-lockfile
 
     - name: pnpm 캐시 저장
-      if: github.job == 'build' && steps.pnpm-cache.outputs.cache-hit != 'true'
+      if: (github.job == 'build' || github.job == 'build-platforms') && steps.pnpm-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
         path: ${{ steps.pnpm-store.outputs.path }}

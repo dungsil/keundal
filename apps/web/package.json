@@ -5,6 +5,7 @@
   "scripts": {
     "build": "nuxt build",
     "build:cloudflare": "nuxt build --preset=cloudflare_module",
+    "build:preview": "pnpm build:cloudflare",
     "deploy:cloudflare": "wrangler deploy --config .output/server/wrangler.json",
     "dev": "nuxt dev",
     "preview": "nuxt preview",
