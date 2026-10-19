@@ -87,11 +87,17 @@ pnpm --filter @keundal/web deploy:cloudflare
 
 ### GitHub Actions 자동 배포
 
-`.github/workflows/ci.yml`의 `deploy` job은 빌드·타입 검사·테스트·린트·CodeQL이 모두 성공한 뒤 Cloudflare 공식 `cloudflare/wrangler-action`으로 배포합니다. `main` 푸시와 `main`에서의 수동 CI 실행은 운영 Worker `keundal-web`을 배포합니다. `main` 대상 PR은 `preview --name pr-<PR 번호>`로 수명을 관리할 수 있는 프리뷰를 만들며 운영 트래픽을 변경하지 않습니다. 같은 PR의 후속 커밋은 같은 프리뷰를 갱신하며, 별도의 Git 브랜치를 만들지는 않습니다. Workers Previews는 현재 open beta이며 저장소에 고정한 Wrangler 버전을 사용합니다.
+`.github/workflows/ci.yml`은 빌드·플랫폼 빌드·타입 검사·테스트·린트·CodeQL을 실행하고 웹 Workers와 데스크톱 설치 파일을 아티팩트로 보관합니다. 배포 워크플로우는 `workflow_run`으로 CI 성공을 확인한 뒤 해당 CI 실행의 아티팩트를 사용합니다. 배포 단계에서는 소스를 다시 빌드하거나 PR 코드를 checkout하지 않습니다.
 
-PR 프리뷰 배포가 성공하면 `marocchino/sticky-pull-request-comment` Action이 프리뷰 URL과 CI 실행 링크를 댓글로 남깁니다. 재배포 시 `cloudflare-preview` 댓글 하나를 갱신하며, 운영 배포나 배포 실패 시에는 댓글을 작성하지 않습니다. 댓글 쓰기 권한은 배포·종료 job에만 부여합니다.
+`.github/workflows/deploy.yml`은 `main` 푸시와 `main`에서의 수동 CI 실행이 성공하면 운영 Worker `keundal-web`을 배포합니다. 배포 직전에 CI 커밋과 최신 `main` 커밋을 비교하며, 두 커밋이 다르면 배포를 생략합니다.
 
-PR을 병합하거나 닫으면 `cleanup-preview` job이 Cloudflare API로 해당 `pr-<번호>` 프리뷰와 모든 배포 이력을 삭제하고 기존 댓글을 종료 상태로 갱신합니다. 이미 없는 프리뷰는 성공으로 처리하되 인증·서버 오류는 실패로 남깁니다. 종료 job은 PR 코드를 checkout하거나 실행하지 않으며, 빌드 성공 여부와 무관하게 실행합니다. PR 번호로 공유하는 concurrency 그룹에서 진행 중인 배포가 끝난 뒤 정리하므로 종료 직전의 배포가 프리뷰를 다시 만들지 않습니다. PR을 다시 열면 일반 CI 성공 후 프리뷰를 다시 생성합니다.
+`.github/workflows/preview.yml`은 같은 저장소의 `main` 대상 PR에서 CI가 성공하면 `preview --name pr-<PR 번호>`로 프리뷰를 만듭니다. PR이 열려 있고 최신 커밋이 CI 커밋과 일치하는지 배포 직전에 다시 확인합니다. 문서 전용 PR처럼 Workers 아티팩트가 없는 실행은 배포하지 않습니다. 같은 PR의 후속 커밋은 같은 프리뷰를 갱신합니다. Workers Previews는 현재 open beta이며 저장소에 고정한 Wrangler 버전을 사용합니다.
+
+PR 프리뷰 배포가 성공하면 `marocchino/sticky-pull-request-comment` Action이 웹 프리뷰 URL, 데스크톱 설치 파일과 CI·배포 실행 링크를 댓글로 남깁니다. 설치 파일 링크는 배포 워크플로우가 아닌 원본 CI 실행의 아티팩트를 가리킵니다. 재배포 시 `cloudflare-preview` 댓글 하나를 갱신하며, 운영 배포나 배포 실패 시에는 댓글을 작성하지 않습니다. 댓글 쓰기 권한은 배포·종료 job에만 부여합니다.
+
+PR을 병합하거나 닫으면 `.github/workflows/cleanup-preview.yml`의 `cleanup-preview` job이 해당 `pr-<번호>` 프리뷰와 모든 배포 이력을 삭제합니다. 기존 댓글도 종료 상태로 갱신합니다. 이미 없는 프리뷰는 성공으로 처리하되 인증·서버 오류는 실패로 남깁니다. 종료 job은 PR 코드를 checkout하거나 실행하지 않으며, 빌드 성공 여부와 무관하게 실행합니다. 프리뷰 배포와 종료는 `preview-<PR 번호>` concurrency 그룹과 `queue: max`를 공유하여 대기 중인 삭제 요청도 보존합니다. PR을 다시 열면 일반 CI 성공 후 프리뷰를 다시 생성합니다.
+
+`workflow_run` 워크플로우는 기본 브랜치에 파일이 있어야 실행되므로 최초 분리 PR에서는 새 배포 워크플로우를 실행하지 않습니다. 병합 후 CI가 완료되면 운영 배포를 시작하며, 이후 PR부터 새 프리뷰를 배포합니다.
 
 저장소의 **Settings → Secrets and variables → Actions**에 다음 secrets를 등록합니다.
 
@@ -100,9 +106,9 @@ PR을 병합하거나 닫으면 `cleanup-preview` job이 Cloudflare API로 해�
 | `CLOUDFLARE_API_TOKEN` | 배포할 계정에 한정한 Workers 편집 권한의 API 토큰 |
 | `CLOUDFLARE_ACCOUNT_ID` | Worker를 배포할 Cloudflare 계정 ID |
 
-Dependabot PR도 프리뷰를 배포합니다. Dependabot이 실행한 워크플로는 Actions secrets를 읽지 못하므로 **Settings → Secrets and variables → Dependabot**에도 같은 이름의 두 secrets를 등록합니다. 값이 없거나 배포에 실패하면 배포 job이 실패하며, 실패를 성공으로 처리하거나 배포를 생략하지 않습니다.
+Dependabot PR도 프리뷰를 배포합니다. CI 완료 후의 배포는 Actions secrets를 사용합니다. Dependabot PR 종료 워크플로우를 위해 **Settings → Secrets and variables → Dependabot**에도 같은 이름의 두 secrets를 등록합니다. 값이 없거나 배포에 실패하면 배포 job이 실패하며, 실패를 성공으로 처리하거나 배포를 생략하지 않습니다.
 
-배포 실패가 머지를 차단하려면 `main` Ruleset의 필수 상태 검사에 **PR 프리뷰 배포**를 추가해야 합니다. 워크플로에 job을 추가하는 것만으로는 머지가 차단되지 않습니다. 기존 빌드·타입 검사·테스트·린트 필수 검사와 CodeQL 규칙도 유지합니다.
+빌드·타입 검사·테스트·린트 필수 검사와 CodeQL 규칙은 기존 CI에서 유지합니다. 배포 결과는 CI 결과와 분리되며, 배포 실패로 CI 검사가 실패하지 않습니다. `workflow_run` 실행은 기본 브랜치에 연결되므로 **PR 프리뷰 배포**를 PR 커밋의 필수 상태 검사로 사용하지 않습니다.
 
 프리뷰 URL은 PR 댓글과 배포 단계 로그에서 확인합니다. 프리뷰는 공개 URL이며 브라우저의 대화·키 저장소는 origin이 다른 운영·각 PR 사이에서 분리됩니다. 새 프리뷰는 운영 secrets·변수·데이터 바인딩을 상속하지 않습니다.
 
