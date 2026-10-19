@@ -85,7 +85,7 @@ jobs:
 
   build-platforms:
     needs: build
-    name: 플랫폼 빌드 (${{ matrix.name }})
+    name: 빌드 (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
