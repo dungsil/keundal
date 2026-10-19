@@ -39,6 +39,7 @@ jobs:
           header: cloudflare-preview
           only_update: true
           message: |
-            ### Cloudflare Workers 프리뷰 종료
+            ### PR 프리뷰 종료
 
-            PR이 병합되거나 닫혀 프리뷰와 배포 이력을 삭제했습니다.
+            PR이 병합되거나 닫혀 웹 프리뷰와 배포 이력을 삭제했습니다.
+            데스크톱 설치 파일은 업로드 후 7일이 지나면 만료됩니다.
