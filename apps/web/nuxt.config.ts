@@ -15,11 +15,30 @@ export default defineNuxtConfig({
     'nuxt-charts'
   ],
 
+  $env: {
+    desktop: {
+      ssr: false,
+      buildDir: '.nuxt-desktop',
+      devtools: { enabled: false },
+      auth: { loadStrategy: 'none' },
+      runtimeConfig: { public: { desktop: true } },
+      devServer: { host: '127.0.0.1', port: 1420 },
+      vite: { server: { strictPort: true } },
+      nitro: {
+        output: { publicDir: '../desktop/dist' }
+      }
+    }
+  },
+
   devtools: {
     enabled: true
   },
 
   css: ['~/assets/css/main.css'],
+
+  runtimeConfig: {
+    public: { desktop: false }
+  },
 
   experimental: {
     viewTransition: true

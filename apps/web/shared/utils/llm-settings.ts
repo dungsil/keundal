@@ -35,8 +35,14 @@ export const providerSettingsSchema = z.object({
 export type ProviderSettings = z.infer<typeof providerSettingsSchema>
 export type LLMSettings = Record<LLMProvider, ProviderSettings>
 
+export const llmSettingsSchema = z.object({
+  anthropic: providerSettingsSchema.default({ apiKey: '', baseURL: '' }),
+  google: providerSettingsSchema.default({ apiKey: '', baseURL: '' }),
+  openai: providerSettingsSchema.default({ apiKey: '', baseURL: '' })
+})
+
 export function defaultLLMSettings(): LLMSettings {
-  return { anthropic: { apiKey: '', baseURL: '' }, google: { apiKey: '', baseURL: '' }, openai: { apiKey: '', baseURL: '' } }
+  return llmSettingsSchema.parse({})
 }
 
 export function providerCredentials(settings: LLMSettings, provider: LLMProvider) {

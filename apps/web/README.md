@@ -33,6 +33,8 @@ HTTP 400 오류는 공급자 JSON의 `error.message`·문자열 `error`·`messag
 
 키·URL·헤더는 현재 origin의 `localStorage`에 **암호화 없이** 저장합니다. 같은 사이트의 스크립트나 브라우저 확장 기능이 읽을 수 있으므로 공용 브라우저에서 사용하지 마세요. 선택한 모델도 브라우저에 저장하며, 설정은 계정에 동기화하지 않습니다. 앱 서버의 환경 변수·쿠키·SSR payload에는 키·헤더를 넣지 않습니다. 브라우저가 공급자 또는 설정한 엔드포인트로 직접 키와 대화를 전송하므로 신뢰할 수 있는 주소만 사용하세요. CORS가 차단되면 오류로 알리며 서버 프록시로 우회하지 않습니다.
 
+동일 UI를 사용하는 [데스크톱 앱](../desktop/README.md)은 LLM 설정을 localStorage 대신 OS 보안 저장소에 저장합니다. 위 브라우저 저장 안내는 웹 앱에 해당하며, 공급자 직접 요청과 CORS 정책은 데스크톱에도 적용됩니다.
+
 ## 저장소와 실행 경계
 
 - 브라우저의 Cordis Context에 `@keundal/plugin-store-indexeddb`와 런타임 설정을 읽는 `llm` 서비스를 등록합니다. `simpleAgentPlugin`이 입력 예산 검사·도구 실행·후속 생성을 수행하고, `session`과 `generation`이 대화·실행 journal을 IndexedDB `keundal-web`에 저장합니다.

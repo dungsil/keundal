@@ -1,0 +1,18 @@
+[package]
+name = "keundal-desktop"
+version = "0.1.0"
+description = "Keundal desktop application"
+authors = ["dungsil"]
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "keundal_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+tauri = { version = "2", features = [] }

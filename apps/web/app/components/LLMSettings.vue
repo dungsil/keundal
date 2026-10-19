@@ -5,7 +5,8 @@ defineProps<{ collapsed?: boolean }>()
 
 const { settings, open, requestedProvider } = useLLMSettings()
 const { model } = useModels()
-const { $chatStore } = useNuxtApp()
+const { $chatStore, $saveLLMSettings } = useNuxtApp()
+const desktop = useRuntimeConfig().public.desktop
 const toast = useToast()
 const provider = ref<LLMProvider>('anthropic')
 const draft = ref(defaultLLMSettings())
@@ -65,12 +66,13 @@ async function save(forget = false) {
   saving.value = true
   try {
     await $chatStore.stop()
-    localStorage.setItem('keundal:llm-settings', JSON.stringify(next))
-    settings.value = next
-    toast.add({ title: forget ? 'Provider settings removed' : 'Settings saved in this browser', icon: 'i-lucide-check', color: 'success' })
+    await $saveLLMSettings(next)
+    toast.add({ title: forget ? 'Provider settings removed' : desktop ? 'Settings saved in OS secret store' : 'Settings saved in this browser', icon: 'i-lucide-check', color: 'success' })
     open.value = false
   } catch {
-    error.value = 'Could not save settings. Check that browser storage is available.'
+    error.value = desktop
+      ? 'Could not save settings. Unlock your OS secret store and check its availability and size limits. No browser storage fallback is used.'
+      : 'Could not save settings. Check that browser storage is available.'
   } finally {
     saving.value = false
   }
@@ -81,7 +83,7 @@ async function save(forget = false) {
   <UModal
     v-model:open="open"
     title="LLM settings"
-    description="Your keys stay in this browser. Requests go directly to the provider."
+    :description="desktop ? 'Your settings are saved in your OS secret store. Requests go directly to the provider.' : 'Your keys stay in this browser. Requests go directly to the provider.'"
     :dismissible="!saving"
     :close="!saving"
   >
@@ -181,11 +183,11 @@ async function save(forget = false) {
           />
         </fieldset>
         <UAlert
-          icon="i-lucide-shield-alert"
+          :icon="desktop ? 'i-lucide-shield-check' : 'i-lucide-shield-alert'"
           color="neutral"
           variant="subtle"
-          title="Browser storage is not a secure vault"
-          description="Keys and headers are stored unencrypted in localStorage. Scripts on this site and browser extensions may read them. Do not use a shared browser. Settings are not synced to your account."
+          :title="desktop ? 'Protected by your OS secret store' : 'Browser storage is not a secure vault'"
+          :description="desktop ? 'API keys, URLs and headers are saved in macOS Keychain, Windows Credential Manager or Linux Secret Service, not localStorage. Settings are available in app memory while in use and are not synced to your account.' : 'Keys and headers are stored unencrypted in localStorage. Scripts on this site and browser extensions may read them. Do not use a shared browser. Settings are not synced to your account.'"
         />
       </form>
     </template>
@@ -211,7 +213,7 @@ async function save(forget = false) {
             @click="open = false"
           />
           <UButton
-            label="Save in this browser"
+            :label="desktop ? 'Save in OS secret store' : 'Save in this browser'"
             type="submit"
             form="llm-settings"
             :loading="saving"

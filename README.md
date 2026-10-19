@@ -51,6 +51,17 @@ pnpm --filter @keundal/web dev
 
 선택한 모델에 맞는 `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`를 `apps/web/.env`에 설정합니다. 받아쓰기는 별도로 OpenAI 키와 로그인이 필요합니다. `apps/server`·AI Gateway·D1·R2는 필요하지 않습니다. 로컬 대화는 계정/기기 간 동기화되지 않으며 공개 공유는 비활성화합니다. 저장소 교체 계약과 Cloudflare 배포 방법은 [웹 앱 문서](./apps/web/README.md)를 참고합니다.
 
+## 데스크톱 앱
+
+[apps/desktop](./apps/desktop/README.md)은 웹 앱의 UI를 공유하는 Tauri 2 앱입니다. 정적 UI를 앱에 포함하므로 별도 웹 서버 없이 실행하며, API 키는 앱의 **LLM settings**에서 입력합니다. Rust와 [운영체제별 Tauri 빌드 도구](https://v2.tauri.app/start/prerequisites/)가 필요합니다.
+
+```sh
+pnpm build
+pnpm --filter @keundal/desktop dev
+# 현재 OS용 설치 파일 생성
+pnpm --filter @keundal/desktop bundle
+```
+
 ## 라이선스
 
 이 프로젝트는 [MIT License](./LICENSE)에 따라 배포됩니다.
