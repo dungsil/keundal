@@ -36,6 +36,15 @@ const emit = defineEmits<{
         :invocation="{ ...(part as WeatherUIToolInvocation) }"
       />
       <UChatTool
+        v-else-if="part.type === 'tool-skill'"
+        :text="part.state === 'output-error' ? 'Skill loading interrupted' : isToolStreaming(part) ? 'Loading skill...' : 'Loaded skill'"
+        :suffix="(part.input as { name?: string })?.name"
+        :streaming="isToolStreaming(part)"
+        chevron="leading"
+      >
+        <pre class="text-xs whitespace-pre-wrap break-words">{{ part.state === 'output-error' ? part.errorText : part.output }}</pre>
+      </UChatTool>
+      <UChatTool
         v-else-if="part.type === 'tool-web_search' || part.type === 'tool-google_search'"
         :text="isToolStreaming(part) ? 'Searching the web...' : 'Searched the web'"
         :suffix="getSearchQuery(part)"

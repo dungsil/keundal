@@ -1968,7 +1968,9 @@ dependencies = [
 name = "keundal-desktop"
 version = "0.1.0"
 dependencies = [
+ "dirs",
  "keyring",
+ "serde",
  "tauri",
  "tauri-build",
 ]
