@@ -15,6 +15,18 @@ import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
 await ctx.plugin(indexedDBStorePlugin, { databaseName: 'my-agent' })
 ```
 
+`session.commit()`은 기본적으로 메시지를 병합합니다. `mode: 'replace'`는 전체 메시지를
+교체하며 `messages: []`로 모두 비울 수 있습니다. revision 검사와 종료 기록의 중복 적용
+방지는 그대로 유지됩니다.
+
+`session.delete(threadId, expectedRevision, { signal }?)`는 현재 revision(없는 스레드는 0)을
+검사하고 스레드와 모든 실행·journal을 하나의 `readwrite` transaction에서 삭제합니다.
+빈 threadId와 음수·안전하지 않은 정수 revision은 거부합니다. `running` 실행이 있으면
+삭제를 거부하며 자동 취소하지 않으므로 호출자가 먼저 실행을 중단하고 종료 확정을 기다려야
+합니다. 없는 스레드의 revision 0 삭제는 반복할 수 있습니다. 삭제는 낙관적 동시성 검사이며
+영구 tombstone을 남기지 않습니다. 이미 준비한 입력과 새 동시 실행에는 기존 generation·revision
+계약이 적용되며, 이후 스레드가 다시 생성될 수 있습니다.
+
 기본 데이터베이스 이름은 `keundal`입니다. `databaseName`으로 앱별 저장 공간을 분리할 수
 있고, 테스트나 별도 브라우저 컨텍스트에서는 `indexedDB`를 전달할 수 있습니다. 이미 생성한
 `IndexedDBStore`를 `store`로 전달하면 플러그인이 해제되어도 저장소 연결의 소유권은 호출자에게

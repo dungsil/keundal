@@ -4,15 +4,20 @@
 
 ## 설정
 
-| 설정      | 설명                                                                               |
-| --------- | ---------------------------------------------------------------------------------- |
-| `apiKey`  | OpenAI API 키입니다. 생략하면 SDK가 `OPENAI_API_KEY`를 사용합니다.                 |
-| `baseURL` | API 기본 주소입니다. 생략하면 SDK의 기본 설정을 사용합니다.                        |
-| `models`  | 모델 ID를 키로 사용하며, 각 값에 `contextWindow`와 `maxOutputTokens`를 지정합니다. |
+| 설정      | 설명                                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------- |
+| `apiKey`  | OpenAI API 키입니다. 생략하면 SDK가 `OPENAI_API_KEY`를 사용합니다.                                    |
+| `baseURL` | API 기본 주소입니다. 생략하면 SDK의 기본 설정을 사용합니다.                                           |
+| `headers` | 선택적인 HTTP 헤더 문자열 맵입니다. SDK의 `defaultHeaders`로 전달하며 기본 헤더를 덮어쓸 수 있습니다. |
+| `models`  | 모델 ID를 키로 사용하며, 각 값에 `contextWindow`와 `maxOutputTokens`를 지정합니다.                    |
 
 모델 한도는 [사용할 모델의 공식 문서](https://developers.openai.com/api/docs/models)에서 확인해 설정합니다. OpenAI의 모델 조회 API는 컨텍스트·출력 한도를 반환하지 않으므로 `getModel()`은 이 설정을 조회합니다. 등록하지 않은 모델이나 한도를 초과하는 출력 예산은 요청 전에 거부합니다.
 
-`countTokens()`는 [Responses 입력 토큰 계산 API](https://developers.openai.com/api/reference/typescript/resources/responses/subresources/input_tokens/methods/count)를 호출합니다. 메시지, 부가 문맥, 도구 정의를 생성 요청과 동일하게 변환하며, 로컬 추정값으로 대체하지 않습니다.
+`countTokens()`는 메시지, 부가 문맥, 도구 정의를 생성 요청과 동일하게 변환해 [Responses 입력 토큰 계산 API](https://developers.openai.com/api/reference/typescript/resources/responses/subresources/input_tokens/methods/count)를 먼저 호출합니다. 이 API 호출이 실패하면 호환 모드로 전환해 생성 입력 JSON의 UTF-8 바이트 수를 로컬 추정값으로 사용합니다. 같은 서비스 인스턴스에서는 이후 토큰 계산 API를 다시 호출하지 않으며, 인스턴스를 새로 만들면 다시 확인합니다. 404뿐 아니라 HTTP·전송 오류도 이 전환 대상입니다.
+
+호환 모드에서도 입력 예산 검사와 축약은 유지하지만 실제 토큰 수를 보장하지 않습니다. 텍스트에는 보수적인 추정이며 이미지·파일 ID·추론 암호문 등은 실제 토큰 비용과 크게 다를 수 있습니다. 취소·플러그인 해제, 로컬 입력·예산 검증 오류, 성공 응답의 잘못된 토큰 수는 대체하지 않고 거부합니다. 생성은 계속 Responses API를 사용하며 Chat Completions로 바꾸지 않습니다. 생성 요청 자체의 오류도 그대로 전달합니다.
+
+브라우저에서 실행하려면 `apiKey`와 `dangerouslyAllowBrowser: true`를 명시합니다. 생략하면 SDK의 브라우저 실행 차단을 유지합니다. 브라우저 키는 사용자·스크립트·확장 기능에 노출될 수 있으므로 서버 소유 비밀 키를 번들에 넣지 마세요. 사용자 자신의 키를 사용하는 앱에서만 위험을 안내하고 opt-in하며, 엔드포인트의 CORS 지원도 필요합니다.
 
 ## 직접 호출
 
@@ -54,12 +59,16 @@ try {
 }
 ```
 
-`countTokens()`와 `stream()`의 두 번째 인자에 `{ signal }`을 전달할 수 있습니다. 취소 신호, 순회 중단, 플러그인 해제는 진행 중인 요청을 취소합니다. HTTP·전송 오류는 SDK 오류를 유지하고, 공급자가 명시한 `error`·`response.failed`·`response.incomplete`는 예외로 전달합니다. 자동 재시도는 하지 않습니다.
+`countTokens()`와 `stream()`의 두 번째 인자에 `{ signal }`을 전달할 수 있습니다. 취소 신호, 순회 중단, 플러그인 해제는 진행 중인 요청을 취소합니다. 생성 요청의 HTTP·전송 오류는 SDK 오류를 유지하고, 공급자가 명시한 `error`·`response.failed`·`response.incomplete`는 예외로 전달합니다. 자동 재시도는 하지 않습니다.
 
 오류 없이 EOF에 도달하면 `response.completed`가 없어도 정상 종료합니다. 아직 열린 텍스트·추론 메시지는 종료 이벤트를 보완하고 받은 내용을 유지합니다. 완료되지 않은 도구 호출은 예외로 전달하며, 수신하지 않은 내용이나 미확정 암호화 값을 보충하지 않습니다. `generation`과 함께 사용하면 받은 내용을 커밋한 뒤 `RUN_FINISHED`를 전달합니다. 실행이 다른 프로세스나 탭에 회수되어 종료가 확정된 경우에는 커밋 없이 `RUN_FINISHED` 없이 끝날 수 있습니다.
 
 ## 입력과 이벤트
 
+- `LLMRequest.webSearch: true`는 함수 도구와 함께 네이티브 `{ type: 'web_search' }` 도구를 등록합니다. false/생략은 등록하지 않습니다. 검색 호출은 로컬 실행용 `TOOL_CALL_*`로 내보내지 않습니다.
+- `reasoning: true`는 `{ effort: 'medium', summary: 'auto' }`를 전송합니다. false는 GPT-5/mini/nano(날짜 snapshot 포함)에 `minimal`(검색 시 `low`), 그 외 모델에는 `none`을 전송하고 요약을 요청하지 않습니다. 초기 GPT-5 계열은 추론을 완전히 끌 수 없습니다. 생략하면 공급자 기본값을 유지합니다. 추론 토큰도 기존 `max_output_tokens` 예산 안에서 사용하며, 모델이 해당 옵션과 검색을 지원해야 합니다. 지원하지 않는 모델의 API 오류는 그대로 전달합니다. 토큰 계산에도 같은 도구·추론 설정을 사용합니다.
+- URL 인용은 `{ type: 'CUSTOM', name: 'keundal.source', value: { id, url, title? } }`로 전달하며 `id`는 URL입니다. 같은 URL이 여러 번 인용되면 이벤트도 반복될 수 있습니다.
+- 네이티브 문맥은 `TEXT_MESSAGE_END.metadata['openai.outputItems']`에 **SDK의 완료된 출력 항목 배열**로 보존합니다. 각 검색 전용 어시스턴트 호스트에는 `[ResponseFunctionWebSearch]`(원래 `id`, `status`, `action` 포함), 인용 텍스트 호스트에는 `[ResponseOutputMessage]`(원래 `phase`, `content[].annotations` 포함)를 담습니다. 후속 변환은 이 배열을 텍스트 대신 재생하고 로컬 함수 호출을 뒤에 추가합니다. 메시지 순서와 메타데이터를 수정하지 말고 보존해야 검색·텍스트·추론·함수 호출 순서가 유지됩니다. 추론 암호화 값은 기존 `reasoning.encryptedValue`에 따로 유지합니다.
 - 시스템·개발자·사용자·어시스턴트 메시지, 함수 호출과 결과, 추론 메시지를 변환합니다. 사용자 입력은 텍스트와 이미지 URL·base64·파일 ID를 지원합니다. 문서·음성·동영상 입력과 `activity` 메시지는 오류로 알립니다.
 - `input.context`는 사용자 역할의 JSON 메시지로 전달합니다. `state`와 `forwardedProps`는 공급자 요청에 자동으로 포함하지 않습니다.
 - 텍스트, 거절 응답, 함수 호출 인자, 추론 요약을 AG-UI 이벤트로 전달합니다. 함수 호출은 요청 이벤트까지 전달하며 도구를 실행하지 않습니다.

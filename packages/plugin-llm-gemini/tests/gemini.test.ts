@@ -92,6 +92,47 @@ async function setup(t: TestContext, handle: (request: Received, response: Serve
   return { ctx, fiber, requests }
 }
 
+test.for([true, false])(
+  'reasoning %s를 네이티브 thinkingBudget으로 적용하고 출력 예산을 유지한다',
+  async (reasoning, t) => {
+    const { ctx, requests } = await setup(t, (_received, response) => send(response, textChunks))
+    await collect(ctx.llm.stream({ ...request, reasoning, webSearch: false }))
+    expect(requests[0]!.body.generationConfig).toEqual({
+      maxOutputTokens: 32,
+      thinkingConfig: { includeThoughts: reasoning, thinkingBudget: reasoning ? 16 : 0 }
+    })
+  }
+)
+
+test('webSearch를 켜면 토큰 계산과 생성 모두 Google 검색을 조용히 무시하지 않고 거부한다', async (t) => {
+  const { ctx, requests } = await setup(t, () => {
+    throw new Error('unexpected HTTP call')
+  })
+  await expect(ctx.llm.countTokens({ ...request, webSearch: true })).rejects.toThrow('native web search')
+  await expect(collect(ctx.llm.stream({ ...request, webSearch: true }))).rejects.toThrow('native web search')
+  expect(requests).toHaveLength(0)
+})
+
+test('reasoning을 켠 한 토큰 예산을 비활성화로 바꾸지 않고 거부한다', async (t) => {
+  const { ctx, requests } = await setup(t, () => {
+    throw new Error('unexpected HTTP call')
+  })
+  const tiny = { ...request, maxOutputTokens: 1, reasoning: true }
+  await expect(ctx.llm.countTokens(tiny)).rejects.toThrow('maxOutputTokens >= 2')
+  await expect(collect(ctx.llm.stream(tiny))).rejects.toThrow('maxOutputTokens >= 2')
+  expect(requests).toHaveLength(0)
+})
+
+test.for(['webSearch', 'reasoning'] as const)('%s가 boolean이 아니면 공급자 호출 전에 거부한다', async (key, t) => {
+  const { ctx, requests } = await setup(t, () => {
+    throw new Error('unexpected HTTP call')
+  })
+  const invalid = { ...request, [key]: 'true' } as LLMRequest
+  await expect(ctx.llm.countTokens(invalid)).rejects.toThrow('must be a boolean')
+  await expect(collect(ctx.llm.stream(invalid))).rejects.toThrow('must be a boolean')
+  expect(requests).toHaveLength(0)
+})
+
 test('streamGenerateContent 요청을 보내고 분할된 UTF-8 SSE를 실행 수명 이벤트 없이 변환한다', async (t) => {
   const { ctx, requests } = await setup(t, async (_request, response) => {
     const bytes = Buffer.from(wire(textChunks))

@@ -4,7 +4,7 @@ import type {
   ImageBlockParam,
   MessageCountTokensParams,
   TextBlockParam,
-  Tool
+  ToolUnion
 } from '@anthropic-ai/sdk/resources/messages'
 import { parseRunAgentInput, type AgentMessage, type LLMRequest } from '@keundal/core'
 
@@ -103,7 +103,12 @@ function validateToolResults(messages: ConvertedMessage[]): void {
 
 export function createInput(
   request: LLMRequest
-): Pick<MessageCountTokensParams, 'model' | 'messages' | 'system' | 'tools'> {
+): Pick<MessageCountTokensParams, 'model' | 'messages' | 'system' | 'tools' | 'thinking'> {
+  for (const key of ['webSearch', 'reasoning'] as const) {
+    if (request[key] !== undefined && typeof request[key] !== 'boolean') throw new Error(`${key} must be a boolean`)
+  }
+  if (request.reasoning && request.maxOutputTokens <= 1024)
+    throw new Error('Anthropic reasoning requires maxOutputTokens > 1024')
   const parsed = parseRunAgentInput(request.input)
   const messages: ConvertedMessage[] = []
   const system: TextBlockParam[] = []
@@ -130,7 +135,21 @@ export function createInput(
         break
       case 'assistant': {
         const content: ContentBlockParam[] = []
-        if (message.content) content.push({ type: 'text', text: message.content })
+        const native = message.metadata?.['anthropic.contentBlocks']
+        if (native !== undefined) {
+          if (
+            !Array.isArray(native) ||
+            native.some(
+              (block) =>
+                !block ||
+                typeof block !== 'object' ||
+                !['server_tool_use', 'web_search_tool_result', 'text'].includes(block.type)
+            )
+          ) {
+            throw new Error('invalid anthropic.contentBlocks metadata')
+          }
+          content.push(...(native as ContentBlockParam[]))
+        } else if (message.content) content.push({ type: 'text', text: message.content })
         for (const call of message.toolCalls ?? []) {
           if (call.encryptedValue) throw new Error('unsupported Anthropic tool call encrypted value')
           content.push({
@@ -163,7 +182,7 @@ export function createInput(
     }
   }
   validateToolResults(messages)
-  const tools = parsed.tools.map((tool): Tool => {
+  const tools = parsed.tools.map((tool): ToolUnion => {
     if (tool.parameters.type !== 'object') throw new Error('Anthropic tool parameters must be an object schema')
     return {
       name: tool.name,
@@ -171,9 +190,20 @@ export function createInput(
       input_schema: { ...tool.parameters, type: 'object' }
     }
   })
+  if (request.webSearch) tools.push({ type: 'web_search_20250305', name: 'web_search' })
   return {
     model: request.model,
     messages,
+    ...(request.reasoning === undefined
+      ? {}
+      : {
+          thinking: request.reasoning
+            ? {
+                type: 'enabled' as const,
+                budget_tokens: Math.min(10000, Math.max(1024, Math.floor(request.maxOutputTokens / 2)))
+              }
+            : { type: 'disabled' as const }
+        }),
     ...(system.length ? { system } : {}),
     ...(tools.length ? { tools } : {})
   }

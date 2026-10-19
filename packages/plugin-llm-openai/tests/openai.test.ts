@@ -109,6 +109,111 @@ async function setup(t: TestContext, handle: (request: Received, response: Serve
   return { ctx, fiber, requests }
 }
 
+test('네이티브 검색과 인용 뒤의 함수 호출을 로컬 호출과 구분하고 후속 요청에 순서대로 보존한다', async (t) => {
+  const search = {
+    id: 'ws_1',
+    type: 'web_search_call',
+    status: 'completed',
+    action: { type: 'search', query: 'Keundal' }
+  }
+  const cited = {
+    ...message,
+    phase: 'commentary',
+    status: 'completed',
+    content: [
+      {
+        type: 'output_text',
+        text: '출처',
+        annotations: [
+          { type: 'url_citation', url: 'https://example.com', title: 'Example', start_index: 0, end_index: 2 }
+        ]
+      }
+    ]
+  }
+  const reason = { id: 'rs_1', type: 'reasoning', summary: [], encrypted_content: 'opaque' }
+  const call = { id: 'fc_1', type: 'function_call', call_id: 'call_1', name: 'lookup', arguments: '{}' }
+  const frames = [search, cited, reason, call].flatMap((item, output_index) => [
+    {
+      type: 'response.output_item.added',
+      output_index,
+      item: item.type === 'message' ? { ...item, content: [] } : item
+    },
+    { type: 'response.output_item.done', output_index, item }
+  ])
+  let generations = 0
+  const { ctx, requests } = await setup(t, (received, response) => {
+    if (received.path?.endsWith('/input_tokens')) {
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ input_tokens: 8 }))
+      return
+    }
+    send(response, generations++ ? textFrames : [...frames, completed])
+  })
+  const enabled = {
+    ...request,
+    webSearch: true,
+    reasoning: true,
+    input: { ...request.input, tools: [{ name: 'lookup', description: 'Lookup', parameters: { type: 'object' } }] }
+  }
+  const events = await collect(ctx.llm.stream(enabled))
+  expect(events.filter((event) => event.type === EventType.TOOL_CALL_START)).toEqual([
+    { type: EventType.TOOL_CALL_START, toolCallId: 'call_1', toolCallName: 'lookup' }
+  ])
+  expect(events).toContainEqual({
+    type: EventType.CUSTOM,
+    name: 'keundal.source',
+    value: { id: 'https://example.com', url: 'https://example.com', title: 'Example' }
+  })
+  const assembly = new MessageAssembly()
+  for (const event of events) assembly.apply(event)
+  assembly.apply({
+    type: EventType.TOOL_CALL_RESULT,
+    messageId: 'result',
+    toolCallId: 'call_1',
+    role: 'tool',
+    content: 'ok'
+  })
+  await ctx.llm.countTokens({
+    ...enabled,
+    input: { ...enabled.input, messages: [...request.input.messages, ...assembly.messages] }
+  })
+  expect(requests[0]!.body.tools).toEqual([
+    { type: 'function', name: 'lookup', description: 'Lookup', parameters: { type: 'object' }, strict: false },
+    { type: 'web_search' }
+  ])
+  expect(requests[0]!.body.reasoning).toEqual({ effort: 'medium', summary: 'auto' })
+  expect(requests[1]!.body.input).toEqual([
+    { role: 'user', content: 'Hello' },
+    search,
+    cited,
+    reason,
+    { type: 'function_call', call_id: 'call_1', name: 'lookup', arguments: '{}' },
+    { type: 'function_call_output', call_id: 'call_1', output: 'ok' }
+  ])
+  expect(requests[1]!.body.tools).toEqual(requests[0]!.body.tools)
+  expect(requests[1]!.body.reasoning).toEqual(requests[0]!.body.reasoning)
+  await collect(
+    ctx.llm.stream({
+      ...enabled,
+      input: { ...enabled.input, messages: [...request.input.messages, ...assembly.messages] }
+    })
+  )
+  expect(requests[2]!.body.input).toEqual(requests[1]!.body.input)
+  await ctx.llm.countTokens({ ...request, webSearch: false, reasoning: false })
+  expect(requests[3]!.body.tools).toEqual([])
+  expect(requests[3]!.body.reasoning).toEqual({ effort: 'none' })
+})
+
+test.for(['webSearch', 'reasoning'] as const)('%s가 boolean이 아니면 공급자 호출 전에 거부한다', async (key, t) => {
+  const { ctx, requests } = await setup(t, () => {
+    throw new Error('unexpected HTTP call')
+  })
+  const invalid = { ...request, [key]: 'true' } as LLMRequest
+  await expect(ctx.llm.countTokens(invalid)).rejects.toThrow('must be a boolean')
+  await expect(collect(ctx.llm.stream(invalid))).rejects.toThrow('must be a boolean')
+  expect(requests).toHaveLength(0)
+})
+
 test('Responses 요청을 보내고 분할된 UTF-8 SSE를 실행 수명 이벤트 없이 변환한다', async (t) => {
   const { ctx, requests } = await setup(t, async (_request, response) => {
     const bytes = Buffer.from(wire(textFrames))
@@ -711,6 +816,46 @@ test.for([
   await expect(collect(ctx.llm.stream(request))).rejects.toThrow(error)
 })
 
+test.for([404, 500, 'network'] as const)(
+  '토큰 계산 API가 %s로 실패하면 로컬 추정으로 전환하고 응답을 생성한다',
+  async (status, t) => {
+    const { ctx, requests } = await setup(t, (incoming, response) => {
+      if (incoming.path === '/v1/responses/input_tokens') {
+        if (status === 'network') {
+          response.destroy()
+          return
+        }
+        response.writeHead(status, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ error: { message: 'Token counting unavailable' } }))
+      } else send(response, textFrames)
+    })
+    const candidate: LLMRequest = {
+      ...request,
+      input: {
+        ...request.input,
+        state: { privateState: 'not model input' },
+        messages: [{ id: 'user-1', role: 'user', content: '한글😊' }],
+        tools: [{ name: 'clock', description: 'Read time', parameters: { type: 'object' } }]
+      }
+    }
+    const expected = Buffer.byteLength(
+      '{"model":"test-model","input":[{"role":"user","content":"한글😊"}],"tools":[{"type":"function","name":"clock","description":"Read time","parameters":{"type":"object"},"strict":false}]}',
+      'utf8'
+    )
+    expect(await ctx.llm.countTokens(candidate)).toBe(expected)
+    expect(await ctx.llm.countTokens(request)).toBeLessThan(expected)
+    await expect(ctx.llm.countTokens({ ...request, maxOutputTokens: 65 })).rejects.toThrow(/output budget/)
+    const events = await collect(ctx.llm.stream(candidate))
+    expect(
+      events
+        .filter((event) => event.type === EventType.TEXT_MESSAGE_CONTENT)
+        .map((event) => event.delta)
+        .join('')
+    ).toBe('안녕하세요')
+    expect(requests.map((item) => item.path)).toEqual(['/v1/responses/input_tokens', '/v1/responses'])
+  }
+)
+
 test('공급자가 반환한 토큰 수가 음수이면 거부한다', async (t) => {
   const { ctx } = await setup(t, (_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' })
@@ -787,19 +932,30 @@ test.for(['signal', 'return', 'dispose'] as const)('%s 요청으로 대기 중�
   }
 })
 
-test('플러그인을 해제하면 응답 헤더를 기다리는 토큰 계산 요청을 취소한다', async (t) => {
-  const started = Promise.withResolvers<void>()
-  const closed = Promise.withResolvers<void>()
-  const { ctx, fiber } = await setup(t, (_request, response) => {
-    response.on('close', () => closed.resolve())
-    started.resolve()
-  })
-  const external = new globalThis.AbortController()
-  const pending = ctx.llm.countTokens(request, { signal: external.signal })
-  const rejected = expect(pending).rejects.toThrow(/disposed/)
-  await started.promise
-  await fiber.dispose()
-  await rejected
-  await closed.promise
-  expect(getEventListeners(external.signal, 'abort')).toHaveLength(0)
-})
+test.for(['signal', 'dispose'] as const)(
+  '%s로 토큰 계산을 취소하면 호환 모드로 전환하지 않고 중단한다',
+  async (mode, t) => {
+    const started = Promise.withResolvers<void>()
+    const closed = Promise.withResolvers<void>()
+    let calls = 0
+    const { ctx, fiber } = await setup(t, (_request, response) => {
+      if (calls++) {
+        response.writeHead(200, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ input_tokens: 9 }))
+        return
+      }
+      response.on('close', () => closed.resolve())
+      started.resolve()
+    })
+    const external = new globalThis.AbortController()
+    const pending = ctx.llm.countTokens(request, { signal: external.signal })
+    const rejected = expect(pending).rejects.toThrow(/cancelled|disposed/)
+    await started.promise
+    if (mode === 'dispose') await fiber.dispose()
+    else external.abort(new Error('cancelled by caller'))
+    await rejected
+    await closed.promise
+    expect(getEventListeners(external.signal, 'abort')).toHaveLength(0)
+    if (mode === 'signal') expect(await ctx.llm.countTokens(request)).toBe(9)
+  }
+)

@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai'
+import { GoogleGenAI, ThinkingLevel } from '@google/genai'
 import { LLMService, type ExecutionOptions, type LLMEvent, type LLMModel, type LLMRequest } from '@keundal/core'
 import type { Context } from 'cordis'
 
@@ -20,7 +20,7 @@ export class GeminiLLMService extends LLMService {
     this.models = parsed.models
     this.client = new GoogleGenAI({
       ...(parsed.apiKey ? { apiKey: parsed.apiKey } : {}),
-      ...(parsed.baseURL ? { httpOptions: { baseUrl: parsed.baseURL } } : {})
+      httpOptions: { baseUrl: parsed.baseURL, headers: parsed.headers }
     })
     ctx.fiber.effect(() => () => {
       this.closed = true
@@ -97,7 +97,20 @@ export class GeminiLLMService extends LLMService {
           ...(systemInstruction ? { systemInstruction } : {}),
           ...(tools ? { tools } : {}),
           maxOutputTokens: request.maxOutputTokens,
-          thinkingConfig: { includeThoughts: true },
+          thinkingConfig: {
+            includeThoughts: request.reasoning ?? true,
+            ...(request.reasoning === undefined
+              ? {}
+              : request.model.startsWith('gemini-3')
+                ? {
+                    thinkingLevel: request.reasoning
+                      ? ThinkingLevel.HIGH
+                      : request.model.includes('flash')
+                        ? ThinkingLevel.MINIMAL
+                        : ThinkingLevel.LOW
+                  }
+                : { thinkingBudget: request.reasoning ? Math.min(24576, Math.floor(request.maxOutputTokens / 2)) : 0 })
+          },
           abortSignal: signal
         }
       })

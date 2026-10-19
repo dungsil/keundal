@@ -92,6 +92,7 @@ async function setup(testContext: TestContext, overrides: Overrides = {}) {
     get = unexpected
     list = unexpected
     commit = unexpected
+    delete = unexpected
   }
   class Generation extends GenerationService {
     constructor(ctx: Context) {

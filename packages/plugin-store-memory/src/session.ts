@@ -61,6 +61,22 @@ export class MemorySessionService extends SessionService {
     }
   }
 
+  async delete(threadId: string, expectedRevision: number, options?: ExecutionOptions): Promise<void> {
+    this.assertOpen()
+    options?.signal?.throwIfAborted()
+    if (typeof threadId !== 'string' || !threadId.trim()) throw new Error('delete requires a non-empty threadId')
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)
+      throw new Error('delete requires a non-negative expectedRevision')
+    const revision = this.store.threads.get(threadId)?.revision ?? 0
+    if (revision !== expectedRevision)
+      throw new Error(`session revision conflict for ${threadId}: expected ${expectedRevision}, stored ${revision}`)
+    const runs = [...this.store.runs.values()].filter((run) => run.threadId === threadId)
+    if (runs.some((run) => run.status === 'running'))
+      throw new Error(`cannot delete session with running generation: ${threadId}`)
+    this.store.threads.delete(threadId)
+    for (const run of runs) this.store.runs.delete(run.runId)
+  }
+
   async commit(change: SessionCommit, options?: ExecutionOptions): Promise<SessionSnapshot> {
     this.assertOpen()
     options?.signal?.throwIfAborted()
@@ -94,7 +110,7 @@ export class MemorySessionService extends SessionService {
 
     const next: StoredThread = {
       revision: current.revision + 1,
-      messages: mergeMessages(current.messages, change.messages),
+      messages: change.mode === 'replace' ? [...change.messages] : mergeMessages(current.messages, change.messages),
       state: change.state ?? current.state
     }
     this.store.threads.set(change.threadId, next)

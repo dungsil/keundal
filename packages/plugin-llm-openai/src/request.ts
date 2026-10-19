@@ -37,8 +37,20 @@ function convertMessage(message: AgentMessage): ResponseInput {
       ]
     case 'assistant': {
       const items: ResponseInput = []
+      const native = message.metadata?.['openai.outputItems']
+      if (native !== undefined) {
+        if (
+          !Array.isArray(native) ||
+          native.some(
+            (item) => !item || typeof item !== 'object' || !['web_search_call', 'message'].includes(item.type)
+          )
+        ) {
+          throw new Error('invalid openai.outputItems metadata')
+        }
+        items.push(...(native as ResponseInput))
+      }
       // 도구 전용 호스트가 빈 텍스트를 가질 수 있으므로 내용이 없으면 message 항목을 만들지 않습니다.
-      if (message.content) {
+      if (message.content && native === undefined) {
         const phase: unknown = message.metadata?.['openai.phase']
         if (phase === 'commentary' || phase === 'final_answer') {
           items.push({
@@ -88,7 +100,12 @@ function convertMessage(message: AgentMessage): ResponseInput {
   }
 }
 
-export function createInput(request: LLMRequest): Pick<ResponseCreateParamsBase, 'model' | 'input' | 'tools'> {
+export function createInput(
+  request: LLMRequest
+): Pick<ResponseCreateParamsBase, 'model' | 'input' | 'tools' | 'reasoning'> {
+  for (const key of ['webSearch', 'reasoning'] as const) {
+    if (request[key] !== undefined && typeof request[key] !== 'boolean') throw new Error(`${key} must be a boolean`)
+  }
   const parsed = parseRunAgentInput(request.input)
   const input: ResponseInput = []
   if (parsed.context.length) {
@@ -112,12 +129,31 @@ export function createInput(request: LLMRequest): Pick<ResponseCreateParamsBase,
   return {
     model: request.model,
     input,
-    tools: parsed.tools.map((tool) => ({
-      type: 'function',
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters,
-      strict: false
-    }))
+    ...(request.reasoning === undefined
+      ? {}
+      : {
+          reasoning: {
+            // Original GPT-5 models cannot disable reasoning, and native search
+            // does not accept their minimal effort. Later GPT-5 models support none.
+            effort: request.reasoning
+              ? 'medium'
+              : /^gpt-5(?:-(?:mini|nano))?(?:-\d{4}-\d{2}-\d{2})?$/.test(request.model)
+                ? request.webSearch
+                  ? 'low'
+                  : 'minimal'
+                : 'none',
+            ...(request.reasoning ? { summary: 'auto' as const } : {})
+          }
+        }),
+    tools: [
+      ...parsed.tools.map((tool) => ({
+        type: 'function' as const,
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+        strict: false
+      })),
+      ...(request.webSearch ? [{ type: 'web_search' as const }] : [])
+    ]
   }
 }
