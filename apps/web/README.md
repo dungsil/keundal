@@ -85,6 +85,8 @@ pnpm --filter @keundal/web deploy:cloudflare
 
 `.github/workflows/ci.yml`의 `deploy` job은 빌드·타입 검사·테스트·린트·CodeQL이 모두 성공한 뒤 Cloudflare 공식 `cloudflare/wrangler-action`으로 배포합니다. `main` 푸시와 `main`에서의 수동 CI 실행은 운영 Worker `keundal-web`을 배포합니다. `main` 대상 PR은 `versions upload --preview-alias pr-<PR 번호>`로 버전만 업로드하므로 운영 트래픽을 변경하지 않습니다. 같은 PR의 후속 커밋은 같은 프리뷰 별칭을 갱신하며, 별도의 Git 브랜치를 만들지는 않습니다.
 
+PR 프리뷰 배포가 성공하면 `marocchino/sticky-pull-request-comment` Action이 해당 버전의 프리뷰 URL과 CI 실행 링크를 댓글로 남깁니다. 재배포 시 `cloudflare-preview` 댓글 하나를 갱신하며, 운영 배포나 배포 실패 시에는 댓글을 작성하지 않습니다. 댓글 쓰기 권한은 배포 job에만 부여합니다.
+
 저장소의 **Settings → Secrets and variables → Actions**에 다음 secrets를 등록합니다.
 
 | Secret | 값 |
