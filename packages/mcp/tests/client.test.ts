@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { realpath } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -111,7 +112,7 @@ test('stdio로 도구를 실행하고 명시한 환경만 전달하며 종료 �
   })
   const result = await execute(tools, 'mcp__stdio__tool__environment')
   expect(result.structuredContent).toMatchObject({
-    cwd: fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, ''),
+    cwd: await realpath(fileURLToPath(new URL('..', import.meta.url))),
     configured: 'explicit',
     inheritedSecret: false
   })

@@ -51,5 +51,5 @@ Windows에서는 `taskkill /T /F`로 트리 종료를 요청합니다.
 출력 파이프는 유예 시간 뒤에 닫지만 OS가 직접 자식의 종료를 보고할 때까지 기다립니다.
 
 다른 실행 파일은 POSIX의 `-c` 또는 Windows의 `/d /s /c` 인자를 지원해야 합니다.
-Tauri나 원격 서버에서는 코어의 `ShellService`를 별도 공급자로 구현하고 이 Node.js 패키지를 교체하십시오.
-코어 계약에는 Node.js 의존성이 없습니다.
+`ShellService`, `ShellRequest`, `ShellResult`와 `ctx.shell`의 타입 확장은 이 패키지에서 제공합니다.
+두 번째 공급자를 추가할 때는 계약을 별도 패키지로 분리하고 Tauri나 원격 서버 구현과 공유하십시오.

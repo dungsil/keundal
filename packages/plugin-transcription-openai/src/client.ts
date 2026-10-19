@@ -1,4 +1,6 @@
-import type { TranscriptionSession } from '@keundal/core'
+import type { TranscriptionSession } from './service.js'
+
+export type { TranscriptionSession } from './service.js'
 
 /** Mono linear resampling; PCM is encoded explicitly little-endian, independent of host byte order. */
 export function resampleAudio(input: Float32Array, from: number, to = 24000): Float32Array {

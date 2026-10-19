@@ -6,8 +6,12 @@ import process from 'node:process'
 import { clearTimeout, setTimeout } from 'node:timers'
 import { TextDecoder } from 'node:util'
 
-import { ShellService, type ExecutionOptions, type ShellRequest, type ShellResult } from '@keundal/core'
+import type { ExecutionOptions } from '@keundal/core'
 import type { Context } from 'cordis'
+
+import { ShellService, type ShellRequest, type ShellResult } from './service.js'
+
+export * from './service.js'
 
 export interface LocalShellConfig {
   readonly cwd: string

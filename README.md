@@ -19,13 +19,19 @@ Keundal("큰달"으로 읽음)은 개인용 오픈소스 에이전트 도구입�
 | `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.             |
 | `@keundal/plugin-store-sqlite`         | SQLite 파일로 `session`과 `generation`을 구현합니다.                      |
 | `@keundal/compaction`                  | 이전 대화를 요약하고 최근 대화를 보존하는 축약 함수를 제공합니다.         |
+| `@keundal/fs`                          | 파일 공급자와 정책이 공유하는 `ctx.fs` 계약을 제공합니다.                 |
 
 각 패키지의 설정과 사용법은 패키지 안의 README.md를 참고하고, 저장소 규칙은 [AGENTS.md](./AGENTS.md)에 정리되어 있습니다.
 
 ## 파일과 Shell 도구
 
-`@keundal/core`의 `FileSystemService`와 `ShellService`는 `ctx.fs`와 `ctx.shell`의 공통 계약입니다.
+`@keundal/fs`의 `FileSystemService`는 `ctx.fs`의 공통 계약입니다.
+`ShellService`와 `ctx.shell`의 타입 확장은 `@keundal/plugin-shell-local`에서 제공합니다.
 실행 공급자와 모델에 노출할 도구는 별도 플러그인으로 연결합니다.
+
+구현이 하나뿐인 기능은 계약과 구현을 같은 패키지에 둡니다. 두 번째 구현이 생기면 계약 패키지를 분리합니다.
+fs는 로컬 공급자와 정책 구현이 계약을 공유하므로 처음부터 별도 계약 패키지를 사용합니다.
+`TranscriptionService`와 `ctx.transcription`의 타입 확장은 `@keundal/plugin-transcription-openai`에서 제공합니다.
 
 - [plugin-fs-local](packages/plugin-fs-local/README.md)은 Node.js 파일 접근을 구현합니다.
 - [plugin-fs-policy](packages/plugin-fs-policy/README.md)는 경로·수정 권한과 대화별 읽기 기록을 검사합니다.

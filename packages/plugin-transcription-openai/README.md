@@ -2,6 +2,9 @@
 
 OpenAI SDK의 `realtime.clientSecrets.create()`로 브라우저용 단기 자격 증명을 발급하는 Cordis 플러그인입니다. Vercel Gateway를 사용하지 않습니다.
 
+`TranscriptionService`, `TranscriptionRequest`, `TranscriptionSession`과 `ctx.transcription`의 타입 확장은 이 패키지에서 제공합니다.
+브라우저에서 사용하는 `TranscriptionSession` 타입은 `@keundal/plugin-transcription-openai/client`에서도 가져올 수 있습니다.
+
 ```ts
 import openaiTranscriptionPlugin from '@keundal/plugin-transcription-openai'
 import { Context } from 'cordis'

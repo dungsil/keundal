@@ -1,3 +1,4 @@
+import type { FileSystemOptions } from '@keundal/fs'
 import type { ExecutableTool } from '@keundal/plugin-agent-simple'
 import { Service, type Context } from 'cordis'
 
@@ -55,7 +56,7 @@ export class FileSystemToolsService extends Service {
       name: string
       description: string
       keys: string[]
-      run: (args: Record<string, string>, options: { signal: AbortSignal; scope: string }) => Promise<unknown>
+      run: (args: Record<string, string>, options: FileSystemOptions) => Promise<unknown>
     }[]
     this.tools = Object.freeze(
       definitions.map(({ name, description, keys, run }): ExecutableTool =>

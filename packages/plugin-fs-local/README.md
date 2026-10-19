@@ -1,6 +1,6 @@
 # @keundal/plugin-fs-local
 
-Node.js 파일 API로 `ctx.fs`를 구현합니다. 서비스 계약은 `@keundal/core`의 `FileSystemService`에 있습니다.
+Node.js 파일 API로 `ctx.fs`를 구현합니다. 서비스 계약은 `@keundal/fs`의 `FileSystemService`에 있습니다.
 
 ```ts
 import localFileSystemPlugin from '@keundal/plugin-fs-local'

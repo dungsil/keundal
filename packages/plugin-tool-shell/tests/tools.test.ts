@@ -1,4 +1,5 @@
-import { ShellService, type ExecutionOptions, type ShellRequest } from '@keundal/core'
+import type { ExecutionOptions } from '@keundal/core'
+import { ShellService, type ShellRequest } from '@keundal/plugin-shell-local'
 import shellToolsPlugin, { ShellToolsService } from '@keundal/plugin-tool-shell'
 import { Context } from 'cordis'
 import { expect, test } from 'vitest'

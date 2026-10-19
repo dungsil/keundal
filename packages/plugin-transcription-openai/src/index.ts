@@ -1,11 +1,10 @@
-import {
-  TranscriptionService,
-  type TranscriptionRequest,
-  type TranscriptionSession,
-  type ExecutionOptions
-} from '@keundal/core'
+import type { ExecutionOptions } from '@keundal/core'
 import type { Context } from 'cordis'
 import OpenAI from 'openai'
+
+import { TranscriptionService, type TranscriptionRequest, type TranscriptionSession } from './service.js'
+
+export * from './service.js'
 
 export interface OpenAITranscriptionConfig {
   apiKey: string

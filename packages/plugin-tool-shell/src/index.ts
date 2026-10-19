@@ -1,5 +1,5 @@
-import type { ShellRequest } from '@keundal/core'
 import type { ExecutableTool } from '@keundal/plugin-agent-simple'
+import type { ShellRequest } from '@keundal/plugin-shell-local'
 import { Service, type Context } from 'cordis'
 
 declare module 'cordis' {
