@@ -85,6 +85,18 @@ jobs:
       - name: 빌드
         run: pnpm build
 
+      - name: Workers 빌드
+        run: pnpm --filter @keundal/web build:cloudflare
+
+      - name: Workers 빌드 아티팩트 업로드
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cloudflare-workers
+          path: apps/web/.output
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
   typecheck:
     needs: changes
     if: needs.changes.outputs.source == 'true'
@@ -246,14 +258,12 @@ jobs:
 
       - name: 개발 환경 준비
         uses: ./.github/actions/setup
+
+      - name: Workers 빌드 아티팩트 내려받기
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          turbo-cache: true
-
-      - name: 웹 의존 패키지 빌드
-        run: pnpm exec turbo run build --filter='@keundal/web^...'
-
-      - name: Workers 빌드
-        run: pnpm --filter @keundal/web build:cloudflare
+          name: cloudflare-workers
+          path: apps/web/.output
 
       - name: Workers 배포
         id: deploy
