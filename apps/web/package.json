@@ -33,7 +33,6 @@
     "date-fns": "^4.4.0",
     "motion-v": "^2.6.0",
     "nuxt": "^4.6.1",
-    "nuxt-auth-utils": "^0.5.31",
     "nuxt-charts": "^2.2.3",
     "shiki": "^4.5.0",
     "striptags": "3.2.0",

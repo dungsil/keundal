@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
 import { once } from 'node:events'
 import { createServer } from 'node:net'
 import { expect, onTestFinished, test } from 'vitest'
@@ -15,8 +14,7 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     env: {
       ...process.env,
       NITRO_HOST: '127.0.0.1',
-      NITRO_PORT: String(address.port),
-      NUXT_SESSION_PASSWORD: randomBytes(32).toString('hex')
+      NITRO_PORT: String(address.port)
     },
     stdio: ['ignore', 'pipe', 'pipe']
   })
@@ -45,5 +43,10 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(response.status, html).toBe(200)
     expect(response.headers.get('content-type')).toContain('text/html')
     expect(html).toContain('id="__nuxt"')
+  }
+  for (const path of ['/auth/github', '/api/_auth/session']) {
+    const response = await fetch(new URL(path, origin), { redirect: 'manual' })
+    expect(response.status).toBe(404)
+    expect(response.headers.get('set-cookie')).toBeNull()
   }
 }, 15_000)

@@ -5,17 +5,13 @@ const input = ref('')
 const loading = ref(false)
 const chatId = crypto.randomUUID()
 
-const { user } = useUserSession()
-
 const greeting = computed(() => {
   const hour = new Date().getHours()
   let timeGreeting = 'Good evening'
   if (hour < 12) timeGreeting = 'Good morning'
   else if (hour < 18) timeGreeting = 'Good afternoon'
 
-  const name = user.value?.name?.split(' ')[0] || user.value?.username
-
-  return name ? `${timeGreeting}, ${name}` : `${timeGreeting}`
+  return timeGreeting
 })
 
 const {
