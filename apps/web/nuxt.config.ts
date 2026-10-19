@@ -37,10 +37,6 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
-  ui: {
-    fonts: false
-  },
-
   runtimeConfig: {
     public: { desktop: false }
   },
@@ -79,5 +75,17 @@ export default defineNuxtConfig({
         braceStyle: '1tbs'
       }
     }
+  },
+
+  fonts: {
+    provider: 'npm',
+    families: [
+      {
+        name: 'Pretendard',
+        providerOptions: {
+          npm: { file: 'latin.css' }
+        }
+      }
+    ]
   }
 })
