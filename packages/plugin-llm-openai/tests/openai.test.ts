@@ -816,6 +816,46 @@ test.for([
   await expect(collect(ctx.llm.stream(request))).rejects.toThrow(error)
 })
 
+test.for([404, 500, 'network'] as const)(
+  '토큰 계산 API가 %s로 실패하면 로컬 추정으로 전환하고 응답을 생성한다',
+  async (status, t) => {
+    const { ctx, requests } = await setup(t, (incoming, response) => {
+      if (incoming.path === '/v1/responses/input_tokens') {
+        if (status === 'network') {
+          response.destroy()
+          return
+        }
+        response.writeHead(status, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ error: { message: 'Token counting unavailable' } }))
+      } else send(response, textFrames)
+    })
+    const candidate: LLMRequest = {
+      ...request,
+      input: {
+        ...request.input,
+        state: { privateState: 'not model input' },
+        messages: [{ id: 'user-1', role: 'user', content: '한글😊' }],
+        tools: [{ name: 'clock', description: 'Read time', parameters: { type: 'object' } }]
+      }
+    }
+    const expected = Buffer.byteLength(
+      '{"model":"test-model","input":[{"role":"user","content":"한글😊"}],"tools":[{"type":"function","name":"clock","description":"Read time","parameters":{"type":"object"},"strict":false}]}',
+      'utf8'
+    )
+    expect(await ctx.llm.countTokens(candidate)).toBe(expected)
+    expect(await ctx.llm.countTokens(request)).toBeLessThan(expected)
+    await expect(ctx.llm.countTokens({ ...request, maxOutputTokens: 65 })).rejects.toThrow(/output budget/)
+    const events = await collect(ctx.llm.stream(candidate))
+    expect(
+      events
+        .filter((event) => event.type === EventType.TEXT_MESSAGE_CONTENT)
+        .map((event) => event.delta)
+        .join('')
+    ).toBe('안녕하세요')
+    expect(requests.map((item) => item.path)).toEqual(['/v1/responses/input_tokens', '/v1/responses'])
+  }
+)
+
 test('공급자가 반환한 토큰 수가 음수이면 거부한다', async (t) => {
   const { ctx } = await setup(t, (_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' })
@@ -892,19 +932,30 @@ test.for(['signal', 'return', 'dispose'] as const)('%s 요청으로 대기 중�
   }
 })
 
-test('플러그인을 해제하면 응답 헤더를 기다리는 토큰 계산 요청을 취소한다', async (t) => {
-  const started = Promise.withResolvers<void>()
-  const closed = Promise.withResolvers<void>()
-  const { ctx, fiber } = await setup(t, (_request, response) => {
-    response.on('close', () => closed.resolve())
-    started.resolve()
-  })
-  const external = new globalThis.AbortController()
-  const pending = ctx.llm.countTokens(request, { signal: external.signal })
-  const rejected = expect(pending).rejects.toThrow(/disposed/)
-  await started.promise
-  await fiber.dispose()
-  await rejected
-  await closed.promise
-  expect(getEventListeners(external.signal, 'abort')).toHaveLength(0)
-})
+test.for(['signal', 'dispose'] as const)(
+  '%s로 토큰 계산을 취소하면 호환 모드로 전환하지 않고 중단한다',
+  async (mode, t) => {
+    const started = Promise.withResolvers<void>()
+    const closed = Promise.withResolvers<void>()
+    let calls = 0
+    const { ctx, fiber } = await setup(t, (_request, response) => {
+      if (calls++) {
+        response.writeHead(200, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ input_tokens: 9 }))
+        return
+      }
+      response.on('close', () => closed.resolve())
+      started.resolve()
+    })
+    const external = new globalThis.AbortController()
+    const pending = ctx.llm.countTokens(request, { signal: external.signal })
+    const rejected = expect(pending).rejects.toThrow(/cancelled|disposed/)
+    await started.promise
+    if (mode === 'dispose') await fiber.dispose()
+    else external.abort(new Error('cancelled by caller'))
+    await rejected
+    await closed.promise
+    expect(getEventListeners(external.signal, 'abort')).toHaveLength(0)
+    if (mode === 'signal') expect(await ctx.llm.countTokens(request)).toBe(9)
+  }
+)

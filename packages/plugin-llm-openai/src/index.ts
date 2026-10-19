@@ -12,6 +12,7 @@ export class OpenAILLMService extends LLMService {
   private readonly client: OpenAI
   private readonly models: Readonly<Record<string, LLMModel>>
   private readonly active = new Set<AbortController>()
+  private useLocalTokenCount = false
   private closed = false
 
   constructor(ctx: Context, config: OpenAILLMConfig) {
@@ -41,11 +42,22 @@ export class OpenAILLMService extends LLMService {
     try {
       operation.signal.throwIfAborted()
       this.validateRequest(request)
-      const result = await this.client.responses.inputTokens.count(createInput(request), { signal: operation.signal })
-      operation.signal.throwIfAborted()
-      if (!Number.isSafeInteger(result.input_tokens) || result.input_tokens < 0)
-        throw new Error('invalid OpenAI input token count')
-      return result.input_tokens
+      const input = createInput(request)
+      if (!this.useLocalTokenCount) {
+        const result = await this.client.responses.inputTokens.count(input, { signal: operation.signal }).catch(() => {
+          operation.signal.throwIfAborted()
+          // Compatible Responses servers may not implement the token-count endpoint.
+          this.useLocalTokenCount = true
+        })
+        operation.signal.throwIfAborted()
+        if (result !== undefined) {
+          if (!Number.isSafeInteger(result.input_tokens) || result.input_tokens < 0)
+            throw new Error('invalid OpenAI input token count')
+          return result.input_tokens
+        }
+      }
+      // A conservative text estimate, not an exact tokenizer or multimodal token count.
+      return new globalThis.TextEncoder().encode(JSON.stringify(input)).length
     } catch (error) {
       operation.signal.throwIfAborted()
       throw error

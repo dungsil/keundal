@@ -55,12 +55,12 @@ function send(response: ServerResponse, frames: Frame[]) {
   response.end(frames.map(frame => `${frame.type ? `event: ${frame.type}\n` : ''}data: ${JSON.stringify(frame)}\n\n`).join(''))
 }
 
-async function setup(handle: (body: Record<string, unknown>, response: ServerResponse, request: IncomingMessage) => void) {
+async function setup(handle: (body: Record<string, unknown>, response: ServerResponse, request: IncomingMessage) => void, tokenStatus = 200) {
   const server = createServer(async (request, response) => {
     const chunks: Buffer[] = []
     for await (const chunk of request) chunks.push(Buffer.from(chunk))
     if (/input_tokens|count_tokens|:countTokens/.test(request.url ?? '')) {
-      response.writeHead(200, { 'content-type': 'application/json' })
+      response.writeHead(tokenStatus, { 'content-type': 'application/json' })
       response.end(JSON.stringify({ input_tokens: 15, totalTokens: 15 }))
       return
     }
@@ -219,6 +219,35 @@ test('공급자 오류를 성공 응답으로 바꾸거나 자동 재시도하�
   expect(chunks).toContainEqual({ type: 'error', errorText: expect.stringContaining('HTTP 429') })
   expect(chunks.some(chunk => chunk.type === 'finish')).toBe(false)
   expect(calls).toBe(1)
+})
+
+test('토큰 계산이 404인 호환 API에서도 답변을 저장하고 생성 요청의 인증 오류는 숨기지 않는다', async () => {
+  let rejected = false
+  const baseURL = await setup((_body, response) => {
+    if (!rejected) return send(response, openaiText('호환 API 답변'))
+    response.writeHead(401, { 'content-type': 'application/json' })
+    response.end(JSON.stringify({ error: { message: 'Incorrect key: private-compat-key' } }))
+  }, 404)
+  const settings = defaultLLMSettings()
+  settings.openai = { apiKey: 'private-compat-key', baseURL }
+  const ctx = new Context()
+  const llm = await ctx.plugin(browserLLMPlugin, { getSettings: () => settings })
+  const store = await ctx.plugin(memoryStorePlugin)
+  const chats = new ChatStore(ctx)
+  onTestFinished(async () => {
+    await chats.stop()
+    await store.dispose()
+    await llm.dispose()
+  })
+  await chats.create('compat', user, 'openai/shared-model')
+  const chunks = await decode(await chats.respond('compat', { model: 'openai/shared-model', messages: [user] }))
+  expect(chunks).toContainEqual({ type: 'finish', finishReason: 'stop' })
+  expect((await chats.get('compat'))!.messages.at(-1)!.parts).toContainEqual({ type: 'text', text: '호환 API 답변' })
+  rejected = true
+  const failed = await decode(await chats.respond('compat', { model: 'openai/shared-model', messages: [user] }))
+  expect(failed).toContainEqual(expect.objectContaining({ type: 'error', errorText: expect.stringContaining('HTTP 401') }))
+  expect(failed.some(chunk => chunk.type === 'finish')).toBe(false)
+  expect(JSON.stringify(failed)).not.toContain('private-compat-key')
 })
 
 test('키와 API URL 변경을 재시작 없이 적용하고 삭제한 키와 공급자가 반사한 키를 실행 이력에 남기지 않는다', async () => {

@@ -12,7 +12,9 @@
 
 모델 한도는 [사용할 모델의 공식 문서](https://developers.openai.com/api/docs/models)에서 확인해 설정합니다. OpenAI의 모델 조회 API는 컨텍스트·출력 한도를 반환하지 않으므로 `getModel()`은 이 설정을 조회합니다. 등록하지 않은 모델이나 한도를 초과하는 출력 예산은 요청 전에 거부합니다.
 
-`countTokens()`는 [Responses 입력 토큰 계산 API](https://developers.openai.com/api/reference/typescript/resources/responses/subresources/input_tokens/methods/count)를 호출합니다. 메시지, 부가 문맥, 도구 정의를 생성 요청과 동일하게 변환하며, 로컬 추정값으로 대체하지 않습니다.
+`countTokens()`는 메시지, 부가 문맥, 도구 정의를 생성 요청과 동일하게 변환해 [Responses 입력 토큰 계산 API](https://developers.openai.com/api/reference/typescript/resources/responses/subresources/input_tokens/methods/count)를 먼저 호출합니다. 이 API 호출이 실패하면 호환 모드로 전환해 생성 입력 JSON의 UTF-8 바이트 수를 로컬 추정값으로 사용합니다. 같은 서비스 인스턴스에서는 이후 토큰 계산 API를 다시 호출하지 않으며, 인스턴스를 새로 만들면 다시 확인합니다. 404뿐 아니라 HTTP·전송 오류도 이 전환 대상입니다.
+
+호환 모드에서도 입력 예산 검사와 축약은 유지하지만 실제 토큰 수를 보장하지 않습니다. 텍스트에는 보수적인 추정이며 이미지·파일 ID·추론 암호문 등은 실제 토큰 비용과 크게 다를 수 있습니다. 취소·플러그인 해제, 로컬 입력·예산 검증 오류, 성공 응답의 잘못된 토큰 수는 대체하지 않고 거부합니다. 생성은 계속 Responses API를 사용하며 Chat Completions로 바꾸지 않습니다. 생성 요청 자체의 오류도 그대로 전달합니다.
 
 브라우저에서 실행하려면 `apiKey`와 `dangerouslyAllowBrowser: true`를 명시합니다. 생략하면 SDK의 브라우저 실행 차단을 유지합니다. 브라우저 키는 사용자·스크립트·확장 기능에 노출될 수 있으므로 서버 소유 비밀 키를 번들에 넣지 마세요. 사용자 자신의 키를 사용하는 앱에서만 위험을 안내하고 opt-in하며, 엔드포인트의 CORS 지원도 필요합니다.
 
@@ -56,7 +58,7 @@ try {
 }
 ```
 
-`countTokens()`와 `stream()`의 두 번째 인자에 `{ signal }`을 전달할 수 있습니다. 취소 신호, 순회 중단, 플러그인 해제는 진행 중인 요청을 취소합니다. HTTP·전송 오류는 SDK 오류를 유지하고, 공급자가 명시한 `error`·`response.failed`·`response.incomplete`는 예외로 전달합니다. 자동 재시도는 하지 않습니다.
+`countTokens()`와 `stream()`의 두 번째 인자에 `{ signal }`을 전달할 수 있습니다. 취소 신호, 순회 중단, 플러그인 해제는 진행 중인 요청을 취소합니다. 생성 요청의 HTTP·전송 오류는 SDK 오류를 유지하고, 공급자가 명시한 `error`·`response.failed`·`response.incomplete`는 예외로 전달합니다. 자동 재시도는 하지 않습니다.
 
 오류 없이 EOF에 도달하면 `response.completed`가 없어도 정상 종료합니다. 아직 열린 텍스트·추론 메시지는 종료 이벤트를 보완하고 받은 내용을 유지합니다. 완료되지 않은 도구 호출은 예외로 전달하며, 수신하지 않은 내용이나 미확정 암호화 값을 보충하지 않습니다. `generation`과 함께 사용하면 받은 내용을 커밋한 뒤 `RUN_FINISHED`를 전달합니다. 실행이 다른 프로세스나 탭에 회수되어 종료가 확정된 경우에는 커밋 없이 `RUN_FINISHED` 없이 끝날 수 있습니다.
 
