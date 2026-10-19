@@ -11,7 +11,6 @@ export default defineNuxtConfig({
     '@nuxt/eslint',
     '@nuxt/ui',
     '@comark/nuxt',
-    'nuxt-auth-utils',
     'nuxt-charts'
   ],
 
@@ -20,7 +19,6 @@ export default defineNuxtConfig({
       ssr: false,
       buildDir: '.nuxt-desktop',
       devtools: { enabled: false },
-      auth: { loadStrategy: 'none' },
       runtimeConfig: { public: { desktop: true } },
       devServer: { host: '127.0.0.1', port: 1420 },
       vite: { server: { strictPort: true } },

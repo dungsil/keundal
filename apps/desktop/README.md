@@ -48,7 +48,7 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 ## 동작과 데이터
 
 - 채팅, 모델 선택, LLM settings와 IndexedDB 저장소는 [웹 앱](../web/README.md)의 구현을 공유합니다. API 키는 앱 안의 **LLM settings**에서 입력합니다.
-- 데스크톱은 SSR과 자동 로그인 세션 조회를 끕니다. OAuth와 서버 API는 포함하지 않으며 `NUXT_SESSION_PASSWORD`도 필요하지 않습니다.
+- 데스크톱은 SSR을 끄고 정적 SPA로 실행합니다. 서버 API는 포함하지 않습니다.
 - 대화·첨부 파일은 WebView의 IndexedDB에 저장하며 SQLite로 대체하지 않습니다. 웹 브라우저 및 개발 모드와 배포 앱은 origin이 달라 대화를 자동 공유하거나 이전하지 않습니다.
 - API 키·URL·헤더를 포함한 LLM 설정은 `keyring`으로 macOS Keychain·Windows Credential Manager·Linux Secret Service에 저장합니다. **Save in OS secret store**로 저장하며 마지막 공급자 설정까지 지우면 보안 저장소 항목도 삭제합니다. 보안 저장소의 서비스명은 `com.keundal.desktop`, 계정명은 `llm-settings`입니다. 개발·배포 앱은 같은 OS 사용자 보안 저장소 항목을 사용합니다.
 - 기존 데스크톱 origin의 `keundal:llm-settings` 평문 설정은 첫 실행에서 검증 후 보안 저장소로 이전하고, 저장 성공 후에만 localStorage에서 제거합니다. 보안 저장소에 이미 설정이 있으면 이를 우선하고 남은 평문 복사본을 제거합니다. 웹 브라우저의 설정은 가져오거나 변경하지 않습니다.

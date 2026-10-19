@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
-const { loggedIn } = useUserSession()
 const { renameChat, deleteChat } = useChatActions()
 
 const sidebarOpen = ref(false)
 const searchOpen = ref(false)
 const { $chatStore } = useNuxtApp()
 
-const { data: chats, refresh: refreshChats } = await useAsyncData('chats', () => $chatStore.list(), {
+const { data: chats } = await useAsyncData('chats', () => $chatStore.list(), {
   server: false,
   transform: data => data.map(chat => ({
     id: chat.id,
@@ -17,12 +16,6 @@ const { data: chats, refresh: refreshChats } = await useAsyncData('chats', () =>
     icon: 'i-lucide-message-circle',
     createdAt: chat.createdAt
   }))
-})
-
-watch(loggedIn, () => {
-  refreshChats()
-
-  sidebarOpen.value = false
 })
 
 const { groups } = useChats(chats)
@@ -154,7 +147,6 @@ defineShortcuts({
         <ClientOnly>
           <LLMSettings :collapsed="collapsed" />
         </ClientOnly>
-        <UserMenu v-if="loggedIn" :collapsed="collapsed" />
       </template>
     </UDashboardSidebar>
 

@@ -9,11 +9,10 @@
 ```sh
 pnpm install
 pnpm build
-cp apps/web/.env.example apps/web/.env
 pnpm --filter @keundal/web dev
 ```
 
-`NUXT_SESSION_PASSWORD`는 32자 이상이어야 합니다. 사이드바 **LLM settings**에서 공급자를 선택하고 API 키를 입력한 뒤 **Save in this browser**로 저장합니다. 채팅 입력창에서 사용할 모델을 선택합니다. 선택한 모델의 키만 있으면 제목과 답변을 모두 생성할 수 있습니다. `apps/server`를 별도로 실행하거나 데이터베이스를 마이그레이션할 필요는 없습니다.
+사이드바 **LLM settings**에서 공급자를 선택하고 API 키를 입력한 뒤 **Save in this browser**로 저장합니다. 채팅 입력창에서 사용할 모델을 선택합니다. 선택한 모델의 키만 있으면 제목과 답변을 모두 생성할 수 있습니다. `apps/server`를 별도로 실행하거나 데이터베이스를 마이그레이션할 필요는 없습니다.
 
 | 모델 목록 API | 설정의 공급자 |
 | --- | --- |
@@ -62,18 +61,6 @@ HTTP 400 오류는 공급자 JSON의 `error.message`·문자열 `error`·`messag
 - 받아쓰기는 브라우저의 OpenAI 설정과 `@keundal/plugin-transcription-openai`로 단기 자격 증명을 직접 발급하고 PCM16 24kHz를 스트리밍합니다. 로그인은 필요하지 않으며 모델은 `gpt-4o-mini-transcribe`입니다. 사용자 지정 OpenAI 주소는 Realtime REST·WebSocket도 지원해야 합니다.
 - 로컬 공급자 fixture로 프로토콜과 취소·도구 후속 요청을 검증합니다. 실제 유료 API의 모델 접근 권한·검색 결과·음성 인식 품질은 별도 확인이 필요합니다.
 
-## GitHub 로그인 (선택)
-
-사이드바의 로그인 진입 버튼은 표시하지 않습니다. 기존 로그인 세션과 선택적인 OAuth 경로는 유지하며, 로그인해도 로컬 대화를 서버로 올리거나 동기화하지 않습니다. OAuth 경로를 사용하려면 GitHub OAuth 앱과 아래 비밀 값을 설정합니다.
-
-```dotenv
-NUXT_OAUTH_GITHUB_CLIENT_ID=
-NUXT_OAUTH_GITHUB_CLIENT_SECRET=
-NUXT_SESSION_PASSWORD=
-```
-
-OAuth callback URL은 앱 도메인의 `/auth/github`입니다.
-
 ## Cloudflare Workers
 
 DB·Blob 바인딩 없이 module Worker `keundal-web`으로 배포합니다. API 토큰은 셸/CI의 비밀 환경 변수 `CLOUDFLARE_API_TOKEN`으로 전달하고 필요하면 `CLOUDFLARE_ACCOUNT_ID`로 계정을 선택합니다. 비밀 값은 커밋하지 않습니다. 기존 Worker를 덮어쓰기 전에 계정·이름을 확인합니다.
@@ -104,17 +91,13 @@ Dependabot PR도 프리뷰를 배포합니다. Dependabot이 실행한 워크플
 
 배포 실패가 머지를 차단하려면 `main` Ruleset의 필수 상태 검사에 **PR 프리뷰 배포**를 추가해야 합니다. 워크플로에 job을 추가하는 것만으로는 머지가 차단되지 않습니다. 기존 빌드·타입 검사·테스트·린트 필수 검사와 CodeQL 규칙도 유지합니다.
 
-프리뷰 URL은 PR 댓글과 배포 단계 로그에서 확인합니다. 프리뷰는 공개 URL이며 브라우저의 대화·키 저장소는 origin이 다른 운영·각 PR 사이에서 분리됩니다. 새 프리뷰는 운영 secrets·변수·데이터 바인딩을 상속하지 않습니다. OAuth가 필요한 프리뷰에는 `wrangler preview base-config secret put` 또는 `wrangler preview secret put --name pr-<번호>`로 별도 secrets를 설정해야 합니다.
+프리뷰 URL은 PR 댓글과 배포 단계 로그에서 확인합니다. 프리뷰는 공개 URL이며 브라우저의 대화·키 저장소는 origin이 다른 운영·각 PR 사이에서 분리됩니다. 새 프리뷰는 운영 secrets·변수·데이터 바인딩을 상속하지 않습니다.
 
 기존 `versions upload --preview-alias`로 만든 URL은 개별 삭제할 수 없습니다. `preview_urls: false` 설정이 다음 `main` 운영 배포에 반영되면 구형 버전 URL·별칭을 모두 비활성화합니다. 새 `preview` 방식의 URL은 이 설정과 독립적이며 PR 종료 시 개별 삭제합니다. 운영 Worker 자체와 정상 운영 URL은 삭제하지 않습니다.
 
 배포 자격 증명을 보호하기 위해 포크 PR은 자동 배포하지 않습니다. `pull_request_target`으로 PR 코드를 실행하지 않으며, 같은 저장소의 PR 코드는 배포 권한을 가진 신뢰된 코드로 취급합니다. CI 검사가 실패하거나 문서 전용 PR처럼 검사가 생략되면 배포하지 않습니다. GitHub는 생략된 job을 필수 검사 실패로 취급하지 않으므로 포크·문서 전용 PR에 프리뷰 성공을 강제하지는 않습니다.
 
-OAuth를 사용할 경우 런타임 세션 비밀 값(32자 이상)을 비공개 프롬프트에서 등록합니다. LLM 공급자 키는 Worker에 등록하지 않고 각 사용자가 웹 설정에서 입력합니다.
-
-```sh
-pnpm --filter @keundal/web exec wrangler secret put NUXT_SESSION_PASSWORD --config .output/server/wrangler.json
-```
+LLM 공급자 키는 Worker에 등록하지 않고 각 사용자가 웹 설정에서 입력합니다.
 
 공개 앱도 사용자 자신의 키로 직접 요청합니다. 공급자의 비용·권한·브라우저 접근 정책은 해당 키 소유자가 관리해야 합니다.
 
