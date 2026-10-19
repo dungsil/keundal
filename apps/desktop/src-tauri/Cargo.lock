@@ -1353,6 +1353,7 @@ dependencies = [
 [[package]]
 name = "glib"
 version = "0.18.5"
+source = "git+https://github.com/dungsil/gtk-rs-core.git?rev=67a8aae85053f2649ff825847f6f5158dd89164a#67a8aae85053f2649ff825847f6f5158dd89164a"
 dependencies = [
  "bitflags 2.13.2",
  "futures-channel",
@@ -1967,6 +1968,7 @@ name = "keundal-desktop"
 version = "0.1.0"
 dependencies = [
  "dirs",
+ "glib",
  "keyring",
  "serde",
  "tauri",

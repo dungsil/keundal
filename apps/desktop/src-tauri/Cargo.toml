@@ -19,5 +19,8 @@ keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "sy
 serde = { version = "1", features = ["derive"] }
 tauri = { version = "2", features = [] }
 
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+glib = "=0.18.5"
+
 [patch.crates-io]
-glib = { path = "vendor/glib-0.18.5" }
+glib = { git = "https://github.com/dungsil/gtk-rs-core.git", rev = "67a8aae85053f2649ff825847f6f5158dd89164a" }

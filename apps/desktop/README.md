@@ -100,3 +100,15 @@ rustc --edition=2021 --test apps/desktop/src-tauri/src/skill_files.rs -o /tmp/ke
 ```
 
 아이콘은 `apps/web/public/favicon.ico`에서 Tauri CLI의 `icon` 명령으로 생성했습니다.
+
+## GLib 보안 수정
+
+Tauri의 GTK 3 의존성은 `glib 0.18`을 요구하므로 `glib 0.20`으로 바로 올릴 수 없습니다.
+Cargo의 `[patch.crates-io]`에서 [포크의 수정 커밋](https://github.com/dungsil/gtk-rs-core/commit/67a8aae85053f2649ff825847f6f5158dd89164a)을 `rev`로 고정합니다.
+이 커밋은 [공식 수정](https://github.com/gtk-rs/gtk-rs-core/pull/1343)을 `glib 0.18.5`에 적용하여
+[RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429.html)를 수정합니다.
+GLib 보조 패키지는 기존 crates.io 버전을 유지합니다.
+
+Linux CI는 데스크톱 빌드 후 문자열 반복자를 `--release`로 검증합니다.
+빈 문자열과 유니코드의 양방향 순회, 인덱스 접근, 빈 배열의 종료 동작을 확인합니다.
+상위 GTK 의존성이 수정된 GLib 버전을 지원하면 패치 설정을 제거하고 테스트 의존성도 같은 버전으로 갱신합니다.

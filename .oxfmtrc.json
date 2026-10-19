@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["apps/web/**", "apps/desktop/src-tauri/vendor/glib-0.18.5/**"],
+  "ignorePatterns": ["apps/web/**"],
   "semi": false,
   "singleQuote": true,
   "jsxSingleQuote": true,

@@ -139,6 +139,13 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && '-' || '' }}
         run: pnpm build:preview
 
+      - name: GLib 보안 수정 검증
+        if: runner.os == 'Linux'
+        run: >-
+          cargo test --release --locked
+          --manifest-path apps/desktop/src-tauri/Cargo.toml
+          --test glib_variant_iter
+
       - name: Workers 빌드 아티팩트 업로드
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
