@@ -45,6 +45,19 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 
 루트 Turbo 빌드는 정적 UI까지만 빌드하므로 기존 웹 CI에 Rust나 OS 라이브러리를 요구하지 않습니다. `@keundal/web` 워크스페이스 의존성으로 공유 패키지 빌드 순서를 보장합니다.
 
+### PR 프리뷰
+
+같은 저장소에서 `main`을 대상으로 연 PR에 소스 변경이 있으면 CI가 설치 파일을 빌드합니다. 기존 웹 프리뷰 댓글에 다음 다운로드 링크를 함께 표시합니다.
+
+- macOS Apple Silicon: DMG
+- macOS Intel: DMG
+- Windows x64: NSIS 설치 파일
+- Linux x64: DEB와 AppImage
+
+다운로드에는 GitHub 로그인이 필요하며, 설치 파일은 업로드 후 7일간 보관합니다. 코드 서명 인증서와 공증은 사용하지 않습니다. macOS 빌드에는 임시 서명(ad-hoc)을 적용하며, OS 보안 경고가 표시될 수 있습니다.
+
+데스크톱 빌드가 실패해도 웹 프리뷰 배포는 계속합니다. 댓글에는 성공한 데스크톱 빌드의 다운로드 링크와 전체 빌드 상태를 표시합니다.
+
 ## 동작과 데이터
 
 - 채팅, 모델 선택, LLM settings와 IndexedDB 저장소는 [웹 앱](../web/README.md)의 구현을 공유합니다. API 키는 앱 안의 **LLM settings**에서 입력합니다.
