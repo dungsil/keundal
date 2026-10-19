@@ -1,8 +1,12 @@
 @import "tailwindcss" theme(static);
 @import "@nuxt/ui";
+@import "@fontsource/pretendard/400.css";
+@import "@fontsource/pretendard/500.css";
+@import "@fontsource/pretendard/600.css";
+@import "@fontsource/pretendard/700.css";
 
 @theme static {
-  --font-sans: 'Public Sans', sans-serif;
+  --font-sans: 'Pretendard', sans-serif;
 }
 
 @layer base {
