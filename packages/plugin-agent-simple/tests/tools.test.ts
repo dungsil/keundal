@@ -495,7 +495,7 @@ test('설정은 실행 함수를 보존하고 중복 도구와 잘못된 반복 
     tools: [tool(execute)]
   })
   expect(valid.issues).toBeUndefined()
-  if (!valid.issues) expect(valid.value.tools?.[0].execute).toBe(execute)
+  if (!valid.issues && typeof valid.value.tools !== 'function') expect(valid.value.tools?.[0].execute).toBe(execute)
   for (const invalid of [
     { tools: [tool(), tool()] },
     { tools: [{ ...tool(), execute: null }] },
@@ -521,6 +521,58 @@ const answerEvents = (messageId: string): LLMEvent[] => [
   { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: 'done' },
   { type: EventType.TEXT_MESSAGE_END, messageId }
 ]
+
+test('도구 공급자는 실행마다 목록을 갱신하고 같은 실행의 후속 생성에는 처음 목록을 유지한다', async (t) => {
+  let available = [
+    tool(() => {
+      available = [{ ...tool(() => 'new-result'), name: 'new-tool' }]
+      return 'old-result'
+    })
+  ]
+  const { ctx, requests } = await setup(
+    t,
+    [call(), answerEvents('first'), callEvents('new-call', 'new-tool'), answerEvents('second')],
+    {
+      tools: async () => available
+    }
+  )
+  const first = await collect(ctx.agent.run(input))
+  expect(first).toContainEqual(expect.objectContaining({ type: EventType.TOOL_CALL_RESULT, content: 'old-result' }))
+  expect(requests.slice(0, 2).map((request) => request.input.tools.map((tool) => tool.name))).toEqual([
+    ['lookup'],
+    ['lookup']
+  ])
+  const second = await collect(ctx.agent.run({ ...input, threadId: 'second-thread', runId: 'second-run' }))
+  expect(second).toContainEqual(expect.objectContaining({ type: EventType.TOOL_CALL_RESULT, content: 'new-result' }))
+  expect(requests.slice(2).map((request) => request.input.tools.map((tool) => tool.name))).toEqual([
+    ['new-tool'],
+    ['new-tool']
+  ])
+})
+
+test('도구 공급자가 중복 목록을 반환하면 생성을 시작하지 않는다', async (t) => {
+  const { ctx, requests } = await setup(t, [], { tools: async () => [tool(), tool()] })
+  await expect(collect(ctx.agent.run(input))).rejects.toThrow('duplicate tool')
+  expect(requests).toEqual([])
+})
+
+test('플러그인을 해제하면 준비 중인 도구 공급자를 취소한다', async (t) => {
+  const started = Promise.withResolvers<AbortSignal>()
+  const { ctx, agent, requests } = await setup(t, [], {
+    tools: ({ signal }) =>
+      new Promise((_, reject) => {
+        started.resolve(signal!)
+        signal!.addEventListener('abort', () => reject(signal!.reason), { once: true })
+      })
+  })
+  const pending = collect(ctx.agent.run(input))
+  const rejected = expect(pending).rejects.toThrow('disposed')
+  const signal = await started.promise
+  await agent.dispose()
+  await rejected
+  expect(signal.aborted).toBe(true)
+  expect(requests).toEqual([])
+})
 
 test('parallelTools를 켜면 실행이 겹치고 결과는 호출 순서대로 전달된다', async (t) => {
   const markers: string[] = []
