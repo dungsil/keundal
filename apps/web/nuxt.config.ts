@@ -47,6 +47,10 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-06-30',
 
   nitro: {
+    externals: {
+      // pnpm 저장소의 Zod locale 경로가 서버 번들 밖으로 남지 않게 합니다.
+      inline: ['zod']
+    },
     cloudflare: {
       nodeCompat: true,
       deployConfig: true,

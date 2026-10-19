@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import { isReasoningUIPart, isTextUIPart, isToolUIPart, getToolName } from 'ai'
-import type { UIMessage } from 'ai'
-import { isPartStreaming, isToolStreaming } from '@nuxt/ui/utils/ai'
+import type { ChatMessage } from '../../../../shared/utils/chat-message'
 
 defineProps<{
-  message: UIMessage
+  message: ChatMessage
   editing: boolean
 }>()
 
 const emit = defineEmits<{
-  save: [message: UIMessage, text: string]
+  save: [message: ChatMessage, text: string]
   cancelEdit: []
 }>()
 </script>
@@ -17,28 +15,28 @@ const emit = defineEmits<{
 <template>
   <template v-for="(part, index) in getMergedParts(message.parts)" :key="`${message.id}-${part.type}-${index}`">
     <UChatReasoning
-      v-if="isReasoningUIPart(part)"
+      v-if="part.type === 'reasoning'"
       :text="part.text"
-      :streaming="isPartStreaming(part)"
+      :streaming="part.state === 'streaming'"
       chevron="leading"
     >
       <ChatComark
         :value="part.text"
-        :streaming="isPartStreaming(part)"
+        :streaming="part.state === 'streaming'"
       />
     </UChatReasoning>
 
-    <template v-else-if="isToolUIPart(part)">
+    <template v-else-if="'toolCallId' in part">
       <ChatToolChart
-        v-if="getToolName(part) === 'chart'"
+        v-if="part.type === 'tool-chart'"
         :invocation="{ ...(part as ChartUIToolInvocation) }"
       />
       <ChatToolWeather
-        v-else-if="getToolName(part) === 'weather'"
+        v-else-if="part.type === 'tool-weather'"
         :invocation="{ ...(part as WeatherUIToolInvocation) }"
       />
       <UChatTool
-        v-else-if="getToolName(part) === 'web_search' || getToolName(part) === 'google_search'"
+        v-else-if="part.type === 'tool-web_search' || part.type === 'tool-google_search'"
         :text="isToolStreaming(part) ? 'Searching the web...' : 'Searched the web'"
         :suffix="getSearchQuery(part)"
         :streaming="isToolStreaming(part)"
@@ -48,11 +46,11 @@ const emit = defineEmits<{
       </UChatTool>
     </template>
 
-    <template v-else-if="isTextUIPart(part)">
+    <template v-else-if="part.type === 'text'">
       <ChatComark
         v-if="message.role === 'assistant'"
         :value="part.text"
-        :streaming="isPartStreaming(part)"
+        :streaming="part.state === 'streaming'"
       />
       <template v-else-if="message.role === 'user'">
         <ChatMessageEdit

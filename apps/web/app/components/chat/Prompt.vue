@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ChatStatus } from 'ai'
+import type { ChatStatus } from '../../../shared/utils/chat-message'
 
 const props = withDefaults(defineProps<{
   status?: ChatStatus

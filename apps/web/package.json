@@ -14,7 +14,6 @@
     "typecheck": "nuxt typecheck && tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@ai-sdk/vue": "^4.0.137",
     "@comark/nuxt": "^0.7.0",
     "@iconify-json/logos": "^1.2.15",
     "@iconify-json/lucide": "^1.2.142",
@@ -30,7 +29,6 @@
     "@shikijs/langs": "^4.5.0",
     "@tauri-apps/api": "2.12.4",
     "@vueuse/core": "^14.4.0",
-    "ai": "^7.0.137",
     "cordis": "catalog:",
     "date-fns": "^4.4.0",
     "motion-v": "^2.6.0",
@@ -40,6 +38,7 @@
     "shiki": "^4.5.0",
     "striptags": "3.2.0",
     "tailwindcss": "^4.3.3",
+    "vue": "3.5.44",
     "zod": "^4.6.5"
   },
   "devDependencies": {

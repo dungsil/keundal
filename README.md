@@ -42,7 +42,7 @@ pnpm --filter @keundal/example-basic start
 
 ## 웹 앱
 
-[apps/web](./apps/web/README.md)은 [Nuxt UI Chat](https://github.com/nuxt-ui-templates/chat)의 화면·컴포넌트·스타일과 에셋을 사용합니다. 제목·대화·도구 실행·웹 검색·추론·받아쓰기는 Keundal 플러그인으로 실행하며 대화·이미지·실행 journal은 `plugin-store-indexeddb`로 브라우저에 저장합니다. AI SDK는 원본 클라이언트와 메시지 타입 호환용으로만 사용합니다. 웹 소스는 원본 ESLint 설정으로 검사하고 루트 Oxfmt로 재포맷하지 않습니다.
+[apps/web](./apps/web/README.md)은 [Nuxt UI Chat](https://github.com/nuxt-ui-templates/chat)의 화면·컴포넌트·스타일과 에셋을 사용합니다. 제목·대화·도구 실행·웹 검색·추론·받아쓰기는 Keundal 플러그인으로 실행하며 대화·이미지·실행 journal은 `plugin-store-indexeddb`로 브라우저에 저장합니다. 채팅 상태·표시 메시지·스트림 처리는 프로젝트 내부에서 Cordis·AG-UI 기반으로 구현하며 Vercel AI SDK에 의존하지 않습니다. 웹 소스는 원본 ESLint 설정으로 검사하고 루트 Oxfmt로 재포맷하지 않습니다.
 
 ```sh
 pnpm install

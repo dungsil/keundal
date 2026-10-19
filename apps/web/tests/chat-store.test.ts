@@ -5,19 +5,26 @@ import { Context } from 'cordis'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
 import sqliteStorePlugin from '@keundal/plugin-store-sqlite'
-import { EventType, LLMService, type LLMRequest, type LLMEvent } from '@keundal/core'
+import { EventType, LLMService, type AGUIEvent, type LLMRequest, type LLMEvent } from '@keundal/core'
 import { IDBFactory } from 'fake-indexeddb'
-import type { UIMessage } from 'ai'
+import type { ChatMessage } from '../shared/utils/chat-message'
 import { expect, onTestFinished, test } from 'vitest'
 import { ChatStore } from '../shared/utils/chat-store'
 import { browserLLMPlugin } from '../shared/utils/browser-llm'
 import { defaultLLMSettings } from '../shared/utils/llm-settings'
+import { useKeundalChat } from '../app/composables/useKeundalChat'
 
 const model = 'openai/gpt-5-nano'
-const user: UIMessage = { id: 'user', role: 'user', parts: [
+const user: ChatMessage = { id: 'user', role: 'user', parts: [
   { type: 'text', text: '원본 질문' },
   { type: 'file', filename: 'local.png', mediaType: 'image/png', url: 'data:image/png;base64,aW1hZ2U=' }
 ] }
+
+async function collect(events: AsyncIterable<AGUIEvent>) {
+  const result: AGUIEvent[] = []
+  for await (const event of events) result.push(event)
+  return result
+}
 
 test.each(['memory', 'indexeddb', 'sqlite'] as const)('%s 플러그인만 교체해도 웹 대화·이미지·투표·편집·재생성·삭제 계약이 같다', async (backend) => {
   const ctx = new Context()
@@ -52,8 +59,12 @@ test.each(['memory', 'indexeddb', 'sqlite'] as const)('%s 플러그인만 교체
     await rm(directory, { recursive: true, force: true })
   })
   await chats.create('chat', user, model)
-  const response = await chats.respond('chat', { model, messages: [user] })
-  expect(await response.text()).toContain('"type":"finish"')
+  for await (const event of chats.respond('chat', { model, messages: [user] })) {
+    if (event.type === EventType.RUN_FINISHED) {
+      expect((await chats.get('chat'))!.messages[1]!.parts).toContainEqual({ type: 'text', text: '원본 응답' })
+      expect((await chats.get('chat'))!.pendingRunId).toBeUndefined()
+    }
+  }
   const reloaded = new ChatStore(ctx)
   let saved = (await reloaded.get('chat'))!
   expect(saved.title).toBe('로컬 제목')
@@ -63,17 +74,27 @@ test.each(['memory', 'indexeddb', 'sqlite'] as const)('%s 플러그인만 교체
   await reloaded.rename('chat', '바꾼 제목')
   await reloaded.vote('chat', saved.messages[1]!.id, false)
   expect((await reloaded.list())[0]).toMatchObject({ title: '바꾼 제목', votes: [{ isUpvoted: false }] })
+  const client = useKeundalChat({ respond: (messages, onMessage, signal) => reloaded.respond('chat', { model, messages, onMessage }, signal) })
+  client.messages.value = saved.messages
   await reloaded.truncate('chat', user.id, 'edit')
-  const edited: UIMessage = { ...user, parts: [{ type: 'text', text: '편집한 질문' }] }
-  expect(await (await reloaded.respond('chat', { model, messages: [edited] })).text()).toContain('"type":"finish"')
+  const edited: ChatMessage = { ...user, parts: [{ type: 'text', text: '편집한 질문' }] }
+  const editing = client.sendMessage({ text: '편집한 질문', messageId: user.id })
+  expect(client.status.value).toBe('submitted')
+  await editing
+  expect(client.status.value).toBe('ready')
+  expect(client.error.value).toBeUndefined()
   saved = (await reloaded.get('chat'))!
+  expect(client.messages.value).toEqual(saved.messages)
   expect(saved.messages).toHaveLength(2)
   expect(saved.votes).toEqual([])
   expect(JSON.stringify(requests[1])).not.toContain('원본 응답')
   expect(JSON.stringify((await ctx.session.get('chat'))!.messages)).not.toContain('원본 질문')
   await reloaded.truncate('chat', saved.messages[1]!.id, 'regenerate')
   expect((await reloaded.get('chat'))!.messages).toEqual([edited])
-  expect(await (await reloaded.respond('chat', { model, messages: [edited] })).text()).toContain('"type":"finish"')
+  await client.regenerate({ messageId: saved.messages[1]!.id })
+  expect(client.status.value).toBe('ready')
+  expect(client.messages.value).toEqual((await reloaded.get('chat'))!.messages)
+  expect(client.messages.value).toHaveLength(2)
   await reloaded.delete('chat')
   expect(await reloaded.get('chat')).toBeUndefined()
   expect(await reloaded.list()).toEqual([])
@@ -102,11 +123,74 @@ test('LLM 오류가 발생하면 성공으로 커밋하지 않고 부분 응답�
   const chats = new ChatStore(ctx)
   await chats.create('chat', user, model)
   await chats.rename('chat', '제목 생성 생략')
-  const stream = await (await chats.respond('chat', { model, messages: [user] })).text()
-  expect(stream).toContain('Provider failed')
-  expect(stream).not.toContain('"type":"finish"')
+  const stream = await collect(chats.respond('chat', { model, messages: [user] }))
+  expect(stream).toContainEqual(expect.objectContaining({ type: EventType.RUN_ERROR, message: 'Provider failed' }))
+  expect(stream.some(event => event.type === EventType.RUN_FINISHED)).toBe(false)
   expect((await ctx.generation.list())[0]!.status).toBe('failed')
   expect((await chats.get('chat'))!.messages[1]!.parts).toContainEqual({ type: 'text', text: '끊긴 응답' })
+  const client = useKeundalChat({ respond: (messages, onMessage, signal) => chats.respond('chat', { model, messages, onMessage }, signal) })
+  client.messages.value = (await chats.get('chat'))!.messages
+  await client.regenerate()
+  expect(client.status.value).toBe('error')
+  expect(client.error.value?.message).toBe('Provider failed')
+  expect(client.messages.value).toEqual((await chats.get('chat'))!.messages)
+  expect(client.messages.value.at(-1)!.parts).toContainEqual({ type: 'text', text: '끊긴 응답' })
+})
+
+test('Vue 채팅 중단은 공급자 작업을 취소하고 부분 응답 저장 후 ready로 돌아와 다음 전송을 허용한다', async () => {
+  const ctx = new Context()
+  let started!: () => void
+  const streaming = new Promise<void>(resolve => started = resolve)
+  let cancelled = false
+  class CancellableLLM extends LLMService {
+    async getModel() { return { contextWindow: 128_000, maxOutputTokens: 4096 } }
+    async countTokens() { return 40 }
+    async* stream(_request: LLMRequest, options?: { signal?: AbortSignal }): AsyncIterable<LLMEvent> {
+      const messageId = crypto.randomUUID()
+      yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' }
+      yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: cancelled ? '다음 응답' : '중단 전 응답' }
+      if (!cancelled) {
+        started()
+        await new Promise<void>((_resolve, reject) => {
+          const abort = () => {
+            cancelled = true
+            reject(options!.signal!.reason)
+          }
+          if (options?.signal?.aborted) abort()
+          else options?.signal?.addEventListener('abort', abort, { once: true })
+        })
+      }
+      yield { type: EventType.TEXT_MESSAGE_END, messageId }
+    }
+  }
+  const llm = await ctx.plugin(CancellableLLM)
+  const store = await ctx.plugin(memoryStorePlugin)
+  const chats = new ChatStore(ctx)
+  const client = useKeundalChat({ respond: (messages, onMessage, signal) => chats.respond('chat', { model, messages, onMessage }, signal) })
+  onTestFinished(async () => {
+    await client.stop()
+    await store.dispose()
+    await llm.dispose()
+  })
+  await chats.create('chat', user, model)
+  await chats.rename('chat', '중단 테스트')
+  client.messages.value = [user]
+  const running = client.regenerate()
+  await streaming
+  expect(client.status.value).toBe('streaming')
+  expect(client.messages.value.at(-1)!.parts).toContainEqual({ type: 'text', text: '중단 전 응답', state: 'streaming' })
+  await client.stop()
+  await running
+  expect(cancelled).toBe(true)
+  expect(client.status.value).toBe('ready')
+  expect(client.error.value).toBeUndefined()
+  expect(client.messages.value).toEqual((await chats.get('chat'))!.messages)
+  expect(client.messages.value.at(-1)!.parts).toContainEqual({ type: 'text', text: '중단 전 응답' })
+  expect((await ctx.generation.list())[0]!.status).toBe('cancelled')
+  await client.sendMessage({ text: '계속' })
+  expect(client.status.value).toBe('ready')
+  expect(client.messages.value).toHaveLength(4)
+  expect(client.messages.value.at(-1)!.parts).toContainEqual({ type: 'text', text: '다음 응답' })
 })
 
 test('IndexedDB를 다시 열면 미완료 journal을 한 번 복구하고 LLM을 재호출하지 않는다', async () => {

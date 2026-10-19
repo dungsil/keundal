@@ -10,7 +10,7 @@
   "rules": {},
   "overrides": [
     {
-      "files": ["apps/**", "examples/**", "packages/*/tests/**"],
+      "files": [".pnpmfile.cjs", "apps/**", "examples/**", "packages/*/tests/**"],
       "env": { "node": true }
     }
   ]
