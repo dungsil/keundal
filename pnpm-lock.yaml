@@ -1117,9 +1117,6 @@ importers:
       '@comark/nuxt':
         specifier: ^0.7.0
         version: 0.7.0(magicast@0.5.5)(nuxt@4.6.1(f10f8451716ca2c6ce655b791cd5799d))(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
-      '@keundal/plugin-skill-filesystem':
-        specifier: workspace:*
-        version: link:../plugin-skill-filesystem
       '@nuxt/ui':
         specifier: ^4.11.3
         version: 4.11.3(3d9f6d5515484cabff85320d640f6c3d)

@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@comark/nuxt": "^0.7.0",
-    "@keundal/plugin-skill-filesystem": "workspace:*",
     "@nuxt/ui": "^4.11.3",
     "@shikijs/langs": "^4.5.0",
     "@vueuse/core": "^14.4.0",
