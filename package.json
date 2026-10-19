@@ -15,10 +15,10 @@
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",
-    "lint-staged": "17.5.1",
-    "oxfmt": "0.70.0",
-    "oxlint": "1.85.0",
-    "oxlint-tsgolint": "7.0.2003",
+    "lint-staged": "17.6.0",
+    "oxfmt": "0.73.0",
+    "oxlint": "1.88.0",
+    "oxlint-tsgolint": "7.0.2004",
     "simple-git-hooks": "2.14.0",
     "turbo": "2.10.13",
     "typescript": "catalog:"

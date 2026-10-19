@@ -3,8 +3,8 @@
 OpenAI SDK의 `realtime.clientSecrets.create()`로 브라우저용 단기 자격 증명을 발급하는 Cordis 플러그인입니다. Vercel Gateway를 사용하지 않습니다.
 
 ```ts
-import { Context } from 'cordis'
 import openaiTranscriptionPlugin from '@keundal/plugin-transcription-openai'
+import { Context } from 'cordis'
 
 const ctx = new Context()
 const fiber = await ctx.plugin(openaiTranscriptionPlugin, {
