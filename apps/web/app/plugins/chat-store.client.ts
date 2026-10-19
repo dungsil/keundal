@@ -1,10 +1,12 @@
 import { Context } from 'cordis'
 import { useLocalStorage } from '@vueuse/core'
 import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
+import skillPlugin from '@keundal/plugin-skill'
 import { ChatStore } from '../../shared/utils/chat-store'
 import { browserLLMPlugin } from '../../shared/utils/browser-llm'
 import { defaultLLMSettings, type LLMSettings } from '../../shared/utils/llm-settings'
 import { createLLMSettingsStorage, LLM_SETTINGS_KEY } from '../../shared/utils/llm-settings-storage'
+import { SkillManager } from '../../shared/utils/skills'
 
 export default defineNuxtPlugin(async () => {
   const ctx = new Context()
@@ -31,12 +33,15 @@ export default defineNuxtPlugin(async () => {
   await llm
   const store = ctx.plugin(indexedDBStorePlugin, { databaseName: 'keundal-web' })
   await store
+  const skillManager = new SkillManager(localStorage, invokeNative)
+  const skills = await ctx.plugin(skillPlugin, { providers: skillManager.providers })
   const chatStore = new ChatStore(ctx)
   await chatStore.recover()
   if (import.meta.hot) import.meta.hot.dispose(async () => {
     await chatStore.stop()
+    await skills.dispose()
     await store.dispose()
     await llm.dispose()
   })
-  return { provide: { chatStore, llmSettings: settings, saveLLMSettings, modelCatalog } }
+  return { provide: { chatStore, llmSettings: settings, saveLLMSettings, modelCatalog, skillManager } }
 })

@@ -28,6 +28,12 @@
           "description": "Allow the local main window to store LLM settings in the OS secret store",
           "windows": ["main"],
           "permissions": ["allow-load-llm-settings", "allow-save-llm-settings"]
+        },
+        {
+          "identifier": "skill-files",
+          "description": "Allow the local main window to read direct SKILL.md files in the fixed skill roots",
+          "windows": ["main"],
+          "permissions": ["allow-list-skill-files", "allow-read-skill-file"]
         }
       ]
     }
