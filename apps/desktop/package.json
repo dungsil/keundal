@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "pnpm --filter @keundal/web exec nuxt generate --envName desktop",
+    "build:preview": "pnpm bundle",
     "bundle": "tauri build",
     "dev": "tauri dev",
     "dev:ui": "pnpm --filter @keundal/web exec nuxt dev --envName desktop --no-open",
