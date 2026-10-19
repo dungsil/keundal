@@ -9,6 +9,22 @@
       "dependsOn": ["^build"],
       "outputs": [".nuxt/**", ".output/**"]
     },
+    "@keundal/web#build:preview": {
+      "dependsOn": ["build"],
+      "outputs": [".nuxt/**", ".output/**"]
+    },
+    "@keundal/desktop#build:preview": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "passThroughEnv": [
+        "APPIMAGE_EXTRACT_AND_RUN",
+        "APPLE_SIGNING_IDENTITY",
+        "CARGO_HOME",
+        "RUSTUP_HOME",
+        "RUSTUP_TOOLCHAIN"
+      ],
+      "outputs": ["dist/**", "src-tauri/target/release/bundle/**"]
+    },
     "typecheck": {},
     "test": {
       "dependsOn": ["build"]
