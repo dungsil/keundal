@@ -5,7 +5,7 @@ import { pipeline } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
 
 import { EventType, LLMService, type LLMEvent, type LLMRequest } from '@keundal/core'
-import { McpClient, type McpPermissions } from '@keundal/mcp-client'
+import { McpClient, type McpPermissions } from '@keundal/mcp'
 import simpleAgentPlugin, { type ExecutableTool, type ToolExecutionContext } from '@keundal/plugin-agent-simple'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { WebStandardStreamableHTTPServerTransport, type ServerCapabilities } from '@modelcontextprotocol/server'

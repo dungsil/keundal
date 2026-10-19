@@ -1,4 +1,4 @@
-# @keundal/mcp-client
+# @keundal/mcp
 
 외부 Model Context Protocol(MCP) 서버의 도구와 리소스를 Keundal 에이전트에 연결합니다. Node.js에서 stdio와 Streamable HTTP를 지원합니다. 프로토콜과 전송은 공식 `@modelcontextprotocol/client` SDK로 구현합니다.
 
@@ -7,7 +7,7 @@
 LLM 플러그인과 저장소 플러그인을 등록한 `ctx`에서 사용합니다.
 
 ```ts
-import { McpClient } from '@keundal/mcp-client'
+import { McpClient } from '@keundal/mcp'
 import simpleAgentPlugin from '@keundal/plugin-agent-simple'
 
 const mcp = await McpClient.connect({

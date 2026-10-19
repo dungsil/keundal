@@ -1,5 +1,5 @@
 {
-  "name": "@keundal/mcp-client",
+  "name": "@keundal/mcp",
   "private": true,
   "files": [
     "dist"
