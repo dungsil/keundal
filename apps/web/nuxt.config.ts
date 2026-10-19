@@ -75,5 +75,11 @@ export default defineNuxtConfig({
         braceStyle: '1tbs'
       }
     }
+  },
+
+  fonts: {
+    families: [
+      { name: 'Pretendard', provider: 'npm', weights: [400, 500, 700], global: true, preload: true }
+    ]
   }
 })
