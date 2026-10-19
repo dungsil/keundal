@@ -19,6 +19,8 @@ on:
       - 'turbo.json'
       - '.oxlintrc.json'
       - '.oxfmtrc.json'
+      - '.github/workflows/**'
+      - '.github/actions/**'
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
@@ -217,3 +219,42 @@ jobs:
 
       - name: CodeQL 보안 검사
         uses: ./.github/actions/codeql
+
+  deploy:
+    name: ${{ github.event_name == 'pull_request' && 'PR 프리뷰 배포' || '운영 배포' }}
+    needs: [build, typecheck, test, lint, codeql]
+    # 검사가 성공한 main과 같은 저장소의 main 대상 PR만 배포한다.
+    if: >-
+      (github.event_name != 'pull_request' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.base.ref == 'main' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 저장소 가져오기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: 개발 환경 준비
+        uses: ./.github/actions/setup
+        with:
+          turbo-cache: true
+
+      - name: 웹 의존 패키지 빌드
+        run: pnpm exec turbo run build --filter='@keundal/web^...'
+
+      - name: Workers 빌드
+        run: pnpm --filter @keundal/web build:cloudflare
+
+      - name: Workers 배포
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          packageManager: pnpm
+          command: >-
+            ${{ github.event_name == 'pull_request' && format('versions upload --preview-alias pr-{0}', github.event.pull_request.number) || 'deploy' }}
+            --config .output/server/wrangler.json

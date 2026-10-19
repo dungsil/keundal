@@ -81,6 +81,25 @@ pnpm --filter @keundal/web exec wrangler deploy --dry-run --config .output/serve
 pnpm --filter @keundal/web deploy:cloudflare
 ```
 
+### GitHub Actions 자동 배포
+
+`.github/workflows/ci.yml`의 `deploy` job은 빌드·타입 검사·테스트·린트·CodeQL이 모두 성공한 뒤 Cloudflare 공식 `cloudflare/wrangler-action`으로 배포합니다. `main` 푸시와 `main`에서의 수동 CI 실행은 운영 Worker `keundal-web`을 배포합니다. `main` 대상 PR은 `versions upload --preview-alias pr-<PR 번호>`로 버전만 업로드하므로 운영 트래픽을 변경하지 않습니다. 같은 PR의 후속 커밋은 같은 프리뷰 별칭을 갱신하며, 별도의 Git 브랜치를 만들지는 않습니다.
+
+저장소의 **Settings → Secrets and variables → Actions**에 다음 secrets를 등록합니다.
+
+| Secret | 값 |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | 배포할 계정에 한정한 Workers 편집 권한의 API 토큰 |
+| `CLOUDFLARE_ACCOUNT_ID` | Worker를 배포할 Cloudflare 계정 ID |
+
+Dependabot PR도 프리뷰를 배포합니다. Dependabot이 실행한 워크플로는 Actions secrets를 읽지 못하므로 **Settings → Secrets and variables → Dependabot**에도 같은 이름의 두 secrets를 등록합니다. 값이 없거나 배포에 실패하면 배포 job이 실패하며, 실패를 성공으로 처리하거나 배포를 생략하지 않습니다.
+
+배포 실패가 머지를 차단하려면 `main` Ruleset의 필수 상태 검사에 **PR 프리뷰 배포**를 추가해야 합니다. 워크플로에 job을 추가하는 것만으로는 머지가 차단되지 않습니다. 기존 빌드·타입 검사·테스트·린트 필수 검사와 CodeQL 규칙도 유지합니다.
+
+최초 Worker 생성은 `wrangler deploy`가 필요하므로 프리뷰 전에 `main` 운영 배포를 한 번 완료해야 합니다. 프리뷰 URL은 배포 단계 로그에서 확인하며, `https://pr-<PR 번호>-keundal-web.<계정 하위 도메인>.workers.dev` 형식입니다. 프리뷰는 공개 URL이며 PR을 닫아도 자동 삭제되지 않습니다. 프리뷰 버전은 같은 Worker의 런타임 secrets를 사용하므로 민감한 운영 바인딩을 추가할 때 이 경계를 다시 검토해야 합니다. 브라우저의 대화·키 저장소는 origin이 다른 운영·각 PR 사이에서 분리됩니다.
+
+배포 자격 증명을 보호하기 위해 포크 PR은 자동 배포하지 않습니다. `pull_request_target`으로 PR 코드를 실행하지 않으며, 같은 저장소의 PR 코드는 배포 권한을 가진 신뢰된 코드로 취급합니다. CI 검사가 실패하거나 문서 전용 PR처럼 검사가 생략되면 배포하지 않습니다. GitHub는 생략된 job을 필수 검사 실패로 취급하지 않으므로 포크·문서 전용 PR에 프리뷰 성공을 강제하지는 않습니다.
+
 OAuth를 사용할 경우 런타임 세션 비밀 값(32자 이상)을 비공개 프롬프트에서 등록합니다. LLM 공급자 키는 Worker에 등록하지 않고 각 사용자가 웹 설정에서 입력합니다.
 
 ```sh

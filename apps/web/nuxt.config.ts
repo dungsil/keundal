@@ -25,7 +25,8 @@ export default defineNuxtConfig({
       nodeCompat: true,
       deployConfig: true,
       wrangler: {
-        name: 'keundal-web'
+        name: 'keundal-web',
+        preview_urls: true
       }
     },
     experimental: {
