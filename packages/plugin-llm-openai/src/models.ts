@@ -9,7 +9,10 @@ export async function listOpenAIModels(
   options: ExecutionOptions = {}
 ): Promise<LLMModelInfo[]> {
   options.signal?.throwIfAborted()
-  const baseURL = (config.baseURL ?? 'https://api.openai.com/v1').replace(/\/+$/, '')
+  const configuredURL = config.baseURL ?? 'https://api.openai.com/v1'
+  let end = configuredURL.length
+  while (configuredURL[end - 1] === '/') end--
+  const baseURL = configuredURL.slice(0, end)
   const response = await globalThis.fetch(`${baseURL}/models`, {
     headers: { authorization: `Bearer ${config.apiKey}`, ...config.headers },
     signal: options.signal,

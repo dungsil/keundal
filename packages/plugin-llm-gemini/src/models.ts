@@ -8,7 +8,10 @@ export async function listGeminiModels(
   config: Omit<GeminiLLMConfig, 'models' | 'apiKey'> & { readonly apiKey: string },
   options: ExecutionOptions = {}
 ): Promise<LLMModelInfo[]> {
-  const baseURL = (config.baseURL ?? 'https://generativelanguage.googleapis.com').replace(/\/+$/, '')
+  const configuredURL = config.baseURL ?? 'https://generativelanguage.googleapis.com'
+  let end = configuredURL.length
+  while (configuredURL[end - 1] === '/') end--
+  const baseURL = configuredURL.slice(0, end)
   const models = new Map<string, LLMModelInfo>()
   const cursors = new Set<string>()
   let cursor = ''
