@@ -81,6 +81,31 @@ pnpm --filter @keundal/web exec wrangler deploy --dry-run --config .output/serve
 pnpm --filter @keundal/web deploy:cloudflare
 ```
 
+### GitHub Actions 자동 배포
+
+`.github/workflows/ci.yml`의 `deploy` job은 빌드·타입 검사·테스트·린트·CodeQL이 모두 성공한 뒤 Cloudflare 공식 `cloudflare/wrangler-action`으로 배포합니다. `main` 푸시와 `main`에서의 수동 CI 실행은 운영 Worker `keundal-web`을 배포합니다. `main` 대상 PR은 `preview --name pr-<PR 번호>`로 수명을 관리할 수 있는 프리뷰를 만들며 운영 트래픽을 변경하지 않습니다. 같은 PR의 후속 커밋은 같은 프리뷰를 갱신하며, 별도의 Git 브랜치를 만들지는 않습니다. Workers Previews는 현재 open beta이며 저장소에 고정한 Wrangler 버전을 사용합니다.
+
+PR 프리뷰 배포가 성공하면 `marocchino/sticky-pull-request-comment` Action이 프리뷰 URL과 CI 실행 링크를 댓글로 남깁니다. 재배포 시 `cloudflare-preview` 댓글 하나를 갱신하며, 운영 배포나 배포 실패 시에는 댓글을 작성하지 않습니다. 댓글 쓰기 권한은 배포·종료 job에만 부여합니다.
+
+PR을 병합하거나 닫으면 `cleanup-preview` job이 Cloudflare API로 해당 `pr-<번호>` 프리뷰와 모든 배포 이력을 삭제하고 기존 댓글을 종료 상태로 갱신합니다. 이미 없는 프리뷰는 성공으로 처리하되 인증·서버 오류는 실패로 남깁니다. 종료 job은 PR 코드를 checkout하거나 실행하지 않으며, 빌드 성공 여부와 무관하게 실행합니다. PR 번호로 공유하는 concurrency 그룹에서 진행 중인 배포가 끝난 뒤 정리하므로 종료 직전의 배포가 프리뷰를 다시 만들지 않습니다. PR을 다시 열면 일반 CI 성공 후 프리뷰를 다시 생성합니다.
+
+저장소의 **Settings → Secrets and variables → Actions**에 다음 secrets를 등록합니다.
+
+| Secret | 값 |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | 배포할 계정에 한정한 Workers 편집 권한의 API 토큰 |
+| `CLOUDFLARE_ACCOUNT_ID` | Worker를 배포할 Cloudflare 계정 ID |
+
+Dependabot PR도 프리뷰를 배포합니다. Dependabot이 실행한 워크플로는 Actions secrets를 읽지 못하므로 **Settings → Secrets and variables → Dependabot**에도 같은 이름의 두 secrets를 등록합니다. 값이 없거나 배포에 실패하면 배포 job이 실패하며, 실패를 성공으로 처리하거나 배포를 생략하지 않습니다.
+
+배포 실패가 머지를 차단하려면 `main` Ruleset의 필수 상태 검사에 **PR 프리뷰 배포**를 추가해야 합니다. 워크플로에 job을 추가하는 것만으로는 머지가 차단되지 않습니다. 기존 빌드·타입 검사·테스트·린트 필수 검사와 CodeQL 규칙도 유지합니다.
+
+프리뷰 URL은 PR 댓글과 배포 단계 로그에서 확인합니다. 프리뷰는 공개 URL이며 브라우저의 대화·키 저장소는 origin이 다른 운영·각 PR 사이에서 분리됩니다. 새 프리뷰는 운영 secrets·변수·데이터 바인딩을 상속하지 않습니다. OAuth가 필요한 프리뷰에는 `wrangler preview base-config secret put` 또는 `wrangler preview secret put --name pr-<번호>`로 별도 secrets를 설정해야 합니다.
+
+기존 `versions upload --preview-alias`로 만든 URL은 개별 삭제할 수 없습니다. `preview_urls: false` 설정이 다음 `main` 운영 배포에 반영되면 구형 버전 URL·별칭을 모두 비활성화합니다. 새 `preview` 방식의 URL은 이 설정과 독립적이며 PR 종료 시 개별 삭제합니다. 운영 Worker 자체와 정상 운영 URL은 삭제하지 않습니다.
+
+배포 자격 증명을 보호하기 위해 포크 PR은 자동 배포하지 않습니다. `pull_request_target`으로 PR 코드를 실행하지 않으며, 같은 저장소의 PR 코드는 배포 권한을 가진 신뢰된 코드로 취급합니다. CI 검사가 실패하거나 문서 전용 PR처럼 검사가 생략되면 배포하지 않습니다. GitHub는 생략된 job을 필수 검사 실패로 취급하지 않으므로 포크·문서 전용 PR에 프리뷰 성공을 강제하지는 않습니다.
+
 OAuth를 사용할 경우 런타임 세션 비밀 값(32자 이상)을 비공개 프롬프트에서 등록합니다. LLM 공급자 키는 Worker에 등록하지 않고 각 사용자가 웹 설정에서 입력합니다.
 
 ```sh
