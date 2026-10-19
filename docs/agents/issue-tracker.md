@@ -154,7 +154,6 @@ UI Development 패널의 수동 연결은 본문 편집이나 `gg pr edit --body
   2. `gg issue close <n>`를 실행한다.
   3. 맵의 Decisions-so-far에 컨텍스트 포인터(gist + 링크)를 덧붙인다.
 
-
 ## 조사 기록 저장
 
 - 호출자가 출처 인용을 포함한 완전한 결과를 같은 조사 이슈에 전용 댓글 하나로 올린다. 이후 세션이 불변 이슈 신원으로 찾을 수 있도록 `<!-- vibe-deep-plan research: <map-issue>/<ticket-issue> -->`로 시작한다.
