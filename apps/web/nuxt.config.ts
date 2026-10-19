@@ -23,7 +23,10 @@ export default defineNuxtConfig({
       devServer: { host: '127.0.0.1', port: 1420 },
       vite: { server: { strictPort: true } },
       nitro: {
-        output: { publicDir: '../desktop/dist' }
+        output: {
+          dir: '.output-desktop',
+          publicDir: '../desktop/dist'
+        }
       }
     }
   },
