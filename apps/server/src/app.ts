@@ -66,11 +66,11 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
   if (!Number.isSafeInteger(maxRequestBodyBytes) || maxRequestBodyBytes <= 0) {
     throw new RangeError('maxRequestBodyBytes must be a positive safe integer')
   }
-  return async function requestListener(request, response) {
-    const url = new URL(request.url ?? '/', 'http://localhost')
-    const segments = url.pathname.split('/').filter(Boolean)
-
+  async function requestListener(request: IncomingMessage, response: ServerResponse) {
     try {
+      const url = new URL(request.url ?? '/', 'http://localhost')
+      const segments = url.pathname.split('/').filter(Boolean)
+
       if (request.method === 'POST' && segments.join('/') === 'runs') {
         const input = parseRunAgentInput(JSON.parse(await readBody(request, maxRequestBodyBytes)))
         response.writeHead(200, SSE_HEADERS)
@@ -116,6 +116,7 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
 
       sendJson(response, 404, { error: `no route for ${request.method} ${url.pathname}` })
     } catch (error) {
+      if (response.destroyed || response.writableEnded) return
       if (error instanceof RequestBodyTooLargeError && !response.headersSent) {
         // 읽지 않은 본문은 재사용하지 않고, 응답을 전송한 뒤 요청과 소켓을 정리합니다.
         response.setHeader('connection', 'close')
@@ -125,9 +126,14 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
       }
       if (!response.headersSent) {
         sendJson(response, 400, { error: 'invalid request' })
-      } else if (!response.writableEnded) {
+      } else {
         response.end()
       }
     }
+  }
+
+  return (request, response) => {
+    // 오류 응답 자체가 실패하더라도 HTTP 서버에 처리되지 않은 Promise 거부를 남기지 않습니다.
+    void requestListener(request, response).catch(() => response.destroy())
   }
 }
