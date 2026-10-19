@@ -22,7 +22,7 @@ on:
       - '.github/workflows/**'
       - '.github/actions/**'
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, closed]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -30,13 +30,12 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  # 종료 시에는 진행 중인 배포가 끝난 뒤 정리하여 프리뷰 재생성을 방지한다.
-  cancel-in-progress: ${{ github.event.action != 'closed' }}
+  # 프리뷰 종료 워크플로우와 그룹을 공유하여 배포와 삭제를 순서대로 실행한다.
+  group: CI-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   changes:
-    if: github.event.action != 'closed'
     name: 변경사항 확인
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -301,7 +300,6 @@ jobs:
 
   codeql:
     # 병합 규칙이 CodeQL 분석 결과를 요구하므로 변경 경로와 관계없이 실행한다.
-    if: github.event.action != 'closed'
     name: CodeQL 보안 검사
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -318,22 +316,14 @@ jobs:
         uses: ./.github/actions/codeql
 
   deploy:
-    name: ${{ github.event_name == 'pull_request' && 'PR 프리뷰 배포' || '운영 배포' }}
+    name: 운영 배포
     needs: [build, typecheck, test, lint, codeql]
-    # 검사가 성공한 main과 같은 저장소의 main 대상 PR만 배포한다.
-    if: >-
-      (github.event_name != 'pull_request' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' &&
-       github.event.action != 'closed' &&
-       github.event.pull_request.base.ref == 'main' &&
-       github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    outputs:
-      preview-url: ${{ steps.deploy.outputs.deployment-url }}
     permissions:
       contents: read
-    steps:
+    steps: &deploy-steps
       - name: 저장소 가져오기
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -362,10 +352,10 @@ jobs:
 
   preview-comment:
     name: PR 프리뷰 댓글 갱신
-    needs: [deploy, desktop]
+    needs: [deploy-preview, desktop]
     if: >-
       !cancelled() && github.event_name == 'pull_request' &&
-      needs.deploy.result == 'success'
+      needs.deploy-preview.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -400,7 +390,7 @@ jobs:
           message: |
             ### PR 프리뷰
 
-            [웹 프리뷰 열기](${{ needs.deploy.outputs.preview-url }})
+            [웹 프리뷰 열기](${{ needs.deploy-preview.outputs.preview-url }})
 
             #### 데스크톱 다운로드
 
@@ -415,51 +405,17 @@ jobs:
 
             [CI 실행 로그](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }})
 
-  cleanup-preview:
-    name: PR 프리뷰 종료
+  deploy-preview:
+    name: PR 프리뷰 배포
+    needs: [build, typecheck, test, lint, codeql]
     if: >-
-      github.event_name == 'pull_request' && github.event.action == 'closed' &&
+      github.event_name == 'pull_request' &&
       github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
+    outputs:
+      preview-url: ${{ steps.deploy.outputs.deployment-url }}
     permissions:
-      pull-requests: write
-    steps:
-      # PR 코드를 실행하지 않고 프리뷰만 삭제한다. 이미 없는 프리뷰도 성공으로 처리한다.
-      - name: Workers 프리뷰 삭제
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        with:
-          script: |
-            const token = process.env.CLOUDFLARE_API_TOKEN;
-            const account = process.env.CLOUDFLARE_ACCOUNT_ID;
-            if (!token || !account) {
-              throw new Error('CLOUDFLARE_API_TOKEN과 CLOUDFLARE_ACCOUNT_ID가 필요합니다.');
-            }
-            const name = `pr-${context.payload.pull_request.number}`;
-            const response = await fetch(
-              `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(account)}/workers/workers/keundal-web/previews/${name}`,
-              { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
-            );
-            const result = await response.json();
-            if (response.ok && result.success) {
-              core.info(`${name} 프리뷰와 배포 이력을 삭제했습니다.`);
-            } else if (response.status === 404 && result.errors?.some(error => error.code === 10025)) {
-              core.info(`${name} 프리뷰가 이미 없습니다.`);
-            } else {
-              throw new Error(`프리뷰 삭제 실패 (HTTP ${response.status})`);
-            }
-
-      - name: PR 프리뷰 종료 댓글 갱신
-        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
-        with:
-          header: cloudflare-preview
-          only_update: true
-          message: |
-            ### PR 프리뷰 종료
-
-            PR이 병합되거나 닫혀 웹 프리뷰와 배포 이력을 삭제했습니다.
-            데스크톱 설치 파일은 업로드 후 7일이 지나면 만료됩니다.
+      contents: read
+    steps: *deploy-steps
