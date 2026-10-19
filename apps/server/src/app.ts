@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http'
 import { URL } from 'node:url'
 
@@ -40,8 +41,20 @@ const readBody = async (request: IncomingMessage): Promise<string> => {
 const sseEvent = (event: AGUIEvent): string => `data: ${JSON.stringify(event)}\n\n`
 
 /** AG-UI 실행과 조회 읽기 경로를 HTTP로 노출하는 요청 리스너를 만듭니다. */
-export function createAgentApp(services: AgentAppServices): RequestListener {
+export function createAgentApp(services: AgentAppServices, options: { token: string }): RequestListener {
+  if (!options?.token || options.token !== options.token.trim() || !/^[A-Za-z0-9\-._~+/]+=*$/.test(options.token)) {
+    throw new Error('HTTP 인증 token을 공백 없는 Bearer 토큰으로 설정하세요.')
+  }
+  const token = Buffer.from(options.token)
+
   return async function requestListener(request, response) {
+    const credentials = /^Bearer ([A-Za-z0-9\-._~+/]+=*)$/i.exec(request.headers.authorization ?? '')
+    const supplied = Buffer.from(credentials?.[1] ?? '')
+    if (supplied.length !== token.length || !timingSafeEqual(supplied, token)) {
+      response.setHeader('WWW-Authenticate', 'Bearer')
+      return sendJson(response, 401, { error: 'unauthorized' })
+    }
+
     const url = new URL(request.url ?? '/', 'http://localhost')
     const segments = url.pathname.split('/').filter(Boolean)
 
