@@ -41,11 +41,11 @@ const sseEvent = (event: AGUIEvent): string => `data: ${JSON.stringify(event)}\n
 
 /** AG-UI 실행과 조회 읽기 경로를 HTTP로 노출하는 요청 리스너를 만듭니다. */
 export function createAgentApp(services: AgentAppServices): RequestListener {
-  return async function requestListener(request, response) {
-    const url = new URL(request.url ?? '/', 'http://localhost')
-    const segments = url.pathname.split('/').filter(Boolean)
-
+  async function requestListener(request: IncomingMessage, response: ServerResponse) {
     try {
+      const url = new URL(request.url ?? '/', 'http://localhost')
+      const segments = url.pathname.split('/').filter(Boolean)
+
       if (request.method === 'POST' && segments.join('/') === 'runs') {
         const input = parseRunAgentInput(JSON.parse(await readBody(request)))
         response.writeHead(200, SSE_HEADERS)
@@ -91,11 +91,17 @@ export function createAgentApp(services: AgentAppServices): RequestListener {
 
       sendJson(response, 404, { error: `no route for ${request.method} ${url.pathname}` })
     } catch {
+      if (response.destroyed || response.writableEnded) return
       if (!response.headersSent) {
         sendJson(response, 400, { error: 'invalid request' })
-      } else if (!response.writableEnded) {
+      } else {
         response.end()
       }
     }
+  }
+
+  return (request, response) => {
+    // 오류 응답 자체가 실패하더라도 HTTP 서버에 처리되지 않은 Promise 거부를 남기지 않습니다.
+    void requestListener(request, response).catch(() => response.destroy())
   }
 }
