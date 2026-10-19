@@ -52,7 +52,7 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 
 ### PR 프리뷰
 
-소스 변경이 있으면 기존 CI의 빌드 job이 Linux, Windows, macOS에서 `pnpm build:preview`를 실행합니다. 같은 저장소에서 `main`을 대상으로 연 PR에는 웹 프리뷰 댓글에 다음 다운로드 링크를 함께 표시합니다.
+소스 변경이 있으면 기존 CI의 `빌드` job이 `pnpm build`로 공통 패키지와 정적 UI를 먼저 빌드합니다. 성공하면 플랫폼 빌드 job이 Linux, Windows, macOS에서 `pnpm build:preview`를 실행합니다. 같은 저장소에서 `main`을 대상으로 연 PR에는 웹 프리뷰 댓글에 다음 다운로드 링크를 함께 표시합니다.
 
 - macOS Apple Silicon: DMG
 - macOS Intel: DMG

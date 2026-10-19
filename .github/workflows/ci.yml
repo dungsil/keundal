@@ -64,10 +64,29 @@ jobs:
         if: github.event_name != 'pull_request'
         run: echo '전체 검사를 실행합니다.'
 
-  build-platforms:
+  build:
     needs: changes
     if: needs.changes.outputs.source == 'true'
-    name: 빌드 (${{ matrix.name }})
+    name: 빌드
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 저장소 가져오기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: 개발 환경 준비
+        uses: ./.github/actions/setup
+        with:
+          turbo-cache: true
+
+      - name: 빌드
+        run: pnpm build
+
+  build-platforms:
+    needs: build
+    name: 플랫폼 빌드 (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -144,26 +163,6 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           overwrite: true
-
-  build:
-    name: 빌드
-    needs: [changes, build-platforms]
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: 빌드 결과 확인
-        env:
-          CHANGES_RESULT: ${{ needs.changes.result }}
-          SOURCE_CHANGED: ${{ needs.changes.outputs.source }}
-          BUILD_RESULT: ${{ needs.build-platforms.result }}
-        run: |
-          if [ "$CHANGES_RESULT" != 'success' ]; then
-            exit 1
-          fi
-          if [ "$SOURCE_CHANGED" = 'true' ] && [ "$BUILD_RESULT" != 'success' ]; then
-            exit 1
-          fi
 
   typecheck:
     needs: changes
@@ -304,7 +303,7 @@ jobs:
 
   deploy:
     name: 운영 배포
-    needs: [build, typecheck, test, lint, codeql]
+    needs: [build, build-platforms, typecheck, test, lint, codeql]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -339,7 +338,7 @@ jobs:
 
   preview-comment:
     name: PR 프리뷰 댓글 갱신
-    needs: [deploy-preview, build]
+    needs: [deploy-preview, build-platforms]
     if: >-
       !cancelled() && github.event_name == 'pull_request' &&
       needs.deploy-preview.result == 'success'
@@ -383,7 +382,7 @@ jobs:
 
             ${{ steps.desktop.outputs.downloads }}
 
-            빌드 상태: `${{ needs.build.result }}`. 실패한 빌드는 CI 실행 로그를 확인하세요.
+            빌드 상태: `${{ needs.build-platforms.result }}`. 실패한 빌드는 CI 실행 로그를 확인하세요.
 
             다운로드에는 GitHub 로그인이 필요하며, 설치 파일은 업로드 후 7일간 보관합니다.
             코드 서명 인증서와 공증이 없는 테스트용 빌드이므로 OS 보안 경고가 표시될 수 있습니다.
@@ -394,7 +393,7 @@ jobs:
 
   deploy-preview:
     name: PR 프리뷰 배포
-    needs: [build, typecheck, test, lint, codeql]
+    needs: [build, build-platforms, typecheck, test, lint, codeql]
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.base.ref == 'main' &&
