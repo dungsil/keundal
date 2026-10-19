@@ -78,6 +78,8 @@ export default defineNuxtConfig({
   },
 
   fonts: {
-    provider: 'npm'
+    families: [
+      { name: 'Pretendard', provider: 'npm', weights: [400, 500, 700], global: true, preload: true }
+    ]
   }
 })
