@@ -1,5 +1,48 @@
-import { EventType, MessageAssembly, mergeMessages, type AgentMessage } from '@keundal/core'
+import { EventType, MessageAssembly, mergeMessages, prepareReplayMessages, type AgentMessage } from '@keundal/core'
 import { expect, test } from 'vitest'
+
+test.each(['provider/model-a', 'provider/model-b', 'other/model-a'])(
+  '%s에 재전송할 때 완료된 호출을 보존하고 같은 모델의 서명과 메타데이터만 유지한다',
+  (targetModel) => {
+    const signed: AgentMessage = { id: 'signed', role: 'reasoning', content: 'Reasoning', encryptedValue: 'signature' }
+    const call = {
+      id: 'complete',
+      type: 'function' as const,
+      function: { name: 'lookup', arguments: '{}' },
+      encryptedValue: 'tool-signature'
+    }
+    const reply: AgentMessage = {
+      id: 'reply',
+      role: 'assistant',
+      content: 'Answer',
+      metadata: { native: 'opaque' },
+      toolCalls: [call, { ...call, id: 'pending', function: { name: 'lookup', arguments: '{' } }]
+    }
+    const result: AgentMessage = { id: 'result', role: 'tool', toolCallId: 'complete', content: 'Found' }
+    const messages: AgentMessage[] = [
+      { id: 'user', role: 'user', content: 'Question' },
+      { id: 'unsigned', role: 'reasoning', content: 'Partial reasoning' },
+      signed,
+      reply,
+      result
+    ]
+    const original = structuredClone(messages)
+    const sameModel = targetModel === 'provider/model-a'
+    expect(prepareReplayMessages(messages, 'provider/model-a', targetModel)).toStrictEqual([
+      messages[0],
+      ...(sameModel ? [signed] : []),
+      {
+        ...reply,
+        metadata: sameModel ? { native: 'opaque' } : undefined,
+        toolCalls: [
+          sameModel ? call : { id: 'complete', type: 'function', function: { name: 'lookup', arguments: '{}' } }
+        ]
+      },
+      result
+    ])
+    expect(messages).toStrictEqual(original)
+  }
+)
 
 test('같은 ID를 재전송하면 기존 위치에서 마지막 값으로 교체하고 입력을 변경하지 않는다', () => {
   const stored: AgentMessage[] = [

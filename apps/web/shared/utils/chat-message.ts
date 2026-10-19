@@ -1,4 +1,4 @@
-import { EventType, LLM_SOURCE_EVENT, MessageAssembly, type AGUIEvent, type AgentMessage, type LLMSource } from '@keundal/core'
+import { EventType, LLM_SOURCE_EVENT, MessageAssembly, prepareReplayMessages, type AGUIEvent, type AgentMessage, type LLMSource } from '@keundal/core'
 
 export type ChatStatus = 'ready' | 'submitted' | 'streaming' | 'error'
 export type TextPart = { type: 'text', text: string, state?: 'streaming' | 'done' }
@@ -102,12 +102,7 @@ export class ChatMessageAssembly {
     for (const { part } of this.calls.values()) {
       if (part.state !== 'output-available') Object.assign(part, { state: 'output-error', errorText: 'Tool execution interrupted' })
     }
-    const results = new Set(this.assembly.messages.flatMap(item => item.role === 'tool' ? [item.toolCallId] : []))
-    const messages = this.assembly.messages
-      .filter(item => item.role !== 'reasoning' || !!item.encryptedValue)
-      .map(item => item.role === 'assistant'
-        ? { ...item, toolCalls: item.toolCalls?.filter(call => results.has(call.id)) }
-        : item)
+    const messages = prepareReplayMessages(this.assembly.messages, model, model)
     this.message.parts.push({ type: 'data-keundal', data: { model, messages } })
   }
 }

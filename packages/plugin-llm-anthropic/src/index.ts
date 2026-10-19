@@ -7,6 +7,7 @@ import { MessageEvents } from './events.js'
 import { createInput } from './request.js'
 
 export { AnthropicLLMConfigSchema, type AnthropicLLMConfig } from './config.js'
+export { listAnthropicModels } from './models.js'
 
 export class AnthropicLLMService extends LLMService {
   private readonly client: Anthropic

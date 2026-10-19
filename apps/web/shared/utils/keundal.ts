@@ -1,4 +1,4 @@
-import { EventType, parseRunAgentInput, type AgentMessage, type AGUIEvent } from '@keundal/core'
+import { EventType, parseRunAgentInput, prepareReplayMessages, type AgentMessage, type AGUIEvent } from '@keundal/core'
 import simpleAgentPlugin from '@keundal/plugin-agent-simple'
 import type { Context } from 'cordis'
 import { z } from 'zod'
@@ -18,12 +18,7 @@ export function toMessages(messages: ChatMessage[], model: string): AgentMessage
     if (message.role === 'assistant' && saved?.type === 'data-keundal') {
       const data = saved.data
       const parsed = parseRunAgentInput(input(data.messages)).messages
-      return parsed.flatMap((item): AgentMessage[] => {
-        if (resolveModel(data.model).value === resolveModel(model).value) return [item]
-        if (item.role === 'reasoning') return []
-        if (item.role !== 'assistant') return [item]
-        return [{ ...item, metadata: undefined, toolCalls: item.toolCalls?.map(({ encryptedValue: _value, ...call }) => call) }]
-      })
+      return prepareReplayMessages(parsed, resolveModel(data.model).value, resolveModel(model).value)
     }
     if (message.role === 'user') {
       const content: Exclude<Extract<AgentMessage, { role: 'user' }>['content'], string> = []

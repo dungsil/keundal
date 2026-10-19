@@ -19,6 +19,14 @@ export interface LLMModel {
   readonly maxOutputTokens: number
 }
 
+/** 모델 목록의 메타데이터입니다. 생성 지원 여부와 설정된 한도를 보장하지 않습니다. */
+export interface LLMModelInfo {
+  readonly id: string
+  readonly name: string
+  readonly contextWindow?: number
+  readonly maxOutputTokens?: number
+}
+
 export interface LLMRequest {
   readonly input: RunAgentInput
   readonly model: string
