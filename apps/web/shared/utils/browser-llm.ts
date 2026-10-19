@@ -35,9 +35,9 @@ export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMS
       await fiber
     } catch (error) {
       await dispose()
-      throw providerError(provider, error)
+      throw providerError(provider, error, credentials)
     }
-    return { llm: context.llm, provider, id, dispose }
+    return { llm: context.llm, provider, id, dispose, credentials }
   }
 
   class BrowserLLM extends LLMService {
@@ -58,7 +58,7 @@ export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMS
         return await service.llm.countTokens({ ...request, model: service.id }, options)
       } catch (error) {
         options?.signal?.throwIfAborted()
-        throw providerError(service.provider, error)
+        throw providerError(service.provider, error, service.credentials)
       } finally {
         await service.dispose()
       }
@@ -71,7 +71,7 @@ export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMS
         yield* service.llm.stream({ ...request, model: service.id }, options)
       } catch (error) {
         options?.signal?.throwIfAborted()
-        throw providerError(service.provider, error)
+        throw providerError(service.provider, error, service.credentials)
       } finally {
         await service.dispose()
       }

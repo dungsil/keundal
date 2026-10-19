@@ -127,8 +127,9 @@ export function useDictation() {
 
   async function open(abort: AbortController, { onMaxDuration }: { onMaxDuration?: () => void }) {
     const context = new Context()
+    const config = providerCredentials(settings.value, 'openai')
     const fiber = context.plugin(openaiTranscriptionPlugin, {
-      ...providerCredentials(settings.value, 'openai'),
+      ...config,
       dangerouslyAllowBrowser: true
     })
     let credentials: TranscriptionSession
@@ -137,7 +138,7 @@ export function useDictation() {
       credentials = await context.transcription.createSession({ model: 'gpt-4o-mini-transcribe', expiresAfterSeconds: 300 }, { signal: abort.signal })
     } catch (error) {
       abort.signal.throwIfAborted()
-      throw providerError('openai', error)
+      throw providerError('openai', error, config)
     } finally {
       await fiber.dispose()
     }

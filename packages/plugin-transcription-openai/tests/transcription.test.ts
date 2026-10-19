@@ -9,11 +9,16 @@ import { expect, test, onTestFinished, type TestContext } from 'vitest'
 import { WebSocketServer } from 'ws'
 
 async function fixture(t: Pick<TestContext, 'onTestFinished'>) {
-  const requests: { url?: string; authorization?: string; body: unknown }[] = []
+  const requests: { url?: string; authorization?: string; gateway?: string | string[]; body: unknown }[] = []
   const server = createServer(async (req, res) => {
     let body = ''
     for await (const chunk of req) body += chunk
-    requests.push({ url: req.url, authorization: req.headers.authorization, body: JSON.parse(body) })
+    requests.push({
+      url: req.url,
+      authorization: req.headers.authorization,
+      gateway: req.headers['x-gateway-token'],
+      body: JSON.parse(body)
+    })
     if (req.headers.authorization === 'Bearer pending') return
     res.setHeader('content-type', 'application/json')
     res.end(JSON.stringify({ value: 'ek_test', expires_at: 123456, session: { type: 'transcription' } }))
@@ -39,17 +44,23 @@ async function fixture(t: Pick<TestContext, 'onTestFinished'>) {
   return { ws, requests, session, baseURL: `http://127.0.0.1:${address.port}/v1` }
 }
 
-test('공개 서비스가 OpenAI REST 자격 증명과 PCM 세션을 생성하고 서버 키를 숨긴다', async (t) => {
+test('공개 서비스가 커스텀 HTTP 헤더로 PCM 세션을 생성하고 키·헤더를 WebSocket 세션에 넣지 않는다', async (t) => {
   const { baseURL, requests } = await fixture(t)
   const ctx = new Context()
-  const fiber = await ctx.plugin(plugin, { apiKey: 'server-key', baseURL })
+  const fiber = await ctx.plugin(plugin, {
+    apiKey: 'server-key',
+    baseURL,
+    headers: { 'X-Gateway-Token': 'private-gateway' }
+  })
   t.onTestFinished(() => fiber.dispose())
   const session = await ctx.transcription.createSession({ model: 'gpt-4o-mini-transcribe' })
   expect(JSON.stringify(session)).not.toContain('server-key')
+  expect(JSON.stringify(session)).not.toContain('private-gateway')
   expect(session.protocols).toEqual(['realtime', 'openai-insecure-api-key.ek_test'])
   expect(requests[0]).toEqual({
     url: '/v1/realtime/client_secrets',
     authorization: 'Bearer server-key',
+    gateway: 'private-gateway',
     body: {
       expires_after: { anchor: 'created_at', seconds: 300 },
       session: {

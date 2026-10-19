@@ -4,6 +4,7 @@ import type { StandardSchemaV1 } from '@standard-schema/spec'
 export interface GeminiLLMConfig {
   readonly apiKey?: string
   readonly baseURL?: string
+  readonly headers?: Readonly<Record<string, string>>
   readonly models: Readonly<Record<string, LLMModel>>
 }
 
@@ -20,6 +21,15 @@ export function parseConfig(value: unknown): GeminiLLMConfig {
       throw new Error(`${key} must be a non-empty string`)
     }
   }
+  if (
+    value.headers !== undefined &&
+    (!isRecord(value.headers) ||
+      Object.entries(value.headers).some(
+        ([name, header]) =>
+          !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name) || typeof header !== 'string' || !/^[\t\x20-\x7e]*$/.test(header)
+      ))
+  )
+    throw new Error('headers must contain valid HTTP names and ASCII string values without line breaks')
   const models: Record<string, LLMModel> = Object.create(null)
   for (const [name, limits] of Object.entries(value.models)) {
     if (
@@ -35,7 +45,12 @@ export function parseConfig(value: unknown): GeminiLLMConfig {
       throw new Error(`invalid model limits for ${name}`)
     models[name] = { contextWindow: limits.contextWindow, maxOutputTokens: limits.maxOutputTokens }
   }
-  return { apiKey: value.apiKey as string | undefined, baseURL: value.baseURL as string | undefined, models }
+  return {
+    apiKey: value.apiKey as string | undefined,
+    baseURL: value.baseURL as string | undefined,
+    headers: value.headers as Record<string, string> | undefined,
+    models
+  }
 }
 
 export const GeminiLLMConfigSchema: StandardSchemaV1<GeminiLLMConfig, GeminiLLMConfig> = {

@@ -4,11 +4,12 @@
 
 ## 설정
 
-| 설정      | 설명                                                                               |
-| --------- | ---------------------------------------------------------------------------------- |
-| `apiKey`  | Anthropic API 키입니다. 생략하면 SDK가 `ANTHROPIC_API_KEY`를 사용합니다.           |
-| `baseURL` | API 기본 주소입니다. 생략하면 SDK의 기본 설정을 사용합니다.                        |
-| `models`  | 모델 ID를 키로 사용하며, 각 값에 `contextWindow`와 `maxOutputTokens`를 지정합니다. |
+| 설정      | 설명                                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------- |
+| `apiKey`  | Anthropic API 키입니다. 생략하면 SDK가 `ANTHROPIC_API_KEY`를 사용합니다.                              |
+| `baseURL` | API 기본 주소입니다. 생략하면 SDK의 기본 설정을 사용합니다.                                           |
+| `headers` | 선택적인 HTTP 헤더 문자열 맵입니다. SDK의 `defaultHeaders`로 전달하며 기본 헤더를 덮어쓸 수 있습니다. |
+| `models`  | 모델 ID를 키로 사용하며, 각 값에 `contextWindow`와 `maxOutputTokens`를 지정합니다.                    |
 
 모델 한도는 [사용할 모델의 공식 문서](https://platform.claude.com/docs/en/about-claude/models/overview)에서 확인해 설정합니다. `getModel()`은 이 설정을 조회하며, 등록하지 않은 모델이나 한도를 초과하는 출력 예산은 요청 전에 거부합니다.
 

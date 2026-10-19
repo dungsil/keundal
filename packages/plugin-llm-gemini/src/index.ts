@@ -20,7 +20,7 @@ export class GeminiLLMService extends LLMService {
     this.models = parsed.models
     this.client = new GoogleGenAI({
       ...(parsed.apiKey ? { apiKey: parsed.apiKey } : {}),
-      ...(parsed.baseURL ? { httpOptions: { baseUrl: parsed.baseURL } } : {})
+      httpOptions: { baseUrl: parsed.baseURL, headers: parsed.headers }
     })
     ctx.fiber.effect(() => () => {
       this.closed = true

@@ -53,6 +53,15 @@ test('모델 캐시는 한 시간 미만에 재사용하고 만료·강제 갱�
   await loadModels('openai', settings, storage)
   expect(requests).toHaveLength(5)
   expect(requests[4]!.url).toBe('/gateway/other/models')
+  settings.openai.headers = { 'X-Gateway-Token': 'private-gateway', 'Authorization': 'Bearer custom-auth' }
+  await loadModels('openai', settings, storage)
+  expect(requests).toHaveLength(6)
+  expect(requests[5]!.headers['x-gateway-token']).toBe('private-gateway')
+  expect(requests[5]!.headers.authorization).toBe('Bearer custom-auth')
+  expect([...values.values()].join()).not.toContain('private-gateway')
+  settings.openai.headers = { 'authorization': 'Bearer custom-auth', 'x-gateway-token': 'private-gateway' }
+  await loadModels('openai', settings, storage)
+  expect(requests).toHaveLength(6)
 })
 
 test.each(['anthropic', 'google'] as const)('%s 모델 목록의 모든 페이지를 병합하고 공급자 인증과 모델 한도를 보존한다', async (provider) => {
@@ -62,10 +71,12 @@ test.each(['anthropic', 'google'] as const)('%s 모델 목록의 모든 페이�
       ? { models: [{ name: `models/model-${second ? 2 : 1}`, displayName: `Model ${second ? 2 : 1}`, supportedGenerationMethods: ['generateContent'], inputTokenLimit: 32768, outputTokenLimit: 8192 }, { name: 'models/embedding', supportedGenerationMethods: ['embedContent'] }], ...(!second ? { nextPageToken: 'next' } : {}) }
       : { data: [{ id: `model-${second ? 2 : 1}`, display_name: `Model ${second ? 2 : 1}`, max_input_tokens: 32768, max_tokens: 8192 }], has_more: !second, last_id: second ? 'end' : 'next' }))
   })
+  settings[provider].headers = { 'X-Gateway-Token': 'private-gateway' }
   const models = await loadModels(provider, settings, storage)
   expect(models.map(model => model.value)).toEqual([`${provider}/model-1`, `${provider}/model-2`])
   expect(models[1]).toMatchObject({ label: 'Model 2', contextWindow: 32768, maxOutputTokens: 8192 })
   expect(requests).toHaveLength(2)
+  expect(requests.every(request => request.headers['x-gateway-token'] === 'private-gateway')).toBe(true)
   expect(requests[0]!.url).toBe(provider === 'google' ? '/gateway/v1beta/models' : '/gateway/v1/models?limit=1000')
   expect(requests[0]!.headers[provider === 'google' ? 'x-goog-api-key' : 'x-api-key']).toBe(`private-${provider}`)
   if (provider === 'anthropic') expect(requests[0]!.headers['anthropic-dangerous-direct-browser-access']).toBe('true')
@@ -88,6 +99,23 @@ test('실패한 모델 조회는 키가 포함된 응답을 노출하거나 캐�
   expect(values.size).toBe(0)
   fail = false
   expect((await loadModels('openai', settings, storage))[0]!.value).toBe('openai/available')
+})
+
+test.each([
+  { body: { error: { message: 'Invalid region; key=private-openai; header=private-gateway' } }, detail: 'Invalid region' },
+  { body: { message: 'Invalid API version' }, detail: 'Invalid API version' },
+  { body: 'not JSON', detail: 'Check your API key' }
+])('400 모델 조회 오류의 원인은 표시하고 키·헤더는 숨기며 잘못된 본문은 일반 안내로 대체한다: $detail', async ({ body, detail }) => {
+  const { settings, storage } = await fixture((_req, res) => {
+    res.writeHead(400)
+    res.end(typeof body === 'string' ? body : JSON.stringify(body))
+  })
+  settings.openai.headers = { 'X-Gateway-Token': 'private-gateway' }
+  const error = await loadModels('openai', settings, storage).catch(error => error)
+  expect(error.message).toContain('HTTP 400')
+  expect(error.message).toContain(detail)
+  expect(error.message).not.toContain('private-openai')
+  expect(error.message).not.toContain('private-gateway')
 })
 
 test('취소한 모델 조회는 결과를 캐시하지 않는다', async () => {

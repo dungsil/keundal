@@ -21,6 +21,7 @@ export class AnthropicLLMService extends LLMService {
     this.client = new Anthropic({
       apiKey: parsed.apiKey,
       baseURL: parsed.baseURL,
+      defaultHeaders: parsed.headers,
       dangerouslyAllowBrowser: parsed.dangerouslyAllowBrowser,
       maxRetries: 0
     })

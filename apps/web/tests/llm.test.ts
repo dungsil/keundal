@@ -7,7 +7,7 @@ import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { browserLLMPlugin } from '../shared/utils/browser-llm'
 import { createKeundalChat as createChat } from '../shared/utils/keundal'
 import { ChatStore } from '../shared/utils/chat-store'
-import { defaultLLMSettings } from '../shared/utils/llm-settings'
+import { defaultLLMSettings, providerSettingsSchema } from '../shared/utils/llm-settings'
 
 async function createKeundalChat(name: string, options: { webSearch?: boolean, reasoning?: boolean }, env: Record<string, string>) {
   const ctx = new Context()
@@ -55,8 +55,9 @@ function send(response: ServerResponse, frames: Frame[]) {
   response.end(frames.map(frame => `${frame.type ? `event: ${frame.type}\n` : ''}data: ${JSON.stringify(frame)}\n\n`).join(''))
 }
 
-async function setup(handle: (body: Record<string, unknown>, response: ServerResponse, request: IncomingMessage) => void, tokenStatus = 200) {
+async function setup(handle: (body: Record<string, unknown>, response: ServerResponse, request: IncomingMessage) => void, tokenStatus = 200, onRequest?: (request: IncomingMessage) => void) {
   const server = createServer(async (request, response) => {
+    onRequest?.(request)
     const chunks: Buffer[] = []
     for await (const chunk of request) chunks.push(Buffer.from(chunk))
     if (/input_tokens|count_tokens|:countTokens/.test(request.url ?? '')) {
@@ -219,6 +220,54 @@ test('공급자 오류를 성공 응답으로 바꾸거나 자동 재시도하�
   expect(chunks).toContainEqual({ type: 'error', errorText: expect.stringContaining('HTTP 429') })
   expect(chunks.some(chunk => chunk.type === 'finish')).toBe(false)
   expect(calls).toBe(1)
+})
+
+test.each(['openai', 'anthropic', 'google'] as const)('%s의 토큰·제목·생성에 커스텀 헤더를 보내고 400 원인은 표시하되 비밀 값은 저장하지 않는다', async (provider) => {
+  const requests: IncomingMessage[] = []
+  let generations = 0
+  const baseURL = await setup((_body, response) => {
+    if (generations++ === 0) return send(response, provider === 'openai' ? openaiText('오류 확인') : provider === 'anthropic' ? anthropicText('오류 확인') : [{ responseId: 'title', candidates: [{ content: { role: 'model', parts: [{ text: '오류 확인' }] }, finishReason: 'STOP' }] }])
+    response.writeHead(400, { 'content-type': 'application/json' })
+    response.end(JSON.stringify({ error: { code: 400, message: 'Unsupported parameter: temperature; key=private-400-key; gateway=private-header; auth=custom-auth-token' } }))
+  }, 200, request => requests.push(request))
+  const authHeader = provider === 'openai' ? 'Authorization' : provider === 'anthropic' ? 'X-Api-Key' : 'X-Goog-Api-Key'
+  const settings = defaultLLMSettings()
+  settings[provider] = { apiKey: 'private-400-key', baseURL, headers: { 'X-Gateway-Token': 'private-header', [authHeader]: provider === 'openai' ? 'Bearer custom-auth-token' : 'custom-auth-token' } }
+  const ctx = new Context()
+  const llm = await ctx.plugin(browserLLMPlugin, { getSettings: () => settings })
+  const store = await ctx.plugin(memoryStorePlugin)
+  const chats = new ChatStore(ctx)
+  onTestFinished(async () => {
+    await chats.stop()
+    await store.dispose()
+    await llm.dispose()
+  })
+  const model = `${provider}/shared-model`
+  await chats.create('bad-request', user, model)
+  const chunks = await decode(await chats.respond('bad-request', { model, messages: [user] }))
+  expect(chunks).toContainEqual({ type: 'error', errorText: expect.stringContaining('HTTP 400). Unsupported parameter: temperature') })
+  expect(chunks.some(chunk => chunk.type === 'finish')).toBe(false)
+  expect(requests.some(request => /input_tokens|count_tokens|:countTokens/.test(request.url!))).toBe(true)
+  expect(generations).toBe(2)
+  for (const request of requests) {
+    expect(request.headers['x-gateway-token']).toBe('private-header')
+    expect(request.headers[authHeader.toLowerCase()]).toBe(provider === 'openai' ? 'Bearer custom-auth-token' : 'custom-auth-token')
+  }
+  const persisted = JSON.stringify({ session: await ctx.session.get('bad-request'), runs: await ctx.generation.list() })
+  expect((await ctx.generation.list())[0]!.status).toBe('failed')
+  for (const secret of ['private-400-key', 'private-header', 'custom-auth-token', baseURL]) {
+    expect(JSON.stringify(chunks)).not.toContain(secret)
+    expect(persisted).not.toContain(secret)
+  }
+})
+
+test('기존 헤더 없는 설정은 유지하고 잘못된 헤더 이름·줄바꿈·중복·숫자 값은 거부한다', () => {
+  const settings = { apiKey: 'key', baseURL: '' }
+  expect(providerSettingsSchema.parse(settings)).toEqual(settings)
+  expect(providerSettingsSchema.parse({ ...settings, headers: { 'X-Gateway': 'value' } }).headers).toEqual({ 'x-gateway': 'value' })
+  for (const headers of [{ 'bad name': 'value' }, { 'X-Key': 'value\r\nInjected: yes' }, { 'X-Key': 'one', 'x-key': 'two' }, { 'X-Key': 123 }, ['not-a-record']]) {
+    expect(providerSettingsSchema.safeParse({ ...settings, headers }).success).toBe(false)
+  }
 })
 
 test('토큰 계산이 404인 호환 API에서도 답변을 저장하고 생성 요청의 인증 오류는 숨기지 않는다', async () => {

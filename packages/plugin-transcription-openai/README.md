@@ -29,6 +29,8 @@ try {
 
 사용자 자신의 키로 브라우저에서 직접 발급하려면 플러그인에 `apiKey`와 `dangerouslyAllowBrowser: true`를 명시합니다. 생략하면 SDK의 브라우저 실행 차단을 유지합니다. 키 노출 위험을 안내하고 엔드포인트의 CORS 지원을 확인해야 하며, 서버 소유 비밀 키를 번들에 넣으면 안 됩니다.
 
+선택적인 `headers: Record<string, string>`는 자격 증명 발급 HTTP 요청의 SDK `defaultHeaders`에 전달합니다. 브라우저의 CORS·금지 헤더 제한은 그대로 적용됩니다. 이 헤더는 반환되는 세션에 포함하지 않으며 브라우저 WebSocket 연결에도 전송하지 않습니다.
+
 발급된 단기 자격 증명으로 스트리밍할 때는 SDK/Cordis 런타임을 가져오지 않는 별도 진입점을 사용합니다.
 
 ```ts

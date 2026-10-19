@@ -28,14 +28,15 @@ export function resolveModel(value: string) {
 async function cacheScope(provider: LLMProvider, settings: LLMSettings) {
   const credentials = providerCredentials(settings, provider)
   const baseURL = (credentials.baseURL || LLM_PROVIDERS.find(item => item.id === provider)!.baseURL).replace(/\/+$/, '')
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([provider, baseURL, credentials.apiKey])))
-  return { scope: Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join(''), baseURL, apiKey: credentials.apiKey }
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([provider, baseURL, credentials.apiKey, Object.entries(credentials.headers ?? {}).sort(([a], [b]) => a.localeCompare(b))])))
+  return { scope: Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join(''), baseURL, credentials }
 }
 
 /** Lists provider metadata only. A listed model may not support this app's tools/streaming API. */
 export async function loadModels(provider: LLMProvider, settings: LLMSettings, storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>, options: { force?: boolean, signal?: AbortSignal } = {}): Promise<ModelOption[]> {
   const key = `keundal:models:${provider}`
-  const { scope, baseURL, apiKey } = await cacheScope(provider, settings)
+  const { scope, baseURL, credentials } = await cacheScope(provider, settings)
+  const { apiKey } = credentials
   options.signal?.throwIfAborted()
   try {
     const cached = cacheSchema.safeParse(JSON.parse(storage.getItem(key) || 'null'))
@@ -50,6 +51,7 @@ export async function loadModels(provider: LLMProvider, settings: LLMSettings, s
     : provider === 'anthropic'
       ? { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
       : { 'x-goog-api-key': apiKey }
+  Object.assign(headers, credentials.headers)
   const path = provider === 'openai' ? '/models' : provider === 'anthropic' ? '/v1/models' : '/v1beta/models'
   const models = new Map<string, ModelOption>()
   const cursors = new Set<string>()
@@ -60,7 +62,7 @@ export async function loadModels(provider: LLMProvider, settings: LLMSettings, s
       if (provider === 'anthropic') url.searchParams.set('limit', '1000')
       if (cursor) url.searchParams.set(provider === 'google' ? 'pageToken' : 'after_id', cursor)
       const response = await fetch(url, { headers, signal, cache: 'no-store', credentials: 'omit' })
-      if (!response.ok) throw response
+      if (!response.ok) throw { status: response.status, error: response.status === 400 ? await response.json().catch(() => undefined) : undefined }
       const page = z.object({
         data: z.array(z.object({ id: z.string().min(1), display_name: z.string().optional(), max_input_tokens: z.number().positive().nullish(), max_tokens: z.number().positive().nullish() })).optional(),
         models: z.array(z.object({ name: z.string().min(1), displayName: z.string().optional(), supportedGenerationMethods: z.array(z.string()).optional(), inputTokenLimit: z.number().positive().optional(), outputTokenLimit: z.number().positive().optional() })).optional(),
@@ -93,7 +95,6 @@ export async function loadModels(provider: LLMProvider, settings: LLMSettings, s
     return result
   } catch (error) {
     options.signal?.throwIfAborted()
-    // Do not expose a provider response that might reflect the API key.
-    throw providerError(provider, error)
+    throw providerError(provider, error, credentials)
   }
 }

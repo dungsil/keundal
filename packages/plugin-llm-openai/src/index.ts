@@ -22,6 +22,7 @@ export class OpenAILLMService extends LLMService {
     this.client = new OpenAI({
       apiKey: parsed.apiKey,
       baseURL: parsed.baseURL,
+      defaultHeaders: parsed.headers,
       dangerouslyAllowBrowser: parsed.dangerouslyAllowBrowser,
       maxRetries: 0
     })

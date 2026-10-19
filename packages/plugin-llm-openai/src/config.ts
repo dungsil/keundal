@@ -4,6 +4,7 @@ import type { StandardSchemaV1 } from '@standard-schema/spec'
 export interface OpenAILLMConfig {
   readonly apiKey?: string
   readonly baseURL?: string
+  readonly headers?: Readonly<Record<string, string>>
   readonly dangerouslyAllowBrowser?: boolean
   readonly models: Readonly<Record<string, LLMModel>>
 }
@@ -21,6 +22,15 @@ export function parseConfig(value: unknown): OpenAILLMConfig {
       throw new Error(`${key} must be a non-empty string`)
     }
   }
+  if (
+    value.headers !== undefined &&
+    (!isRecord(value.headers) ||
+      Object.entries(value.headers).some(
+        ([name, header]) =>
+          !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name) || typeof header !== 'string' || !/^[\t\x20-\x7e]*$/.test(header)
+      ))
+  )
+    throw new Error('headers must contain valid HTTP names and ASCII string values without line breaks')
   if (value.dangerouslyAllowBrowser !== undefined && typeof value.dangerouslyAllowBrowser !== 'boolean')
     throw new Error('dangerouslyAllowBrowser must be a boolean')
   const models: Record<string, LLMModel> = Object.create(null)
@@ -41,6 +51,7 @@ export function parseConfig(value: unknown): OpenAILLMConfig {
   return {
     apiKey: value.apiKey as string | undefined,
     baseURL: value.baseURL as string | undefined,
+    headers: value.headers as Record<string, string> | undefined,
     dangerouslyAllowBrowser: value.dangerouslyAllowBrowser as boolean | undefined,
     models
   }
