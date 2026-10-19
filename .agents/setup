@@ -30,6 +30,23 @@ EOF
 fi
 echo "Toolchain ready in ${SECONDS}s: $(node --version), pnpm $(pnpm --version)"
 
+echo 'Preparing Rust for desktop filesystem tests'
+SECONDS=0
+export PATH="$HOME/.cargo/bin:$PATH"
+if ! command -v rustc >/dev/null 2>&1; then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+    sh -s -- -y --profile minimal --default-toolchain stable --no-modify-path
+fi
+profile_marker='# Keundal orb Rust toolchain'
+if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
+  cat >> "$HOME/.bash_profile" <<'EOF'
+
+# Keundal orb Rust toolchain
+export PATH="$HOME/.cargo/bin:$PATH"
+EOF
+fi
+echo "Rust ready in ${SECONDS}s: $(rustc --version)"
+
 echo 'Installing workspace dependencies from the lockfile'
 SECONDS=0
 pnpm install --frozen-lockfile

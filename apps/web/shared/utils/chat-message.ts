@@ -79,9 +79,11 @@ export class ChatMessageAssembly {
         Object.assign(call.part, { state: 'input-available', input: JSON.parse(call.args) })
         break
       }
-      case EventType.TOOL_CALL_RESULT:
-        Object.assign(this.calls.get(event.toolCallId)!.part, { state: 'output-available', output: JSON.parse(event.content as string) })
+      case EventType.TOOL_CALL_RESULT: {
+        const { part } = this.calls.get(event.toolCallId)!
+        Object.assign(part, { state: 'output-available', output: part.type === 'tool-skill' ? event.content : JSON.parse(event.content as string) })
         break
+      }
       case EventType.CUSTOM:
         if (event.name === LLM_SOURCE_EVENT) {
           const source = event.value as LLMSource

@@ -145,7 +145,10 @@ defineShortcuts({
 
       <template #footer="{ collapsed }">
         <ClientOnly>
-          <LLMSettings :collapsed="collapsed" />
+          <div class="flex flex-col gap-1 w-full">
+            <SkillSettings :collapsed="collapsed" />
+            <LLMSettings :collapsed="collapsed" />
+          </div>
         </ClientOnly>
       </template>
     </UDashboardSidebar>

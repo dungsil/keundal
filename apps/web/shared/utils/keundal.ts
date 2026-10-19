@@ -55,6 +55,7 @@ export async function createKeundalChat(context: Context, name: string, options:
     webSearch: !!options.webSearch && config.provider !== 'google',
     reasoning: options.reasoning === false && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id) ? undefined : options.reasoning,
     maxToolRounds: 4,
+    skills: !!context.skills,
     tools: Object.entries({ chart: chartTool, weather: weatherTool }).map(([name, tool]) => ({
       name,
       description: tool.description,

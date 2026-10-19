@@ -3,7 +3,8 @@ import { resolve } from 'node:path'
 
 import type { ExecutionOptions, SkillCatalog, SkillDefinition, SkillProvider } from '@keundal/core'
 import type { Context } from 'cordis'
-import { parse } from 'yaml'
+
+import { parseSkillMarkdown } from './markdown.js'
 
 export interface FilesystemSkillConfig {
   readonly roots: readonly string[]
@@ -13,21 +14,9 @@ export interface FilesystemSkillConfig {
 async function readSkill(path: string, options?: ExecutionOptions): Promise<SkillDefinition> {
   options?.signal?.throwIfAborted()
   try {
-    const text = (await readFile(path, { encoding: 'utf8', signal: options?.signal })).replace(/^\uFEFF/, '')
+    const text = await readFile(path, { encoding: 'utf8', signal: options?.signal })
     options?.signal?.throwIfAborted()
-    const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text)
-    if (!match) throw new Error('YAML frontmatter is required')
-    const metadata: unknown = parse(match[1])
-    if (typeof metadata !== 'object' || metadata === null || !('name' in metadata) || !('description' in metadata)) {
-      throw new Error('name and description are required')
-    }
-    const { name, description } = metadata
-    if (typeof name !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) throw new Error('invalid skill name')
-    if (typeof description !== 'string' || !description.trim())
-      throw new Error('description must be a non-empty string')
-    const content = text.slice(match[0].length).trim()
-    if (!content) throw new Error('skill content must not be empty')
-    return { name, description, content }
+    return parseSkillMarkdown(text)
   } catch (cause) {
     options?.signal?.throwIfAborted()
     throw new Error(`failed to read skill ${path}: ${cause instanceof Error ? cause.message : String(cause)}`, {

@@ -319,6 +319,12 @@ importers:
       '@keundal/plugin-llm-openai':
         specifier: workspace:*
         version: link:../../packages/plugin-llm-openai
+      '@keundal/plugin-skill':
+        specifier: workspace:*
+        version: link:../../packages/plugin-skill
+      '@keundal/plugin-skill-filesystem':
+        specifier: workspace:*
+        version: link:../../packages/plugin-skill-filesystem
       '@keundal/plugin-store-indexeddb':
         specifier: workspace:*
         version: link:../../packages/plugin-store-indexeddb
