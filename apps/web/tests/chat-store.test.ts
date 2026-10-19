@@ -12,7 +12,7 @@ import { expect, onTestFinished, test } from 'vitest'
 import { ChatStore } from '../shared/utils/chat-store'
 import { browserLLMPlugin } from '../shared/utils/browser-llm'
 import { defaultLLMSettings } from '../shared/utils/llm-settings'
-import { useKeundalChat } from '../app/composables/useKeundalChat'
+import { useKeundalChat } from '../../../packages/ui/app/composables/useKeundalChat'
 
 const model = 'openai/gpt-5-nano'
 const user: ChatMessage = { id: 'user', role: 'user', parts: [
