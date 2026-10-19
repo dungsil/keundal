@@ -9,7 +9,7 @@ const { $chatStore } = useNuxtApp()
 const toast = useToast()
 const provider = ref<LLMProvider>('anthropic')
 const draft = ref(defaultLLMSettings())
-const headerText = ref({ anthropic: '', google: '', openai: '' })
+const headerRows = ref<Record<LLMProvider, { id: string, key: string, value: string }[]>>({ anthropic: [], google: [], openai: [] })
 const error = ref('')
 const saving = ref(false)
 const current = computed(() => LLM_PROVIDERS.find(item => item.id === provider.value)!)
@@ -18,15 +18,22 @@ watch(open, (value) => {
   error.value = ''
   if (value) {
     draft.value = JSON.parse(JSON.stringify(settings.value))
-    for (const item of LLM_PROVIDERS) headerText.value[item.id] = Object.keys(draft.value[item.id].headers ?? {}).length ? JSON.stringify(draft.value[item.id].headers, null, 2) : ''
+    for (const item of LLM_PROVIDERS) headerRows.value[item.id] = Object.entries(draft.value[item.id].headers ?? {}).map(([key, value]) => ({ id: crypto.randomUUID(), key, value }))
     provider.value = requestedProvider.value ?? LLM_PROVIDERS.find(item => model.value.startsWith(`${item.id}/`))?.id ?? 'anthropic'
     requestedProvider.value = null
   } else {
     // Do not retain an extra copy of credentials after closing the form.
     draft.value = defaultLLMSettings()
-    headerText.value = { anthropic: '', google: '', openai: '' }
+    headerRows.value = { anthropic: [], google: [], openai: [] }
   }
 })
+
+async function addHeader() {
+  const id = crypto.randomUUID()
+  headerRows.value[provider.value].push({ id, key: '', value: '' })
+  await nextTick()
+  document.getElementById(id)?.focus()
+}
 
 async function save(forget = false) {
   error.value = ''
@@ -34,13 +41,18 @@ async function save(forget = false) {
   if (forget) next[provider.value] = { apiKey: '', baseURL: '' }
   else {
     for (const item of LLM_PROVIDERS) {
-      try {
-        draft.value[item.id].headers = JSON.parse(headerText.value[item.id] || '{}')
-      } catch {
+      const rows = headerRows.value[item.id].map(row => ({ key: row.key.trim(), value: row.value })).filter(row => row.key || row.value)
+      if (rows.some(row => !row.key)) {
         provider.value = item.id
-        error.value = 'Request headers must be a JSON object with string values.'
+        error.value = 'Enter a key for every request header value.'
         return
       }
+      if (new Set(rows.map(row => row.key.toLowerCase())).size !== rows.length) {
+        provider.value = item.id
+        error.value = 'Duplicate request header names'
+        return
+      }
+      draft.value[item.id].headers = Object.fromEntries(rows.map(row => [row.key, row.value]))
       const parsed = providerSettingsSchema.safeParse(draft.value[item.id])
       if (!parsed.success) {
         provider.value = item.id
@@ -119,18 +131,55 @@ async function save(forget = false) {
             :disabled="saving"
           />
         </UFormField>
-        <UFormField label="Request headers (JSON, optional)" name="headers" description="Custom headers override provider defaults for HTTP requests, including model discovery. Your endpoint must allow them via CORS; browser-forbidden headers cannot be set. WebSocket connections cannot use custom headers.">
-          <UTextarea
-            v-model="headerText[provider]"
-            :placeholder="'{\n  &quot;X-API-Version&quot;: &quot;2026-10-01&quot;\n}'"
-            autocomplete="off"
-            autocapitalize="off"
-            :spellcheck="false"
-            :rows="3"
-            class="w-full font-mono"
+        <fieldset class="space-y-3">
+          <legend class="text-sm font-medium text-highlighted">
+            Request headers (optional)
+          </legend>
+          <p class="text-sm text-muted">
+            Custom headers override provider defaults for HTTP requests, including model discovery. Your endpoint must allow them via CORS; browser-forbidden headers cannot be set. WebSocket connections cannot use custom headers.
+          </p>
+          <div v-for="(row, index) in headerRows[provider]" :key="row.id" class="flex items-start gap-2">
+            <UInput
+              :id="row.id"
+              v-model="row.key"
+              :aria-label="`Header ${index + 1} key`"
+              placeholder="Key"
+              autocomplete="off"
+              autocapitalize="off"
+              :spellcheck="false"
+              class="min-w-0 flex-1"
+              :disabled="saving"
+            />
+            <UInput
+              v-model="row.value"
+              :aria-label="`Header ${index + 1} value`"
+              placeholder="Value"
+              autocomplete="off"
+              autocapitalize="off"
+              :spellcheck="false"
+              class="min-w-0 flex-1"
+              :disabled="saving"
+            />
+            <UButton
+              type="button"
+              icon="i-lucide-trash-2"
+              :aria-label="`Remove header ${index + 1}`"
+              color="neutral"
+              variant="ghost"
+              :disabled="saving"
+              @click="headerRows[provider].splice(index, 1)"
+            />
+          </div>
+          <UButton
+            type="button"
+            label="Add header"
+            icon="i-lucide-plus"
+            color="neutral"
+            variant="outline"
             :disabled="saving"
+            @click="addHeader"
           />
-        </UFormField>
+        </fieldset>
         <UAlert
           icon="i-lucide-shield-alert"
           color="neutral"
