@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { parseSkillMarkdown } from '@keundal/plugin-skill-filesystem/markdown'
+
 import { managedSkillSchema, type LocalSkillFile, type ManagedSkill, type SkillSettings } from '#shared/utils/skills'
 
 defineProps<{ collapsed?: boolean }>()
@@ -19,6 +20,10 @@ const selectedFile = ref<LocalSkillFile | null>(null)
 const deleting = ref(false)
 const importInput = ref<HTMLInputElement | null>(null)
 const blank = (): ManagedSkill => ({ name: '', description: '', content: '', enabled: true })
+function backToSkills() {
+  editing.value = false
+  error.value = ''
+}
 const draft = ref(blank())
 
 async function refreshFiles() {
@@ -64,7 +69,11 @@ function edit(skill?: ManagedSkill, file?: LocalSkillFile) {
   deleting.value = false
   originalName.value = skill?.name ?? null
   selectedFile.value = file ?? null
-  draft.value = skill ? { ...skill } : file?.definition ? { ...file.definition, enabled: !settings.value.disabledFiles.includes(file.path) } : blank()
+  draft.value = skill
+    ? { ...skill }
+    : file?.definition
+      ? { ...file.definition, enabled: !settings.value.disabledFiles.includes(file.path) }
+      : blank()
   editing.value = true
 }
 
@@ -80,11 +89,15 @@ function save() {
     return
   }
   const skills = settings.value.skills.filter(skill => skill.name !== originalName.value)
-  if (persist({ ...settings.value, skills: [...skills, parsed.data].sort((a, b) => a.name.localeCompare(b.name)) })) editing.value = false
+  if (persist({ ...settings.value, skills: [...skills, parsed.data].sort((a, b) => a.name.localeCompare(b.name)) }))
+    editing.value = false
 }
 
 function remove() {
-  if (persist({ ...settings.value, skills: settings.value.skills.filter(skill => skill.name !== originalName.value) })) editing.value = false
+  if (
+    persist({ ...settings.value, skills: settings.value.skills.filter(skill => skill.name !== originalName.value) })
+  )
+    editing.value = false
 }
 
 async function importFile(event: Event) {
@@ -142,7 +155,7 @@ function toggleFile(path: string, enabled: boolean) {
               icon="i-lucide-arrow-left"
               variant="ghost"
               color="neutral"
-              @click="editing = false; error = ''"
+              @click="backToSkills"
             />
             <UBadge
               v-if="selectedFile"
@@ -166,7 +179,11 @@ function toggleFile(path: string, enabled: boolean) {
                 :readonly="!!selectedFile"
               />
             </UFormField>
-            <UFormField label="Description" name="skill-description" description="Tell the assistant when to use this skill.">
+            <UFormField
+              label="Description"
+              name="skill-description"
+              description="Tell the assistant when to use this skill."
+            >
               <UTextarea
                 v-model="draft.description"
                 aria-label="Skill description"
@@ -176,7 +193,11 @@ function toggleFile(path: string, enabled: boolean) {
                 :readonly="!!selectedFile"
               />
             </UFormField>
-            <UFormField label="Instructions" name="skill-instructions" description="Markdown is supported. Supporting files are not loaded automatically.">
+            <UFormField
+              label="Instructions"
+              name="skill-instructions"
+              description="Markdown is supported. Supporting files are not loaded automatically."
+            >
               <UTextarea
                 v-model="draft.content"
                 aria-label="Skill instructions"
@@ -188,7 +209,10 @@ function toggleFile(path: string, enabled: boolean) {
             </UFormField>
             <USwitch v-if="!selectedFile" v-model="draft.enabled" label="Enabled for new responses" />
           </form>
-          <div v-if="deleting" class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-error/30 p-3">
+          <div
+            v-if="deleting"
+            class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-error/30 p-3"
+          >
             <p class="text-sm">
               Delete {{ originalName }}? This cannot be undone.
             </p>
@@ -228,7 +252,10 @@ function toggleFile(path: string, enabled: boolean) {
               <UButton label="New skill" icon="i-lucide-plus" @click="edit()" />
             </div>
           </div>
-          <div v-if="!settings.skills.length" class="rounded-lg border border-dashed border-default px-4 py-8 text-center">
+          <div
+            v-if="!settings.skills.length"
+            class="rounded-lg border border-dashed border-default px-4 py-8 text-center"
+          >
             <UIcon name="i-lucide-book-open" class="size-7 text-dimmed" />
             <p class="mt-2 text-sm font-medium">
               No saved skills yet
@@ -247,7 +274,18 @@ function toggleFile(path: string, enabled: boolean) {
                   {{ skill.description }}
                 </p>
               </div>
-              <USwitch :model-value="skill.enabled" :aria-label="`Enable ${skill.name}`" @update:model-value="persist({ ...settings, skills: settings.skills.map(item => item.name === skill.name ? { ...item, enabled: $event } : item) })" />
+              <USwitch
+                :model-value="skill.enabled"
+                :aria-label="`Enable ${skill.name}`"
+                @update:model-value="
+                  persist({
+                    ...settings,
+                    skills: settings.skills.map((item) =>
+                      item.name === skill.name ? { ...item, enabled: $event } : item
+                    )
+                  })
+                "
+              />
               <UButton
                 label="Edit"
                 color="neutral"
@@ -263,7 +301,11 @@ function toggleFile(path: string, enabled: boolean) {
 
           <div v-if="desktop" class="space-y-3 border-t border-default pt-5">
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <USwitch :model-value="settings.loadLocal" label="Load .agents/skills" @update:model-value="persist({ ...settings, loadLocal: $event })" />
+              <USwitch
+                :model-value="settings.loadLocal"
+                label="Load .agents/skills"
+                @update:model-value="persist({ ...settings, loadLocal: $event })"
+              />
               <UButton
                 label="Refresh files"
                 icon="i-lucide-refresh-cw"
@@ -274,7 +316,8 @@ function toggleFile(path: string, enabled: boolean) {
               />
             </div>
             <p class="text-xs text-muted">
-              The app reads its launch directory and your home directory. Saved skills take priority, then launch-directory files.
+              The app reads its launch directory and your home directory. Saved skills take priority, then
+              launch-directory files.
             </p>
             <p v-for="root in roots" :key="root" class="text-xs text-muted break-all">
               {{ root }}
@@ -300,7 +343,10 @@ function toggleFile(path: string, enabled: boolean) {
                   <p v-if="file.error" class="text-xs text-error">
                     {{ file.error }}
                   </p>
-                  <p v-else-if="settings.skills.some(skill => skill.enabled && skill.name === file.definition?.name)" class="text-xs text-muted">
+                  <p
+                    v-else-if="settings.skills.some((skill) => skill.enabled && skill.name === file.definition?.name)"
+                    class="text-xs text-muted"
+                  >
                     A saved skill with this name takes priority.
                   </p>
                 </div>
@@ -338,13 +384,17 @@ function toggleFile(path: string, enabled: boolean) {
           variant="ghost"
           @click="deleting = true"
         />
-        <span v-else class="text-xs text-muted">{{ editing && selectedFile ? 'Edit this file in your text editor.' : 'Enabled skills are available in every chat.' }}</span>
+        <span v-else class="text-xs text-muted">{{
+          editing && selectedFile
+            ? 'Edit this file in your text editor.'
+            : 'Enabled skills are available in every chat.'
+        }}</span>
         <div class="flex gap-2">
           <UButton
             :label="editing && !selectedFile ? 'Cancel' : 'Done'"
             color="neutral"
             variant="ghost"
-            @click="editing ? editing = false : open = false"
+            @click="editing ? (editing = false) : (open = false)"
           />
           <UButton
             v-if="editing && !selectedFile"

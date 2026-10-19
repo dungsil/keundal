@@ -8,7 +8,7 @@ const { selectedModel, models, loading, error, refresh } = useModels()
     :items="models"
     :loading="loading"
     size="sm"
-    :icon="models.find(m => m.value === selectedModel)?.icon"
+    :icon="models.find((m) => m.value === selectedModel)?.icon"
     color="neutral"
     variant="ghost"
     value-key="value"
@@ -17,7 +17,11 @@ const { selectedModel, models, loading, error, refresh } = useModels()
       content: 'w-80 max-w-[calc(100vw-2rem)]',
       trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200'
     }"
-    @update:open="value => { if (value) refresh(false) }"
+    @update:open="
+      (value) => {
+        if (value) refresh(false)
+      }
+    "
   >
     <template #content-bottom>
       <div class="border-t border-default p-2 space-y-2 max-w-80">
@@ -25,7 +29,8 @@ const { selectedModel, models, loading, error, refresh } = useModels()
           {{ error }}
         </p>
         <p class="text-xs text-muted">
-          Provider models are cached in this browser for 1 hour. Listed models must support this app's text, tools and token-counting APIs.
+          Provider models are cached in this browser for 1 hour. Listed models must support this app's text, tools and
+          token-counting APIs.
         </p>
         <UButton
           label="Refresh models"

@@ -1,10 +1,15 @@
-import { shallowRef } from 'vue'
 import { EventType } from '@keundal/core'
-import type { ChatStore } from '../../shared/utils/chat-store'
-import type { ChatMessage, ChatStatus, FilePart } from '../../shared/utils/chat-message'
+import { shallowRef } from 'vue'
+
+import type { ChatMessage, ChatStatus, FilePart } from '#shared/utils/chat-message'
+import type { ChatStore } from '#shared/utils/chat-store'
 
 export function useKeundalChat(options: {
-  respond: (messages: ChatMessage[], onMessage: (message: ChatMessage) => void, signal: AbortSignal) => ReturnType<ChatStore['respond']>
+  respond: (
+    messages: ChatMessage[],
+    onMessage: (message: ChatMessage) => void,
+    signal: AbortSignal
+  ) => ReturnType<ChatStore['respond']>
   onFinish?: () => Promise<void>
   onError?: (error: Error) => void
 }) {
@@ -21,11 +26,18 @@ export function useKeundalChat(options: {
     // Defer execution until active is assigned, including synchronous failures.
     const done = Promise.resolve().then(async () => {
       try {
-        for await (const event of options.respond(messages.value, (message) => {
-          const index = messages.value.findIndex(item => item.id === message.id)
-          messages.value = index < 0 ? [...messages.value, message] : messages.value.map(item => item.id === message.id ? message : item)
-          if (!abort.signal.aborted) status.value = 'streaming'
-        }, abort.signal)) {
+        for await (const event of options.respond(
+          messages.value,
+          (message) => {
+            const index = messages.value.findIndex(item => item.id === message.id)
+            messages.value
+              = index < 0
+                ? [...messages.value, message]
+                : messages.value.map(item => (item.id === message.id ? message : item))
+            if (!abort.signal.aborted) status.value = 'streaming'
+          },
+          abort.signal
+        )) {
           if (event.type === EventType.RUN_ERROR && !abort.signal.aborted) {
             // Drain the iterator before reporting the error so partial output is saved.
             error.value = new Error(event.message)
@@ -56,7 +68,8 @@ export function useKeundalChat(options: {
   async function sendMessage(input: { text: string, files?: FilePart[], messageId?: string }) {
     if (active) return
     const message: ChatMessage = {
-      id: input.messageId ?? crypto.randomUUID(), role: 'user',
+      id: input.messageId ?? crypto.randomUUID(),
+      role: 'user',
       parts: [{ type: 'text', text: input.text }, ...(input.files ?? [])]
     }
     if (input.messageId) {

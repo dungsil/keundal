@@ -19,11 +19,15 @@ defineProps<{
             scale: 0.5,
             opacity: 0
           }"
-          :animate="show ? {
-            rotate: -15,
-            scale: 1,
-            opacity: 1
-          } : {}"
+          :animate="
+            show
+              ? {
+                  rotate: -15,
+                  scale: 1,
+                  opacity: 1
+                }
+              : {}
+          "
           :transition="{
             type: 'spring',
             stiffness: 400,
@@ -39,11 +43,15 @@ defineProps<{
             opacity: 0,
             y: 0
           }"
-          :animate="show ? {
-            scale: 1,
-            opacity: 1,
-            y: 0
-          } : {}"
+          :animate="
+            show
+              ? {
+                  scale: 1,
+                  opacity: 1,
+                  y: 0
+                }
+              : {}
+          "
           :transition="{
             type: 'spring',
             stiffness: 500,
@@ -60,11 +68,15 @@ defineProps<{
             scale: 0.5,
             opacity: 0
           }"
-          :animate="show ? {
-            rotate: 15,
-            scale: 1,
-            opacity: 1
-          } : {}"
+          :animate="
+            show
+              ? {
+                  rotate: 15,
+                  scale: 1,
+                  opacity: 1
+                }
+              : {}
+          "
           :transition="{
             type: 'spring',
             stiffness: 400,
@@ -81,21 +93,21 @@ defineProps<{
           opacity: 0,
           y: 10
         }"
-        :animate="show ? {
-          opacity: 1,
-          y: 0
-        } : {}"
+        :animate="
+          show
+            ? {
+                opacity: 1,
+                y: 0
+              }
+            : {}
+        "
         :transition="{
           delay: 0.08,
           duration: 0.2
         }"
       >
-        <p class="text-lg/7 font-medium mt-4">
-          Drop your files here
-        </p>
-        <p class="text-sm/6 text-muted">
-          Supported formats: Images, PDFs, CSV files
-        </p>
+        <p class="text-lg/7 font-medium mt-4">Drop your files here</p>
+        <p class="text-sm/6 text-muted">Supported formats: Images, PDFs, CSV files</p>
       </Motion>
     </div>
   </div>

@@ -20,7 +20,7 @@ defineProps<{
         class="size-4 shrink-0 rounded-sm"
         loading="lazy"
         @error="($event.target as HTMLImageElement).style.display = 'none'"
-      >
+      />
       <span class="truncate">{{ source.title || getDomain(source.url) }}</span>
       <span v-if="source.title" class="text-xs text-dimmed ms-auto shrink-0">{{ getDomain(source.url) }}</span>
     </a>

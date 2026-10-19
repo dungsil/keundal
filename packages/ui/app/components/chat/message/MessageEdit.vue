@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ChatMessage } from '../../../../shared/utils/chat-message'
+import type { ChatMessage } from '#shared/utils/chat-message'
 
 const props = defineProps<{
   message: ChatMessage
@@ -16,24 +16,10 @@ const editingText = ref(props.text)
 
 <template>
   <div class="flex flex-col gap-2 w-full">
-    <UTextarea
-      v-model="editingText"
-      autofocus
-      autoresize
-      :rows="1"
-      size="xl"
-      variant="none"
-      :ui="{ base: 'p-0' }"
-    />
+    <UTextarea v-model="editingText" autofocus autoresize :rows="1" size="xl" variant="none" :ui="{ base: 'p-0' }" />
 
     <div class="flex gap-1.5 justify-end">
-      <UButton
-        size="sm"
-        variant="soft"
-        color="neutral"
-        label="Cancel"
-        @click="emit('cancel')"
-      />
+      <UButton size="sm" variant="soft" color="neutral" label="Cancel" @click="emit('cancel')" />
       <UButton
         size="sm"
         label="Save"

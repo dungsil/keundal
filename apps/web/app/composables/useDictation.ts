@@ -1,22 +1,21 @@
-import type { TranscriptionSession } from '@keundal/plugin-transcription-openai/client'
 import openaiTranscriptionPlugin from '@keundal/plugin-transcription-openai'
+import type { TranscriptionSession } from '@keundal/plugin-transcription-openai/client'
+import { encodeRealtimeAudio, resampleAudio, streamTranscription } from '@keundal/plugin-transcription-openai/client'
 import { Context } from 'cordis'
+
 import { providerCredentials, providerError } from '#shared/utils/llm-settings'
-import {
-  encodeRealtimeAudio,
-  resampleAudio,
-  streamTranscription
-} from '@keundal/plugin-transcription-openai/client'
 
 const SAMPLE_RATE = 24_000
 // Recordings stop on their own after this long.
 const MAX_DURATION = 120_000
 
 export function isDictationSupported() {
-  return typeof window !== 'undefined'
+  return (
+    typeof window !== 'undefined'
     && typeof AudioContext !== 'undefined'
     && typeof WebSocket !== 'undefined'
     && !!navigator.mediaDevices?.getUserMedia
+  )
 }
 
 interface Session {
@@ -135,7 +134,10 @@ export function useDictation() {
     let credentials: TranscriptionSession
     try {
       await fiber
-      credentials = await context.transcription.createSession({ model: 'gpt-4o-mini-transcribe', expiresAfterSeconds: 300 }, { signal: abort.signal })
+      credentials = await context.transcription.createSession(
+        { model: 'gpt-4o-mini-transcribe', expiresAfterSeconds: 300 },
+        { signal: abort.signal }
+      )
     } catch (error) {
       abort.signal.throwIfAborted()
       throw providerError('openai', error, config)
@@ -185,7 +187,7 @@ export function useDictation() {
     let processor: ScriptProcessorNode
 
     try {
-      const context = audioContext = new AudioContext({ sampleRate: SAMPLE_RATE })
+      const context = (audioContext = new AudioContext({ sampleRate: SAMPLE_RATE }))
       source = context.createMediaStreamSource(stream)
       processor = context.createScriptProcessor(4096, 1, 1)
 
@@ -198,9 +200,10 @@ export function useDictation() {
         }
         level.value = Math.min(1, Math.sqrt(sum / input.length) * 5)
 
-        const samples = context.sampleRate === SAMPLE_RATE
-          ? new Float32Array(input)
-          : resampleAudio(new Float32Array(input), context.sampleRate, SAMPLE_RATE)
+        const samples
+          = context.sampleRate === SAMPLE_RATE
+            ? new Float32Array(input)
+            : resampleAudio(new Float32Array(input), context.sampleRate, SAMPLE_RATE)
         controller.enqueue(encodeRealtimeAudio(samples))
       }
       // The processor must be connected to run, mute it so the microphone is not played back
@@ -229,9 +232,10 @@ export function useDictation() {
       partial: '',
       timeout: setTimeout(() => {
         if (onMaxDuration) onMaxDuration()
-        else void stop().catch((cause) => {
-          error.value = cause instanceof Error ? cause : new Error(String(cause))
-        })
+        else
+          void stop().catch((cause) => {
+            error.value = cause instanceof Error ? cause : new Error(String(cause))
+          })
       }, MAX_DURATION)
     }
     recording.value = true

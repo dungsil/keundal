@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { ChatMessage } from '../../../../shared/utils/chat-message'
 import { useClipboard } from '@vueuse/core'
+
+import type { ChatMessage } from '#shared/utils/chat-message'
 
 const props = defineProps<{
   message: ChatMessage & { createdAt?: string | Date }
@@ -27,14 +28,19 @@ const emit = defineEmits<{
   vote: [message: ChatMessage, isUpvoted: boolean]
 }>()
 
-const hasFiles = computed(() => props.message.parts.some(part => part.type === 'file'))
+const hasFiles = computed(() => props.message.parts.some((part) => part.type === 'file'))
 
 const clipboard = useClipboard()
 
 const copied = ref(false)
 
 function copy() {
-  clipboard.copy(props.message.parts.filter(part => part.type === 'text').map(part => part.text).join(''))
+  clipboard.copy(
+    props.message.parts
+      .filter((part) => part.type === 'text')
+      .map((part) => part.text)
+      .join('')
+  )
 
   copied.value = true
 

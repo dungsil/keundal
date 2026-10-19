@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ChatMessage } from '../../../../shared/utils/chat-message'
+import type { ChatMessage } from '#shared/utils/chat-message'
 
 defineProps<{
   message: ChatMessage
@@ -20,29 +20,31 @@ const emit = defineEmits<{
       :streaming="part.state === 'streaming'"
       chevron="leading"
     >
-      <ChatComark
-        :value="part.text"
-        :streaming="part.state === 'streaming'"
-      />
+      <ChatComark :value="part.text" :streaming="part.state === 'streaming'" />
     </UChatReasoning>
 
     <template v-else-if="'toolCallId' in part">
-      <ChatToolChart
-        v-if="part.type === 'tool-chart'"
-        :invocation="{ ...(part as ChartUIToolInvocation) }"
-      />
+      <ChatToolChart v-if="part.type === 'tool-chart'" :invocation="{ ...(part as ChartUIToolInvocation) }" />
       <ChatToolWeather
         v-else-if="part.type === 'tool-weather'"
         :invocation="{ ...(part as WeatherUIToolInvocation) }"
       />
       <UChatTool
         v-else-if="part.type === 'tool-skill'"
-        :text="part.state === 'output-error' ? 'Skill loading interrupted' : isToolStreaming(part) ? 'Loading skill...' : 'Loaded skill'"
+        :text="
+          part.state === 'output-error'
+            ? 'Skill loading interrupted'
+            : isToolStreaming(part)
+              ? 'Loading skill...'
+              : 'Loaded skill'
+        "
         :suffix="(part.input as { name?: string })?.name"
         :streaming="isToolStreaming(part)"
         chevron="leading"
       >
-        <pre class="text-xs whitespace-pre-wrap break-words">{{ part.state === 'output-error' ? part.errorText : part.output }}</pre>
+        <pre class="text-xs whitespace-pre-wrap break-words">{{
+          part.state === 'output-error' ? part.errorText : part.output
+        }}</pre>
       </UChatTool>
       <UChatTool
         v-else-if="part.type === 'tool-web_search' || part.type === 'tool-google_search'"
@@ -56,11 +58,7 @@ const emit = defineEmits<{
     </template>
 
     <template v-else-if="part.type === 'text'">
-      <ChatComark
-        v-if="message.role === 'assistant'"
-        :value="part.text"
-        :streaming="part.state === 'streaming'"
-      />
+      <ChatComark v-if="message.role === 'assistant'" :value="part.text" :streaming="part.state === 'streaming'" />
       <template v-else-if="message.role === 'user'">
         <ChatMessageEdit
           v-if="editing"

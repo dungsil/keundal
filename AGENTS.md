@@ -4,6 +4,7 @@
 
 | 패키지                                 | 역할                                                                      |
 | -------------------------------------- | ------------------------------------------------------------------------- |
+| `@keundal/ui`                          | 웹 UI의 공통 Vue 컴포넌트를 Nuxt 레이어로 제공합니다.                     |
 | `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.    |
 | `@keundal/plugin-agent-simple`         | 세 서비스와 대화 축약 함수를 조합하고 도구 실행과 후속 생성을 연결합니다. |
 | `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                                |

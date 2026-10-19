@@ -21,7 +21,8 @@ export function useFileUploadWithStatus() {
       if (index === -1) return
 
       try {
-        if (!fileWithStatus.file.type.startsWith('image/')) throw new Error('Keundal currently supports image attachments only')
+        if (!fileWithStatus.file.type.startsWith('image/'))
+          throw new Error('Keundal currently supports image attachments only')
         if (fileWithStatus.file.size > 8 * 1024 * 1024) throw new Error('File exceeds 8MB')
         const url = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
@@ -36,9 +37,8 @@ export function useFileUploadWithStatus() {
           uploadedUrl: url
         })
       } catch (error) {
-        const errorMessage = (error as { data?: { message?: string } }).data?.message
-          || (error as Error).message
-          || 'Upload failed'
+        const errorMessage
+          = (error as { data?: { message?: string } }).data?.message || (error as Error).message || 'Upload failed'
         toast.add({
           title: 'Upload failed',
           description: errorMessage,
@@ -62,9 +62,7 @@ export function useFileUploadWithStatus() {
     onUpdate: uploadFiles
   })
 
-  const uploading = computed(() =>
-    files.value.some(f => f.status === 'uploading')
-  )
+  const uploading = computed(() => files.value.some(f => f.status === 'uploading'))
 
   const uploadedFiles = computed(() =>
     files.value

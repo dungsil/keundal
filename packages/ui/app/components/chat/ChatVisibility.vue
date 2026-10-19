@@ -33,12 +33,7 @@ const options = [
     close
   >
     <UTooltip text="Share chat">
-      <UButton
-        color="neutral"
-        variant="ghost"
-        icon="i-lucide-share"
-        aria-label="Share chat"
-      />
+      <UButton color="neutral" variant="ghost" icon="i-lucide-share" aria-label="Share chat" />
     </UTooltip>
 
     <template #body>
@@ -61,11 +56,7 @@ const options = [
             </p>
           </div>
 
-          <UIcon
-            v-if="visibility === option.value"
-            name="i-lucide-circle-check"
-            class="size-5 text-primary shrink-0"
-          />
+          <UIcon v-if="visibility === option.value" name="i-lucide-circle-check" class="size-5 text-primary shrink-0" />
         </button>
       </div>
     </template>

@@ -93,11 +93,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="flex items-center gap-1">
     <template v-if="recording || finalizing">
-      <div
-        v-if="recording"
-        class="flex items-center gap-0.75 h-7 px-2"
-        aria-hidden="true"
-      >
+      <div v-if="recording" class="flex items-center gap-0.75 h-7 px-2" aria-hidden="true">
         <span
           v-for="(bar, index) in bars"
           :key="index"
@@ -125,11 +121,7 @@ onBeforeUnmount(() => {
       />
     </template>
 
-    <UTooltip
-      v-else
-      :text="tooltip"
-      :content="{ side: 'top' }"
-    >
+    <UTooltip v-else :text="tooltip" :content="{ side: 'top' }">
       <UButton
         icon="i-lucide-mic"
         color="neutral"

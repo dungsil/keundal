@@ -1,19 +1,22 @@
 <script setup lang="ts">
-import type { ChatStatus } from '../../../shared/utils/chat-message'
+import type { ChatStatus } from '#shared/utils/chat-message'
 
-const props = withDefaults(defineProps<{
-  status?: ChatStatus
-  error?: Error
-  files?: FileWithStatus[]
-  uploading?: boolean
-  disabled?: boolean
-  /** Opens the file picker. */
-  open: () => void
-}>(), {
-  status: 'ready',
-  error: undefined,
-  files: () => []
-})
+const props = withDefaults(
+  defineProps<{
+    status?: ChatStatus
+    error?: Error
+    files?: FileWithStatus[]
+    uploading?: boolean
+    disabled?: boolean
+    /** Opens the file picker. */
+    open: () => void
+  }>(),
+  {
+    status: 'ready',
+    error: undefined,
+    files: () => []
+  }
+)
 
 const emit = defineEmits<{
   submit: [event: Event]
@@ -31,7 +34,9 @@ const placeholder = computed(() => {
   return dictationPreview.value || (dictation.value === 'recording' ? 'Listening...' : 'Transcribing...')
 })
 
-const canDictate = computed(() => dictation.value !== 'idle' || (props.status === 'ready' && !input.value.trim() && !props.files.length))
+const canDictate = computed(
+  () => dictation.value !== 'idle' || (props.status === 'ready' && !input.value.trim() && !props.files.length)
+)
 
 function appendTranscript(text: string) {
   input.value = input.value.trim() ? `${input.value.trimEnd()} ${text}` : text

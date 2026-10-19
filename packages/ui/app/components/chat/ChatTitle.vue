@@ -20,20 +20,23 @@ async function rename() {
   if (newTitle) emit('update:title', newTitle)
 }
 
-const items = computed<DropdownMenuItem[][]>(() => [[
-  {
-    label: 'Rename',
-    icon: 'i-lucide-pencil',
-    onSelect: rename
-  }
-], [
-  {
-    label: 'Delete',
-    icon: 'i-lucide-trash',
-    color: 'error' as const,
-    onSelect: () => deleteChat(props.chatId)
-  }
-]])
+const items = computed<DropdownMenuItem[][]>(() => [
+  [
+    {
+      label: 'Rename',
+      icon: 'i-lucide-pencil',
+      onSelect: rename
+    }
+  ],
+  [
+    {
+      label: 'Delete',
+      icon: 'i-lucide-trash',
+      color: 'error' as const,
+      onSelect: () => deleteChat(props.chatId)
+    }
+  ]
+])
 </script>
 
 <template>
@@ -41,12 +44,7 @@ const items = computed<DropdownMenuItem[][]>(() => [[
     {{ displayTitle }}
   </span>
 
-  <UDropdownMenu
-    v-else
-    :items="items"
-    :content="{ align: 'end' }"
-    :ui="{ content: 'min-w-44' }"
-  >
+  <UDropdownMenu v-else :items="items" :content="{ align: 'end' }" :ui="{ content: 'min-w-44' }">
     <UButton
       color="neutral"
       variant="ghost"

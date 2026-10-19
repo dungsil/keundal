@@ -34,9 +34,7 @@ export function useChatActions() {
 
       const chatsCache = useNuxtData<ChatListItem[]>('chats')
       if (chatsCache.data.value) {
-        chatsCache.data.value = chatsCache.data.value.map(c =>
-          c.id === id ? { ...c, label: result } : c
-        )
+        chatsCache.data.value = chatsCache.data.value.map(c => (c.id === id ? { ...c, label: result } : c))
       }
 
       const chatCache = useNuxtData<{ title: string | null }>(`chat-${id}`)

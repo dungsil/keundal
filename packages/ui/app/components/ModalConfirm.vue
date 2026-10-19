@@ -20,12 +20,7 @@ const emit = defineEmits<{ close: [boolean] }>()
   >
     <template #footer>
       <UButton :color="color" label="Delete" @click="emit('close', true)" />
-      <UButton
-        color="neutral"
-        variant="ghost"
-        label="Cancel"
-        @click="emit('close', false)"
-      />
+      <UButton color="neutral" variant="ghost" label="Cancel" @click="emit('close', false)" />
     </template>
   </UModal>
 </template>

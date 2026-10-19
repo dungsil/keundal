@@ -38,12 +38,7 @@ function submit() {
 
     <template #footer>
       <UButton label="Save" :disabled="!trimmed" @click="submit" />
-      <UButton
-        color="neutral"
-        variant="ghost"
-        label="Cancel"
-        @click="emit('close', false)"
-      />
+      <UButton color="neutral" variant="ghost" label="Cancel" @click="emit('close', false)" />
     </template>
   </UModal>
 </template>

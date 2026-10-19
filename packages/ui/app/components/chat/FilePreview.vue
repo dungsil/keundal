@@ -65,10 +65,7 @@ onUnmounted(() => {
       />
     </UTooltip>
 
-    <div
-      v-if="status === 'uploading'"
-      class="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg"
-    >
+    <div v-if="status === 'uploading'" class="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
       <UIcon name="i-lucide-loader-2" class="size-6 animate-spin text-white" />
     </div>
 
@@ -110,7 +107,7 @@ onUnmounted(() => {
               :src="previewUrl"
               :alt="removeRandomSuffix(name)"
               class="max-w-[95vw] max-h-[95vh] object-contain rounded-md"
-            >
+            />
           </Motion>
         </div>
       </AnimatePresence>

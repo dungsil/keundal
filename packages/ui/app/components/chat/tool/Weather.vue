@@ -4,24 +4,31 @@ const props = defineProps<{
 }>()
 
 const color = computed(() => {
-  return ({
-    'output-available': 'bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 dark:from-sky-500 dark:via-blue-600 dark:to-indigo-700 text-white',
-    'output-error': 'bg-muted text-error'
-  })[props.invocation.state as string] || 'bg-muted text-white'
+  return (
+    {
+      'output-available':
+        'bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 dark:from-sky-500 dark:via-blue-600 dark:to-indigo-700 text-white',
+      'output-error': 'bg-muted text-error'
+    }[props.invocation.state as string] || 'bg-muted text-white'
+  )
 })
 
 const icon = computed(() => {
-  return ({
-    'input-available': 'i-lucide-cloud-sun',
-    'output-error': 'i-lucide-triangle-alert'
-  })[props.invocation.state as string] || 'i-lucide-loader-circle'
+  return (
+    {
+      'input-available': 'i-lucide-cloud-sun',
+      'output-error': 'i-lucide-triangle-alert'
+    }[props.invocation.state as string] || 'i-lucide-loader-circle'
+  )
 })
 
 const message = computed(() => {
-  return ({
-    'input-available': 'Loading weather data...',
-    'output-error': 'Can\'t get weather data, please try again later'
-  })[props.invocation.state as string] || 'Loading weather data...'
+  return (
+    {
+      'input-available': 'Loading weather data...',
+      'output-error': "Can't get weather data, please try again later"
+    }[props.invocation.state as string] || 'Loading weather data...'
+  )
 })
 </script>
 
@@ -45,10 +52,7 @@ const message = computed(() => {
 
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2">
-          <UIcon
-            :name="invocation.output.condition.icon"
-            class="size-6 text-white"
-          />
+          <UIcon :name="invocation.output.condition.icon" class="size-6 text-white" />
           <div class="text-sm font-medium">
             {{ invocation.output.condition.text }}
           </div>
@@ -76,25 +80,16 @@ const message = computed(() => {
             {{ forecast.day }}
           </div>
 
-          <UIcon
-            :name="forecast.condition.icon"
-            class="size-5 text-white"
-          />
+          <UIcon :name="forecast.condition.icon" class="size-5 text-white" />
           <div class="text-xs font-medium">
-            <div>
-              {{ forecast.high }}°
-            </div>
-            <div class="text-white/60">
-              {{ forecast.low }}°
-            </div>
+            <div>{{ forecast.high }}°</div>
+            <div class="text-white/60">{{ forecast.low }}°</div>
           </div>
         </div>
       </div>
 
       <div v-else class="flex items-center justify-center py-3">
-        <div class="text-xs">
-          No forecast available
-        </div>
+        <div class="text-xs">No forecast available</div>
       </div>
     </template>
 

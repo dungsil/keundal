@@ -10,17 +10,27 @@ const desktop = useRuntimeConfig().public.desktop
 const toast = useToast()
 const provider = ref<LLMProvider>('anthropic')
 const draft = ref(defaultLLMSettings())
-const headerRows = ref<Record<LLMProvider, { id: string, key: string, value: string }[]>>({ anthropic: [], google: [], openai: [] })
+const headerRows = ref<Record<LLMProvider, { id: string; key: string; value: string }[]>>({
+  anthropic: [],
+  google: [],
+  openai: []
+})
 const error = ref('')
 const saving = ref(false)
-const current = computed(() => LLM_PROVIDERS.find(item => item.id === provider.value)!)
+const current = computed(() => LLM_PROVIDERS.find((item) => item.id === provider.value)!)
 
 watch(open, (value) => {
   error.value = ''
   if (value) {
     draft.value = JSON.parse(JSON.stringify(settings.value))
-    for (const item of LLM_PROVIDERS) headerRows.value[item.id] = Object.entries(draft.value[item.id].headers ?? {}).map(([key, value]) => ({ id: crypto.randomUUID(), key, value }))
-    provider.value = requestedProvider.value ?? LLM_PROVIDERS.find(item => model.value.startsWith(`${item.id}/`))?.id ?? 'anthropic'
+    for (const item of LLM_PROVIDERS)
+      headerRows.value[item.id] = Object.entries(draft.value[item.id].headers ?? {}).map(([key, value]) => ({
+        id: crypto.randomUUID(),
+        key,
+        value
+      }))
+    provider.value =
+      requestedProvider.value ?? LLM_PROVIDERS.find((item) => model.value.startsWith(`${item.id}/`))?.id ?? 'anthropic'
     requestedProvider.value = null
   } else {
     // Do not retain an extra copy of credentials after closing the form.
@@ -42,18 +52,20 @@ async function save(forget = false) {
   if (forget) next[provider.value] = { apiKey: '', baseURL: '' }
   else {
     for (const item of LLM_PROVIDERS) {
-      const rows = headerRows.value[item.id].map(row => ({ key: row.key.trim(), value: row.value })).filter(row => row.key || row.value)
-      if (rows.some(row => !row.key)) {
+      const rows = headerRows.value[item.id]
+        .map((row) => ({ key: row.key.trim(), value: row.value }))
+        .filter((row) => row.key || row.value)
+      if (rows.some((row) => !row.key)) {
         provider.value = item.id
         error.value = 'Enter a key for every request header value.'
         return
       }
-      if (new Set(rows.map(row => row.key.toLowerCase())).size !== rows.length) {
+      if (new Set(rows.map((row) => row.key.toLowerCase())).size !== rows.length) {
         provider.value = item.id
         error.value = 'Duplicate request header names'
         return
       }
-      draft.value[item.id].headers = Object.fromEntries(rows.map(row => [row.key, row.value]))
+      draft.value[item.id].headers = Object.fromEntries(rows.map((row) => [row.key, row.value]))
       const parsed = providerSettingsSchema.safeParse(draft.value[item.id])
       if (!parsed.success) {
         provider.value = item.id
@@ -67,7 +79,15 @@ async function save(forget = false) {
   try {
     await $chatStore.stop()
     await $saveLLMSettings(next)
-    toast.add({ title: forget ? 'Provider settings removed' : desktop ? 'Settings saved in OS secret store' : 'Settings saved in this browser', icon: 'i-lucide-check', color: 'success' })
+    toast.add({
+      title: forget
+        ? 'Provider settings removed'
+        : desktop
+          ? 'Settings saved in OS secret store'
+          : 'Settings saved in this browser',
+      icon: 'i-lucide-check',
+      color: 'success'
+    })
     open.value = false
   } catch {
     error.value = desktop
@@ -83,7 +103,11 @@ async function save(forget = false) {
   <UModal
     v-model:open="open"
     title="LLM settings"
-    :description="desktop ? 'Your settings are saved in your OS secret store. Requests go directly to the provider.' : 'Your keys stay in this browser. Requests go directly to the provider.'"
+    :description="
+      desktop
+        ? 'Your settings are saved in your OS secret store. Requests go directly to the provider.'
+        : 'Your keys stay in this browser. Requests go directly to the provider.'
+    "
     :dismissible="!saving"
     :close="!saving"
   >
@@ -123,7 +147,11 @@ async function save(forget = false) {
             :disabled="saving"
           />
         </UFormField>
-        <UFormField label="API base URL (optional)" name="baseURL" description="Leave empty for the official endpoint. A custom endpoint receives your key and must support browser CORS.">
+        <UFormField
+          label="API base URL (optional)"
+          name="baseURL"
+          description="Leave empty for the official endpoint. A custom endpoint receives your key and must support browser CORS."
+        >
           <UInput
             v-model="draft[provider].baseURL"
             :placeholder="current.baseURL"
@@ -134,11 +162,11 @@ async function save(forget = false) {
           />
         </UFormField>
         <fieldset class="space-y-3">
-          <legend class="text-sm font-medium text-highlighted">
-            Request headers (optional)
-          </legend>
+          <legend class="text-sm font-medium text-highlighted">Request headers (optional)</legend>
           <p class="text-sm text-muted">
-            Custom headers override provider defaults for HTTP requests, including model discovery. Your endpoint must allow them via CORS; browser-forbidden headers cannot be set. WebSocket connections cannot use custom headers.
+            Custom headers override provider defaults for HTTP requests, including model discovery. Your endpoint must
+            allow them via CORS; browser-forbidden headers cannot be set. WebSocket connections cannot use custom
+            headers.
           </p>
           <div v-for="(row, index) in headerRows[provider]" :key="row.id" class="flex items-start gap-2">
             <UInput
@@ -187,7 +215,11 @@ async function save(forget = false) {
           color="neutral"
           variant="subtle"
           :title="desktop ? 'Protected by your OS secret store' : 'Browser storage is not a secure vault'"
-          :description="desktop ? 'API keys, URLs and headers are saved in macOS Keychain, Windows Credential Manager or Linux Secret Service, not localStorage. Settings are available in app memory while in use and are not synced to your account.' : 'Keys and headers are stored unencrypted in localStorage. Scripts on this site and browser extensions may read them. Do not use a shared browser. Settings are not synced to your account.'"
+          :description="
+            desktop
+              ? 'API keys, URLs and headers are saved in macOS Keychain, Windows Credential Manager or Linux Secret Service, not localStorage. Settings are available in app memory while in use and are not synced to your account.'
+              : 'Keys and headers are stored unencrypted in localStorage. Scripts on this site and browser extensions may read them. Do not use a shared browser. Settings are not synced to your account.'
+          "
         />
       </form>
     </template>
@@ -201,17 +233,16 @@ async function save(forget = false) {
           label="Forget provider"
           color="error"
           variant="ghost"
-          :disabled="saving || (!settings[provider]?.apiKey && !settings[provider]?.baseURL && !Object.keys(settings[provider]?.headers ?? {}).length)"
+          :disabled="
+            saving ||
+            (!settings[provider]?.apiKey &&
+              !settings[provider]?.baseURL &&
+              !Object.keys(settings[provider]?.headers ?? {}).length)
+          "
           @click="save(true)"
         />
         <div class="flex gap-2">
-          <UButton
-            label="Cancel"
-            color="neutral"
-            variant="ghost"
-            :disabled="saving"
-            @click="open = false"
-          />
+          <UButton label="Cancel" color="neutral" variant="ghost" :disabled="saving" @click="open = false" />
           <UButton
             :label="desktop ? 'Save in OS secret store' : 'Save in this browser'"
             type="submit"
