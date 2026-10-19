@@ -15,6 +15,7 @@ const sqlitePath = process.env.KEUNDAL_SQLITE_PATH ?? 'keundal-server.sqlite'
 const model = process.env.KEUNDAL_MODEL
 const contextWindow = Number(process.env.KEUNDAL_CONTEXT_WINDOW ?? 128_000)
 const maxOutputTokens = Number(process.env.KEUNDAL_MAX_OUTPUT_TOKENS ?? 4_096)
+const maxRequestBodyBytes = process.env.KEUNDAL_MAX_REQUEST_BODY_BYTES
 if (!model?.trim()) {
   console.error('KEUNDAL_MODEL 환경 변수를 설정하세요. 예: gpt-4.1-mini, gemini-2.5-flash, claude-sonnet-4-5')
   process.exit(1)
@@ -47,18 +48,21 @@ await ctx.plugin(agentPlugin, {
 })
 
 // GET 라우트가 JSON 직렬화할 수 없는 메서드는 서버가 노출하는 읽기 경로에서 제외합니다.
-const app = createAgentApp({
-  agent: (input: RunAgentInput, options) => ctx.agent.run(input, options),
-  session: {
-    get: (threadId, options) => ctx.session.get(threadId, options),
-    list: (options) => ctx.session.list(options)
+const app = createAgentApp(
+  {
+    agent: (input: RunAgentInput, options) => ctx.agent.run(input, options),
+    session: {
+      get: (threadId, options) => ctx.session.get(threadId, options),
+      list: (options) => ctx.session.list(options)
+    },
+    generation: {
+      get: (runId, options) => ctx.generation.get(runId, options),
+      list: (options) => ctx.generation.list(options),
+      recover: (options) => ctx.generation.recover(options)
+    }
   },
-  generation: {
-    get: (runId, options) => ctx.generation.get(runId, options),
-    list: (options) => ctx.generation.list(options),
-    recover: (options) => ctx.generation.recover(options)
-  }
-})
+  { maxRequestBodyBytes: maxRequestBodyBytes === undefined ? undefined : Number(maxRequestBodyBytes) }
+)
 
 createServer(app).listen(port, () => {
   console.log(`keundal server listening on http://localhost:${port}`)

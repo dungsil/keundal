@@ -1,1 +1,1 @@
-export { createAgentApp, type AgentAppServices } from './app.js'
+export { createAgentApp, type AgentAppOptions, type AgentAppServices } from './app.js'
