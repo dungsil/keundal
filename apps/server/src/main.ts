@@ -11,6 +11,8 @@ import { Context } from 'cordis'
 import { createAgentApp } from './app.js'
 
 const port = Number(process.env.PORT ?? 8000)
+const host = process.env.KEUNDAL_HOST ?? '127.0.0.1'
+if (!host.trim()) throw new Error('KEUNDAL_HOST는 비어 있을 수 없습니다.')
 const sqlitePath = process.env.KEUNDAL_SQLITE_PATH ?? 'keundal-server.sqlite'
 const model = process.env.KEUNDAL_MODEL
 const contextWindow = Number(process.env.KEUNDAL_CONTEXT_WINDOW ?? 128_000)
@@ -22,6 +24,26 @@ if (!model?.trim()) {
 }
 
 const ctx = new Context()
+// 토큰 설정은 공급자와 저장소 초기화 전에 검증합니다.
+const app = createAgentApp(
+  {
+    agent: (input: RunAgentInput, options) => ctx.agent.run(input, options),
+    session: {
+      get: (threadId, options) => ctx.session.get(threadId, options),
+      list: (options) => ctx.session.list(options)
+    },
+    generation: {
+      get: (runId, options) => ctx.generation.get(runId, options),
+      list: (options) => ctx.generation.list(options),
+      recover: (options) => ctx.generation.recover(options)
+    }
+  },
+  {
+    token: process.env.KEUNDAL_API_TOKEN ?? '',
+    maxRequestBodyBytes: maxRequestBodyBytes === undefined ? undefined : Number(maxRequestBodyBytes)
+  }
+)
+
 if (process.env.OPENAI_API_KEY) {
   await ctx.plugin(openaiLLMPlugin, {
     apiKey: process.env.OPENAI_API_KEY,
@@ -47,24 +69,10 @@ await ctx.plugin(agentPlugin, {
   maxOutputTokens: Math.min(1024, maxOutputTokens, contextWindow - 1)
 })
 
-// GET 라우트가 JSON 직렬화할 수 없는 메서드는 서버가 노출하는 읽기 경로에서 제외합니다.
-const app = createAgentApp(
-  {
-    agent: (input: RunAgentInput, options) => ctx.agent.run(input, options),
-    session: {
-      get: (threadId, options) => ctx.session.get(threadId, options),
-      list: (options) => ctx.session.list(options)
-    },
-    generation: {
-      get: (runId, options) => ctx.generation.get(runId, options),
-      list: (options) => ctx.generation.list(options),
-      recover: (options) => ctx.generation.recover(options)
-    }
-  },
-  { maxRequestBodyBytes: maxRequestBodyBytes === undefined ? undefined : Number(maxRequestBodyBytes) }
-)
-
-createServer(app).listen(port, () => {
-  console.log(`keundal server listening on http://localhost:${port}`)
+const server = createServer(app).listen(port, host, () => {
+  const address = server.address()
+  const boundPort = address && typeof address !== 'string' ? address.port : port
+  const displayHost = host.includes(':') ? `[${host}]` : host
+  console.log(`keundal server listening on http://${displayHost}:${boundPort}`)
   console.log(`POST /runs · GET /threads · GET /threads/:id · GET /runs · GET /runs/:id · POST /recover`)
 })

@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http'
 import { URL } from 'node:url'
 
@@ -21,6 +22,8 @@ export interface AgentAppServices {
 }
 
 export interface AgentAppOptions {
+  /** 모든 HTTP 요청에 필요한 Bearer 토큰입니다. */
+  token: string
   /** POST /runs 본문의 최대 바이트 수. 기본값은 8 MiB입니다. */
   maxRequestBodyBytes?: number
 }
@@ -61,13 +64,24 @@ const readBody = async (request: IncomingMessage, maxBytes: number): Promise<str
 const sseEvent = (event: AGUIEvent): string => `data: ${JSON.stringify(event)}\n\n`
 
 /** AG-UI 실행과 조회 읽기 경로를 HTTP로 노출하는 요청 리스너를 만듭니다. */
-export function createAgentApp(services: AgentAppServices, options: AgentAppOptions = {}): RequestListener {
+export function createAgentApp(services: AgentAppServices, options: AgentAppOptions): RequestListener {
+  if (!options?.token || options.token !== options.token.trim() || !/^[A-Za-z0-9\-._~+/]+=*$/.test(options.token)) {
+    throw new Error('HTTP 인증 token을 공백 없는 Bearer 토큰으로 설정하세요.')
+  }
+  const token = Buffer.from(options.token)
   const maxRequestBodyBytes = options.maxRequestBodyBytes ?? 8 * 1024 * 1024
   if (!Number.isSafeInteger(maxRequestBodyBytes) || maxRequestBodyBytes <= 0) {
     throw new RangeError('maxRequestBodyBytes must be a positive safe integer')
   }
   async function requestListener(request: IncomingMessage, response: ServerResponse) {
     try {
+      const credentials = /^Bearer ([A-Za-z0-9\-._~+/]+=*)$/i.exec(request.headers.authorization ?? '')
+      const supplied = Buffer.from(credentials?.[1] ?? '')
+      if (supplied.length !== token.length || !timingSafeEqual(supplied, token)) {
+        response.setHeader('WWW-Authenticate', 'Bearer')
+        return sendJson(response, 401, { error: 'unauthorized' })
+      }
+
       const url = new URL(request.url ?? '/', 'http://localhost')
       const segments = url.pathname.split('/').filter(Boolean)
 
