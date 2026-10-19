@@ -53,13 +53,10 @@ jobs:
           rustup default stable
 
       - name: Rust 빌드 캐시 설정
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            apps/desktop/src-tauri/target
-          key: desktop-${{ matrix.name }}-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
+          workspaces: apps/desktop/src-tauri -> target
+          key: desktop-${{ matrix.name }}
 
       - name: 공유 패키지 빌드
         run: pnpm exec turbo run build --filter='@keundal/web^...'
