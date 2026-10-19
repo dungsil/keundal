@@ -28,6 +28,7 @@
     "@keundal/plugin-transcription-openai": "workspace:*",
     "@nuxt/ui": "^4.11.3",
     "@shikijs/langs": "^4.5.0",
+    "@tauri-apps/api": "2.12.4",
     "@vueuse/core": "^14.4.0",
     "ai": "^7.0.137",
     "cordis": "catalog:",

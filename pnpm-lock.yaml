@@ -332,6 +332,9 @@ importers:
       '@shikijs/langs':
         specifier: ^4.5.0
         version: 4.5.0
+      '@tauri-apps/api':
+        specifier: 2.12.4
+        version: 2.12.4
       '@vueuse/core':
         specifier: ^14.4.0
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
@@ -3236,6 +3239,9 @@ packages:
     resolution: {integrity: sha512-AnYTTgpps/HyHJ9jgBW6dAPVTOY9UVb1AY8Gi2Th1dTDDUiUqalbq5W2hBrW0q8/DI8V5bt9HUgTvatbvZIukQ==}
     peerDependencies:
       vue: ^2.7.0 || ^3.0.0
+
+  '@tauri-apps/api@2.12.4':
+    resolution: {integrity: sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg==}
 
   '@tauri-apps/cli-darwin-arm64@2.12.3':
     resolution: {integrity: sha512-xmVNoJOOKzKLj7GLHXmXLimRby9M42aBIJa0sB80N7o24eKV5JiVmToKTRLVH9yhL05GZ/B6rSSOmbzNFJwBAA==}
@@ -11247,6 +11253,8 @@ snapshots:
     dependencies:
       '@tanstack/virtual-core': 3.19.4
       vue: 3.5.44(typescript@6.0.3)
+
+  '@tauri-apps/api@2.12.4': {}
 
   '@tauri-apps/cli-darwin-arm64@2.12.3':
     optional: true

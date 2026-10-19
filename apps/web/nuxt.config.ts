@@ -14,6 +14,7 @@ export default defineNuxtConfig({
       buildDir: '.nuxt-desktop',
       devtools: { enabled: false },
       auth: { loadStrategy: 'none' },
+      runtimeConfig: { public: { desktop: true } },
       devServer: { host: '127.0.0.1', port: 1420 },
       vite: { server: { strictPort: true } },
       nitro: {
@@ -27,6 +28,10 @@ export default defineNuxtConfig({
   },
 
   css: ['~/assets/css/main.css'],
+
+  runtimeConfig: {
+    public: { desktop: false }
+  },
 
   experimental: {
     viewTransition: true
