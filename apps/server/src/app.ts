@@ -20,6 +20,13 @@ export interface AgentAppServices {
   generation: Pick<GenerationService, 'get' | 'list' | 'recover'>
 }
 
+export interface AgentAppOptions {
+  /** POST /runs 본문의 최대 바이트 수. 기본값은 8 MiB입니다. */
+  maxRequestBodyBytes?: number
+}
+
+class RequestBodyTooLargeError extends Error {}
+
 const SSE_HEADERS = {
   'content-type': 'text/event-stream',
   'cache-control': 'no-cache',
@@ -31,23 +38,41 @@ const sendJson = (response: ServerResponse, status: number, body: unknown): void
   response.end(JSON.stringify(body))
 }
 
-const readBody = async (request: IncomingMessage): Promise<string> => {
+const readBody = async (request: IncomingMessage, maxBytes: number): Promise<string> => {
+  if (Number(request.headers['content-length']) > maxBytes) {
+    request.pause()
+    throw new RequestBodyTooLargeError()
+  }
   const chunks: Buffer[] = []
-  for await (const chunk of request) chunks.push(Buffer.from(chunk))
+  let bytes = 0
+  // 기본 async iterator는 조기 종료 시 소켓도 파괴하므로 413 전송까지 유지합니다.
+  for await (const chunk of request.iterator({ destroyOnReturn: false })) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    bytes += buffer.length
+    if (bytes > maxBytes) {
+      request.pause()
+      throw new RequestBodyTooLargeError()
+    }
+    chunks.push(buffer)
+  }
   return Buffer.concat(chunks).toString('utf8')
 }
 
 const sseEvent = (event: AGUIEvent): string => `data: ${JSON.stringify(event)}\n\n`
 
 /** AG-UI 실행과 조회 읽기 경로를 HTTP로 노출하는 요청 리스너를 만듭니다. */
-export function createAgentApp(services: AgentAppServices): RequestListener {
+export function createAgentApp(services: AgentAppServices, options: AgentAppOptions = {}): RequestListener {
+  const maxRequestBodyBytes = options.maxRequestBodyBytes ?? 8 * 1024 * 1024
+  if (!Number.isSafeInteger(maxRequestBodyBytes) || maxRequestBodyBytes <= 0) {
+    throw new RangeError('maxRequestBodyBytes must be a positive safe integer')
+  }
   return async function requestListener(request, response) {
     const url = new URL(request.url ?? '/', 'http://localhost')
     const segments = url.pathname.split('/').filter(Boolean)
 
     try {
       if (request.method === 'POST' && segments.join('/') === 'runs') {
-        const input = parseRunAgentInput(JSON.parse(await readBody(request)))
+        const input = parseRunAgentInput(JSON.parse(await readBody(request, maxRequestBodyBytes)))
         response.writeHead(200, SSE_HEADERS)
         try {
           for await (const raw of services.agent(input, {})) {
@@ -90,7 +115,14 @@ export function createAgentApp(services: AgentAppServices): RequestListener {
       }
 
       sendJson(response, 404, { error: `no route for ${request.method} ${url.pathname}` })
-    } catch {
+    } catch (error) {
+      if (error instanceof RequestBodyTooLargeError && !response.headersSent) {
+        // 읽지 않은 본문은 재사용하지 않고, 응답을 전송한 뒤 요청과 소켓을 정리합니다.
+        response.setHeader('connection', 'close')
+        response.once('finish', () => request.destroy())
+        sendJson(response, 413, { error: 'request body too large' })
+        return
+      }
       if (!response.headersSent) {
         sendJson(response, 400, { error: 'invalid request' })
       } else if (!response.writableEnded) {
