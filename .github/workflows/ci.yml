@@ -318,7 +318,7 @@ jobs:
           message: |
             ### PR 프리뷰
 
-            [웹 프리뷰 열기](${{ needs.deploy-preview.outputs.preview-url }})
+            ${{ needs.deploy-preview.outputs.preview-url && format('[웹 프리뷰 열기]({0})', needs.deploy-preview.outputs.preview-url) || '웹 프리뷰 URL이 설정되지 않았습니다.' }}
 
             #### 데스크톱 다운로드
 
