@@ -1,4 +1,4 @@
-import type { TranscriptionSession } from '@keundal/core'
+import type { TranscriptionSession } from '@keundal/plugin-transcription-openai/client'
 import openaiTranscriptionPlugin from '@keundal/plugin-transcription-openai'
 import { Context } from 'cordis'
 import { providerCredentials, providerError } from '#shared/utils/llm-settings'

@@ -1,8 +1,7 @@
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 
-import type { TranscriptionSession } from '@keundal/core'
-import plugin from '@keundal/plugin-transcription-openai'
+import plugin, { type TranscriptionSession } from '@keundal/plugin-transcription-openai'
 import { encodeRealtimeAudio, resampleAudio, streamTranscription } from '@keundal/plugin-transcription-openai/client'
 import { Context } from 'cordis'
 import { expect, test, onTestFinished, type TestContext } from 'vitest'

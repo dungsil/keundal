@@ -1,7 +1,7 @@
 # @keundal/plugin-fs-policy
 
 파일 공급자를 감싸 경로 권한과 읽기 전 수정 방지를 적용합니다.
-정책 서비스도 `FileSystemService`를 구현하므로 파일 도구는 공급자와 정책을 구별하지 않습니다.
+정책 서비스도 `@keundal/fs`의 `FileSystemService`를 구현하므로 파일 도구는 공급자와 정책을 구별하지 않습니다.
 이 패키지는 Node.js 파일 API를 가져오지 않습니다.
 
 ```ts

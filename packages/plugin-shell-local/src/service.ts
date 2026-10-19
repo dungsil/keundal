@@ -1,6 +1,5 @@
+import type { ExecutionOptions } from '@keundal/core'
 import { Service, type Context } from 'cordis'
-
-import type { ExecutionOptions } from './execution.js'
 
 export interface ShellRequest {
   readonly command: string
@@ -16,6 +15,12 @@ export interface ShellResult {
   readonly timedOut: boolean
   readonly aborted: boolean
   readonly truncated: boolean
+}
+
+declare module 'cordis' {
+  interface Context {
+    readonly shell: ShellService
+  }
 }
 
 export abstract class ShellService extends Service {

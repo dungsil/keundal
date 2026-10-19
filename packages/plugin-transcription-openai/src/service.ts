@@ -1,6 +1,5 @@
+import type { ExecutionOptions } from '@keundal/core'
 import { Service, type Context } from 'cordis'
-
-import type { ExecutionOptions } from './execution.js'
 
 /** Serializable browser connection configuration. Never contains a server API key. */
 export interface TranscriptionSession {
@@ -15,6 +14,12 @@ export interface TranscriptionSession {
 export interface TranscriptionRequest {
   readonly model: string
   readonly expiresAfterSeconds?: number
+}
+
+declare module 'cordis' {
+  interface Context {
+    readonly transcription: TranscriptionService
+  }
 }
 
 export abstract class TranscriptionService extends Service {

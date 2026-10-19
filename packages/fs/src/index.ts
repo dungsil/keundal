@@ -1,6 +1,5 @@
+import type { ExecutionOptions } from '@keundal/core'
 import { Service, type Context } from 'cordis'
-
-import type { ExecutionOptions } from './execution.js'
 
 export interface FileSystemOptions extends ExecutionOptions {
   /** 정책이 읽기 기록을 구분하는 호출자 ID입니다. 도구는 threadId를 사용합니다. */
@@ -31,6 +30,12 @@ export interface DirectoryEntry {
 export interface FileEdit {
   readonly oldText: string
   readonly newText: string
+}
+
+declare module 'cordis' {
+  interface Context {
+    readonly fs: FileSystemService
+  }
 }
 
 export abstract class FileSystemService extends Service {

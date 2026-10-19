@@ -5,16 +5,16 @@ import { link, lstat, open, readdir, readlink, realpath, rename, unlink } from '
 import path from 'node:path'
 import process from 'node:process'
 
+import type { ExecutionOptions } from '@keundal/core'
 import {
   FileSystemService,
   type DirectoryEntry,
-  type ExecutionOptions,
   type FileEdit,
   type FileMutation,
   type FileMutationOptions,
   type FileSnapshot,
   type FileSystemOptions
-} from '@keundal/core'
+} from '@keundal/fs'
 import type { Context } from 'cordis'
 
 export interface LocalFileSystemConfig {

@@ -1,11 +1,11 @@
+import type { ExecutionOptions } from '@keundal/core'
 import {
   FileSystemService,
-  type ExecutionOptions,
   type FileEdit,
   type FileMutation,
   type FileMutationOptions,
   type FileSystemOptions
-} from '@keundal/core'
+} from '@keundal/fs'
 import type { Context } from 'cordis'
 
 export interface FileSystemPolicyConfig {

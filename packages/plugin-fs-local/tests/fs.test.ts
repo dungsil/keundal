@@ -31,21 +31,37 @@ async function setup(t: TestContext, maxFileBytes?: number) {
   return { fs: ctx.fs, cwd, fiber }
 }
 
+async function createSymlink(t: TestContext, target: string, link: string) {
+  try {
+    await symlink(target, link)
+  } catch (error) {
+    if (process.platform === 'win32' && (error as NodeJS.ErrnoException).code === 'EPERM') {
+      t.skip('심볼릭 링크를 만들 권한이 없습니다.')
+    }
+    throw error
+  }
+}
+
 test('플러그인이 공개 서비스를 등록하고 파일과 디렉터리를 읽는다', async (t) => {
   const { fs, cwd } = await setup(t)
   expect(fs).toBeInstanceOf(LocalFileSystemService)
   const created = await fs.write('hello.txt', '안녕하세요')
   await mkdir(path.join(cwd, 'folder'))
-  await symlink('hello.txt', path.join(cwd, 'alias'))
   expect(await fs.read('hello.txt')).toEqual({ ...created, content: '안녕하세요' })
   expect(created.path).toBe(path.join(await realpath(cwd), 'hello.txt'))
   expect(await fs.list('.')).toEqual(
     expect.arrayContaining([
       { name: 'hello.txt', kind: 'file' },
-      { name: 'folder', kind: 'directory' },
-      { name: 'alias', kind: 'symlink' }
+      { name: 'folder', kind: 'directory' }
     ])
   )
+})
+
+test('디렉터리 목록에서 심볼릭 링크를 구분한다', async (t) => {
+  const { fs, cwd } = await setup(t)
+  await fs.write('hello.txt', '안녕하세요')
+  await createSymlink(t, 'hello.txt', path.join(cwd, 'alias'))
+  expect(await fs.list('.')).toEqual(expect.arrayContaining([{ name: 'alias', kind: 'symlink' }]))
 })
 
 test('관찰한 버전으로 정확히 한 번 나타나는 문자열만 바꾼다', async (t) => {
@@ -101,7 +117,7 @@ test('동시에 생성하는 두 서비스 중 하나만 파일을 만든다', a
 test('같은 버전의 동시 쓰기를 직렬화하고 심볼릭 링크 별칭에도 적용한다', async (t) => {
   const { fs, cwd } = await setup(t)
   const first = await fs.write('file', 'old')
-  await symlink('file', path.join(cwd, 'alias'))
+  await createSymlink(t, 'file', path.join(cwd, 'alias'))
   const results = await Promise.allSettled([
     fs.write('file', 'left', { expectedVersion: first.version }),
     fs.write('alias', 'right', { expectedVersion: first.version })
@@ -136,10 +152,10 @@ test('취소된 쓰기는 파일을 만들거나 기존 내용을 바꾸지 않�
 test('심볼릭 링크 다음의 ..과 없는 경로를 기존 조상에서 해석한다', async (t) => {
   const { fs, cwd } = await setup(t)
   await mkdir(path.join(cwd, 'real', 'nested'), { recursive: true })
-  await symlink('real/nested', path.join(cwd, 'alias'))
+  await createSymlink(t, 'real/nested', path.join(cwd, 'alias'))
   const root = await realpath(cwd)
   expect(await fs.resolve('alias/../missing/child')).toBe(path.join(root, 'real/missing/child'))
-  await symlink('real/not-created', path.join(cwd, 'dangling'))
+  await createSymlink(t, 'real/not-created', path.join(cwd, 'dangling'))
   expect(await fs.resolve('dangling/child')).toBe(path.join(root, 'real/not-created/child'))
   await expect(fs.write('alias/missing/child', 'x')).rejects.toThrow()
   expect(await readdir(path.join(cwd, 'real/nested'))).toEqual([])

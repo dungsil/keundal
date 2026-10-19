@@ -17,10 +17,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@keundal/core": "workspace:*",
+    "@keundal/plugin-shell-local": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {
+    "@keundal/core": "workspace:*",
     "@keundal/plugin-agent-simple": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",

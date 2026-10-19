@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -12,7 +12,7 @@ import { Context } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
 
 async function setup(t: TestContext) {
-  const root = await mkdtemp(join(tmpdir(), 'keundal-fs-tools-'))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'keundal-fs-tools-')))
   const ctx = new Context()
   const raw = ctx.isolate('fs')
   const provider = await raw.plugin(localFileSystemPlugin, { cwd: root })

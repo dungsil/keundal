@@ -7,6 +7,17 @@ import fileSystemPolicyPlugin, { PolicyFileSystemService } from '@keundal/plugin
 import { Context } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
 
+async function createSymlink(t: TestContext, target: string, link: string) {
+  try {
+    await symlink(target, link)
+  } catch (error) {
+    if (process.platform === 'win32' && (error as NodeJS.ErrnoException).code === 'EPERM') {
+      t.skip('심볼릭 링크를 만들 권한이 없습니다.')
+    }
+    throw error
+  }
+}
+
 async function setup(t: TestContext, writable = true, limits = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'keundal-policy-'))
   const root = join(dir, 'root')
@@ -33,7 +44,7 @@ test('읽기와 수정에 경로 경계를 적용하고 외부 심볼릭 링크�
   await writeFile(join(dir, 'secret'), 'private')
   await mkdir(`${root}-sibling`)
   await writeFile(`${root}-sibling/file`, 'sibling')
-  await symlink(dir, join(root, 'escape'))
+  await createSymlink(t, dir, join(root, 'escape'))
   const options = { scope: 'thread' }
   for (const path of ['../secret', `${root}-sibling/file`, 'escape/secret', 'escape/new']) {
     await expect(fs.read(path, options)).rejects.toThrow('outside')
@@ -47,7 +58,7 @@ test('읽기와 수정에 경로 경계를 적용하고 외부 심볼릭 링크�
 test('기존 파일은 같은 scope에서 읽어야 수정하고 별칭은 같은 파일로 취급한다', async (t) => {
   const { fs, root } = await setup(t)
   await writeFile(join(root, 'file'), 'first')
-  await symlink('file', join(root, 'alias'))
+  await createSymlink(t, 'file', join(root, 'alias'))
   const one = { scope: 'one' }
   const two = { scope: 'two' }
   await expect(fs.write('file', 'blind', one)).rejects.toThrow('version conflict')
