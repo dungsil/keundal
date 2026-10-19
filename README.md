@@ -20,6 +20,21 @@ Keundal("큰달"으로 읽음)은 개인용 오픈소스 에이전트 도구입�
 
 각 패키지의 설정과 사용법은 패키지 안의 README.md를 참고하고, 저장소 규칙은 [AGENTS.md](./AGENTS.md)에 정리되어 있습니다.
 
+## 파일과 Shell 도구
+
+`@keundal/core`의 `FileSystemService`와 `ShellService`는 `ctx.fs`와 `ctx.shell`의 공통 계약입니다.
+실행 공급자와 모델에 노출할 도구는 별도 플러그인으로 연결합니다.
+
+- [plugin-fs-local](packages/plugin-fs-local/README.md)은 Node.js 파일 접근을 구현합니다.
+- [plugin-fs-policy](packages/plugin-fs-policy/README.md)는 경로·수정 권한과 대화별 읽기 기록을 검사합니다.
+- [plugin-tool-fs](packages/plugin-tool-fs/README.md)는 읽기·목록·쓰기·편집 도구를 제공합니다.
+- [plugin-shell-local](packages/plugin-shell-local/README.md)은 전경 명령과 취소·시간·출력 한도·프로세스 종료를 관리합니다.
+- [plugin-tool-shell](packages/plugin-tool-shell/README.md)은 Shell 도구를 제공합니다.
+
+파일 정책과 Shell의 작업 디렉터리 검사는 OS 샌드박스가 아닙니다.
+Shell 명령은 파일 정책을 거치지 않습니다. 신뢰할 수 없는 실행에는 OS 격리를 적용하십시오.
+Node.js 공급자 대신 Tauri IPC나 원격 서버 공급자를 연결할 수 있습니다. 앱의 자동 도구 등록은 포함하지 않습니다.
+
 ## 시작하기
 
 Node.js 24와 pnpm이 필요합니다. 버전은 루트 `package.json`의 `devEngines`를 따릅니다.
