@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 
-import type { ExecutableTool } from '@keundal/plugin-agent-simple'
+import type { ExecutableTool } from '@keundal/agent'
 import { Client, StreamableHTTPClientTransport, type RequestOptions } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 

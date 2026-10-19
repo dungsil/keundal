@@ -1,5 +1,5 @@
 {
-  "name": "@keundal/plugin-agent-simple",
+  "name": "@keundal/agent",
   "private": true,
   "files": [
     "dist"

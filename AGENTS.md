@@ -2,19 +2,20 @@
 
 ## 패키지 구성
 
-| 패키지                                 | 역할                                                                      |
-| -------------------------------------- | ------------------------------------------------------------------------- |
-| `@keundal/ui`                          | 웹 UI의 공통 Vue 컴포넌트를 Nuxt 레이어로 제공합니다.                     |
-| `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.    |
-| `@keundal/plugin-agent-simple`         | 세 서비스와 대화 축약 함수를 조합하고 도구 실행과 후속 생성을 연결합니다. |
-| `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                                |
-| `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                          |
-| `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                              |
-| `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                    |
-| `@keundal/compaction`                  | 이전 대화를 요약하고 최근 대화를 보존하는 축약 함수를 제공합니다.         |
-| `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.             |
-| `@keundal/plugin-store-sqlite`         | SQLite 파일로 `session`과 `generation`을 구현합니다.                      |
-| `@keundal/tsconfig`, `@keundal/tsdown` | 공통 TypeScript·빌드 설정을 제공합니다.                                   |
+| 패키지                                 | 역할                                                                   |
+| -------------------------------------- | ---------------------------------------------------------------------- |
+| `@keundal/ui`                          | 웹 UI의 공통 Vue 컴포넌트를 Nuxt 레이어로 제공합니다.                  |
+| `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다. |
+| `@keundal/agent`                       | 에이전트 구현 계약과 공통 실행 루프를 제공합니다.                      |
+| `@keundal/coding-agent`                | 에이전트 구현 계약을 확장한 코딩 작업용 에이전트입니다.                |
+| `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                             |
+| `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                       |
+| `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                           |
+| `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                 |
+| `@keundal/compaction`                  | 이전 대화를 요약하고 최근 대화를 보존하는 축약 함수를 제공합니다.      |
+| `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.          |
+| `@keundal/plugin-store-sqlite`         | SQLite 파일로 `session`과 `generation`을 구현합니다.                   |
+| `@keundal/tsconfig`, `@keundal/tsdown` | 공통 TypeScript·빌드 설정을 제공합니다.                                |
 
 서비스 계약은 `packages/core/src/{llm,session,generation,compaction}.ts`에 정의하고, 구체 구현은 플러그인으로 주입합니다. 저장소가 공유하는 대화 병합과 실행 메시지 조립은 `packages/core/src/messages.ts`에 둡니다. AG-UI 타입, 이벤트 상수, 검증 기능은 `@keundal/core`에서 가져옵니다. `@ag-ui/core` 직접 의존은 코어의 프로토콜 래퍼에서만 관리합니다.
 
@@ -23,7 +24,7 @@
 `ShellService`는 `@keundal/plugin-shell-local`에, `TranscriptionService`는 `@keundal/plugin-transcription-openai`에 둡니다.
 구현이 하나뿐이면 계약과 구현을 같은 패키지에 두고, 두 번째 구현이 생기면 계약 패키지를 분리합니다.
 
-플러그인 설정과 사용법은 [에이전트 문서](packages/plugin-agent-simple/README.md), [OpenAI 문서](packages/plugin-llm-openai/README.md), [Gemini 문서](packages/plugin-llm-gemini/README.md), [Anthropic 문서](packages/plugin-llm-anthropic/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [축약 문서](packages/compaction/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
+플러그인 설정과 사용법은 [에이전트 문서](packages/agent/README.md), [코딩 에이전트 문서](packages/coding-agent/README.md), [OpenAI 문서](packages/plugin-llm-openai/README.md), [Gemini 문서](packages/plugin-llm-gemini/README.md), [Anthropic 문서](packages/plugin-llm-anthropic/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [축약 문서](packages/compaction/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
 
 ## 서비스 계약
 
@@ -38,13 +39,15 @@
 
 ## 에이전트 조합
 
-`simpleAgentPlugin`은 `llm`, `session`, `generation`을 주입받고 `@keundal/compaction`의 축약 함수를 직접 호출합니다. 축약 설정은 에이전트의 `compaction` 옵션으로 전달합니다. `ctx.agent.run(input, { signal })`은 AG-UI `RunAgentInput`을 받아 `AsyncIterable<AGUIEvent>`를 반환합니다.
+`@keundal/agent`는 에이전트 구현의 계약과 공통 실행 루프를 제공합니다. `agentPlugin`은 `llm`, `session`, `generation`을 주입받고 `@keundal/compaction`의 축약 함수를 직접 호출합니다. 축약 설정은 에이전트의 `compaction` 옵션으로 전달합니다. `ctx.agent.run(input, { signal })`은 AG-UI `RunAgentInput`을 받아 `AsyncIterable<AGUIEvent>`를 반환합니다.
 
 세션 입력을 준비한 뒤 컨텍스트 한도에서 출력 예산을 뺀 크기와 입력 크기를 비교합니다. 예산을 초과하면 한 번 축약하고 다시 계산하며, 여전히 초과하면 생성을 시작하지 않습니다. 준비된 입력·revision·축약 결과는 `generation.run()`에 전달하고, 반환된 이벤트를 그대로 전달합니다. 준비 오류는 순회 중 예외로 전달합니다.
 
 에이전트의 `tools` 설정은 도구 정의와 실행 함수를 함께 받습니다. 도구 호출을 수집하고 실행 결과를 후속 요청에 넣는 전체 과정은 하나의 generation 실행으로 기록합니다. 후속 요청에도 입력 예산 검사를 적용하며, `maxToolRounds`의 기본값은 8입니다. 도구를 등록하지 않으면 기존의 단일 생성 동작을 유지합니다.
 
 플러그인 해제와 순회 중단은 준비·생성 작업을 취소합니다. 주입된 서비스를 교체하면 Cordis가 조합 플러그인의 수명을 갱신하며, 서비스별 격리는 `ctx.isolate('llm')`을 사용합니다.
+
+다른 에이전트 구현은 `Agent`를 상속하고 `registerAgent()`에 구현 클래스를 넘깁니다. `@keundal/coding-agent`는 `Agent`를 상속해 코딩 작업용 시스템 지침을 넣고, `registerAgent()`로 같은 `ctx.agent` 서비스를 구성합니다. 도구 등록은 앱이 담당하며 이 패키지는 도구를 직접 등록하지 않습니다.
 
 ## 개발과 검증
 

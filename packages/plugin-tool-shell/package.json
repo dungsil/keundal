@@ -21,8 +21,8 @@
     "cordis": "catalog:"
   },
   "devDependencies": {
+    "@keundal/agent": "workspace:*",
     "@keundal/core": "workspace:*",
-    "@keundal/plugin-agent-simple": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",

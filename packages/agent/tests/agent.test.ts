@@ -1,5 +1,6 @@
 import { getEventListeners } from 'node:events'
 
+import agentPlugin from '@keundal/agent'
 import {
   EventType,
   GenerationService,
@@ -13,7 +14,6 @@ import {
   type PreparedSession,
   type RunAgentInput
 } from '@keundal/core'
-import simpleAgentPlugin from '@keundal/plugin-agent-simple'
 import { Context, type Fiber } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
 
@@ -117,7 +117,7 @@ async function setup(testContext: TestContext, overrides: Overrides = {}) {
   })
   const llmFiber = await ctx.plugin(LLM)
   fibers.push(llmFiber, await ctx.plugin(Session), await ctx.plugin(Generation))
-  const agentFiber = await ctx.plugin(simpleAgentPlugin, {
+  const agentFiber = await ctx.plugin(agentPlugin, {
     ...config,
     compaction: { keepRecentMessages: 1, maxSummaryTokens: overrides.maxSummaryTokens ?? 20 }
   })

@@ -80,7 +80,7 @@ try {
 - 추론 서명과 `redacted_thinking` 데이터는 `REASONING_ENCRYPTED_VALUE`로 전달합니다. 후속 요청을 구성하는 쪽에서 `reasoning` 메시지의 `content`와 `encryptedValue`, 메시지 순서를 보존해야 합니다. `encryptedValue`는 공급자와 블록 종류를 구분하는 JSON 문자열이므로 수정하지 않고 재사용합니다.
 - `end_turn`, `tool_use`, `stop_sequence` 종료 사유와 `message_stop`을 모두 확인해야 성공으로 처리합니다. `max_tokens`, `refusal`, `pause_turn` 등 다른 종료 사유, 완료 이벤트 없는 스트림 종료, 미완료 블록은 예외로 전달합니다.
 
-생성 요청에는 출력 예산을 `max_tokens`로 지정합니다. 대화와 문맥 축약은 Keundal 측에서 관리합니다. `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`는 생성하지 않으며, journal·커밋·복구도 수행하지 않습니다. 전체 에이전트를 실행하려면 저장소 플러그인과 `@keundal/plugin-agent-simple`을 함께 등록합니다.
+생성 요청에는 출력 예산을 `max_tokens`로 지정합니다. 대화와 문맥 축약은 Keundal 측에서 관리합니다. `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`는 생성하지 않으며, journal·커밋·복구도 수행하지 않습니다. 전체 에이전트를 실행하려면 저장소 플러그인과 `@keundal/agent`을 함께 등록합니다.
 
 ## 검증
 

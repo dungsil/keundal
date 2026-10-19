@@ -2,8 +2,8 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import agentPlugin from '@keundal/agent'
 import { EventType, LLMService, type LLMEvent, type LLMRequest } from '@keundal/core'
-import simpleAgentPlugin from '@keundal/plugin-agent-simple'
 import localFileSystemPlugin from '@keundal/plugin-fs-local'
 import fileSystemPolicyPlugin from '@keundal/plugin-fs-policy'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
@@ -110,7 +110,7 @@ test('에이전트가 실제 파일을 읽고 수정한 도구 결과를 후속 
   }
   const llm = await ctx.plugin(LLM)
   const store = await ctx.plugin(memoryStorePlugin)
-  const agent = await ctx.plugin(simpleAgentPlugin, { model: 'test', maxOutputTokens: 200, tools: ctx.fsTools.tools })
+  const agent = await ctx.plugin(agentPlugin, { model: 'test', maxOutputTokens: 200, tools: ctx.fsTools.tools })
   t.onTestFinished(async () => {
     await agent.dispose()
     await store.dispose()

@@ -1,5 +1,5 @@
 import { EventType, parseRunAgentInput, prepareReplayMessages, type AgentMessage, type AGUIEvent } from '@keundal/core'
-import simpleAgentPlugin from '@keundal/plugin-agent-simple'
+import agentPlugin from '@keundal/agent'
 import type { Context } from 'cordis'
 import { z } from 'zod'
 import { ChatMessageAssembly, type ChatMessage } from './chat-message'
@@ -44,7 +44,7 @@ export async function createKeundalChat(context: Context, name: string, options:
   const config = resolveModel(name)
   const maxOutputTokens = options.maxOutputTokens ?? 4096
   const ctx = context.isolate('agent')
-  const agent = ctx.plugin(simpleAgentPlugin, {
+  const agent = ctx.plugin(agentPlugin, {
     model: config.value,
     maxOutputTokens,
     webSearch: !!options.webSearch && config.provider !== 'google',
