@@ -19,6 +19,14 @@
 
 브라우저에서 실행하려면 `apiKey`와 `dangerouslyAllowBrowser: true`를 명시합니다. 생략하면 SDK의 브라우저 실행 차단을 유지합니다. 브라우저 키는 사용자·스크립트·확장 기능에 노출될 수 있으므로 서버 소유 비밀 키를 번들에 넣지 마세요. 사용자 자신의 키를 사용하는 앱에서만 위험을 안내하고 opt-in하며, 엔드포인트의 CORS 지원도 필요합니다.
 
+## 모델 목록 조회
+
+`listOpenAIModels({ apiKey, baseURL?, headers? }, { signal? })`은 `/models`에서 모델 목록을 조회합니다. 플러그인 등록과 `models` 설정은 필요하지 않습니다. `apiKey`는 직접 전달합니다.
+
+결과는 `@keundal/core`의 `LLMModelInfo[]`이며 공급자 접두사 없는 `id`, 표시 이름 `name`, 선택적인 `contextWindow`·`maxOutputTokens`를 포함합니다. 호환 API가 반환한 한도는 보존하지만, 한도가 없는 모델에 기본값을 넣지 않습니다. Responses API 지원 여부는 모델마다 따로 확인해야 합니다.
+
+조회는 자동 재시도하거나 캐시하지 않습니다. 호출자가 취소 신호와 시간제한을 지정합니다. HTTP 오류는 `status`와 HTTP 400의 JSON 본문인 `error`를 전달합니다. UI에 표시하기 전에 호출자가 비밀 값을 제거해야 합니다.
+
 ## 직접 호출
 
 워크스페이스에서 `pnpm build`를 실행한 뒤 사용할 수 있습니다. 아래 코드의 `OPENAI_MODEL`, `OPENAI_CONTEXT_WINDOW`, `OPENAI_MAX_OUTPUT_TOKENS`는 호출하는 애플리케이션에서 플러그인 설정을 만드는 예시 환경 변수입니다. `OPENAI_API_KEY`도 설정해야 합니다.

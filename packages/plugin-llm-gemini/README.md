@@ -2,6 +2,14 @@
 
 공식 `@google/genai` SDK의 Gemini API로 `@keundal/core`의 `LLMService`를 구현합니다. Cordis 플러그인으로 등록하면 `ctx.llm`에서 모델 한도 조회, 입력 토큰 계산, AG-UI 이벤트 스트리밍을 사용할 수 있습니다.
 
+## 모델 목록 조회
+
+`listGeminiModels({ apiKey, baseURL?, headers? }, { signal? })`은 `/v1beta/models`의 모든 페이지를 조회합니다. 플러그인 등록과 `models` 설정은 필요하지 않습니다. `apiKey`는 직접 전달합니다. `generateContent`를 지원하지 않는 모델은 제외합니다.
+
+결과는 `@keundal/core`의 `LLMModelInfo[]`이며 `models/` 접두사를 뺀 `id`, 표시 이름 `name`, 선택적인 `contextWindow`·`maxOutputTokens`를 포함합니다. 공급자가 반환한 한도만 보존하며 생성 설정을 변경하지 않습니다. 반복된 페이지 커서는 오류로 전달합니다.
+
+조회는 자동 재시도하거나 캐시하지 않습니다. 호출자가 취소 신호와 시간제한을 지정합니다. HTTP 오류는 `status`와 HTTP 400의 JSON 본문인 `error`를 전달합니다. UI에 표시하기 전에 호출자가 비밀 값을 제거해야 합니다.
+
 ## 설정
 
 | 설정      | 설명                                                                                                       |

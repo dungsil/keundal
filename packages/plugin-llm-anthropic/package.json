@@ -20,7 +20,8 @@
     "@anthropic-ai/sdk": "catalog:",
     "@keundal/core": "workspace:*",
     "@standard-schema/spec": "catalog:",
-    "cordis": "catalog:"
+    "cordis": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",
