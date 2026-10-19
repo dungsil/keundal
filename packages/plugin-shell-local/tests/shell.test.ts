@@ -21,7 +21,8 @@ async function setup(t: TestContext, config: Partial<LocalShellConfig> = {}) {
 }
 
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
-const node = (code: string) => `${quote(process.execPath)} -e ${quote(code)}`
+const node = (code: string, ...args: string[]) =>
+  [quote(process.execPath), '-e', quote(code), '--', ...args.map(quote)].join(' ')
 
 test.skipIf(process.platform === 'win32')('stdout과 stderr를 수집하고 비정상 종료 코드를 보존한다', async (t) => {
   const { ctx } = await setup(t)
@@ -118,9 +119,10 @@ for (const mode of ['timeout', 'cancel', 'dispose', 'exit'] as const) {
     `${mode} 이후 TERM을 무시하는 자손을 종료하고 상속된 파이프를 정리한다`,
     async (t) => {
       const { ctx, cwd, provider } = await setup(t, { timeoutMs: 3000 })
-      const marker = join(cwd, 'pid')
+      const marker = join(cwd, 'pid \'"$`\n한글')
       const child = node(
-        `process.on('SIGTERM',()=>{}); require('fs').writeFileSync(${JSON.stringify(marker)}, String(process.pid)); setInterval(()=>{},1000)`
+        "process.on('SIGTERM',()=>{}); require('fs').writeFileSync(process.argv[1], String(process.pid)); setInterval(()=>{},1000)",
+        marker
       )
       const controller = new AbortController()
       const command =
