@@ -498,6 +498,46 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/mcp:
+    dependencies:
+      '@keundal/plugin-agent-simple':
+        specifier: workspace:*
+        version: link:../plugin-agent-simple
+      '@modelcontextprotocol/client':
+        specifier: 2.3.1
+        version: 2.3.1
+    devDependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/plugin-store-memory':
+        specifier: workspace:*
+        version: link:../plugin-store-memory
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@modelcontextprotocol/server':
+        specifier: 2.3.1
+        version: 2.3.1
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.10
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/plugin-agent-simple:
     dependencies:
       '@keundal/compaction':

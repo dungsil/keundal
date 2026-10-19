@@ -13,13 +13,15 @@ import { addTools, parseTools, streamWithTools, type ExecutableTool } from './to
 
 export type { ExecutableTool, ToolExecutionContext } from './tools.js'
 
+export type ToolProvider = (options: ExecutionOptions) => readonly ExecutableTool[] | Promise<readonly ExecutableTool[]>
+
 export interface SimpleAgentConfig {
   readonly model: string
   readonly maxOutputTokens: number
   readonly webSearch?: boolean
   readonly reasoning?: boolean
   readonly compaction?: SummaryCompactionConfig
-  readonly tools?: readonly ExecutableTool[]
+  readonly tools?: readonly ExecutableTool[] | ToolProvider
   /** 도구를 실행하고 후속 생성을 요청할 최대 횟수입니다. 기본값은 8입니다. */
   readonly maxToolRounds?: number
   /** 같은 응답의 도구 실행을 겹쳐 시작합니다. 기본값은 false로 순차 실행입니다. */
@@ -53,7 +55,9 @@ const simpleAgentConfigSchema: StandardSchemaV1<SimpleAgentConfig, SimpleAgentCo
               throw new Error(`${key} must be a boolean`)
             }
           }
-          const tools = parseTools('tools' in value ? value.tools : undefined)
+          const configuredTools = 'tools' in value ? value.tools : undefined
+          const tools =
+            typeof configuredTools === 'function' ? (configuredTools as ToolProvider) : parseTools(configuredTools)
           const maxToolRounds = 'maxToolRounds' in value ? value.maxToolRounds : 8
           if (typeof maxToolRounds !== 'number' || !Number.isSafeInteger(maxToolRounds) || maxToolRounds <= 0) {
             throw new Error('maxToolRounds must be a positive integer')
@@ -149,7 +153,10 @@ export class SimpleAgent extends Service {
       const options = { signal }
       const prepared = await this.ctx.session.prepare(request, options)
       signal.throwIfAborted()
-      const tools = this.config.tools ?? []
+      const tools = parseTools(
+        typeof this.config.tools === 'function' ? await this.config.tools(options) : this.config.tools
+      )
+      signal.throwIfAborted()
       const preparedInput = addTools(parseRunAgentInput(prepared.input), tools)
       if (preparedInput.threadId !== request.threadId || preparedInput.runId !== request.runId) {
         throw new Error('session preparation must preserve threadId and runId')
