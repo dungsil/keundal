@@ -2,6 +2,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { connect } from 'node:net'
 import { networkInterfaces, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -295,4 +296,68 @@ test.each([undefined, '0.0.0.0'])('실행 파일은 기본 loopback과 명시적
       expect(await exposed.json()).toEqual([])
     }
   }
+})
+
+test('잘못된 raw request target은 400을 반환하고 서버 프로세스와 후속 정상 요청을 유지한다', async (t) => {
+  const child = spawn(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `
+        import { createServer } from 'node:http'
+        import { createAgentApp } from ${JSON.stringify(import.meta.resolve('@keundal/server'))}
+
+        const app = createAgentApp({
+          agent: async function* () {},
+          session: { list: async () => [], get: async () => undefined },
+          generation: { list: async () => [], get: async () => undefined, recover: async () => [] }
+        }, { token: ${JSON.stringify(token)} })
+        const server = createServer(app)
+        server.listen(0, '127.0.0.1', () => process.send(server.address().port))
+      `
+    ],
+    { env: { ...process.env, NODE_OPTIONS: '' }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] }
+  )
+  let stderr = ''
+  child.stderr!.on('data', (chunk) => (stderr += String(chunk)))
+  const exited = once(child, 'exit')
+  t.onTestFinished(async () => {
+    if (child.exitCode === null && child.signalCode === null) child.kill()
+    await exited
+  })
+  const [port] = await Promise.race([
+    once(child, 'message'),
+    exited.then(() => {
+      throw new Error(`server exited before listening: ${stderr}`)
+    })
+  ])
+
+  const rawRequest = (target: string, authenticated = true): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const socket = connect(Number(port), '127.0.0.1')
+      let response = ''
+      socket.setTimeout(2000, () => socket.destroy(new Error('request timed out')))
+      socket.on('connect', () => {
+        const authorization = authenticated ? `Authorization: Bearer ${token}\r\n` : ''
+        socket.write(`GET ${target} HTTP/1.1\r\nHost: localhost\r\n${authorization}Connection: close\r\n\r\n`)
+      })
+      socket.on('data', (chunk) => (response += String(chunk)))
+      socket.on('end', () => resolve(response))
+      socket.on('error', reject)
+    })
+
+  expect(await rawRequest('//[', false)).toContain('HTTP/1.1 401 Unauthorized')
+  expect(await rawRequest('/threads')).toContain('HTTP/1.1 200 OK')
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const invalid = await rawRequest('//[')
+    expect(invalid).toContain('HTTP/1.1 400 Bad Request')
+    expect(invalid).toContain('{"error":"invalid request"}')
+    const normal = await rawRequest('/threads')
+    expect(normal).toContain('HTTP/1.1 200 OK')
+    expect(normal).toContain('[]')
+    expect(child.exitCode).toBeNull()
+    expect(child.signalCode).toBeNull()
+  }
+  expect(stderr).toBe('')
 })

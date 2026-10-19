@@ -47,18 +47,18 @@ export function createAgentApp(services: AgentAppServices, options: { token: str
   }
   const token = Buffer.from(options.token)
 
-  return async function requestListener(request, response) {
-    const credentials = /^Bearer ([A-Za-z0-9\-._~+/]+=*)$/i.exec(request.headers.authorization ?? '')
-    const supplied = Buffer.from(credentials?.[1] ?? '')
-    if (supplied.length !== token.length || !timingSafeEqual(supplied, token)) {
-      response.setHeader('WWW-Authenticate', 'Bearer')
-      return sendJson(response, 401, { error: 'unauthorized' })
-    }
-
-    const url = new URL(request.url ?? '/', 'http://localhost')
-    const segments = url.pathname.split('/').filter(Boolean)
-
+  async function requestListener(request: IncomingMessage, response: ServerResponse) {
     try {
+      const credentials = /^Bearer ([A-Za-z0-9\-._~+/]+=*)$/i.exec(request.headers.authorization ?? '')
+      const supplied = Buffer.from(credentials?.[1] ?? '')
+      if (supplied.length !== token.length || !timingSafeEqual(supplied, token)) {
+        response.setHeader('WWW-Authenticate', 'Bearer')
+        return sendJson(response, 401, { error: 'unauthorized' })
+      }
+
+      const url = new URL(request.url ?? '/', 'http://localhost')
+      const segments = url.pathname.split('/').filter(Boolean)
+
       if (request.method === 'POST' && segments.join('/') === 'runs') {
         const input = parseRunAgentInput(JSON.parse(await readBody(request)))
         response.writeHead(200, SSE_HEADERS)
@@ -104,11 +104,17 @@ export function createAgentApp(services: AgentAppServices, options: { token: str
 
       sendJson(response, 404, { error: `no route for ${request.method} ${url.pathname}` })
     } catch {
+      if (response.destroyed || response.writableEnded) return
       if (!response.headersSent) {
         sendJson(response, 400, { error: 'invalid request' })
-      } else if (!response.writableEnded) {
+      } else {
         response.end()
       }
     }
+  }
+
+  return (request, response) => {
+    // 오류 응답 자체가 실패하더라도 HTTP 서버에 처리되지 않은 Promise 거부를 남기지 않습니다.
+    void requestListener(request, response).catch(() => response.destroy())
   }
 }
