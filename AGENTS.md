@@ -59,3 +59,21 @@ pnpm lint
 - CI 공통 환경과 의존성 설치는 `.github/actions/setup/action.yml`에서 관리합니다.
 
 커밋, 이슈, PR을 만들 때는 [CONTRIBUTING.md](CONTRIBUTING.md)를 따릅니다.
+
+## Agent skills
+
+### Korean repository text
+
+한국어 문서, 커밋 메시지, 이슈, PR, 리뷰 또는 댓글의 초안을 쓰기 전에 설치된 `vibe-docs` 스킬을 읽고 `필수 적용 순서`를 따른다. `CONTEXT.md`, 이 글의 주제를 다루는 ADR, `docs/agents/`에 정의된 도메인 용어와 라벨 문자열은 원래 표기를 그대로 유지한다.
+
+### Issue tracker
+
+이슈와 PRD는 GitHub Issues에서 관리하고 `gg` CLI를 사용한다. 자세한 내용은 `docs/agents/issue-tracker.md`를 읽는다.
+
+### Triage labels
+
+트리아지 상태는 `상태:`, 계획과 결정 유형은 `유형:` 라벨로 구분한다. `wontfix`는 `상태:수정안함`, `task`는 `유형:작업`을 쓴다. 자세한 내용은 `docs/agents/triage-labels.md`를 읽는다.
+
+### Domain docs
+
+단일 컨텍스트다. 루트 `CONTEXT.md`와 `docs/adr/`를 사용한다. 자세한 내용은 `docs/agents/domain.md`를 읽는다.
