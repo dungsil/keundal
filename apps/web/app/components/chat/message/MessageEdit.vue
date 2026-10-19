@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { UIMessage } from 'ai'
+import type { ChatMessage } from '../../../../shared/utils/chat-message'
 
 const props = defineProps<{
-  message: UIMessage
+  message: ChatMessage
   text: string
 }>()
 
 const emit = defineEmits<{
-  save: [message: UIMessage, text: string]
+  save: [message: ChatMessage, text: string]
   cancel: []
 }>()
 

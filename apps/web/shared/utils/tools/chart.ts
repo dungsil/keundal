@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import type { UIToolInvocation } from 'ai'
+import type { ToolInvocation } from '../chat-message'
 
-export type ChartUIToolInvocation = UIToolInvocation<{ input: z.infer<typeof chartSchema>, output: Awaited<ReturnType<typeof chartTool.execute>> }>
+export type ChartUIToolInvocation = ToolInvocation<{ input: z.infer<typeof chartSchema>, output: Awaited<ReturnType<typeof chartTool.execute>> }>
 
 const chartSchema = z.object({
   title: z.string().optional().describe('Title of the chart'),

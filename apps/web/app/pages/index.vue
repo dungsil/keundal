@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { UIMessage } from 'ai'
+import type { ChatMessage } from '../../shared/utils/chat-message'
 
 const input = ref('')
 const loading = ref(false)
@@ -38,7 +38,7 @@ async function createChat(prompt: string) {
   if (!ensureConfigured(model.value)) return
   loading.value = true
 
-  const parts: UIMessage['parts'] = [{ type: 'text', text: prompt }]
+  const parts: ChatMessage['parts'] = [{ type: 'text', text: prompt }]
 
   if (uploadedFiles.value.length > 0) {
     parts.push(...uploadedFiles.value)

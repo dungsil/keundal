@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import type { UIMessage } from 'ai'
-import { isFileUIPart } from 'ai'
+import type { ChatMessage } from '../../../../shared/utils/chat-message'
 import { useClipboard } from '@vueuse/core'
-import { getTextFromMessage } from '@nuxt/ui/utils/ai'
 
 const props = defineProps<{
-  message: UIMessage & { createdAt?: string | Date }
+  message: ChatMessage & { createdAt?: string | Date }
   streaming: boolean
   editing: boolean
   vote: boolean | null
@@ -24,19 +22,19 @@ const formattedDate = computed(() => {
 })
 
 const emit = defineEmits<{
-  edit: [message: UIMessage]
-  regenerate: [message: UIMessage]
-  vote: [message: UIMessage, isUpvoted: boolean]
+  edit: [message: ChatMessage]
+  regenerate: [message: ChatMessage]
+  vote: [message: ChatMessage, isUpvoted: boolean]
 }>()
 
-const hasFiles = computed(() => props.message.parts.some(isFileUIPart))
+const hasFiles = computed(() => props.message.parts.some(part => part.type === 'file'))
 
 const clipboard = useClipboard()
 
 const copied = ref(false)
 
 function copy() {
-  clipboard.copy(getTextFromMessage(props.message))
+  clipboard.copy(props.message.parts.filter(part => part.type === 'text').map(part => part.text).join(''))
 
   copied.value = true
 

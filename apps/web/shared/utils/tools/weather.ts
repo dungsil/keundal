@@ -1,7 +1,7 @@
-import type { UIToolInvocation } from 'ai'
+import type { ToolInvocation } from '../chat-message'
 import { z } from 'zod'
 
-export type WeatherUIToolInvocation = UIToolInvocation<{ input: z.infer<typeof weatherSchema>, output: Awaited<ReturnType<typeof weatherTool.execute>> }>
+export type WeatherUIToolInvocation = ToolInvocation<{ input: z.infer<typeof weatherSchema>, output: Awaited<ReturnType<typeof weatherTool.execute>> }>
 
 const getWeatherData = (k: string) => ({
   'sunny': { text: 'Sunny', icon: 'i-lucide-sun' },

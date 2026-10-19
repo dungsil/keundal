@@ -1,4 +1,4 @@
-import type { getToolName } from 'ai'
+import type { ToolPart } from '../../shared/utils/chat-message'
 
 export interface Source {
   url: string
@@ -15,7 +15,9 @@ interface SearchOutput {
   groundingMetadata?: { groundingChunks?: GoogleGroundingChunk[] }
 }
 
-type ToolPart = Parameters<typeof getToolName>[0]
+export function isToolStreaming(part: ToolPart): boolean {
+  return part.state === 'input-streaming' || part.state === 'input-available'
+}
 
 export function getSearchQuery(part: ToolPart): string | undefined {
   return (part.input as { query?: string } | undefined)?.query

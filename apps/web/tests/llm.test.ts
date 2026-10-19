@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { createServer, type ServerResponse, type IncomingMessage } from 'node:http'
-import { DefaultChatTransport, type UIMessage, type UIMessageChunk } from 'ai'
+import { EventType, LLM_SOURCE_EVENT, type AGUIEvent } from '@keundal/core'
+import type { ChatMessage } from '../shared/utils/chat-message'
 import { expect, test, onTestFinished } from 'vitest'
 import { Context } from 'cordis'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
@@ -27,7 +28,7 @@ async function createKeundalChat(name: string, options: { webSearch?: boolean, r
 }
 
 type Frame = Record<string, unknown>
-const user: UIMessage = { id: 'user-1', role: 'user', parts: [{ type: 'text', text: '서울 날씨' }, { type: 'file', url: 'data:image/png;base64,iVBORw==', mediaType: 'image/png' }] }
+const user: ChatMessage = { id: 'user-1', role: 'user', parts: [{ type: 'text', text: '서울 날씨' }, { type: 'file', url: 'data:image/png;base64,iVBORw==', mediaType: 'image/png' }] }
 
 function openaiText(text: string): Frame[] {
   const item = { id: 'msg_answer', type: 'message', role: 'assistant', content: [] }
@@ -77,11 +78,8 @@ async function setup(handle: (body: Record<string, unknown>, response: ServerRes
   return `http://127.0.0.1:${address.port}`
 }
 
-// Exercise the unchanged template client's real SSE decoder, not just our encoder.
-async function decode(response: Response, onChunk?: (chunk: UIMessageChunk) => void) {
-  const transport = new DefaultChatTransport({ fetch: async () => response })
-  const stream = await transport.sendMessages({ trigger: 'submit-message', chatId: 'chat', messageId: undefined, messages: [user], abortSignal: undefined })
-  const chunks: UIMessageChunk[] = []
+async function collect(stream: AsyncIterable<AGUIEvent>, onChunk?: (chunk: AGUIEvent) => void) {
+  const chunks: AGUIEvent[] = []
   for await (const chunk of stream) {
     chunks.push(chunk)
     onChunk?.(chunk)
@@ -95,7 +93,7 @@ test.each([
   { name: 'google/gemini-3-flash', key: 'GEMINI_API_KEY', url: 'GEMINI_BASE_URL', id: 'gemini-3-flash-preview', frames: [{ responseId: 'gemini-answer', candidates: [{ content: { role: 'model', parts: [{ text: '서울은 맑아요' }] }, finishReason: 'STOP' }] }] },
   { name: 'openai/shared-model', key: 'OPENAI_API_KEY', url: 'OPENAI_BASE_URL', id: 'shared-model', frames: openaiText('서울은 맑아요') },
   { name: 'anthropic/shared-model', key: 'ANTHROPIC_API_KEY', url: 'ANTHROPIC_BASE_URL', id: 'shared-model', frames: anthropicText('서울은 맑아요') }
-])('$name: 제목과 이미지 대화를 Keundal로 실행하고 원본 클라이언트 스트림으로 저장한다', async ({ name, key, url, id, frames }) => {
+])('$name: 제목과 이미지 대화를 실행하고 AG-UI 이벤트와 표시 메시지를 보존한다', async ({ name, key, url, id, frames }) => {
   const received: Record<string, unknown>[] = []
   const baseURL = await setup((body, response) => {
     received.push(body)
@@ -104,12 +102,12 @@ test.each([
   const chat = await createKeundalChat(name, { reasoning: false }, { [key]: 'local-test-key', [url]: baseURL })
   onTestFinished(chat.dispose)
   expect(await chat.title(user)).toBe('서울은 맑아요')
-  let saved: UIMessage | undefined
-  const chunks = await decode(chat.respond({ threadId: 'chat', messages: [user], instructions: '도움말', onFinish: async (message) => {
+  let saved: ChatMessage | undefined
+  const chunks = await collect(chat.respond({ threadId: 'chat', messages: [user], instructions: '도움말', onFinish: async (message) => {
     saved = message
   } }))
-  expect(chunks).toContainEqual(expect.objectContaining({ type: 'text-delta', delta: '서울은 맑아요' }))
-  expect(chunks.at(-1)).toEqual({ type: 'finish', finishReason: 'stop' })
+  expect(chunks).toContainEqual(expect.objectContaining({ type: EventType.TEXT_MESSAGE_CONTENT, delta: '서울은 맑아요' }))
+  expect(chunks.at(-1)).toMatchObject({ type: EventType.RUN_FINISHED, threadId: 'chat' })
   expect(saved?.parts).toContainEqual({ type: 'text', text: '서울은 맑아요' })
   expect(received).toHaveLength(2)
   expect(JSON.stringify(received[1])).toContain('iVBORw==')
@@ -143,13 +141,15 @@ test('검색 출처와 추론 암호문을 보존하고 chart 실행과 새 요�
   const env = { OPENAI_API_KEY: 'local-test-key', OPENAI_BASE_URL: baseURL }
   const chat = await createKeundalChat('openai/gpt-5-nano', { webSearch: true, reasoning: true }, env)
   onTestFinished(chat.dispose)
-  let saved!: UIMessage
-  const chunks = await decode(chat.respond({ threadId: 'chat', messages: [user], instructions: '', onFinish: async (message) => {
+  let saved!: ChatMessage
+  const chunks = await collect(chat.respond({ threadId: 'chat', messages: [user], instructions: '', onFinish: async (message) => {
     saved = message
   } }))
-  expect(chunks).toContainEqual({ type: 'tool-output-available', toolCallId: call.call_id, output: args })
-  expect(chunks).toContainEqual({ type: 'source-url', sourceId: 'https://example.com/trends', url: 'https://example.com/trends', title: 'Trends' })
-  expect(chunks.at(-1)?.type).toBe('finish')
+  expect(chunks).toContainEqual(expect.objectContaining({ type: EventType.TOOL_CALL_RESULT, toolCallId: call.call_id, content: JSON.stringify(args) }))
+  expect(chunks).toContainEqual(expect.objectContaining({ type: EventType.CUSTOM, name: LLM_SOURCE_EVENT, value: expect.objectContaining({ url: 'https://example.com/trends', title: 'Trends' }) }))
+  expect(saved.parts).toContainEqual(expect.objectContaining({ type: 'tool-chart', state: 'output-available', input: args, output: args }))
+  expect(saved.parts).toContainEqual({ type: 'source-url', sourceId: 'https://example.com/trends', url: 'https://example.com/trends', title: 'Trends' })
+  expect(chunks.at(-1)?.type).toBe(EventType.RUN_FINISHED)
   expect(requests).toHaveLength(2)
   const expected = [
     expect.objectContaining({ type: 'reasoning', id: reasoning.id, encrypted_content: 'opaque-reasoning' }),
@@ -160,7 +160,7 @@ test('검색 출처와 추론 암호문을 보존하고 chart 실행과 새 요�
   expect(requests[1]!.input).toEqual(expect.arrayContaining(expected))
   const reloaded = await createKeundalChat('openai/gpt-5-nano', { webSearch: true, reasoning: false }, env)
   onTestFinished(reloaded.dispose)
-  await decode(reloaded.respond({ threadId: 'chat', messages: [user, JSON.parse(JSON.stringify(saved)), { id: 'user-2', role: 'user', parts: [{ type: 'text', text: '계속' }] }], instructions: '' }))
+  await collect(reloaded.respond({ threadId: 'chat', messages: [user, JSON.parse(JSON.stringify(saved)), { id: 'user-2', role: 'user', parts: [{ type: 'text', text: '계속' }] }], instructions: '' }))
   expect(requests[2]!.input).toEqual(expect.arrayContaining(expected))
   expect(requests[2]!.reasoning).toEqual({ effort: 'low' })
 })
@@ -176,8 +176,8 @@ test('Gemini chart 호출의 thoughtSignature를 후속 요청에 보존한다',
   })
   const chat = await createKeundalChat('google/gemini-3-flash', { reasoning: true }, { GEMINI_API_KEY: 'local-test-key', GEMINI_BASE_URL: baseURL })
   onTestFinished(chat.dispose)
-  const chunks = await decode(chat.respond({ threadId: 'chat', messages: [user], instructions: '' }))
-  expect(chunks.at(-1)?.type).toBe('finish')
+  const chunks = await collect(chat.respond({ threadId: 'chat', messages: [user], instructions: '' }))
+  expect(chunks.at(-1)?.type).toBe(EventType.RUN_FINISHED)
   expect(requests).toHaveLength(2)
   expect(requests[1]!.contents).toEqual(expect.arrayContaining([
     { role: 'model', parts: [{ functionCall: { name: 'chart', args }, thoughtSignature: 'opaque-gemini-signature' }] },
@@ -200,10 +200,10 @@ test('취소하면 응답을 기다리는 공급자 연결과 UI 스트림을 �
   const chat = await createKeundalChat('openai/gpt-5-nano', {}, { OPENAI_API_KEY: 'local-test-key', OPENAI_BASE_URL: baseURL })
   onTestFinished(chat.dispose)
   const controller = new AbortController()
-  const consuming = decode(chat.respond({ threadId: 'chat', messages: [user], instructions: '', signal: controller.signal }))
+  const consuming = collect(chat.respond({ threadId: 'chat', messages: [user], instructions: '', signal: controller.signal }))
   await connected
   controller.abort()
-  expect(await consuming).toContainEqual({ type: 'abort' })
+  expect((await consuming).some(event => event.type === EventType.RUN_FINISHED)).toBe(false)
   await closed
 })
 
@@ -216,9 +216,9 @@ test('공급자 오류를 성공 응답으로 바꾸거나 자동 재시도하�
   })
   const chat = await createKeundalChat('openai/gpt-5-nano', {}, { OPENAI_API_KEY: 'local-test-key', OPENAI_BASE_URL: baseURL })
   onTestFinished(chat.dispose)
-  const chunks = await decode(chat.respond({ threadId: 'chat', messages: [user], instructions: '' }))
-  expect(chunks).toContainEqual({ type: 'error', errorText: expect.stringContaining('HTTP 429') })
-  expect(chunks.some(chunk => chunk.type === 'finish')).toBe(false)
+  const chunks = await collect(chat.respond({ threadId: 'chat', messages: [user], instructions: '' }))
+  expect(chunks).toContainEqual(expect.objectContaining({ type: EventType.RUN_ERROR, message: expect.stringContaining('HTTP 429') }))
+  expect(chunks.some(chunk => chunk.type === EventType.RUN_FINISHED)).toBe(false)
   expect(calls).toBe(1)
 })
 
@@ -244,9 +244,9 @@ test.each(['openai', 'anthropic', 'google'] as const)('%s의 토큰·제목·생
   })
   const model = `${provider}/shared-model`
   await chats.create('bad-request', user, model)
-  const chunks = await decode(await chats.respond('bad-request', { model, messages: [user] }))
-  expect(chunks).toContainEqual({ type: 'error', errorText: expect.stringContaining('HTTP 400). Unsupported parameter: temperature') })
-  expect(chunks.some(chunk => chunk.type === 'finish')).toBe(false)
+  const chunks = await collect(chats.respond('bad-request', { model, messages: [user] }))
+  expect(chunks).toContainEqual(expect.objectContaining({ type: EventType.RUN_ERROR, message: expect.stringContaining('HTTP 400). Unsupported parameter: temperature') }))
+  expect(chunks.some(chunk => chunk.type === EventType.RUN_FINISHED)).toBe(false)
   expect(requests.some(request => /input_tokens|count_tokens|:countTokens/.test(request.url!))).toBe(true)
   expect(generations).toBe(2)
   for (const request of requests) {
@@ -289,13 +289,13 @@ test('토큰 계산이 404인 호환 API에서도 답변을 저장하고 생성 
     await llm.dispose()
   })
   await chats.create('compat', user, 'openai/shared-model')
-  const chunks = await decode(await chats.respond('compat', { model: 'openai/shared-model', messages: [user] }))
-  expect(chunks).toContainEqual({ type: 'finish', finishReason: 'stop' })
+  const chunks = await collect(chats.respond('compat', { model: 'openai/shared-model', messages: [user] }))
+  expect(chunks).toContainEqual(expect.objectContaining({ type: EventType.RUN_FINISHED }))
   expect((await chats.get('compat'))!.messages.at(-1)!.parts).toContainEqual({ type: 'text', text: '호환 API 답변' })
   rejected = true
-  const failed = await decode(await chats.respond('compat', { model: 'openai/shared-model', messages: [user] }))
-  expect(failed).toContainEqual(expect.objectContaining({ type: 'error', errorText: expect.stringContaining('HTTP 401') }))
-  expect(failed.some(chunk => chunk.type === 'finish')).toBe(false)
+  const failed = await collect(chats.respond('compat', { model: 'openai/shared-model', messages: [user] }))
+  expect(failed).toContainEqual(expect.objectContaining({ type: EventType.RUN_ERROR, message: expect.stringContaining('HTTP 401') }))
+  expect(failed.some(chunk => chunk.type === EventType.RUN_FINISHED)).toBe(false)
   expect(JSON.stringify(failed)).not.toContain('private-compat-key')
 })
 
@@ -332,13 +332,13 @@ test('키와 API URL 변경을 재시작 없이 적용하고 삭제한 키와 �
     await llm.dispose()
   })
   await chats.create('settings', user, 'openai/gpt-5-nano')
-  expect(await (await chats.respond('settings', { model: 'openai/gpt-5-nano', messages: [user] })).text()).toContain('첫 번째 설정')
+  expect(JSON.stringify(await collect(chats.respond('settings', { model: 'openai/gpt-5-nano', messages: [user] })))).toContain('첫 번째 설정')
   settings.openai = { apiKey: 'second-private-key', baseURL: secondURL }
-  const followup: UIMessage = { id: 'followup', role: 'user', parts: [{ type: 'text', text: '설정 변경 후 요청' }] }
+  const followup: ChatMessage = { id: 'followup', role: 'user', parts: [{ type: 'text', text: '설정 변경 후 요청' }] }
   const messages = [...(await chats.get('settings'))!.messages, followup]
-  expect(await (await chats.respond('settings', { model: 'openai/gpt-5-nano', messages })).text()).toContain('변경한 설정')
+  expect(JSON.stringify(await collect(chats.respond('settings', { model: 'openai/gpt-5-nano', messages })))).toContain('변경한 설정')
   rejected = true
-  const failed = await (await chats.respond('settings', { model: 'openai/gpt-5-nano', messages })).text()
+  const failed = JSON.stringify(await collect(chats.respond('settings', { model: 'openai/gpt-5-nano', messages })))
   expect(failed).toContain('HTTP 401')
   expect(failed).not.toContain('second-private-key')
   expect(authorizations).toEqual(['Bearer first-private-key', 'Bearer first-private-key', 'Bearer second-private-key', 'Bearer second-private-key'])
@@ -365,17 +365,17 @@ test('Anthropic 추론 중 중단한 대화를 다시 보내도 서명 없는 �
   const chat = await createKeundalChat('anthropic/claude-haiku-4.5', { reasoning: true }, env)
   onTestFinished(chat.dispose)
   const controller = new AbortController()
-  let saved!: UIMessage
-  const chunks = await decode(chat.respond({ threadId: 'chat', messages: [user], instructions: '', signal: controller.signal, onFinish: async (message) => {
+  let saved!: ChatMessage
+  const chunks = await collect(chat.respond({ threadId: 'chat', messages: [user], instructions: '', signal: controller.signal, onFinish: async (message) => {
     saved = message
   } }), (chunk) => {
-    if (chunk.type === 'reasoning-delta') controller.abort()
+    if (chunk.type === EventType.REASONING_MESSAGE_CONTENT) controller.abort()
   })
-  expect(chunks).toContainEqual({ type: 'abort' })
+  expect(chunks.some(event => event.type === EventType.RUN_FINISHED)).toBe(false)
   expect(saved.parts).toContainEqual({ type: 'reasoning', text: '부분 추론' })
   const resumed = await createKeundalChat('anthropic/claude-haiku-4.5', { reasoning: true }, env)
   onTestFinished(resumed.dispose)
-  const next = await decode(resumed.respond({ threadId: 'chat', messages: [user, saved, { id: 'user-2', role: 'user', parts: [{ type: 'text', text: '계속' }] }], instructions: '' }))
-  expect(next.at(-1)?.type).toBe('finish')
+  const next = await collect(resumed.respond({ threadId: 'chat', messages: [user, saved, { id: 'user-2', role: 'user', parts: [{ type: 'text', text: '계속' }] }], instructions: '' }))
+  expect(next.at(-1)?.type).toBe(EventType.RUN_FINISHED)
   expect(calls).toBe(2)
 })

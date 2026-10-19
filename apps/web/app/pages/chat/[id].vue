@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { useChat } from '@ai-sdk/vue'
-import { DefaultChatTransport } from 'ai'
-import type { UIMessage } from 'ai'
+import type { ChatMessage } from '../../../shared/utils/chat-message'
 
 const route = useRoute()
 const toast = useToast()
@@ -35,27 +33,15 @@ const votes = ref<NonNullable<typeof data.value>['votes']>([])
 
 const input = ref('')
 
-const { messages, status, error, sendMessage, regenerate, stop } = useChat({
-  id: route.params.id as string,
-  messages: data.value?.messages,
-  transport: new DefaultChatTransport({
-    fetch: async (_url, init) => $chatStore.respond(route.params.id as string, JSON.parse(init!.body as string), init?.signal ?? undefined),
-    body: () => ({
-      model: model.value,
-      webSearch: webSearch.value,
-      reasoning: reasoning.value
-    })
-  }),
-  onData: async (dataPart) => {
-    if (dataPart.type === 'data-chat-title') {
-      await refreshNuxtData('chats')
-      const chatsCache = useNuxtData<{ id: string, label: string }[]>('chats')
-      const updated = chatsCache.data.value?.find(c => c.id === data.value!.id)
-      if (updated && updated.label !== 'Untitled') {
-        title.value = updated.label
-      }
+const { messages, status, error, sendMessage, regenerate, stop } = useKeundalChat({
+  respond: (messages, onMessage, signal) => $chatStore.respond(route.params.id as string, {
+    messages, model: model.value, webSearch: webSearch.value, reasoning: reasoning.value,
+    onMessage,
+    onTitle: (value) => {
+      title.value = value
+      void refreshNuxtData('chats')
     }
-  },
+  }, signal),
   onFinish: async () => {
     await refreshNuxtData('chats')
   },
@@ -93,13 +79,13 @@ async function handleSubmit(e: Event) {
 
 const editingMessageId = ref<string | null>(null)
 
-function startEdit(message: UIMessage) {
+function startEdit(message: ChatMessage) {
   if (editingMessageId.value) return
 
   editingMessageId.value = message.id
 }
 
-async function saveEdit(message: UIMessage, text: string) {
+async function saveEdit(message: ChatMessage, text: string) {
   try {
     await $chatStore.truncate(data.value!.id, message.id, 'edit')
   } catch {
@@ -111,7 +97,7 @@ async function saveEdit(message: UIMessage, text: string) {
   sendMessage({ text, messageId: message.id })
 }
 
-async function regenerateMessage(message: UIMessage) {
+async function regenerateMessage(message: ChatMessage) {
   try {
     await $chatStore.truncate(data.value!.id, message.id, 'regenerate')
   } catch {
@@ -128,7 +114,7 @@ function getVote(messageId: string) {
   return !!vote.isUpvoted
 }
 
-async function vote(message: UIMessage, isUpvoted: boolean) {
+async function vote(message: ChatMessage, isUpvoted: boolean) {
   const snapshot = (votes.value ?? []).map(v => ({ ...v }))
   const toggling = getVote(message.id) === isUpvoted
   const next = toggling ? null : isUpvoted

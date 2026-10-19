@@ -1,13 +1,13 @@
 import type { Context } from 'cordis'
-import type { SessionSnapshot } from '@keundal/core'
-import type { UIMessage } from 'ai'
+import type { AGUIEvent, SessionSnapshot } from '@keundal/core'
+import type { ChatMessage } from './chat-message'
 import { createKeundalChat, toMessages } from './keundal'
 
 export interface LocalChat {
   id: string
   title: string | null
   createdAt: string
-  messages: UIMessage[]
+  messages: ChatMessage[]
   votes: { chatId: string, messageId: string, isUpvoted: boolean }[]
   model: string
   started: boolean
@@ -49,14 +49,14 @@ export class ChatStore {
     })
   }
 
-  private async complete(id: string, runId: string, message: UIMessage) {
+  private async complete(id: string, runId: string, message: ChatMessage) {
     const snapshot = await this.ctx.session.get(id)
     const chat = this.chat(snapshot)
     if (!chat || chat.pendingRunId !== runId) throw new Error('Chat changed while the response was running')
     await this.save(snapshot, { ...chat, messages: [...chat.messages, message], pendingRunId: undefined })
   }
 
-  async create(id: string, message: UIMessage, model: string): Promise<LocalChat> {
+  async create(id: string, message: ChatMessage, model: string): Promise<LocalChat> {
     if (await this.ctx.session.get(id)) throw new Error('Chat already exists')
     const chat: LocalChat = {
       id, title: null, createdAt: new Date().toISOString(), messages: [message], votes: [], model,
@@ -108,7 +108,14 @@ export class ChatStore {
     await this.ctx.session.delete(id, snapshot?.revision ?? 0)
   }
 
-  async respond(id: string, request: { messages: UIMessage[], model: string, reasoning?: boolean, webSearch?: boolean }, signal?: AbortSignal): Promise<Response> {
+  async* respond(id: string, request: {
+    messages: ChatMessage[]
+    model: string
+    reasoning?: boolean
+    webSearch?: boolean
+    onMessage?: (message: ChatMessage) => void
+    onTitle?: (title: string) => void
+  }, signal?: AbortSignal): AsyncGenerator<AGUIEvent> {
     if (this.active.has(id)) throw new Error('A response is already running')
     const abort = new AbortController()
     const combined = signal ? AbortSignal.any([signal, abort.signal]) : abort.signal
@@ -130,26 +137,24 @@ export class ChatStore {
       if (titleGenerated) {
         chat = { ...chat, title: await runtime.title(chat.messages[0]!, combined) }
         await this.save(saved, chat)
+        request.onTitle?.(chat.title!)
       }
-      return runtime.respond({
-        threadId: id, runId, messages: request.messages, signal: combined, state: { web: chat }, titleGenerated,
+      yield* runtime.respond({
+        threadId: id, runId, messages: request.messages, signal: combined, state: { web: chat }, onMessage: request.onMessage,
         instructions: `You are a knowledgeable and helpful AI assistant. Be clear, accurate and concise.
 Do not use markdown headings. Use bold text for section labels instead.
 ${request.webSearch && !request.model.startsWith('google/') ? 'Use native web search when current information is needed and cite sources.' : 'Web search is disabled. Do not claim to have verified live information.'}`,
         onFinish: async (message) => {
-          try {
-            await this.complete(id, runId, message)
-          } finally {
-            this.active.delete(id)
-            release()
-          }
+          await this.complete(id, runId, message)
         }
       })
-    } catch (error) {
-      await runtime?.dispose()
-      this.active.delete(id)
-      release()
-      throw error
+    } finally {
+      try {
+        await runtime?.dispose()
+      } finally {
+        this.active.delete(id)
+        release()
+      }
     }
   }
 
@@ -162,14 +167,14 @@ ${request.webSearch && !request.model.startsWith('google/') ? 'Use native web se
       const chat = this.chat(snapshot)
       if (!chat || chat.pendingRunId !== run.request.input.runId) continue
       const runtime = await createKeundalChat(this.ctx, chat.model)
-      const response = runtime.respond({
+      const events = runtime.respond({
         threadId: id, runId: run.request.input.runId, messages: chat.messages, instructions: '',
         events: (async function* () { for (const entry of run.journal) yield entry.event })(),
         onFinish: async (message) => {
           await this.complete(id, run.request.input.runId, message)
         }
       })
-      await response.arrayBuffer()
+      for await (const _event of events) { /* Drain the journal projection and persist it. */ }
     }
   }
 
