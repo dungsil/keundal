@@ -8,6 +8,8 @@ Keundal("큰달"으로 읽음)은 개인용 오픈소스 에이전트 도구입�
 | -------------------------------------- | ------------------------------------------------------------------------- |
 | `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.    |
 | `@keundal/plugin-agent-simple`         | 세 서비스와 대화 축약 함수를 조합하고 도구 실행과 후속 생성을 연결합니다. |
+| `@keundal/plugin-skill`                | 스킬 공급자를 조합하고 목록 조회와 본문 로딩을 제공합니다.                |
+| `@keundal/plugin-skill-filesystem`     | 지정한 디렉터리의 `SKILL.md`를 스킬 공급자로 등록합니다.                  |
 | `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                                |
 | `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                          |
 | `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                              |

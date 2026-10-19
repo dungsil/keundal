@@ -49,6 +49,37 @@ for await (const event of ctx.agent.run({
 
 `execute`는 JSON 객체로 해석한 인자와 `threadId`, `runId`, `toolCallId`, `signal`을 받습니다. `parameters`는 모델에 전달할 JSON Schema입니다. 인자의 세부 타입과 업무 규칙은 실행 함수에서 검증해야 합니다. 반환값은 문자열이며, 객체 결과는 `JSON.stringify()`로 변환합니다.
 
+## 스킬 사용
+
+`skills: true`를 설정하면 `skills` 서비스를 추가로 주입받습니다. 서비스가 사라지면 진행 중 실행을 취소하고, 서비스가 돌아오면 에이전트를 다시 구성합니다. 기본값은 비활성화이며 기존 세 서비스만 필요합니다.
+
+```ts
+import skillPlugin from '@keundal/plugin-skill'
+import filesystemSkillPlugin from '@keundal/plugin-skill-filesystem'
+
+await ctx.plugin(skillPlugin)
+await ctx.plugin(filesystemSkillPlugin, { roots: ['./skills'] })
+await ctx.plugin(simpleAgentPlugin, {
+  model: 'your-model',
+  maxOutputTokens: 1024,
+  skills: true
+})
+```
+
+매 실행에서 이름과 설명 목록을 준비한 뒤 `system` 메시지로 추가합니다. 설명의 공백을 정규화하고 스킬당 최대 500자로 제한합니다. 본문은 목록에 포함하지 않습니다.
+
+모델은 `skill({ name })` 도구로 본문을 불러옵니다. 로딩은 스크립트나 첨부 파일을 실행하거나 읽지 않습니다. 선택한 공급자는 실행 중 유지하지만, 파일 본문은 로딩 시점의 내용을 사용할 수 있습니다.
+
+목록과 본문은 입력 토큰 예산에 포함합니다. 본문은 일반 도구 결과로 기록하며 후속 요청의 예산 검사를 거칩니다. 본문을 임의로 자르지 않으며, 축약 후에도 입력을 보존할 수 없으면 후속 생성을 시작하지 않습니다.
+
+목록 메시지의 예약 ID는 `keundal:skill-catalog`입니다. 세션이 이전 목록을 반환하면 같은 ID의 현재 목록으로 대체합니다. 목록이 비거나 스킬을 끄면 이전 안내를 무효화하며, 목록을 쌓지 않습니다. 호출자가 입력 메시지에 예약 ID를 사용하면 거부합니다.
+
+기본 저장소는 목록을 별도 세션 기록으로 저장하지 않습니다. 목록은 생성 요청에 포함되며 매 실행마다 새로 준비합니다. 불러온 본문은 기존 도구 결과와 같은 저장·축약 정책을 따릅니다. 복구 시 스킬을 다시 읽지 않습니다.
+
+스킬 사용 시 `skill`이라는 이름의 도구를 설정이나 입력에 중복 등록할 수 없습니다. 없는 이름과 잘못된 인자는 도구 결과로 안내합니다. 파일 오류는 실행 오류로, 취소는 취소로 전달합니다.
+
+`/name` 직접 호출, 파일 감시, 리소스 자동 로딩은 지원하지 않습니다.
+
 ## 대화 축약 설정
 
 입력이 모델의 컨텍스트 예산을 넘으면 `@keundal/compaction`의 `compact()`를 자동으로 호출합니다. 별도 등록 없이 에이전트 설정의 `compaction`으로 축약 옵션을 조정합니다.

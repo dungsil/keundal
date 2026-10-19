@@ -9,6 +9,7 @@ import {
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { Service, type Context } from 'cordis'
 
+import { SKILL_CATALOG_ID, skillTool, withSkillCatalog } from './skills.js'
 import { addTools, parseTools, streamWithTools, type ExecutableTool } from './tools.js'
 
 export type { ExecutableTool, ToolExecutionContext } from './tools.js'
@@ -20,6 +21,7 @@ export interface SimpleAgentConfig {
   readonly reasoning?: boolean
   readonly compaction?: SummaryCompactionConfig
   readonly tools?: readonly ExecutableTool[]
+  readonly skills?: boolean
   /** 도구를 실행하고 후속 생성을 요청할 최대 횟수입니다. 기본값은 8입니다. */
   readonly maxToolRounds?: number
   /** 같은 응답의 도구 실행을 겹쳐 시작합니다. 기본값은 false로 순차 실행입니다. */
@@ -47,13 +49,16 @@ const simpleAgentConfigSchema: StandardSchemaV1<SimpleAgentConfig, SimpleAgentCo
         )
         if (compaction.issues) return { issues: compaction.issues }
         try {
-          for (const key of ['webSearch', 'reasoning'] as const) {
+          for (const key of ['webSearch', 'reasoning', 'skills'] as const) {
             const option = (value as Record<string, unknown>)[key]
             if (option !== undefined && typeof option !== 'boolean') {
               throw new Error(`${key} must be a boolean`)
             }
           }
           const tools = parseTools('tools' in value ? value.tools : undefined)
+          const skills = 'skills' in value ? (value.skills as boolean | undefined) : undefined
+          if (skills && tools.some((tool) => tool.name === 'skill'))
+            throw new Error('skill tool name is reserved when skills are enabled')
           const maxToolRounds = 'maxToolRounds' in value ? value.maxToolRounds : 8
           if (typeof maxToolRounds !== 'number' || !Number.isSafeInteger(maxToolRounds) || maxToolRounds <= 0) {
             throw new Error('maxToolRounds must be a positive integer')
@@ -68,6 +73,7 @@ const simpleAgentConfigSchema: StandardSchemaV1<SimpleAgentConfig, SimpleAgentCo
               ...('reasoning' in value ? { reasoning: value.reasoning as boolean | undefined } : {}),
               compaction: compaction.value,
               tools,
+              skills,
               maxToolRounds,
               parallelTools
             }
@@ -146,11 +152,16 @@ export class SimpleAgent extends Service {
     try {
       signal.throwIfAborted()
       const request = parseRunAgentInput(input)
+      if (request.messages.some((message) => message.id === SKILL_CATALOG_ID)) {
+        throw new Error(`message id is reserved: ${SKILL_CATALOG_ID}`)
+      }
       const options = { signal }
       const prepared = await this.ctx.session.prepare(request, options)
       signal.throwIfAborted()
-      const tools = this.config.tools ?? []
-      const preparedInput = addTools(parseRunAgentInput(prepared.input), tools)
+      const catalog = this.config.skills ? await this.ctx.skills.prepare(options) : undefined
+      signal.throwIfAborted()
+      const tools = [...(this.config.tools ?? []), ...(catalog ? [skillTool(catalog)] : [])]
+      const preparedInput = addTools(withSkillCatalog(parseRunAgentInput(prepared.input), catalog), tools)
       if (preparedInput.threadId !== request.threadId || preparedInput.runId !== request.runId) {
         throw new Error('session preparation must preserve threadId and runId')
       }
@@ -256,7 +267,13 @@ export class SimpleAgent extends Service {
 
 export const simpleAgentPlugin = Object.assign(
   function simpleAgentPlugin(ctx: Context, config: SimpleAgentConfig) {
-    new SimpleAgent(ctx, config)
+    if (config.skills) {
+      ctx.inject(['skills'], (skillsCtx) => {
+        new SimpleAgent(skillsCtx, config)
+      })
+    } else {
+      new SimpleAgent(ctx, config)
+    }
   },
   { inject: ['llm', 'generation', 'session'], Config: simpleAgentConfigSchema }
 )
