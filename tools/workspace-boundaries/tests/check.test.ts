@@ -53,6 +53,21 @@ test('상대 경로와 Nuxt 상속, 동적 import, 재노출로 앱 경계를 �
   assert.equal((await checkWorkspaceBoundaries(root)).length, 5)
 })
 
+test('Vue script 태그의 대소문자가 달라도 다른 앱의 참조를 거부한다', async (t) => {
+  for (const [opening, closing] of [
+    ['script', 'script'],
+    ['SCRIPT', 'SCRIPT'],
+    ['ScRiPt', 'sCrIpT']
+  ]) {
+    const root = await fixture(t, {
+      'apps/alpha/app.vue': `<${opening} setup>import x from "@fixture/beta/code"</${closing}>`
+    })
+    assert.deepEqual(await checkWorkspaceBoundaries(root), [
+      `${join('apps', 'alpha', 'app.vue')}: @fixture/beta/code references app @fixture/beta`
+    ])
+  }
+})
+
 test('패키지에서 앱을 참조하거나 스크립트로 다른 앱을 실행하면 실패한다', async (t) => {
   const root = await fixture(t, {
     'packages/shared/package.json': { name: '@fixture/shared', dependencies: { '@fixture/alpha': 'workspace:*' } },
