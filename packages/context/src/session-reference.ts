@@ -104,21 +104,55 @@ export function formatSessionReferenceMention(reference: SessionReferenceInput):
 /** Parse markdown and bare session URI references into readable user text. */
 export function parseSessionReferenceText(text: string): ParsedSessionReferenceText {
   const references: SessionReferenceInput[] = []
-  const pattern =
-    /@\[((?:\\.|[^\\\]])*)\]\(((?:keundal|dsh)-session:[^\s)]*)\)|((?:keundal|dsh)-session:[A-Za-z0-9_-]+)/gu
-  const rendered = text.replace(
-    pattern,
-    (_match, rawLabel: string | undefined, markdownUri: string | undefined, bareUri: string | undefined) => {
-      const uri = markdownUri ?? bareUri
-      if (uri === undefined) throw invalidReference('missing URI')
-      const sessionId = decodeSessionReferenceUri(uri)
-      const label = rawLabel === undefined ? sessionId : rawLabel.replace(/\\(.)/gu, '$1')
-      references.push({ sessionId, label })
-      return `@${label}`
+  const parts: string[] = []
+  let copiedThrough = 0
+  let labelEnd = 0
+  let cursor = 0
+  while (cursor < text.length) {
+    let uriStart = cursor
+    let labelStart: number | undefined
+    if (text.startsWith('@[', cursor)) {
+      if (labelEnd < cursor + 2) {
+        labelEnd = cursor + 2
+        while (labelEnd < text.length && text[labelEnd] !== ']') {
+          labelEnd += text[labelEnd] === '\\' ? 2 : 1
+        }
+      }
+      if (text.startsWith('](', labelEnd)) {
+        uriStart = labelEnd + 2
+        labelStart = cursor + 2
+      }
     }
-  )
-  if (/@\[[^\]]*\]\((?:keundal|dsh)-session:/u.test(text) && references.length === 0) throw invalidReference(text)
-  return { text: rendered, references }
+    const scheme = text.startsWith(SESSION_REFERENCE_SCHEME, uriStart)
+      ? SESSION_REFERENCE_SCHEME
+      : text.startsWith('dsh-session:', uriStart)
+        ? 'dsh-session:'
+        : undefined
+    if (!scheme) {
+      cursor++
+      continue
+    }
+    let end = uriStart + scheme.length
+    if (labelStart !== undefined) {
+      while (end < text.length && text[end] !== ')' && !/\s/u.test(text[end]!)) end++
+      if (text[end] !== ')') throw invalidReference(text.slice(uriStart, end))
+    } else {
+      while (end < text.length && /[A-Za-z0-9_-]/u.test(text[end]!)) end++
+      if (end === uriStart + scheme.length) {
+        cursor = end
+        continue
+      }
+    }
+    const sessionId = decodeSessionReferenceUri(text.slice(uriStart, end))
+    const label = labelStart === undefined ? sessionId : text.slice(labelStart, labelEnd).replace(/\\(.)/gu, '$1')
+    references.push({ sessionId, label })
+    parts.push(text.slice(copiedThrough, cursor), `@${label}`)
+    cursor = labelStart === undefined ? end : end + 1
+    copiedThrough = cursor
+  }
+  if (!references.length) return { text, references }
+  parts.push(text.slice(copiedThrough))
+  return { text: parts.join(''), references }
 }
 
 /** Session read/candidate service and current-request context preparer. */

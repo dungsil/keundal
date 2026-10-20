@@ -143,6 +143,26 @@ describe('세션 참조 URI와 스냅숏', () => {
     expect(() => parseSessionReferenceText('@[bad](keundal-session:!!!)')).toThrow(SessionReferenceError)
   })
 
+  test('닫히지 않은 멘션이 반복되어도 원문을 보존하고 뒤의 유효한 참조를 찾는다', () => {
+    const prefix = '@['.repeat(100_000)
+    const uri = encodeSessionReferenceUri('source')
+    expect(parseSessionReferenceText(prefix)).toEqual({ text: prefix, references: [] })
+    expect(parseSessionReferenceText(`${prefix} ${uri}`)).toEqual({
+      text: `${prefix} @source`,
+      references: [{ sessionId: 'source', label: 'source' }]
+    })
+    expect(() => parseSessionReferenceText('@[](dsh-session:'.repeat(100_000))).toThrow(SessionReferenceError)
+  })
+
+  test('대괄호가 포함된 별칭을 보존하고 유효한 참조 뒤의 잘못된 멘션도 거부한다', () => {
+    const valid = formatSessionReferenceMention({ sessionId: 'source', label: 'nested @[label' })
+    expect(parseSessionReferenceText(valid)).toEqual({
+      text: '@nested @[label',
+      references: [{ sessionId: 'source', label: 'nested @[label' }]
+    })
+    expect(() => parseSessionReferenceText(`${valid} @[broken](dsh-session:`)).toThrow(SessionReferenceError)
+  })
+
   test('요청한 참조만 한 번 캡처하고 읽기 전용·태그 안전한 바이트 제한 스냅숏을 삽입한다', async () => {
     const source = sourceSnapshot(
       'source',
