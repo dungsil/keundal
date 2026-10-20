@@ -379,3 +379,28 @@ test('Anthropic 추론 중 중단한 대화를 다시 보내도 서명 없는 �
   expect(next.at(-1)?.type).toBe(EventType.RUN_FINISHED)
   expect(calls).toBe(2)
 })
+
+test('브라우저 공급자가 컨텍스트 초과를 반환하면 오류 정보를 안전하게 보존하여 한 번 재시도한다', async () => {
+  let calls = 0
+  let summaries = 0
+  const baseURL = await setup((body, response) => {
+    if (JSON.stringify(body).includes('Summarize the conversation data')) {
+      summaries++
+      return send(response, openaiText('Earlier facts.'))
+    }
+    if (++calls === 1) {
+      response.writeHead(400, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ error: { code: 'context_length_exceeded', message: 'Maximum context length exceeded' } }))
+    } else send(response, openaiText('Recovered'))
+  })
+  const runtime = await createKeundalChat('openai/gpt-5-nano', {}, { OPENAI_API_KEY: 'local-test-key', OPENAI_BASE_URL: baseURL })
+  onTestFinished(runtime.dispose)
+  const messages: ChatMessage[] = Array.from({ length: 9 }, (_, index) => ({
+    id: `history-${index}`, role: index % 2 ? 'assistant' : 'user', parts: [{ type: 'text', text: `Message ${index}` }]
+  }))
+  const events = await collect(runtime.respond({ threadId: 'overflow', messages, instructions: 'Be helpful.' }))
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(events).toContainEqual(expect.objectContaining({ type: EventType.TEXT_MESSAGE_CONTENT, delta: 'Recovered' }))
+  expect(calls).toBe(2)
+  expect(summaries).toBe(1)
+})

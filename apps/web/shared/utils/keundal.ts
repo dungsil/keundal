@@ -101,7 +101,7 @@ export async function createKeundalChat(context: Context, name: string, options:
       let failed = false
       try {
         for await (const event of request.events ?? ctx.agent.run(input([
-          { id: randomUUID(), role: 'system', content: request.instructions },
+          { id: 'keundal:web-instructions', role: 'system', content: request.instructions },
           ...toMessages(request.messages, name)
         ], request.threadId, runId, request.state), { signal: request.signal })) {
           projection.apply(event)
@@ -116,13 +116,9 @@ export async function createKeundalChat(context: Context, name: string, options:
       } catch (error) {
         yield { type: EventType.RUN_ERROR, message: error instanceof Error ? error.message : String(error) }
       } finally {
-        try {
-          projection.finish(name)
-          await request.onFinish?.(projection.message)
-          request.onMessage?.(structuredClone(projection.message))
-        } finally {
-          await dispose()
-        }
+        projection.finish(name)
+        await request.onFinish?.(projection.message)
+        request.onMessage?.(structuredClone(projection.message))
       }
       // The UI sees success only after the display message is durably saved too.
       if (finished) yield finished

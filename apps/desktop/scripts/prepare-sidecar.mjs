@@ -7,11 +7,6 @@ const desktop = dirname(dirname(fileURLToPath(import.meta.url)))
 const root = join(desktop, '..', '..')
 const tauri = join(desktop, 'src-tauri')
 const server = join(root, 'apps', 'server')
-execFileSync(process.platform === 'win32' ? 'pnpm.exe' : 'pnpm', ['--filter', '@keundal/server', 'build'], {
-  cwd: root,
-  stdio: 'inherit'
-})
-
 const output = execFileSync('rustc', ['-vV'], { encoding: 'utf8' })
 const triple = process.env.TAURI_ENV_TARGET_TRIPLE ?? /^host:\s*(.+)$/m.exec(output)?.[1]?.trim()
 if (!triple) throw new Error('Could not determine the Rust target triple')

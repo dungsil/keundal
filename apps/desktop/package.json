@@ -10,7 +10,7 @@
     "dev": "pnpm prepare:sidecar && tauri dev",
     "dev:ui": "pnpm --filter @keundal/web exec nuxt dev --envName desktop --no-open",
     "tauri": "tauri",
-    "prepare:sidecar": "node scripts/prepare-sidecar.mjs",
+    "prepare:sidecar": "pnpm --filter @keundal/server build && node scripts/prepare-sidecar.mjs",
     "build:tauri": "pnpm prepare:sidecar && pnpm build"
   },
   "devDependencies": {

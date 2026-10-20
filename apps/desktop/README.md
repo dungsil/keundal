@@ -86,7 +86,7 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 - 웹 UI는 호스트의 `/models`와 `/threads`를 사용합니다. API 키 설정은 호스트 시작 시에만 반영되므로 공급자를 바꾼 뒤 앱을 다시 시작합니다.
 - 호스트가 시작하지 못하면 웹 UI는 브라우저 저장소 모드로 돌아갑니다.
 
-`pnpm --filter @keundal/desktop dev`와 `bundle`은 `scripts/prepare-sidecar.mjs`를 실행합니다. 이 스크립트는 `@keundal/server`를 빌드하고, 현재 Node.js 실행 파일을 `src-tauri/binaries/keundal-host-<triple>`로 복사하며, 서버 번들을 `src-tauri/sidecar`에 복사합니다. 설치 파일에는 Node.js 런타임과 서버 번들이 포함되므로 앱 크기가 커집니다.
+`pnpm --filter @keundal/desktop dev`와 `bundle`은 `prepare:sidecar` 명령으로 `@keundal/server`를 먼저 빌드합니다. 이어서 `scripts/prepare-sidecar.mjs`가 현재 Node.js 실행 파일을 `src-tauri/binaries/keundal-host-<triple>`로 복사하고, 서버 번들을 `src-tauri/sidecar`에 복사합니다. 설치 파일에는 Node.js 런타임과 서버 번들이 포함되므로 앱 크기가 커집니다.
 
 ## 로컬 스킬
 

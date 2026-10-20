@@ -71,7 +71,7 @@ export async function* streamWithTools(
   maxToolRounds: number,
   prepareInput: (input: RunAgentInput) => Promise<RunAgentInput>,
   signal: AbortSignal,
-  options: { parallel?: boolean } = {}
+  options: { parallel?: boolean; stream?: LLMService['stream'] } = {}
 ): AsyncGenerator<LLMEvent> {
   const registered = new Map(tools.map((tool) => [tool.name, tool]))
   const usedIds = new Set(
@@ -85,7 +85,7 @@ export async function* streamWithTools(
     signal.throwIfAborted()
     const assembly = new MessageAssembly()
     const calls = new Map<string, PendingCall>()
-    for await (const event of llm.stream(current, { signal })) {
+    for await (const event of options.stream ? options.stream(current, { signal }) : llm.stream(current, { signal })) {
       signal.throwIfAborted()
       if (event.type === EventType.TOOL_CALL_START) {
         if (usedIds.has(event.toolCallId)) throw new Error(`duplicate tool call id: ${event.toolCallId}`)
