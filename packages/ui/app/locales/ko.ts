@@ -81,6 +81,13 @@ export default {
   'file.imagesOnly': '현재 Keundal은 이미지 첨부만 지원합니다.',
   'file.tooLarge': '파일 크기가 8MB를 초과합니다.',
   'file.failed': '파일 첨부 실패',
+  'model.defaultTitle': '기본 모델',
+  'model.defaultLabel': '모델',
+  'model.defaultDescription':
+    '앱을 열거나 새 대화를 시작할 때 사용할 모델입니다. 이 기기에 저장됩니다. 공급자 설정을 먼저 저장하면 모델 목록을 불러옵니다.',
+  'model.noDefault': '마지막으로 선택한 모델 사용',
+  'model.defaultSaved': '기본 모델을 저장했습니다.',
+  'model.defaultSaveFailed': '기본 모델을 저장하지 못했습니다. 브라우저 저장소를 사용할 수 있는지 확인하세요.',
   'model.refresh': '모델 목록 새로고침',
   'model.cache':
     '공급자의 모델 목록은 이 브라우저에 1시간 동안 저장됩니다. 이 앱의 텍스트·도구·토큰 계산 API를 지원하는 모델만 표시됩니다.',
