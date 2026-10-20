@@ -19,9 +19,26 @@ export class GeminiLLMService extends LLMService {
     super(ctx)
     const parsed = parseConfig(config)
     this.models = parsed.models
+    const noAuth = parsed.apiKey === ''
     this.client = new GoogleGenAI({
-      ...(parsed.apiKey ? { apiKey: parsed.apiKey } : {}),
-      httpOptions: { baseUrl: parsed.baseURL, headers: parsed.headers }
+      // The SDK requires a key; the transport removes this sentinel before sending.
+      apiKey: noAuth ? 'keundal-no-auth' : parsed.apiKey,
+      ...(noAuth ? { vertexai: false } : {}),
+      httpOptions: {
+        baseUrl: parsed.baseURL,
+        headers: parsed.headers,
+        ...(noAuth
+          ? {
+              fetch: (url, init) => {
+                const headers = new globalThis.Headers(init?.headers)
+                if (!Object.keys(parsed.headers ?? {}).some((name) => name.toLowerCase() === 'x-goog-api-key')) {
+                  headers.delete('x-goog-api-key')
+                }
+                return globalThis.fetch(url, { ...init, headers })
+              }
+            }
+          : {})
+      }
     })
     ctx.fiber.effect(() => () => {
       this.closed = true

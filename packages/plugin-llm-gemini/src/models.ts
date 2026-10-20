@@ -20,7 +20,7 @@ export async function listGeminiModels(
     const url = new globalThis.URL(`${baseURL}/v1beta/models`)
     if (cursor) url.searchParams.set('pageToken', cursor)
     const response = await globalThis.fetch(url, {
-      headers: { 'x-goog-api-key': config.apiKey, ...config.headers },
+      headers: { ...(config.apiKey ? { 'x-goog-api-key': config.apiKey } : {}), ...config.headers },
       signal: options.signal,
       cache: 'no-store',
       credentials: 'omit'

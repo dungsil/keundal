@@ -49,7 +49,6 @@ export function defaultLLMSettings(): LLMSettings {
 export function providerCredentials(settings: LLMSettings, provider: LLMProvider) {
   const parsed = providerSettingsSchema.safeParse(settings[provider])
   if (!parsed.success) throw new Error(`Open LLM settings and check the ${provider} configuration`)
-  if (!parsed.data.apiKey) throw new Error(`Open LLM settings and add your ${provider} API key`)
   return { apiKey: parsed.data.apiKey, baseURL: parsed.data.baseURL || undefined, headers: parsed.data.headers }
 }
 

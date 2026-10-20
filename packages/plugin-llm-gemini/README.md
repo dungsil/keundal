@@ -4,7 +4,7 @@
 
 ## 모델 목록 조회
 
-`listGeminiModels({ apiKey, baseURL?, headers? }, { signal? })`은 `/v1beta/models`의 모든 페이지를 조회합니다. 플러그인 등록과 `models` 설정은 필요하지 않습니다. `apiKey`는 직접 전달합니다. `generateContent`를 지원하지 않는 모델은 제외합니다.
+`listGeminiModels({ apiKey, baseURL?, headers? }, { signal? })`은 `/v1beta/models`의 모든 페이지를 조회합니다. 플러그인 등록과 `models` 설정은 필요하지 않습니다. `apiKey`는 직접 전달하며, 빈 문자열이면 기본 인증 헤더를 보내지 않습니다. 커스텀 인증 헤더는 그대로 적용합니다. `generateContent`를 지원하지 않는 모델은 제외합니다.
 
 결과는 `@keundal/core`의 `LLMModelInfo[]`이며 `models/` 접두사를 뺀 `id`, 표시 이름 `name`, 선택적인 `contextWindow`·`maxOutputTokens`를 포함합니다. 공급자가 반환한 한도만 보존하며 생성 설정을 변경하지 않습니다. 반복된 페이지 커서는 오류로 전달합니다.
 
@@ -22,6 +22,8 @@
 모델 한도는 [사용할 모델의 공식 문서](https://ai.google.dev/gemini-api/docs/models)에서 확인해 설정합니다. 등록하지 않은 모델이나 한도를 초과하는 출력 예산은 요청 전에 거부합니다.
 
 `countTokens()`는 Gemini API의 토큰 계산 엔드포인트를 호출합니다. 이 엔드포인트는 `contents`만 받으므로 시스템·개발자 지시문은 사용자 차례로 접어 계산에 포함하고, 도구 선언은 계산에 포함되지 않습니다. 대화와 부가 문맥은 생성 요청과 동일한 변환을 사용합니다.
+
+`apiKey: ''`를 명시하면 인증이 필요 없는 호환 엔드포인트에 요청할 수 있습니다. 모델 조회·토큰 계산·생성 요청에서 기본 인증 헤더를 생략하고 환경 변수의 키도 사용하지 않습니다. `headers`로 지정한 인증 헤더는 그대로 적용합니다. `apiKey`를 생략하면 기존 SDK의 환경 변수 처리를 유지합니다.
 
 ## 직접 호출
 
