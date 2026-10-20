@@ -176,9 +176,6 @@ jobs:
           key: desktop-${{ matrix.name }}
           cache-bin: false
 
-      - name: 데스크톱이 사용하는 패키지 빌드
-        run: pnpm exec turbo run build --filter='./packages/*' --filter='./tools/*'
-
       - name: 데스크톱 설치 파일 빌드
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
         env:
