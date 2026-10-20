@@ -34,10 +34,10 @@ Tauri가 `apps/web`의 개발 서버(포트 1420)를 시작하고 네이티브 �
 # 공유 패키지와 정적 UI 빌드: Rust 없이도 실행 가능
 pnpm build
 
-# 현재 OS용 네이티브 앱과 설치 파일 빌드
+# 현재 OS용 네이티브 앱과 배포 파일 빌드
 pnpm --filter @keundal/desktop bundle
 
-# 웹 Workers와 현재 OS용 데스크톱 설치 파일 빌드
+# 웹 Workers와 현재 OS용 데스크톱 배포 파일 빌드
 pnpm build:preview
 
 # 설치 파일 없이 네이티브 실행 파일만 빌드
@@ -48,17 +48,17 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 
 `pnpm build`는 정적 UI까지만 빌드하므로 Rust나 OS 라이브러리가 필요하지 않습니다. `@keundal/web` 워크스페이스 의존성으로 공유 패키지 빌드 순서를 보장합니다.
 
-`pnpm build:preview`는 Turbo에서 웹 Workers와 데스크톱 설치 파일을 함께 빌드합니다. 웹과 데스크톱은 Nuxt 출력 경로를 분리하여 병렬로 빌드합니다. 설치 파일 형식은 운영체제별 Tauri 설정을 따릅니다.
+`pnpm build:preview`는 Turbo에서 웹 Workers와 데스크톱 배포 파일을 함께 빌드합니다. 웹과 데스크톱은 Nuxt 출력 경로를 분리하여 병렬로 빌드합니다. 배포 파일 형식은 운영체제별 Tauri 설정을 따릅니다. Windows는 설치 파일을 만들지 않습니다. CI는 `keundal-desktop.exe`, Node.js 런타임인 `keundal-host.exe`, `sidecar` 폴더를 `apps/desktop/src-tauri/target/release/portable`에 모아 배포합니다. 실행할 PC에는 WebView2가 필요합니다.
 
 ### PR 프리뷰
 
 소스 변경이 있으면 기존 CI의 `빌드` job이 `pnpm build`로 공통 패키지와 정적 UI를 먼저 빌드합니다. 성공하면 플랫폼 빌드 job이 Linux, Windows, macOS에서 `pnpm build:preview`를 실행합니다. 같은 저장소에서 `main`을 대상으로 연 PR에는 웹 프리뷰 댓글에 다음 다운로드 링크를 함께 표시합니다.
 
 - macOS Apple Silicon: DMG
-- Windows x64: NSIS 설치 파일
+- Windows x64: 설치 없이 실행하는 EXE와 호스트·리소스
 - Linux x64: DEB와 AppImage
 
-다운로드에는 GitHub 로그인이 필요하며, 설치 파일은 업로드 후 7일간 보관합니다. 코드 서명 인증서와 공증은 사용하지 않습니다. macOS 빌드에는 임시 서명(ad-hoc)을 적용하며, OS 보안 경고가 표시될 수 있습니다.
+다운로드에는 GitHub 로그인이 필요하며, 배포 파일은 업로드 후 7일간 보관합니다. Windows는 다운로드한 압축 파일을 모두 푼 뒤 `keundal-desktop.exe`를 실행합니다. `keundal-host.exe`와 `sidecar` 폴더도 함께 유지해야 합니다. 설정과 대화 데이터는 OS 사용자 프로필에 저장합니다. 코드 서명 인증서와 공증은 사용하지 않습니다. macOS 빌드에는 임시 서명(ad-hoc)을 적용하며, OS 보안 경고가 표시될 수 있습니다.
 
 웹과 데스크톱 빌드가 모두 성공하면 웹 프리뷰를 배포하고 댓글에 데스크톱 다운로드 링크를 표시합니다. 빌드가 실패하면 CI 실행 로그에서 원인을 확인합니다.
 
@@ -86,7 +86,7 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 - 웹 UI는 호스트의 `/models`와 `/threads`를 사용합니다. API 키 설정은 호스트 시작 시에만 반영되므로 공급자를 바꾼 뒤 앱을 다시 시작합니다.
 - 호스트가 시작하지 못하면 웹 UI는 브라우저 저장소 모드로 돌아갑니다.
 
-`pnpm --filter @keundal/desktop dev`와 `bundle`은 `prepare:sidecar` 명령으로 데스크톱의 호스트 진입점을 `dist-sidecar`에 빌드합니다. 이어서 `scripts/prepare-sidecar.mjs`가 현재 Node.js 실행 파일을 `src-tauri/binaries/keundal-host-<triple>`로 복사하고, sidecar 번들을 `src-tauri/sidecar`에 복사합니다. 설치 파일에는 Node.js 런타임과 sidecar 번들이 포함되므로 앱 크기가 커집니다.
+`pnpm --filter @keundal/desktop dev`와 `bundle`은 `prepare:sidecar` 명령으로 데스크톱의 호스트 진입점을 `dist-sidecar`에 빌드합니다. 이어서 `scripts/prepare-sidecar.mjs`가 현재 Node.js 실행 파일을 `src-tauri/binaries/keundal-host-<triple>`로 복사하고, sidecar 번들을 `src-tauri/sidecar`에 복사합니다. 배포 파일에는 Node.js 런타임과 sidecar 번들이 포함되므로 앱 크기가 커집니다.
 
 ## 로컬 스킬
 
