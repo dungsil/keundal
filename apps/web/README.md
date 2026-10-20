@@ -12,7 +12,7 @@ pnpm build
 pnpm --filter @keundal/web dev
 ```
 
-사이드바 **LLM settings**에서 공급자를 선택하고 API 키를 입력한 뒤 **Save in this browser**로 저장합니다. 채팅 입력창에서 사용할 모델을 선택합니다. 선택한 모델의 키만 있으면 제목과 답변을 모두 생성할 수 있습니다. `apps/server`를 별도로 실행하거나 데이터베이스를 마이그레이션할 필요는 없습니다.
+사이드바 **LLM settings**에서 공급자를 선택하고 API 키를 입력한 뒤 **Save in this browser**로 저장합니다. 채팅 입력창에서 사용할 모델을 선택합니다. 선택한 모델의 키만 있으면 제목과 답변을 모두 생성할 수 있습니다. 브라우저 모드에는 데이터베이스 마이그레이션이 필요하지 않습니다.
 
 | 모델 목록 API | 설정의 공급자 |
 | --- | --- |
@@ -33,6 +33,42 @@ HTTP 400 오류는 공급자 JSON의 `error.message`·문자열 `error`·`messag
 키·URL·헤더는 현재 origin의 `localStorage`에 **암호화 없이** 저장합니다. 같은 사이트의 스크립트나 브라우저 확장 기능이 읽을 수 있으므로 공용 브라우저에서 사용하지 마세요. 선택한 모델도 브라우저에 저장하며, 설정은 계정에 동기화하지 않습니다. 앱 서버의 환경 변수·쿠키·SSR payload에는 키·헤더를 넣지 않습니다. 브라우저가 공급자 또는 설정한 엔드포인트로 직접 키와 대화를 전송하므로 신뢰할 수 있는 주소만 사용하세요. CORS가 차단되면 오류로 알리며 서버 프록시로 우회하지 않습니다.
 
 동일 UI를 사용하는 [데스크톱 앱](../desktop/README.md)은 LLM 설정을 localStorage 대신 OS 보안 저장소에 저장합니다. 위 브라우저 저장 안내는 웹 앱에 해당하며, 공급자 직접 요청과 CORS 정책은 데스크톱에도 적용됩니다.
+
+## 웹 서버의 에이전트 모드
+
+웹 앱은 기본으로 브라우저에서 에이전트를 실행합니다. Node.js로 실행하는 Nitro 서버는 `@keundal/agent-host`를 직접 조립하여 `/api/agent/**`에서 대화와 실행을 처리할 수 있습니다. 별도 HTTP 서버나 프록시 주소는 필요하지 않습니다.
+
+```sh
+export OPENAI_API_KEY="sk-..."             # 또는 GEMINI_API_KEY, ANTHROPIC_API_KEY
+export KEUNDAL_MODEL="gpt-4.1-mini"
+export KEUNDAL_API_TOKEN="your-random-bearer-token"
+export KEUNDAL_SQLITE_PATH=".data/keundal.sqlite"
+export NUXT_PUBLIC_AGENT_ENDPOINT="/api/agent"
+export NUXT_PUBLIC_AGENT_TOKEN="$KEUNDAL_API_TOKEN"
+pnpm --filter @keundal/web build
+pnpm --filter @keundal/web preview
+```
+
+호스트는 첫 API 요청 때 만들어지고 같은 웹 서버 프로세스에서 재사용합니다. 서버가 종료되면 호스트도 정리합니다. 모델 공급자의 키는 서버 환경 변수에서 읽으며 브라우저에 전달하지 않습니다. 호스트 설정이 없으면 API는 `503`을 반환하며 브라우저 모드는 계속 사용할 수 있습니다.
+
+모든 API 요청에는 `Authorization: Bearer <토큰>`이 필요합니다. 위 UI 설정의 `NUXT_PUBLIC_AGENT_TOKEN`은 브라우저에 전달되므로 이 모드는 신뢰할 수 있는 단일 사용자 환경에서 사용합니다. 토큰을 가진 호출자는 호스트의 모든 대화와 실행 기록에 접근합니다. 외부에 공개할 때는 접근 제어와 TLS를 별도로 구성해야 합니다. 다른 origin에서 직접 호출하려면 `KEUNDAL_CORS_ORIGINS`에 허용할 origin을 추가합니다.
+
+| API 경로 | 동작 |
+| --- | --- |
+| `POST /api/agent/runs` | AG-UI 실행을 SSE로 전달합니다. `x-keundal-model` 헤더로 모델을 선택합니다. |
+| `GET /api/agent/models` | 호스트에 등록한 모델과 한도를 조회합니다. |
+| `POST /api/agent/title` | 첫 사용자 메시지로 제목을 생성합니다. |
+| `GET /api/agent/threads`와 `GET /api/agent/threads/:id` | 대화 목록과 스냅숏을 조회합니다. |
+| `PUT /api/agent/threads/:id` | 기준 revision과 메시지·상태를 받아 대화를 저장합니다. |
+| `DELETE /api/agent/threads/:id?revision=N` | 기준 revision과 일치하는 대화를 삭제합니다. |
+| `GET /api/agent/runs`와 `GET /api/agent/runs/:id` | 실행 목록과 스냅숏을 조회합니다. |
+| `POST /api/agent/recover` | 미완료 실행을 `interrupted`로 확정합니다. |
+
+요청 본문은 기본 8 MiB까지 허용하며 `KEUNDAL_MAX_REQUEST_BODY_BYTES`로 변경합니다. 상한을 넘는 요청은 JSON 파싱과 에이전트 실행 전에 `413`으로 거부합니다. `KEUNDAL_PROVIDER`, `KEUNDAL_CONTEXT_WINDOW`, `KEUNDAL_MAX_OUTPUT_TOKENS`, `KEUNDAL_BASE_URL`, `KEUNDAL_HEADERS`로 공급자와 모델 설정을 지정할 수 있습니다.
+
+호스트 모드에서는 대화·실행·제목이 SQLite에 저장되고 모델 목록도 호스트에서 조회합니다. UI의 API 키 설정은 호스트 설정을 바꾸지 않습니다. Cloudflare Workers에서는 Node.js SQLite 호스트를 포함하지 않으며 이 API는 `503`을 반환합니다. Workers의 브라우저 모드와 외부 호스트 직접 연결은 유지합니다.
+
+데스크톱은 웹 서버를 실행하지 않습니다. `apps/desktop/sidecar/main.ts`가 `@keundal/agent-host/runtime`을 직접 사용하며, UI는 준비된 로컬 호스트에 연결합니다.
 
 ## 저장소와 실행 경계
 
@@ -120,7 +156,7 @@ Dependabot PR도 프리뷰를 배포합니다. CI 완료 후의 배포는 Action
 
 프리뷰 URL은 PR 댓글과 배포 단계 로그에서 확인합니다. 프리뷰는 공개 URL이며 브라우저의 대화·키 저장소는 origin이 다른 운영·각 PR 사이에서 분리됩니다. 새 프리뷰는 운영 secrets·변수·데이터 바인딩을 상속하지 않습니다.
 
-기존 `versions upload --preview-alias`로 만든 URL은 개별 삭제할 수 없습니다. `preview_urls: false` 설정이 다음 `main` 운영 배포에 반영되면 구형 버전 URL·별칭을 모두 비활성화합니다. 새 `preview` 방식의 URL은 이 설정과 독립적이며 PR 종료 시 개별 삭제합니다. 운영 Worker 자체와 정상 운영 URL은 삭제하지 않습니다.
+Workers.dev 프리뷰 URL을 사용하려면 `preview_urls: true` 설정을 유지해야 합니다. 이 설정은 `main` 운영 배포에 먼저 반영한 뒤 PR 프리뷰를 배포해야 합니다. `false`이면 프리뷰 생성에 성공해도 활성 URL이 없어 PR 댓글에 링크가 표시되지 않습니다. `preview` 방식으로 만든 프리뷰는 PR 종료 시 개별 삭제하며, 운영 Worker 자체와 정상 운영 URL은 삭제하지 않습니다.
 
 배포 자격 증명을 보호하기 위해 포크 PR은 자동 배포하지 않습니다. `pull_request_target`으로 PR 코드를 실행하지 않으며, 같은 저장소의 PR 코드는 배포 권한을 가진 신뢰된 코드로 취급합니다. CI 검사가 실패하거나 문서 전용 PR처럼 검사가 생략되면 배포하지 않습니다. GitHub는 생략된 job을 필수 검사 실패로 취급하지 않으므로 포크·문서 전용 PR에 프리뷰 성공을 강제하지는 않습니다.
 

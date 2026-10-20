@@ -237,46 +237,18 @@ importers:
 
   apps/desktop:
     devDependencies:
+      '@keundal/agent-host':
+        specifier: workspace:*
+        version: link:../../packages/agent-host
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
       '@keundal/web':
         specifier: workspace:*
         version: link:../web
       '@tauri-apps/cli':
         specifier: 2.12.3
         version: 2.12.3
-
-  apps/server:
-    dependencies:
-      '@keundal/agent':
-        specifier: workspace:*
-        version: link:../../packages/agent
-      '@keundal/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@keundal/plugin-llm-anthropic':
-        specifier: workspace:*
-        version: link:../../packages/plugin-llm-anthropic
-      '@keundal/plugin-llm-gemini':
-        specifier: workspace:*
-        version: link:../../packages/plugin-llm-gemini
-      '@keundal/plugin-llm-openai':
-        specifier: workspace:*
-        version: link:../../packages/plugin-llm-openai
-      '@keundal/plugin-store-sqlite':
-        specifier: workspace:*
-        version: link:../../packages/plugin-store-sqlite
-      cordis:
-        specifier: 'catalog:'
-        version: 4.0.0-rc.10
-    devDependencies:
-      '@keundal/plugin-store-memory':
-        specifier: workspace:*
-        version: link:../../packages/plugin-store-memory
-      '@keundal/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@keundal/tsdown':
-        specifier: workspace:*
-        version: link:../../tools/tsdown
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.6
@@ -310,6 +282,9 @@ importers:
       '@keundal/agent':
         specifier: workspace:*
         version: link:../../packages/agent
+      '@keundal/agent-host':
+        specifier: workspace:*
+        version: link:../../packages/agent-host
       '@keundal/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -355,6 +330,9 @@ importers:
       date-fns:
         specifier: ^4.4.0
         version: 4.4.0
+      h3:
+        specifier: 1.15.11
+        version: 1.15.11
       motion-v:
         specifier: ^2.6.0
         version: 2.7.0(@vueuse/core@14.4.0(vue@3.5.44(typescript@6.0.3)))(vue@3.5.44(typescript@6.0.3))
@@ -472,6 +450,52 @@ importers:
       '@keundal/plugin-skill-filesystem':
         specifier: workspace:*
         version: link:../plugin-skill-filesystem
+      '@keundal/plugin-store-memory':
+        specifier: workspace:*
+        version: link:../plugin-store-memory
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/agent-host:
+    dependencies:
+      '@keundal/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/plugin-llm-anthropic':
+        specifier: workspace:*
+        version: link:../plugin-llm-anthropic
+      '@keundal/plugin-llm-gemini':
+        specifier: workspace:*
+        version: link:../plugin-llm-gemini
+      '@keundal/plugin-llm-openai':
+        specifier: workspace:*
+        version: link:../plugin-llm-openai
+      '@keundal/plugin-store-sqlite':
+        specifier: workspace:*
+        version: link:../plugin-store-sqlite
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.10
+    devDependencies:
       '@keundal/plugin-store-memory':
         specifier: workspace:*
         version: link:../plugin-store-memory

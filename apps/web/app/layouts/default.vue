@@ -5,6 +5,7 @@ const { t } = useLocale()
 
 const { renameChat, deleteChat } = useChatActions()
 
+const route = useRoute()
 const sidebarOpen = ref(false)
 const searchOpen = ref(false)
 const { $chatStore } = useNuxtApp()
@@ -154,7 +155,16 @@ defineShortcuts({
         <ClientOnly>
           <div class="flex flex-col gap-1 w-full">
             <SkillSettings :collapsed="collapsed" />
-            <LLMSettings :collapsed="collapsed" />
+            <UButton
+              :label="collapsed ? '' : t('settings.title')"
+              :to="{ path: '/settings', query: route.path === '/settings' ? route.query : { returnTo: route.path } }"
+              icon="i-lucide-settings-2"
+              color="neutral"
+              :variant="route.path === '/settings' ? 'soft' : 'ghost'"
+              class="w-full"
+              :aria-label="t('settings.title')"
+              @click="sidebarOpen = false"
+            />
           </div>
         </ClientOnly>
       </template>

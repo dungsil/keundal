@@ -1,10 +1,7 @@
-import { spawn, spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
 import { createServer, request as httpRequest } from 'node:http'
 import { connect } from 'node:net'
-import { networkInterfaces, tmpdir } from 'node:os'
-import { join } from 'node:path'
 
 import agentPlugin from '@keundal/agent'
 import {
@@ -19,8 +16,8 @@ import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { Context, type Fiber } from 'cordis'
 
 const fetch = globalThis.fetch
-import { createAgentApp, type AgentAppOptions, type AgentAppServices } from '@keundal/server'
-import { expect, onTestFinished, test, type TestContext } from 'vitest'
+import { createAgentApp, type AgentAppOptions, type AgentAppServices } from '@keundal/agent-host/http'
+import { expect, test, type TestContext } from 'vitest'
 
 const token = 'test-only-server-token'
 
@@ -60,19 +57,23 @@ const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {
 
   let agentCalls = 0
   const services: AgentAppServices = {
-    agent: (run, options?: ExecutionOptions) => {
+    run: (run, options?: ExecutionOptions) => {
       agentCalls++
       return ctx.agent.run(run, options)
     },
     session: {
       get: (threadId, options) => ctx.session.get(threadId, options),
-      list: (options) => ctx.session.list(options)
+      list: (options) => ctx.session.list(options),
+      commit: (change, options) => ctx.session.commit(change, options),
+      delete: (threadId, revision, options) => ctx.session.delete(threadId, revision, options)
     },
     generation: {
       get: (runId, options) => ctx.generation.get(runId, options),
       list: (options) => ctx.generation.list(options),
       recover: (options) => ctx.generation.recover(options)
-    }
+    },
+    models: () => [{ id: 'test', provider: 'openai', contextWindow: 2000, maxOutputTokens: 200 }],
+    title: async () => 'test title'
   }
   const app = createAgentApp(services, { token, ...options })
   const server = createServer(app)
@@ -88,13 +89,15 @@ const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {
   const requestJson = async (
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
+    headers: Record<string, string> = {}
   ): Promise<{ status: number; json: unknown }> => {
     const response = await fetch(`${base}${path}`, {
       method,
       headers: {
         authorization: `Bearer ${token}`,
-        ...(body === undefined ? {} : { 'content-type': 'application/json' })
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        ...headers
       },
       body: body === undefined ? undefined : JSON.stringify(body)
     })
@@ -103,13 +106,15 @@ const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {
   const requestText = async (
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
+    headers: Record<string, string> = {}
   ): Promise<{ status: number; text: string; contentType: string }> => {
     const response = await fetch(`${base}${path}`, {
       method,
       headers: {
         authorization: `Bearer ${token}`,
-        ...(body === undefined ? {} : { 'content-type': 'application/json' })
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        ...headers
       },
       body: body === undefined ? undefined : JSON.stringify(body)
     })
@@ -238,77 +243,6 @@ test('GET 조회 경로와 404, recover를 노출한다', async (t) => {
   expect((recovered.json as { status: string }[]).map((run) => run.status)).toEqual(['completed'])
 })
 
-test('실행 파일은 토큰 누락·빈 토큰·빈 바인딩 주소에서 시작하지 않는다', () => {
-  for (const config of [
-    {},
-    { KEUNDAL_API_TOKEN: '' },
-    { KEUNDAL_API_TOKEN: ' ' },
-    { KEUNDAL_API_TOKEN: token, KEUNDAL_HOST: '' }
-  ]) {
-    const result = spawnSync(process.execPath, ['dist/main.js'], {
-      env: { PORT: '0', KEUNDAL_MODEL: 'test', OPENAI_API_KEY: 'test-only', ...config },
-      encoding: 'utf8',
-      timeout: 5000
-    })
-    expect(result.error).toBeUndefined()
-    expect(result.status).toBe(1)
-    expect(result.stderr).toMatch(/HTTP 인증 token|KEUNDAL_HOST/)
-    expect(result.stdout).not.toContain('listening')
-  }
-})
-
-test.each([undefined, '0.0.0.0'])('실행 파일은 기본 loopback과 명시적 외부 바인딩(%s)을 적용한다', async (host) => {
-  const directory = mkdtempSync(join(tmpdir(), 'keundal-server-'))
-  const child = spawn(process.execPath, ['dist/main.js'], {
-    env: {
-      PORT: '0',
-      KEUNDAL_MODEL: 'test',
-      OPENAI_API_KEY: 'test-only',
-      KEUNDAL_API_TOKEN: token,
-      KEUNDAL_SQLITE_PATH: join(directory, 'test.sqlite'),
-      ...(host === undefined ? {} : { KEUNDAL_HOST: host })
-    },
-    stdio: ['ignore', 'pipe', 'pipe']
-  })
-  onTestFinished(async () => {
-    if (child.exitCode === null && child.signalCode === null) {
-      const exited = once(child, 'exit')
-      child.kill()
-      await exited
-    }
-    rmSync(directory, { recursive: true, force: true })
-  })
-  let output = ''
-  child.stdout.on('data', (chunk) => {
-    output += String(chunk)
-  })
-  await expect.poll(() => output, { timeout: 5000 }).toContain(`http://${host ?? '127.0.0.1'}:`)
-  const port = /http:\/\/[^:]+:(\d+)/.exec(output)?.[1]
-  expect(port).toBeDefined()
-  const response = await fetch(`http://127.0.0.1:${port}/threads`, { headers: { authorization: `Bearer ${token}` } })
-  expect(response.status).toBe(200)
-  expect(await response.json()).toEqual([])
-  const denied = await fetch(`http://127.0.0.1:${port}/threads`)
-  expect(denied.status).toBe(401)
-  await denied.text()
-
-  const external = Object.values(networkInterfaces())
-    .flat()
-    .find((address) => address?.family === 'IPv4' && !address.internal)
-  if (external) {
-    const request = fetch(`http://${external.address}:${port}/threads`, {
-      headers: { authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(2000)
-    })
-    if (host === undefined) {
-      await expect(request).rejects.toThrow()
-    } else {
-      const exposed = await request
-      expect(exposed.status).toBe(200)
-      expect(await exposed.json()).toEqual([])
-    }
-  }
-})
 test.for(['content-length', 'chunked'] as const)(
   '%s 요청은 UTF-8 바이트 상한 이내와 경계값을 허용하고 1바이트 초과는 agent 실행 없이 거부한다',
   async (transfer, t) => {
@@ -431,7 +365,7 @@ test('잘못된 raw request target은 400을 반환하고 서버 프로세스와
       '-e',
       `
         import { createServer } from 'node:http'
-        import { createAgentApp } from ${JSON.stringify(import.meta.resolve('@keundal/server'))}
+        import { createAgentApp } from ${JSON.stringify(import.meta.resolve('@keundal/agent-host/http'))}
 
         const app = createAgentApp({
           agent: async function* () {},
@@ -485,4 +419,75 @@ test('잘못된 raw request target은 400을 반환하고 서버 프로세스와
     expect(child.signalCode).toBeNull()
   }
   expect(stderr).toBe('')
+})
+
+test('GET /models는 설정된 모델 한도를 돌려준다', async (t) => {
+  const { requestJson } = await setup(t)
+  const result = await requestJson('GET', '/models')
+  expect(result.status).toBe(200)
+  expect(result.json).toEqual({
+    models: [{ id: 'test', provider: 'openai', contextWindow: 2000, maxOutputTokens: 200 }]
+  })
+})
+
+test('POST /runs는 알 수 없는 모델 헤더를 400으로 거부한다', async (t) => {
+  const { requestJson, agentCalls } = await setup(t)
+  const result = await requestJson('POST', '/runs', input, { 'x-keundal-model': 'missing' })
+  expect(result.status).toBe(400)
+  expect(result.json).toEqual({ error: 'unknown model: missing' })
+  expect(agentCalls).toBe(0)
+})
+
+test('PUT /threads/:id와 DELETE /threads/:id는 세션 스냅숏을 저장하고 삭제한다', async (t) => {
+  const { base, requestJson } = await setup(t)
+  const created = await requestJson('PUT', '/threads/thread', {
+    expectedRevision: 0,
+    mode: 'replace',
+    messages: [{ id: 'q1', role: 'user', content: 'hello' }],
+    state: { web: { id: 'thread' } }
+  })
+  expect(created.status).toBe(200)
+  expect(created.json).toMatchObject({ threadId: 'thread', revision: 1, state: { web: { id: 'thread' } } })
+
+  const removed = await fetch(`${base}/threads/thread?revision=1`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${token}` }
+  })
+  expect(removed.status).toBe(204)
+  expect((await requestJson('GET', '/threads/thread')).status).toBe(404)
+})
+
+test('POST /title은 제목을 생성한다', async (t) => {
+  const { requestJson } = await setup(t)
+  const result = await requestJson('POST', '/title', {
+    model: 'test',
+    message: { id: 'q1', role: 'user', content: 'hello' }
+  })
+  expect(result.status).toBe(200)
+  expect(result.json).toEqual({ title: 'test title' })
+})
+
+test('허용한 origin의 preflight에 CORS 헤더를 붙인다', async (t) => {
+  const { base } = await setup(t, { allowedOrigins: ['http://tauri.localhost'] })
+  const response = await fetch(`${base}/runs`, {
+    method: 'OPTIONS',
+    headers: {
+      origin: 'http://tauri.localhost',
+      'access-control-request-method': 'POST',
+      'access-control-request-headers': 'authorization,content-type'
+    }
+  })
+  expect(response.status).toBe(204)
+  expect(response.headers.get('access-control-allow-origin')).toBe('http://tauri.localhost')
+  expect(response.headers.get('access-control-allow-headers')).toContain('authorization')
+})
+
+test('허용하지 않은 origin의 preflight는 403으로 거부한다', async (t) => {
+  const { base } = await setup(t, { allowedOrigins: ['http://tauri.localhost'] })
+  const response = await fetch(`${base}/runs`, {
+    method: 'OPTIONS',
+    headers: { origin: 'https://example.com', 'access-control-request-method': 'POST' }
+  })
+  expect(response.status).toBe(403)
+  expect(response.headers.get('access-control-allow-origin')).toBeNull()
 })

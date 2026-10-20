@@ -193,5 +193,7 @@ export default {
   'error.response': '응답 생성 실패',
   'error.secureStorage': '보안 저장소를 사용할 수 없습니다',
   'error.secureStorageDescription':
-    'LLM 설정을 불러오지 못했습니다. 운영체제 보안 저장소의 잠금을 해제한 뒤 앱을 다시 시작하세요. 브라우저 저장소에는 대신 저장하지 않습니다.'
+    'LLM 설정을 불러오지 못했습니다. 운영체제 보안 저장소의 잠금을 해제한 뒤 앱을 다시 시작하세요. 브라우저 저장소에는 대신 저장하지 않습니다.',
+  'settings.title': '설정',
+  'settings.back': '대화로 돌아가기'
 } satisfies Record<keyof typeof en, string>

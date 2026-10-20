@@ -3,6 +3,26 @@ import type { AGUIEvent, SessionSnapshot } from '@keundal/core'
 import type { ChatMessage } from './chat-message'
 import { createKeundalChat, toMessages } from './keundal'
 
+export interface ChatStoreLike {
+  list(): Promise<LocalChat[]>
+  get(id: string): Promise<LocalChat | undefined>
+  create(id: string, message: ChatMessage, model: string): Promise<LocalChat>
+  rename(id: string, title: string): Promise<void>
+  truncate(id: string, messageId: string, type: 'edit' | 'regenerate'): Promise<void>
+  vote(id: string, messageId: string, isUpvoted?: boolean): Promise<void>
+  delete(id: string): Promise<void>
+  respond(id: string, request: {
+    messages: ChatMessage[]
+    model: string
+    reasoning?: boolean
+    webSearch?: boolean
+    onMessage?: (message: ChatMessage) => void
+    onTitle?: (title: string) => void
+  }, signal?: AbortSignal): AsyncGenerator<AGUIEvent>
+  recover(): Promise<void>
+  stop(): Promise<void>
+}
+
 export interface LocalChat {
   id: string
   title: string | null
@@ -19,7 +39,7 @@ export interface LocalChat {
 type ChatState = { web: LocalChat }
 
 /** Uses only Keundal service contracts: swapping the store plugin needs no UI/agent changes. */
-export class ChatStore {
+export class ChatStore implements ChatStoreLike {
   private readonly runtimes = new Map<string, { key: string, runtime: Awaited<ReturnType<typeof createKeundalChat>> }>()
   private readonly active = new Map<string, { abort: AbortController, done: Promise<void> }>()
 

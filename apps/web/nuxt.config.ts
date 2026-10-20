@@ -1,7 +1,9 @@
+import { fileURLToPath } from 'node:url'
+
 // Nitro의 Wrangler 타입에 아직 없는 previews 설정도 생성 파일에 전달한다.
 const wrangler = {
   name: 'keundal-web',
-  preview_urls: false,
+  preview_urls: true,
   previews: {}
 }
 
@@ -39,7 +41,15 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
-    public: { desktop: false }
+    public: {
+      desktop: false,
+      // Keundal HTTP 호스트를 직접 사용할 때 지정합니다. 비어 있으면 브라우저 모드입니다.
+      agentEndpoint: '',
+      agentToken: ''
+    }
+  },
+  alias: {
+    '#agent-host-runtime': fileURLToPath(new URL('./server/agent/runtime-node.ts', import.meta.url))
   },
 
   experimental: {
@@ -66,6 +76,14 @@ export default defineNuxtConfig({
   vite: {
     optimizeDeps: {
       include: ['striptags']
+    }
+  },
+  hooks: {
+    'nitro:config'(config) {
+      if (String(config.preset ?? '').startsWith('cloudflare')) {
+        config.alias ??= {}
+        config.alias['#agent-host-runtime'] = fileURLToPath(new URL('./server/agent/runtime-unavailable.ts', import.meta.url))
+      }
     }
   },
 

@@ -5,8 +5,14 @@ import { resolveModel, type ModelOption } from '#shared/utils/models'
 export function useModels() {
   const model = useState('chat-model', () => 'anthropic/claude-haiku-4.5')
   useLocalStorage('keundal:model', model, { initOnMounted: true, writeDefaults: false })
-  const catalog = useNuxtApp().$modelCatalog
+  const { $modelCatalog: catalog, $remoteModels: remoteModels } = useNuxtApp()
+  if (remoteModels) {
+    watch(remoteModels, (available) => {
+      if (available.length && !available.some(item => item.value === model.value)) model.value = available[0]!.value
+    }, { immediate: true })
+  }
   const models = computed<ModelOption[]>(() => {
+    if (remoteModels) return remoteModels.value
     const available = catalog?.models.value ?? []
     const selected = resolveModel(model.value)
     if (available.some(item => item.value === selected.value)) return available

@@ -33,3 +33,11 @@ pub async fn save_llm_settings(settings: Option<String>) -> Result<(), String> {
     .await
     .map_err(|_| "Could not update LLM settings in the OS secret store".to_string())?
 }
+
+pub fn load_llm_settings_json() -> Result<Option<String>, String> {
+    match settings_entry()?.get_password() {
+        Ok(settings) => Ok(Some(settings)),
+        Err(Error::NoEntry) => Ok(None),
+        Err(_) => Err("Could not read LLM settings from the OS secret store".to_string()),
+    }
+}

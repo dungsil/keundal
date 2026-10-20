@@ -191,5 +191,7 @@ export default {
   'error.response': 'Response failed',
   'error.secureStorage': 'Secure storage unavailable',
   'error.secureStorageDescription':
-    'Could not load LLM settings. Unlock your OS secret store and restart the app. No browser storage fallback is used.'
+    'Could not load LLM settings. Unlock your OS secret store and restart the app. No browser storage fallback is used.',
+  'settings.title': 'Settings',
+  'settings.back': 'Back to chat'
 }
