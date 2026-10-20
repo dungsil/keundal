@@ -131,14 +131,18 @@ async function save(forget = false) {
       <p class="text-sm text-muted">
         Models are loaded automatically from this provider after saving. Choose the active model in the chat composer.
       </p>
-      <UFormField label="API key" name="apiKey">
+      <UFormField
+        label="API key (optional)"
+        name="apiKey"
+        description="Leave empty for endpoints that do not require authentication. Custom request headers still apply."
+      >
         <UInput
           v-model="draft[provider].apiKey"
           type="password"
           autocomplete="off"
           autocapitalize="off"
           :spellcheck="false"
-          placeholder="Enter your API key"
+          placeholder="Leave empty for no authentication"
           class="w-full"
           :disabled="saving"
         />

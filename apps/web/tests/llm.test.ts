@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 import { createServer, type ServerResponse, type IncomingMessage } from 'node:http'
 import { EventType, LLM_SOURCE_EVENT, type AGUIEvent } from '@keundal/core'
 import type { ChatMessage } from '../shared/utils/chat-message'
-import { expect, test, onTestFinished } from 'vitest'
+import { expect, test, onTestFinished, vi } from 'vitest'
 import { Context } from 'cordis'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { browserLLMPlugin } from '../shared/utils/browser-llm'
@@ -345,9 +345,11 @@ test('키와 API URL 변경을 재시작 없이 적용하고 삭제한 키와 �
   expect(budgets).toEqual([1024, 1024, 1024, 1024])
   const persisted = JSON.stringify({ session: await ctx.session.get('settings'), runs: await ctx.generation.list() })
   for (const value of ['first-private-key', 'second-private-key', firstURL, secondURL]) expect(persisted).not.toContain(value)
-  settings.openai = { apiKey: '', baseURL: '' }
-  await expect(ctx.llm.countTokens({ model: 'openai/gpt-5-nano', maxOutputTokens: 4096, input: { threadId: 'settings', runId: 'forgotten', messages: [], tools: [], context: [], state: {} } })).rejects.toThrow('add your openai API key')
-  expect(authorizations).toHaveLength(4)
+  rejected = false
+  settings.openai = { apiKey: '', baseURL: secondURL }
+  expect(await ctx.llm.countTokens({ model: 'openai/gpt-5-nano', maxOutputTokens: 1024, input: { threadId: 'settings', runId: 'no-auth', messages: [], tools: [], context: [], state: {} } })).toBe(15)
+  expect(JSON.stringify(await collect(chats.respond('settings', { model: 'openai/gpt-5-nano', messages })))).toContain('변경한 설정')
+  expect(authorizations.at(-1)).toBeUndefined()
 })
 
 test('Anthropic 추론 중 중단한 대화를 다시 보내도 서명 없는 부분 추론을 재생하지 않는다', async () => {
@@ -403,4 +405,53 @@ test('브라우저 공급자가 컨텍스트 초과를 반환하면 오류 정�
   expect(events).toContainEqual(expect.objectContaining({ type: EventType.TEXT_MESSAGE_CONTENT, delta: 'Recovered' }))
   expect(calls).toBe(2)
   expect(summaries).toBe(1)
+})
+
+test.each([
+  { provider: 'openai', name: 'openai/local-model', frames: openaiText('인증 없는 응답') },
+  { provider: 'anthropic', name: 'anthropic/local-model', frames: anthropicText('인증 없는 응답') },
+  { provider: 'google', name: 'google/local-model', frames: [{ responseId: 'local', candidates: [{ content: { role: 'model', parts: [{ text: '인증 없는 응답' }] }, finishReason: 'STOP' }] }] }
+] as const)('$provider: 빈 API 키로 토큰 계산과 제목·답변 생성을 수행하고 환경 인증을 전송하지 않는다', async ({ provider, name, frames }) => {
+  for (const key of ['OPENAI_API_KEY', 'OPENAI_ADMIN_KEY', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'GEMINI_API_KEY', 'GOOGLE_API_KEY']) vi.stubEnv(key, 'must-not-be-sent')
+  onTestFinished(() => {
+    vi.unstubAllEnvs()
+  })
+  const requests: IncomingMessage[] = []
+  const baseURL = await setup((_body, response) => send(response, [...frames]), 200, request => requests.push(request))
+  const settings = defaultLLMSettings()
+  settings[provider] = { apiKey: '', baseURL }
+  const ctx = new Context()
+  const llm = ctx.plugin(browserLLMPlugin, { getSettings: () => settings })
+  await llm
+  const store = ctx.plugin(memoryStorePlugin)
+  await store
+  const chat = await createChat(ctx, name, { reasoning: false })
+  onTestFinished(async () => {
+    await chat.dispose()
+    await store.dispose()
+    await llm.dispose()
+  })
+  expect(await ctx.llm.countTokens({ model: name, maxOutputTokens: 4096, input: { threadId: 'no-auth', runId: 'count', messages: [{ id: 'user', role: 'user', content: 'hello' }], tools: [], context: [], state: {} } })).toBe(15)
+  expect(await chat.title(user)).toBe('인증 없는 응답')
+  expect(await collect(chat.respond({ threadId: 'no-auth', messages: [user], instructions: '' }))).toContainEqual(expect.objectContaining({ type: EventType.TEXT_MESSAGE_CONTENT, delta: '인증 없는 응답' }))
+  expect(requests).toHaveLength(4)
+  for (const request of requests) {
+    for (const header of ['authorization', 'api-key', 'x-api-key', 'x-goog-api-key']) expect(request.headers[header]).toBeUndefined()
+    expect(request.url).not.toContain('must-not-be-sent')
+  }
+  settings[provider].headers = { 'Authorization': 'Bearer gateway-token', 'X-Gateway-Token': 'custom-value' }
+  expect(await chat.title(user)).toBe('인증 없는 응답')
+  for (const request of requests.slice(4)) {
+    expect(request.headers.authorization).toBe('Bearer gateway-token')
+    expect(request.headers['x-gateway-token']).toBe('custom-value')
+    expect(request.headers['x-api-key']).toBeUndefined()
+    expect(request.headers['x-goog-api-key']).toBeUndefined()
+  }
+  if (provider !== 'openai') {
+    const apiHeader = provider === 'google' ? 'X-Goog-Api-Key' : 'X-Api-Key'
+    settings[provider].headers = { [apiHeader]: 'gateway-key' }
+    expect(await chat.title(user)).toBe('인증 없는 응답')
+    expect(requests.at(-1)!.headers[apiHeader.toLowerCase()]).toBe('gateway-key')
+    expect(requests.at(-1)!.headers.authorization).toBeUndefined()
+  }
 })

@@ -22,7 +22,7 @@ export async function listAnthropicModels(
     if (cursor) url.searchParams.set('after_id', cursor)
     const response = await globalThis.fetch(url, {
       headers: {
-        'x-api-key': config.apiKey,
+        ...(config.apiKey ? { 'x-api-key': config.apiKey } : {}),
         'anthropic-version': '2023-06-01',
         ...(config.dangerouslyAllowBrowser ? { 'anthropic-dangerous-direct-browser-access': 'true' } : {}),
         ...config.headers

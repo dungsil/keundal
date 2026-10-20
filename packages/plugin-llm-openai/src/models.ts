@@ -14,7 +14,7 @@ export async function listOpenAIModels(
   while (configuredURL[end - 1] === '/') end--
   const baseURL = configuredURL.slice(0, end)
   const response = await globalThis.fetch(`${baseURL}/models`, {
-    headers: { authorization: `Bearer ${config.apiKey}`, ...config.headers },
+    headers: { ...(config.apiKey ? { authorization: `Bearer ${config.apiKey}` } : {}), ...config.headers },
     signal: options.signal,
     cache: 'no-store',
     credentials: 'omit'

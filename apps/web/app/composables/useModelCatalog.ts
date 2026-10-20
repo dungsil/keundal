@@ -1,4 +1,4 @@
-import type { Ref } from 'vue'
+import { onScopeDispose, ref, watch, type Ref } from 'vue'
 
 import { LLM_PROVIDERS, type LLMSettings } from '#shared/utils/llm-settings'
 import { loadModels, type ModelOption } from '#shared/utils/models'
@@ -17,7 +17,8 @@ export function useModelCatalog(settings: Ref<LLMSettings>) {
     error.value = ''
     const results = await Promise.all(
       LLM_PROVIDERS.map(async (provider) => {
-        if (!settings.value[provider.id]?.apiKey) {
+        const configured = settings.value[provider.id]
+        if (!configured?.apiKey && !configured?.baseURL && !Object.keys(configured?.headers ?? {}).length) {
           try {
             localStorage.removeItem(`keundal:models:${provider.id}`)
           } catch {
