@@ -665,7 +665,7 @@ test.for([
   null,
   {},
   { models: {} },
-  { apiKey: '', models: { model: limits } },
+  { apiKey: 42, models: { model: limits } },
   { baseURL: ' ', models: { model: limits } },
   { models: { model: { contextWindow: 8, maxOutputTokens: 9 } } },
   { models: { model: { contextWindow: 8, maxOutputTokens: 0 } } },

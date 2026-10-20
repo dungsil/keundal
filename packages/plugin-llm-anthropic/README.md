@@ -19,11 +19,13 @@
 
 ## 모델 목록 조회
 
-`listAnthropicModels({ apiKey, baseURL?, headers?, dangerouslyAllowBrowser? }, { signal? })`은 `/v1/models`의 모든 페이지를 조회합니다. 플러그인 등록과 `models` 설정은 필요하지 않습니다. `apiKey`는 직접 전달합니다. `dangerouslyAllowBrowser: true`는 브라우저 접근 헤더를 추가합니다.
+`listAnthropicModels({ apiKey, baseURL?, headers?, dangerouslyAllowBrowser? }, { signal? })`은 `/v1/models`의 모든 페이지를 조회합니다. 플러그인 등록과 `models` 설정은 필요하지 않습니다. `apiKey`는 직접 전달하며, 빈 문자열이면 기본 인증 헤더를 보내지 않습니다. 커스텀 인증 헤더는 그대로 적용합니다. `dangerouslyAllowBrowser: true`는 브라우저 접근 헤더를 추가합니다.
 
 결과는 `@keundal/core`의 `LLMModelInfo[]`이며 공급자 접두사 없는 `id`, 표시 이름 `name`, 선택적인 `contextWindow`·`maxOutputTokens`를 포함합니다. 공급자가 반환한 한도만 보존하며 생성 설정을 변경하지 않습니다. 누락되거나 반복된 페이지 커서는 오류로 전달합니다.
 
 조회는 자동 재시도하거나 캐시하지 않습니다. 호출자가 취소 신호와 시간제한을 지정합니다. HTTP 오류는 `status`와 HTTP 400의 JSON 본문인 `error`를 전달합니다. UI에 표시하기 전에 호출자가 비밀 값을 제거해야 합니다.
+
+`apiKey: ''`를 명시하면 인증이 필요 없는 호환 엔드포인트에 요청할 수 있습니다. 모델 조회·토큰 계산·생성 요청에서 기본 인증 헤더를 생략하고 환경 변수의 키도 사용하지 않습니다. `headers`로 지정한 인증 헤더는 그대로 적용합니다. `apiKey`를 생략하면 기존 SDK의 환경 변수 처리를 유지합니다.
 
 ## 직접 호출
 
