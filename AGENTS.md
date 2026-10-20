@@ -2,20 +2,21 @@
 
 ## 패키지 구성
 
-| 패키지                                 | 역할                                                                   |
-| -------------------------------------- | ---------------------------------------------------------------------- |
-| `@keundal/ui`                          | 웹 UI의 공통 Vue 컴포넌트를 Nuxt 레이어로 제공합니다.                  |
-| `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다. |
-| `@keundal/agent`                       | 에이전트 구현 계약과 공통 실행 루프를 제공합니다.                      |
-| `@keundal/coding-agent`                | 에이전트 구현 계약을 확장한 코딩 작업용 에이전트입니다.                |
-| `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                             |
-| `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                       |
-| `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                           |
-| `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                 |
-| `@keundal/compaction`                  | 이전 대화를 요약하고 최근 대화를 보존하는 축약 함수를 제공합니다.      |
-| `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.          |
-| `@keundal/plugin-store-sqlite`         | SQLite 파일로 `session`과 `generation`을 구현합니다.                   |
-| `@keundal/tsconfig`, `@keundal/tsdown` | 공통 TypeScript·빌드 설정을 제공합니다.                                |
+| 패키지                                 | 역할                                                                                 |
+| -------------------------------------- | ------------------------------------------------------------------------------------ |
+| `@keundal/ui`                          | 웹 UI의 공통 Vue 컴포넌트를 Nuxt 레이어로 제공합니다.                                |
+| `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.               |
+| `@keundal/agent-host`                  | Node.js에서 LLM·저장소·에이전트 플러그인을 조립하고 HTTP 계층에 서비스를 제공합니다. |
+| `@keundal/agent`                       | 에이전트 구현 계약과 공통 실행 루프를 제공합니다.                                    |
+| `@keundal/coding-agent`                | 에이전트 구현 계약을 확장한 코딩 작업용 에이전트입니다.                              |
+| `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                                           |
+| `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                                     |
+| `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                                         |
+| `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                               |
+| `@keundal/compaction`                  | 이전 대화를 요약하고 최근 대화를 보존하는 축약 함수를 제공합니다.                    |
+| `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.                        |
+| `@keundal/plugin-store-sqlite`         | SQLite 파일로 `session`과 `generation`을 구현합니다.                                 |
+| `@keundal/tsconfig`, `@keundal/tsdown` | 공통 TypeScript·빌드 설정을 제공합니다.                                              |
 
 서비스 계약은 `packages/core/src/{llm,session,generation,compaction}.ts`에 정의하고, 구체 구현은 플러그인으로 주입합니다. 저장소가 공유하는 대화 병합과 실행 메시지 조립은 `packages/core/src/messages.ts`에 둡니다. AG-UI 타입, 이벤트 상수, 검증 기능은 `@keundal/core`에서 가져옵니다. `@ag-ui/core` 직접 의존은 코어의 프로토콜 래퍼에서만 관리합니다.
 
@@ -48,6 +49,10 @@
 플러그인 해제와 순회 중단은 준비·생성 작업을 취소합니다. 주입된 서비스를 교체하면 Cordis가 조합 플러그인의 수명을 갱신하며, 서비스별 격리는 `ctx.isolate('llm')`을 사용합니다.
 
 다른 에이전트 구현은 `Agent`를 상속하고 `registerAgent()`에 구현 클래스를 넘깁니다. `@keundal/coding-agent`는 `Agent`를 상속해 코딩 작업용 시스템 지침을 넣고, `registerAgent()`로 같은 `ctx.agent` 서비스를 구성합니다. 도구 등록은 앱이 담당하며 이 패키지는 도구를 직접 등록하지 않습니다.
+
+## 앱의 호스트 실행
+
+`apps/web`의 Nitro API와 `apps/desktop`의 sidecar는 `@keundal/agent-host`를 직접 사용합니다. 공통 HTTP 계약은 `@keundal/agent-host/http`에 두고, 환경 변수로 호스트와 요청 리스너를 조립하는 기능은 `@keundal/agent-host/runtime`에 둡니다. 웹은 `/api/agent/**`에서 요청을 처리하고 Nitro 종료 때 호스트를 정리합니다. 데스크톱의 프로세스 진입점과 번들은 `apps/desktop/sidecar`와 `dist-sidecar`에 둡니다. 데스크톱 호스트는 웹 서버에 의존하지 않습니다.
 
 ## 개발과 검증
 

@@ -9,6 +9,7 @@ dist/
 
 ### 예시 실행물 ###
 examples/basic/*.sqlite
+apps/web/*.sqlite*
 
 ### AI Agents ###
 .agents/*

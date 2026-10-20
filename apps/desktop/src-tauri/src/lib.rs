@@ -1,14 +1,25 @@
 mod settings;
+mod sidecar;
 mod skills;
 
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
+        .manage(sidecar::SidecarState::default())
         .invoke_handler(tauri::generate_handler![
             settings::load_llm_settings,
             settings::save_llm_settings,
             skills::list_skill_files,
-            skills::read_skill_file
+            skills::read_skill_file,
+            sidecar::sidecar_info
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to run Keundal desktop application");
+        .build(tauri::generate_context!())
+        .expect("failed to build Keundal desktop application");
+    app.run(|app, event| {
+        if let tauri::RunEvent::Exit = event {
+            use tauri::Manager;
+            if let Some(state) = app.try_state::<sidecar::SidecarState>() {
+                state.stop();
+            }
+        }
+    });
 }

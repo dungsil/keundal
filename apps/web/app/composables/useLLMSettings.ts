@@ -7,6 +7,7 @@ export function useLLMSettings() {
   const open = useState('llm-settings-open', () => false)
   const requestedProvider = useState<LLMProvider | null>('llm-settings-provider', () => null)
   function ensureConfigured(model: string) {
+    if (useNuxtApp().$remoteAgent) return true
     const provider = LLM_PROVIDERS.find(item => model.startsWith(`${item.id}/`))
     try {
       if (!provider) return false

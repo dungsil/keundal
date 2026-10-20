@@ -7,6 +7,7 @@ Keundal("큰달"으로 읽음)은 개인용 오픈소스 에이전트 도구입�
 | 패키지                                 | 역할                                                                    |
 | -------------------------------------- | ----------------------------------------------------------------------- |
 | `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.  |
+| `@keundal/agent-host`                  | Node.js에서 에이전트 서비스와 플러그인을 조립합니다.                    |
 | `@keundal/agent`                       | 에이전트 구현 계약과 공통 실행 루프를 제공합니다.                       |
 | `@keundal/coding-agent`                | 에이전트 구현 계약을 확장한 코딩 작업용 에이전트입니다.                 |
 | `@keundal/context`                     | 작업 지침·파일과 세션 참조·시간·실행 환경을 요청 컨텍스트로 제공합니다. |
@@ -75,7 +76,7 @@ pnpm install
 pnpm --filter @keundal/web dev
 ```
 
-선택한 모델에 맞는 `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`를 `apps/web/.env`에 설정합니다. 받아쓰기는 별도로 OpenAI 키와 로그인이 필요합니다. `apps/server`·AI Gateway·D1·R2는 필요하지 않습니다. 로컬 대화는 계정/기기 간 동기화되지 않으며 공개 공유는 비활성화합니다. 저장소 교체 계약과 Cloudflare 배포 방법은 [웹 앱 문서](./apps/web/README.md)를 참고합니다.
+선택한 모델에 맞는 `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`를 `apps/web/.env`에 설정합니다. 받아쓰기는 별도로 OpenAI 키와 로그인이 필요합니다. AI Gateway·D1·R2는 필요하지 않습니다. Node.js에서는 웹 앱에 통합된 에이전트 API를 선택해 사용할 수 있습니다. 로컬 대화는 계정/기기 간 동기화되지 않으며 공개 공유는 비활성화합니다. 저장소 교체 계약과 Cloudflare 배포 방법은 [웹 앱 문서](./apps/web/README.md)를 참고합니다.
 
 ## 데스크톱 앱
 

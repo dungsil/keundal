@@ -1,13 +1,14 @@
 import { defineConfig } from 'tsdown'
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/main.ts'],
+  entry: ['sidecar/main.ts'],
   format: 'esm',
   fixedExtension: false,
   platform: 'node',
   target: 'node24',
-  outDir: 'dist',
-  dts: { entry: ['src/index.ts'] },
+  outDir: 'dist-sidecar',
+  dts: false,
   sourcemap: true,
+  deps: { alwaysBundle: () => true },
   clean: true
 })

@@ -5,6 +5,7 @@ fn main() {
             "save_llm_settings",
             "list_skill_files",
             "read_skill_file",
+            "sidecar_info",
         ]),
     ))
     .expect("failed to build Tauri application");
