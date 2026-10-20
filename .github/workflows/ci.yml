@@ -162,6 +162,19 @@ jobs:
           cp apps/desktop/src-tauri/binaries/keundal-host-x86_64-pc-windows-msvc.exe "$portable/keundal-host.exe"
           cp -R apps/desktop/src-tauri/sidecar "$portable/"
 
+      - name: Windows 포터블 실행 검증
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $smokeRoot = Join-Path $env:RUNNER_TEMP 'keundal portable smoke'
+          New-Item -ItemType Directory -Force -Path $smokeRoot | Out-Null
+          $archive = Join-Path $smokeRoot 'portable.zip'
+          $extracted = Join-Path $smokeRoot 'extracted app'
+          Compress-Archive -Path 'apps/desktop/src-tauri/target/release/portable/*' -DestinationPath $archive -Force
+          Expand-Archive -Path $archive -DestinationPath $extracted -Force
+          & (Join-Path $extracted 'keundal-host.exe') 'apps/desktop/scripts/smoke-portable.mjs' $extracted
+          if ($LASTEXITCODE -ne 0) { throw 'Portable smoke test failed' }
+
       - name: 데스크톱 배포 파일 업로드
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
