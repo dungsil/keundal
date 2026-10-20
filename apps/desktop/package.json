@@ -7,11 +7,14 @@
     "build": "pnpm --filter @keundal/web exec nuxt generate --envName desktop",
     "build:preview": "pnpm bundle",
     "bundle": "tauri build",
-    "dev": "tauri dev",
+    "dev": "pnpm prepare:sidecar && tauri dev",
     "dev:ui": "pnpm --filter @keundal/web exec nuxt dev --envName desktop --no-open",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "prepare:sidecar": "node scripts/prepare-sidecar.mjs",
+    "build:tauri": "pnpm prepare:sidecar && pnpm build"
   },
   "devDependencies": {
+    "@keundal/server": "workspace:*",
     "@keundal/web": "workspace:*",
     "@tauri-apps/cli": "2.12.3"
   }

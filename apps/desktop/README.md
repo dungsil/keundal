@@ -65,16 +65,28 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 ## 동작과 데이터
 
 - 채팅, 모델 선택, LLM settings와 IndexedDB 저장소는 [웹 앱](../web/README.md)의 구현을 공유합니다. API 키는 앱 안의 **LLM settings**에서 입력합니다.
-- 데스크톱은 SSR을 끄고 정적 SPA로 실행합니다. 서버 API는 포함하지 않습니다.
-- 대화·첨부 파일은 WebView의 IndexedDB에 저장하며 SQLite로 대체하지 않습니다. 웹 브라우저 및 개발 모드와 배포 앱은 origin이 달라 대화를 자동 공유하거나 이전하지 않습니다.
+- 데스크톱은 SSR을 끄고 정적 SPA로 실행합니다. 로컬 호스트가 시작되면 대화·실행 기록은 앱 데이터 디렉터리의 SQLite에 저장합니다. 호스트가 시작하지 못하면 WebView의 IndexedDB를 사용합니다.
+- 웹 브라우저 및 개발 모드와 배포 앱은 origin이 달라 대화를 자동 공유하거나 이전하지 않습니다.
 - API 키·URL·헤더를 포함한 LLM 설정은 `keyring`으로 macOS Keychain·Windows Credential Manager·Linux Secret Service에 저장합니다. **Save in OS secret store**로 저장하며 마지막 공급자 설정까지 지우면 보안 저장소 항목도 삭제합니다. 보안 저장소의 서비스명은 `com.keundal.desktop`, 계정명은 `llm-settings`입니다. 개발·배포 앱은 같은 OS 사용자 보안 저장소 항목을 사용합니다.
 - 기존 데스크톱 origin의 `keundal:llm-settings` 평문 설정은 첫 실행에서 검증 후 보안 저장소로 이전하고, 저장 성공 후에만 localStorage에서 제거합니다. 보안 저장소에 이미 설정이 있으면 이를 우선하고 남은 평문 복사본을 제거합니다. 웹 브라우저의 설정은 가져오거나 변경하지 않습니다.
 - 보안 저장소가 잠겨 있거나 권한·서비스·용량 문제로 실패하면 오류로 알리고 localStorage로 대체하지 않습니다. 시작 시 조회·이전에 실패하면 잠금을 해제하거나 서비스를 복구한 뒤 앱을 재시작해야 합니다. 저장 실패 시에는 적용 중인 설정과 폼을 유지합니다. 설정은 하나의 보안 항목에 저장하므로 OS의 항목 크기 제한을 따릅니다.
 - 저장 시 보호와 실행 중 메모리 보호는 다릅니다. 공급자에 요청하려면 설정을 앱 메모리로 읽어야 하며, 앱 내부의 악성 스크립트나 손상된 OS로부터 실행 중인 키까지 보호하지는 않습니다. 계정 동기화는 하지 않습니다. 웹 앱은 기존대로 브라우저 localStorage를 사용합니다.
-- 공급자 요청은 WebView에서 직접 전송합니다. 공급자나 사용자 지정 API는 앱 origin의 CORS를 허용해야 하며 Rust HTTP 프록시로 우회하지 않습니다.
+- 로컬 호스트 모드에서는 호스트가 공급자 요청을 전송합니다. 호스트가 없으면 WebView가 직접 전송하며, 공급자나 사용자 지정 API는 앱 origin의 CORS를 허용해야 합니다.
 - 웹 UI의 HTML5 파일 드롭을 유지하도록 Tauri의 네이티브 드롭 처리를 끕니다. Windows WebView2에서도 웹의 이미지 첨부 경로를 사용합니다.
 - 보안 저장소 IPC는 로컬 `main` 창의 LLM 설정 조회·저장에만 허용하며, 다른 자격 증명 항목이나 원격 콘텐츠에 권한을 부여하지 않습니다. CSP는 기존 웹 앱과 마찬가지로 강제하지 않습니다.
 - 받아쓰기는 OS/WebView의 마이크 지원·권한에 따라 달라지며 실제 공급자 API와 플랫폼별 확인이 필요합니다.
+
+## 로컬 호스트
+
+데스크톱은 Tauri 창과 함께 Node.js 호스트를 sidecar 프로세스로 실행합니다. 호스트는 `apps/server`의 sidecar 모드를 사용하며 SQLite 파일을 앱 데이터 디렉터리에 저장합니다.
+
+- 앱은 OS 보안 저장소의 LLM 설정에서 API 키가 있는 첫 공급자를 고릅니다. 공급자 순서는 OpenAI, Anthropic, Google Gemini입니다.
+- 모델은 `KEUNDAL_MODEL` 환경 변수로 바꿀 수 있습니다. 없으면 공급자별 기본 모델을 사용합니다.
+- 호스트는 `127.0.0.1`의 임의 포트에 바인딩하고, 실행마다 새 Bearer 토큰을 만듭니다. 토큰은 Tauri IPC로 웹 UI에만 전달합니다.
+- 웹 UI는 호스트의 `/models`와 `/threads`를 사용합니다. API 키 설정은 호스트 시작 시에만 반영되므로 공급자를 바꾼 뒤 앱을 다시 시작합니다.
+- 호스트가 시작하지 못하면 웹 UI는 브라우저 저장소 모드로 돌아갑니다.
+
+`pnpm --filter @keundal/desktop dev`와 `bundle`은 `scripts/prepare-sidecar.mjs`를 실행합니다. 이 스크립트는 `@keundal/server`를 빌드하고, 현재 Node.js 실행 파일을 `src-tauri/binaries/keundal-host-<triple>`로 복사하며, 서버 번들을 `src-tauri/sidecar`에 복사합니다. 설치 파일에는 Node.js 런타임과 서버 번들이 포함되므로 앱 크기가 커집니다.
 
 ## 로컬 스킬
 

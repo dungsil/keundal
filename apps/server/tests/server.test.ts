@@ -60,19 +60,23 @@ const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {
 
   let agentCalls = 0
   const services: AgentAppServices = {
-    agent: (run, options?: ExecutionOptions) => {
+    run: (run, options?: ExecutionOptions) => {
       agentCalls++
       return ctx.agent.run(run, options)
     },
     session: {
       get: (threadId, options) => ctx.session.get(threadId, options),
-      list: (options) => ctx.session.list(options)
+      list: (options) => ctx.session.list(options),
+      commit: (change, options) => ctx.session.commit(change, options),
+      delete: (threadId, revision, options) => ctx.session.delete(threadId, revision, options)
     },
     generation: {
       get: (runId, options) => ctx.generation.get(runId, options),
       list: (options) => ctx.generation.list(options),
       recover: (options) => ctx.generation.recover(options)
-    }
+    },
+    models: () => [{ id: 'test', provider: 'openai', contextWindow: 2000, maxOutputTokens: 200 }],
+    title: async () => 'test title'
   }
   const app = createAgentApp(services, { token, ...options })
   const server = createServer(app)
@@ -88,13 +92,15 @@ const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {
   const requestJson = async (
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
+    headers: Record<string, string> = {}
   ): Promise<{ status: number; json: unknown }> => {
     const response = await fetch(`${base}${path}`, {
       method,
       headers: {
         authorization: `Bearer ${token}`,
-        ...(body === undefined ? {} : { 'content-type': 'application/json' })
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        ...headers
       },
       body: body === undefined ? undefined : JSON.stringify(body)
     })
@@ -103,13 +109,15 @@ const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {
   const requestText = async (
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
+    headers: Record<string, string> = {}
   ): Promise<{ status: number; text: string; contentType: string }> => {
     const response = await fetch(`${base}${path}`, {
       method,
       headers: {
         authorization: `Bearer ${token}`,
-        ...(body === undefined ? {} : { 'content-type': 'application/json' })
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        ...headers
       },
       body: body === undefined ? undefined : JSON.stringify(body)
     })
@@ -485,4 +493,75 @@ test('잘못된 raw request target은 400을 반환하고 서버 프로세스와
     expect(child.signalCode).toBeNull()
   }
   expect(stderr).toBe('')
+})
+
+test('GET /models는 설정된 모델 한도를 돌려준다', async (t) => {
+  const { requestJson } = await setup(t)
+  const result = await requestJson('GET', '/models')
+  expect(result.status).toBe(200)
+  expect(result.json).toEqual({
+    models: [{ id: 'test', provider: 'openai', contextWindow: 2000, maxOutputTokens: 200 }]
+  })
+})
+
+test('POST /runs는 알 수 없는 모델 헤더를 400으로 거부한다', async (t) => {
+  const { requestJson, agentCalls } = await setup(t)
+  const result = await requestJson('POST', '/runs', input, { 'x-keundal-model': 'missing' })
+  expect(result.status).toBe(400)
+  expect(result.json).toEqual({ error: 'unknown model: missing' })
+  expect(agentCalls).toBe(0)
+})
+
+test('PUT /threads/:id와 DELETE /threads/:id는 세션 스냅숏을 저장하고 삭제한다', async (t) => {
+  const { base, requestJson } = await setup(t)
+  const created = await requestJson('PUT', '/threads/thread', {
+    expectedRevision: 0,
+    mode: 'replace',
+    messages: [{ id: 'q1', role: 'user', content: 'hello' }],
+    state: { web: { id: 'thread' } }
+  })
+  expect(created.status).toBe(200)
+  expect(created.json).toMatchObject({ threadId: 'thread', revision: 1, state: { web: { id: 'thread' } } })
+
+  const removed = await fetch(`${base}/threads/thread?revision=1`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${token}` }
+  })
+  expect(removed.status).toBe(204)
+  expect((await requestJson('GET', '/threads/thread')).status).toBe(404)
+})
+
+test('POST /title은 제목을 생성한다', async (t) => {
+  const { requestJson } = await setup(t)
+  const result = await requestJson('POST', '/title', {
+    model: 'test',
+    message: { id: 'q1', role: 'user', content: 'hello' }
+  })
+  expect(result.status).toBe(200)
+  expect(result.json).toEqual({ title: 'test title' })
+})
+
+test('허용한 origin의 preflight에 CORS 헤더를 붙인다', async (t) => {
+  const { base } = await setup(t, { allowedOrigins: ['http://tauri.localhost'] })
+  const response = await fetch(`${base}/runs`, {
+    method: 'OPTIONS',
+    headers: {
+      origin: 'http://tauri.localhost',
+      'access-control-request-method': 'POST',
+      'access-control-request-headers': 'authorization,content-type'
+    }
+  })
+  expect(response.status).toBe(204)
+  expect(response.headers.get('access-control-allow-origin')).toBe('http://tauri.localhost')
+  expect(response.headers.get('access-control-allow-headers')).toContain('authorization')
+})
+
+test('허용하지 않은 origin의 preflight는 403으로 거부한다', async (t) => {
+  const { base } = await setup(t, { allowedOrigins: ['http://tauri.localhost'] })
+  const response = await fetch(`${base}/runs`, {
+    method: 'OPTIONS',
+    headers: { origin: 'https://example.com', 'access-control-request-method': 'POST' }
+  })
+  expect(response.status).toBe(403)
+  expect(response.headers.get('access-control-allow-origin')).toBeNull()
 })

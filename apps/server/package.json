@@ -19,15 +19,12 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
+    "@keundal/agent-host": "workspace:*",
     "@keundal/core": "workspace:*",
-    "@keundal/plugin-agent-simple": "workspace:*",
-    "@keundal/plugin-llm-anthropic": "workspace:*",
-    "@keundal/plugin-llm-gemini": "workspace:*",
-    "@keundal/plugin-llm-openai": "workspace:*",
-    "@keundal/plugin-store-sqlite": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {
+    "@keundal/plugin-agent-simple": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",

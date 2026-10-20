@@ -23,10 +23,11 @@
         "RUSTFLAGS",
         "CARGO_ENCODED_RUSTFLAGS",
         "CARGO_BUILD_TARGET",
-        "APPLE_SIGNING_IDENTITY"
+        "APPLE_SIGNING_IDENTITY",
+        "TAURI_ENV_TARGET_TRIPLE"
       ],
       "passThroughEnv": ["APPIMAGE_EXTRACT_AND_RUN", "CARGO_HOME", "CARGO_INCREMENTAL", "RUSTUP_HOME"],
-      "outputs": ["dist/**", "src-tauri/target/release/bundle/**"]
+      "outputs": ["dist/**", "src-tauri/target/release/bundle/**", "src-tauri/sidecar/**", "src-tauri/binaries/**"]
     },
     "typecheck": {},
     "test": {

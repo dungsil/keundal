@@ -56,6 +56,7 @@
     "typescript": "^6.0.3",
     "vitest": "catalog:",
     "vue-tsc": "^3.3.13",
-    "wrangler": "4.151.1"
+    "wrangler": "4.151.1",
+    "@keundal/server": "workspace:*"
   }
 }

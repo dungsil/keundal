@@ -34,6 +34,22 @@ HTTP 400 오류는 공급자 JSON의 `error.message`·문자열 `error`·`messag
 
 동일 UI를 사용하는 [데스크톱 앱](../desktop/README.md)은 LLM 설정을 localStorage 대신 OS 보안 저장소에 저장합니다. 위 브라우저 저장 안내는 웹 앱에 해당하며, 공급자 직접 요청과 CORS 정책은 데스크톱에도 적용됩니다.
 
+## 원격 호스트 모드
+
+웹 앱은 기본으로 브라우저에서 에이전트를 실행합니다. `apps/server`의 HTTP 호스트를 사용하려면 브라우저에 노출할 경로와 Nitro 서버가 접근할 호스트 주소를 설정합니다.
+
+```sh
+export NUXT_PUBLIC_AGENT_ENDPOINT="/api/agent"
+export NUXT_AGENT_URL="http://127.0.0.1:8000"
+export NUXT_AGENT_TOKEN="$KEUNDAL_API_TOKEN"
+pnpm --filter @keundal/web build
+pnpm --filter @keundal/web preview
+```
+
+`/api/agent/**`는 Nitro가 `NUXT_AGENT_URL`로 전달하고 `Authorization: Bearer` 헤더를 서버 측에서 붙입니다. 브라우저는 호스트 토큰을 받지 않습니다. 직접 다른 origin의 호스트를 호출하려면 `NUXT_PUBLIC_AGENT_ENDPOINT`에 전체 URL을 넣고 `NUXT_PUBLIC_AGENT_TOKEN`을 설정합니다. 이 경우 토큰이 브라우저에 노출되므로 신뢰할 수 있는 환경에서만 사용합니다. 호스트의 `KEUNDAL_CORS_ORIGINS`에 웹 앱의 origin을 추가해야 합니다.
+
+원격 모드에서는 대화·실행·제목이 호스트의 SQLite에 저장됩니다. 모델 목록은 호스트의 `GET /models`를 사용하며, 모델 선택·API 키 설정 화면은 호스트 설정을 바꾸지 않습니다. 호스트 모델과 공급자 키는 `apps/server` 환경 변수에서 관리합니다. 데스크톱은 로컬 호스트가 준비되면 자동으로 이 모드를 사용합니다.
+
 ## 저장소와 실행 경계
 
 - 공급자별 모델 목록 조회는 각 `plugin-llm-*` 패키지의 `listOpenAIModels`·`listAnthropicModels`·`listGeminiModels`가 담당합니다. 웹 앱은 설정 읽기, 모델 별칭, 아이콘, 캐시, 시간제한과 오류 표시를 담당합니다.

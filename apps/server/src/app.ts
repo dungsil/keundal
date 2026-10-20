@@ -3,22 +3,20 @@ import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http'
 import { URL } from 'node:url'
 
+import type { AgentHostModel, AgentHostRunOptions, AgentHostServices } from '@keundal/agent-host'
 import {
   EventType,
   parseAGUIEvent,
   parseRunAgentInput,
   type AGUIEvent,
-  type ExecutionOptions,
-  type GenerationService,
+  type AgentMessage,
   type RunAgentInput,
-  type SessionService
+  type SessionCommit
 } from '@keundal/core'
 
-/** HTTP 계층이 접근하는 에이전트 표면입니다. 세 공식 저장소의 서비스가 이 모양을 만족합니다. */
-export interface AgentAppServices {
-  agent: (input: RunAgentInput, options?: ExecutionOptions) => AsyncIterable<AGUIEvent>
-  session: Pick<SessionService, 'get' | 'list'>
-  generation: Pick<GenerationService, 'get' | 'list' | 'recover'>
+/** HTTP 계층이 접근하는 에이전트 표면입니다. `@keundal/agent-host`가 이 모양을 만듭니다. */
+export interface AgentAppServices extends Omit<AgentHostServices, 'run'> {
+  run(input: RunAgentInput, options?: AgentHostRunOptions): AsyncIterable<AGUIEvent>
 }
 
 export interface AgentAppOptions {
@@ -26,6 +24,8 @@ export interface AgentAppOptions {
   token: string
   /** POST /runs 본문의 최대 바이트 수. 기본값은 8 MiB입니다. */
   maxRequestBodyBytes?: number
+  /** 브라우저에서 직접 호출할 때 허용할 origin 목록입니다. 비어 있으면 CORS 헤더를 보내지 않습니다. */
+  allowedOrigins?: readonly string[]
 }
 
 class RequestBodyTooLargeError extends Error {}
@@ -63,7 +63,52 @@ const readBody = async (request: IncomingMessage, maxBytes: number): Promise<str
 
 const sseEvent = (event: AGUIEvent): string => `data: ${JSON.stringify(event)}\n\n`
 
-/** AG-UI 실행과 조회 읽기 경로를 HTTP로 노출하는 요청 리스너를 만듭니다. */
+const commitBody = (threadId: string, value: unknown): SessionCommit => {
+  if (typeof value !== 'object' || value === null) throw new Error('invalid commit')
+  const body = value as Record<string, unknown>
+  if (!Number.isSafeInteger(body.expectedRevision) || (body.expectedRevision as number) < 0) {
+    throw new Error('invalid revision')
+  }
+  if (body.mode !== undefined && body.mode !== 'merge' && body.mode !== 'replace') {
+    throw new Error('invalid mode')
+  }
+  const parsed = parseRunAgentInput({
+    threadId,
+    runId: 'commit',
+    state: body.state,
+    tools: [],
+    context: [],
+    messages: body.messages
+  })
+  return {
+    threadId,
+    expectedRevision: body.expectedRevision as number,
+    ...(body.mode === 'merge' || body.mode === 'replace' ? { mode: body.mode } : {}),
+    messages: parsed.messages,
+    state: parsed.state
+  }
+}
+
+const titleBody = (value: unknown): { model: string; message: AgentMessage } => {
+  if (typeof value !== 'object' || value === null) throw new Error('invalid title request')
+  const body = value as Record<string, unknown>
+  if (typeof body.model !== 'string' || !body.model.trim()) throw new Error('invalid model')
+  const parsed = parseRunAgentInput({
+    threadId: 'title',
+    runId: 'title',
+    state: {},
+    tools: [],
+    context: [],
+    messages: [body.message]
+  })
+  const message = parsed.messages[0]
+  if (!message) throw new Error('invalid message')
+  return { model: body.model, message }
+}
+
+const modelId = (value: string | string[] | undefined): string | undefined => (Array.isArray(value) ? value[0] : value)
+
+/** AG-UI 실행과 세션 읽기·쓰기 경로를 HTTP로 노출하는 요청 리스너를 만듭니다. */
 export function createAgentApp(services: AgentAppServices, options: AgentAppOptions): RequestListener {
   if (!options?.token || options.token !== options.token.trim() || !/^[A-Za-z0-9\-._~+/]+=*$/.test(options.token)) {
     throw new Error('HTTP 인증 token을 공백 없는 Bearer 토큰으로 설정하세요.')
@@ -73,8 +118,27 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
   if (!Number.isSafeInteger(maxRequestBodyBytes) || maxRequestBodyBytes <= 0) {
     throw new RangeError('maxRequestBodyBytes must be a positive safe integer')
   }
+  const allowedOrigins = new Set(options.allowedOrigins ?? [])
+  const models = (): readonly AgentHostModel[] => services.models()
+
   async function requestListener(request: IncomingMessage, response: ServerResponse) {
     try {
+      const origin = request.headers.origin
+      const allowedOrigin = origin && allowedOrigins.has(origin) ? origin : undefined
+      if (allowedOrigin) {
+        response.setHeader('access-control-allow-origin', allowedOrigin)
+        response.setHeader('access-control-allow-methods', 'GET,POST,PUT,DELETE,OPTIONS')
+        response.setHeader('access-control-allow-headers', 'authorization,content-type,x-keundal-model')
+        response.setHeader('access-control-max-age', '600')
+        response.setHeader('vary', 'origin')
+      }
+      if (request.method === 'OPTIONS') {
+        if (origin && !allowedOrigin) return sendJson(response, 403, { error: 'origin not allowed' })
+        response.writeHead(204)
+        response.end()
+        return
+      }
+
       const credentials = /^Bearer ([A-Za-z0-9\-._~+/]+=*)$/i.exec(request.headers.authorization ?? '')
       const supplied = Buffer.from(credentials?.[1] ?? '')
       if (supplied.length !== token.length || !timingSafeEqual(supplied, token)) {
@@ -85,11 +149,19 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
       const url = new URL(request.url ?? '/', 'http://localhost')
       const segments = url.pathname.split('/').filter(Boolean)
 
+      if (request.method === 'GET' && segments.join('/') === 'models') {
+        return sendJson(response, 200, { models: models() })
+      }
+
       if (request.method === 'POST' && segments.join('/') === 'runs') {
+        const requested = modelId(request.headers['x-keundal-model'])
+        if (requested !== undefined && !models().some((model) => model.id === requested)) {
+          return sendJson(response, 400, { error: `unknown model: ${requested}` })
+        }
         const input = parseRunAgentInput(JSON.parse(await readBody(request, maxRequestBodyBytes)))
         response.writeHead(200, SSE_HEADERS)
         try {
-          for await (const raw of services.agent(input, {})) {
+          for await (const raw of services.run(input, requested === undefined ? {} : { model: requested })) {
             const event = parseAGUIEvent(raw)
             response.write(sseEvent(event))
             if (event.type === EventType.RUN_FINISHED || event.type === EventType.RUN_ERROR) break
@@ -110,11 +182,36 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
         return
       }
 
+      if (request.method === 'POST' && segments.join('/') === 'title') {
+        const requestBody = titleBody(JSON.parse(await readBody(request, maxRequestBodyBytes)))
+        if (!models().some((model) => model.id === requestBody.model)) {
+          return sendJson(response, 400, { error: `unknown model: ${requestBody.model}` })
+        }
+        return sendJson(response, 200, { title: await services.title(requestBody) })
+      }
+
       if (request.method === 'GET' && segments[0] === 'threads') {
         if (segments.length === 1) return sendJson(response, 200, await services.session.list())
         const snapshot = await services.session.get(segments[1])
         if (!snapshot) return sendJson(response, 404, { error: `thread not found: ${segments[1]}` })
         return sendJson(response, 200, snapshot)
+      }
+
+      if (request.method === 'PUT' && segments[0] === 'threads' && segments[1]) {
+        const change = commitBody(segments[1], JSON.parse(await readBody(request, maxRequestBodyBytes)))
+        return sendJson(response, 200, await services.session.commit(change))
+      }
+
+      if (request.method === 'DELETE' && segments[0] === 'threads' && segments[1]) {
+        const value = url.searchParams.get('revision')
+        const revision = value === null ? Number.NaN : Number(value)
+        if (!Number.isSafeInteger(revision) || revision < 0) {
+          return sendJson(response, 400, { error: 'invalid revision' })
+        }
+        await services.session.delete(segments[1], revision)
+        response.writeHead(204)
+        response.end()
+        return
       }
 
       if (request.method === 'GET' && segments[0] === 'runs') {

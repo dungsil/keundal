@@ -39,7 +39,15 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
-    public: { desktop: false }
+    // Nitro 전용 값입니다. 브라우저에 노출되지 않습니다.
+    agentUrl: '',
+    agentToken: '',
+    public: {
+      desktop: false,
+      // Keundal HTTP 호스트를 직접 사용할 때 지정합니다. 비어 있으면 브라우저 모드입니다.
+      agentEndpoint: '',
+      agentToken: ''
+    }
   },
 
   experimental: {
