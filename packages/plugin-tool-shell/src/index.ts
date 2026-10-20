@@ -1,4 +1,4 @@
-import type { ExecutableTool } from '@keundal/plugin-agent-simple'
+import type { ExecutableTool } from '@keundal/agent'
 import type { ShellRequest } from '@keundal/plugin-shell-local'
 import { Service, type Context } from 'cordis'
 

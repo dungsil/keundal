@@ -1,15 +1,41 @@
-# @keundal/plugin-agent-simple
+# @keundal/agent
 
-`llm`, `session`, `generation` 서비스를 조합하여 `ctx.agent.run()`을 제공합니다. 입력이 모델의 컨텍스트 예산을 넘으면 이전 대화를 축약합니다. 도구 실행 함수를 등록하면 도구 호출 수집, 실행, 결과 메시지 작성, 후속 생성을 자동으로 처리합니다.
+에이전트 구현의 계약과 공통 실행 루프를 제공합니다. `llm`, `session`, `generation` 서비스를 조합하여 `ctx.agent.run()`을 만들고, 입력이 모델의 컨텍스트 예산을 넘으면 이전 대화를 축약합니다. 도구 실행 함수를 등록하면 도구 호출 수집, 실행, 결과 메시지 작성, 후속 생성을 자동으로 처리합니다.
+
+범용 대화 에이전트로 바로 쓸 수도 있고, 다른 에이전트 구현이 이 계약을 확장할 수도 있습니다. [`@keundal/coding-agent`](../coding-agent/README.md)는 코딩 작업용 지침을 얹은 구현입니다.
+
+## 구현 확장
+
+`Agent`를 상속해 다른 에이전트 구현을 만듭니다. `systemPrompt()`은 매 실행에 앞서 모델에 전달할 시스템 지침을 정하고, `registerAgent()`는 구현 클래스를 `ctx.agent`로 등록합니다.
+
+```ts
+import { Agent, AgentConfigSchema, registerAgent, type AgentConfig } from '@keundal/agent'
+import type { Context } from 'cordis'
+
+class ReviewAgent extends Agent {
+  protected override systemPrompt(): string {
+    return this.config.systemPrompt ?? 'Review the change and report the risk.'
+  }
+}
+
+export const reviewAgentPlugin = Object.assign(
+  function reviewAgentPlugin(ctx: Context, config: AgentConfig) {
+    registerAgent(ctx, config, ReviewAgent)
+  },
+  { inject: ['llm', 'generation', 'session'], Config: AgentConfigSchema }
+)
+```
+
+상속한 구현은 도구 실행, 후속 생성, 축약, 스킬 처리를 그대로 물려받습니다. 실행 흐름을 바꿔야 하면 `run()`을 덮어씁니다.
 
 ## 도구 등록
 
 LLM 플러그인과 저장소 플러그인을 등록한 `ctx`에 에이전트를 추가합니다.
 
 ```ts
-import simpleAgentPlugin from '@keundal/plugin-agent-simple'
+import agentPlugin from '@keundal/agent'
 
-await ctx.plugin(simpleAgentPlugin, {
+await ctx.plugin(agentPlugin, {
   model: 'your-model',
   maxOutputTokens: 1024,
   maxToolRounds: 8,
@@ -61,7 +87,7 @@ import filesystemSkillPlugin from '@keundal/plugin-skill-filesystem'
 
 await ctx.plugin(skillPlugin)
 await ctx.plugin(filesystemSkillPlugin, { roots: ['./skills'] })
-await ctx.plugin(simpleAgentPlugin, {
+await ctx.plugin(agentPlugin, {
   model: 'your-model',
   maxOutputTokens: 1024,
   skills: true
@@ -82,6 +108,22 @@ await ctx.plugin(simpleAgentPlugin, {
 
 `/name` 직접 호출, 파일 감시, 리소스 자동 로딩은 지원하지 않습니다.
 
+## 요청 컨텍스트
+
+`context: true`를 설정하면 [`@keundal/context`](../context/README.md)의 `requestContext` 서비스를 주입받습니다. 공급자는 첫 모델 요청과 도구 후속 요청의 입력 예산 검사 전에 실행합니다.
+
+공급자가 추가한 `user` 메시지는 `keundal.context.message` CUSTOM 이벤트로 실행 journal에 기록합니다. 세 저장소는 같은 코어 메시지 조립기를 사용하며, 성공한 실행에서 컨텍스트와 응답을 함께 커밋합니다.
+
+`keundal:context:` 접두사는 컨텍스트 메시지의 예약 ID입니다. 호출자가 직접 입력에서 사용하면 거부합니다. 컨텍스트 서비스가 사라지면 진행 중 실행을 취소하며, 복구에서는 공급자를 다시 실행하지 않습니다.
+
+## 시스템 지침
+
+`systemPrompt`를 설정하면 매 실행의 맨 앞에 `system` 메시지로 지침을 넣습니다. 호출자가 입력 메시지에 넣는 시스템 메시지와 함께 전달되므로, 요청마다 다른 지침을 이어 붙일 수 있습니다.
+
+지침 메시지의 예약 ID는 `keundal:system-prompt`입니다. 세션이 이전 지침을 반환하면 같은 ID의 현재 지침으로 대체하므로 지침이 쌓이지 않습니다. 호출자가 입력 메시지에 예약 ID를 사용하면 거부합니다.
+
+지침은 축약에서 지시 메시지로 보존됩니다. 축약 요약에는 포함되지 않으므로 지침은 매 실행마다 그대로 유지됩니다.
+
 ## 대화 축약 설정
 
 입력이 모델의 컨텍스트 예산을 넘으면 `@keundal/compaction`의 `compact()`를 자동으로 호출합니다. 별도 등록 없이 에이전트 설정의 `compaction`으로 축약 옵션을 조정합니다.
@@ -95,7 +137,7 @@ await ctx.plugin(simpleAgentPlugin, {
 
 ## 실행과 종료
 
-- `SimpleAgentConfig.webSearch?: boolean`과 `reasoning?: boolean`은 입력 토큰 계산, generation 요청, 모든 도구 후속 요청에 그대로 전달됩니다. 생략하면 기존 공급자 기본값을 유지하며 boolean이 아닌 값은 거부합니다. 축약 후에도 이 옵션을 포함한 입력 비용을 다시 확인합니다. 요약 자체는 검색 도구 없이 수행합니다.
+- `AgentConfig.webSearch?: boolean`과 `reasoning?: boolean`은 입력 토큰 계산, generation 요청, 모든 도구 후속 요청에 그대로 전달됩니다. 생략하면 기존 공급자 기본값을 유지하며 boolean이 아닌 값은 거부합니다. 축약 후에도 이 옵션을 포함한 입력 비용을 다시 확인합니다. 요약 자체는 검색 도구 없이 수행합니다.
 - OpenAI·Anthropic 네이티브 검색은 공급자에서 수행하므로 `tools`에 검색 실행 함수를 등록하지 않습니다. 검색 출처는 코어의 `LLM_SOURCE_EVENT`(`'keundal.source'`) CUSTOM 이벤트로 전달됩니다. 검색·인용의 공급자 메타데이터는 어시스턴트 메시지와 함께 후속 요청·세션에 보존됩니다. 자세한 메타데이터 형식과 모델 지원 제한은 각 공급자의 README를 참고합니다. Gemini는 `webSearch: true`를 명시적으로 거부합니다.
 - 모델 응답의 스트림이 끝나고 모든 도구 호출이 완료되면 호출 순서대로 실행합니다. 같은 응답에 잘못된 JSON, 미완료 호출, 미등록 도구가 있으면 실행을 시작하지 않습니다.
 - 실행 결과는 `TOOL_CALL_RESULT` 이벤트와 `role: 'tool'` 메시지로 기록하며, 호출 ID로 원래 도구 호출과 연결합니다. 호출·결과·추론 서명을 포함한 대화를 후속 요청에 전달합니다.

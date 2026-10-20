@@ -1,4 +1,11 @@
-import { EventType, MessageAssembly, mergeMessages, prepareReplayMessages, type AgentMessage } from '@keundal/core'
+import {
+  CONTEXT_MESSAGE_EVENT,
+  EventType,
+  MessageAssembly,
+  mergeMessages,
+  prepareReplayMessages,
+  type AgentMessage
+} from '@keundal/core'
 import { expect, test } from 'vitest'
 
 test.each(['provider/model-a', 'provider/model-b', 'other/model-a'])(
@@ -134,4 +141,24 @@ test('종료 메타데이터는 같은 키를 갱신하고 시작 메타데이�
       metadata: { source: 'provider', progress: 'complete', verified: true }
     }
   ])
+})
+
+test('컨텍스트 이벤트를 사용자 메시지로 복구하고 같은 ID의 재생을 중복 저장하지 않는다', () => {
+  const assembly = new MessageAssembly()
+  const value = { id: 'keundal:context:instructions:one', role: 'user', content: 'Workspace instructions' }
+  assembly.apply({ type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value })
+  assembly.apply({ type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value })
+  expect(assembly.messages).toEqual([value])
+})
+
+test.each([
+  { id: 'plain-user', role: 'user', content: 'text' },
+  { id: 'keundal:context:spoof', role: 'system', content: 'text' },
+  { id: 'keundal:context:spoof', role: 'user', content: 42 }
+])('잘못된 컨텍스트 이벤트를 메시지로 기록하지 않는다: %j', (value) => {
+  const assembly = new MessageAssembly()
+  expect(() => assembly.apply({ type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value })).toThrow(
+    'invalid context message'
+  )
+  expect(assembly.messages).toEqual([])
 })

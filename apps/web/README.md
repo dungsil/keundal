@@ -55,7 +55,7 @@ pnpm --filter @keundal/web preview
 - 공급자별 모델 목록 조회는 각 `plugin-llm-*` 패키지의 `listOpenAIModels`·`listAnthropicModels`·`listGeminiModels`가 담당합니다. 웹 앱은 설정 읽기, 모델 별칭, 아이콘, 캐시, 시간제한과 오류 표시를 담당합니다.
 - `@keundal/core`의 `prepareReplayMessages(messages, sourceModel, targetModel)`는 결과 없는 도구 호출과 서명 없는 추론을 제외합니다. 다른 모델로 전송할 때는 추론과 어시스턴트 메타데이터·도구 서명도 제거합니다. 원본 메시지는 변경하지 않습니다. 모델 별칭 정규화는 호출자가 담당합니다.
 - `shared`의 `ChatMessage`·`ChatMessageAssembly`·`ChatStore`는 앱의 표시 형식과 `session.state.web` 저장 정책을 담당합니다. 설정 저장, 첨부 파일 표시, chart/weather 예제 도구와 Nuxt 인증 타입도 앱에 둡니다.
-- 브라우저의 Cordis Context에 `@keundal/plugin-store-indexeddb`와 런타임 설정을 읽는 `llm` 서비스를 등록합니다. `simpleAgentPlugin`이 입력 예산 검사·도구 실행·후속 생성을 수행하고, `session`과 `generation`이 대화·실행 journal을 IndexedDB `keundal-web`에 저장합니다.
+- 브라우저의 Cordis Context에 `@keundal/plugin-store-indexeddb`와 런타임 설정을 읽는 `llm` 서비스를 등록합니다. `agentPlugin`이 입력 예산 검사·도구 실행·후속 생성을 수행하고, `session`과 `generation`이 대화·실행 journal을 IndexedDB `keundal-web`에 저장합니다.
 - 기존 OpenAI·Anthropic·Gemini 플러그인이 브라우저에서 모델 한도·토큰 계산·스트림을 제공합니다. OpenAI·Anthropic SDK는 명시적인 브라우저 실행 opt-in을 사용합니다. `/api/llm` 프록시는 없으며 서버 DB, D1, R2, NuxtHub도 사용하지 않습니다. 키·URL·헤더는 생성 요청이나 journal에 넣지 않고, 400 오류의 진단 메시지만 위 규칙으로 정제해 전달합니다.
 - 제목·투표·UI 메시지·첨부 이미지는 `session.state.web`에 보관합니다. 정규 AG-UI 대화는 `session.messages`에 저장합니다. 웹 앱은 저장소 내부 API나 독자적인 IndexedDB 테이블을 사용하지 않습니다.
 - `ChatStore.respond()`는 HTTP나 SSE로 변환하지 않고 `AsyncIterable<AGUIEvent>`를 반환합니다. `useKeundalChat()`이 전송·중단·편집·재생성 상태를 관리하며 `ChatMessageAssembly`가 텍스트·추론·도구·출처 이벤트를 앱 소유의 `ChatMessage`로 투영합니다. `RUN_FINISHED`는 표시 메시지까지 저장한 뒤 전달합니다. 기존 `session.state.web` 메시지와 `data-keundal`의 정규 대화는 그대로 읽을 수 있습니다.

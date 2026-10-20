@@ -22,6 +22,6 @@ pnpm --filter @keundal/example-basic start
 
 - `plugin-llm-openai` — OpenAI Responses API로 `llm` 서비스를 구현합니다. API 키와 모델 한도를 설정에서 받습니다.
 - `plugin-store-sqlite` — 대화와 실행 기록을 SQLite 파일에 영속화합니다. `plugin-store-memory`(메모리)나 `plugin-store-indexeddb`(브라우저)로 바꿔도 에이전트 코드는 그대로 동작합니다.
-- `plugin-agent-simple` — `llm`·`session`·`generation`을 조합하고 `clock` 도구 실행을 자동으로 연결합니다.
+- `agent` — `llm`·`session`·`generation`을 조합하고 `clock` 도구 실행을 자동으로 연결합니다.
 
 클라이언트(`src/main.ts`)는 대화 이력을 직접 유지해 매 턴 `messages`로 전달하고, 에이전트는 실행이 커밋한 생성 메시지를 `session`에서 읽어 이력에 누적합니다. 실제 애플리케이션에서는 이 역할을 UI 프런트엔드나 서버가 담당합니다.

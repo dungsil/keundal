@@ -5,9 +5,9 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
 
+import agentPlugin, { type ExecutableTool, type ToolExecutionContext } from '@keundal/agent'
 import { EventType, LLMService, type LLMEvent, type LLMRequest } from '@keundal/core'
 import { McpClient, type McpPermissions } from '@keundal/mcp'
-import simpleAgentPlugin, { type ExecutableTool, type ToolExecutionContext } from '@keundal/plugin-agent-simple'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { WebStandardStreamableHTTPServerTransport, type ServerCapabilities } from '@modelcontextprotocol/server'
 import { Context } from 'cordis'
@@ -258,7 +258,7 @@ test('MCP 도구 결과를 후속 생성과 세션에 저장한 뒤 RUN_FINISHED
   }
   const llm = await ctx.plugin(LLM)
   const store = await ctx.plugin(memoryStorePlugin)
-  const agent = await ctx.plugin(simpleAgentPlugin, {
+  const agent = await ctx.plugin(agentPlugin, {
     model: 'fixture',
     maxOutputTokens: 100,
     tools: (options) => client.tools(options)

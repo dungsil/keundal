@@ -8,7 +8,7 @@ import {
   type LLMRequest,
   type LLMEvent
 } from '@keundal/core'
-import agentPlugin from '@keundal/plugin-agent-simple'
+import agentPlugin from '@keundal/agent'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { createAgentApp, type AgentAppServices } from '@keundal/server'
 import { Context } from 'cordis'

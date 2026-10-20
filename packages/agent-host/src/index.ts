@@ -1,3 +1,4 @@
+import agentPlugin from '@keundal/agent'
 import {
   EventType,
   type AGUIEvent,
@@ -7,7 +8,6 @@ import {
   type RunAgentInput,
   type SessionService
 } from '@keundal/core'
-import agentPlugin from '@keundal/plugin-agent-simple'
 import anthropicLLMPlugin from '@keundal/plugin-llm-anthropic'
 import geminiLLMPlugin from '@keundal/plugin-llm-gemini'
 import openaiLLMPlugin from '@keundal/plugin-llm-openai'

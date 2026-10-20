@@ -1,5 +1,5 @@
 import type { AGUIEvent, GenerationRequest, GenerationSnapshot, RunAgentInput, SessionSnapshot } from '@keundal/core'
-import { EventType } from '@keundal/core'
+import { CONTEXT_MESSAGE_EVENT, EventType } from '@keundal/core'
 
 export type { AGUIEvent, GenerationRequest, GenerationSnapshot, RunAgentInput, SessionSnapshot }
 
@@ -228,8 +228,31 @@ const listScenario = async (store: ConformanceStore): Promise<unknown> => {
   }
 }
 
+const contextScenario = async (store: ConformanceStore): Promise<unknown> => {
+  const initial = { id: 'keundal:context:instructions:initial', role: 'user', content: 'Use tabs.' }
+  const changed = { id: 'keundal:context:instructions:changed', role: 'user', content: 'Use spaces.' }
+  await collect(
+    store.generation.run(request('context-run'), {
+      stream: async function* () {
+        yield { type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value: initial }
+        yield { type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value: changed }
+        yield* defaultStream()
+      }
+    })
+  )
+  const run = await store.generation.get('context-run')
+  const thread = await store.session.get('thread')
+  const prepared = await store.session.prepare({ ...request('context-next', 1).input, messages: [] })
+  return {
+    run: run?.messages.slice(0, 2),
+    stored: thread?.messages.slice(0, 2),
+    resumed: prepared.input.messages.slice(0, 2)
+  }
+}
+
 const scenarios: ReadonlyArray<{ name: string; run: (store: ConformanceStore) => Promise<unknown> }> = [
   { name: 'success', run: successScenario },
+  { name: 'durableContext', run: contextScenario },
   { name: 'failedPartial', run: failedPartialScenario },
   { name: 'cancelled', run: cancelledScenario },
   { name: 'firstTerminalCommit', run: firstTerminalCommitScenario },
@@ -240,6 +263,20 @@ const scenarios: ReadonlyArray<{ name: string; run: (store: ConformanceStore) =>
 
 /** 세 저장소가 같은 결과를 내야 하는 시나리오의 기대 보고서입니다. */
 export const expectedConformanceReport: ConformanceReport = {
+  durableContext: {
+    run: [
+      { id: 'keundal:context:instructions:initial', role: 'user', content: 'Use tabs.' },
+      { id: 'keundal:context:instructions:changed', role: 'user', content: 'Use spaces.' }
+    ],
+    stored: [
+      { id: 'keundal:context:instructions:initial', role: 'user', content: 'Use tabs.' },
+      { id: 'keundal:context:instructions:changed', role: 'user', content: 'Use spaces.' }
+    ],
+    resumed: [
+      { id: 'keundal:context:instructions:initial', role: 'user', content: 'Use tabs.' },
+      { id: 'keundal:context:instructions:changed', role: 'user', content: 'Use spaces.' }
+    ]
+  },
   success: {
     eventTypes: ['RUN_STARTED', 'TEXT_MESSAGE_START', 'TEXT_MESSAGE_CONTENT', 'TEXT_MESSAGE_END', 'RUN_FINISHED'],
     runStatus: 'completed',

@@ -21,8 +21,8 @@
     "cordis": "catalog:"
   },
   "devDependencies": {
+    "@keundal/agent": "workspace:*",
     "@keundal/core": "workspace:*",
-    "@keundal/plugin-agent-simple": "workspace:*",
     "@keundal/plugin-fs-local": "workspace:*",
     "@keundal/plugin-fs-policy": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",

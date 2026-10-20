@@ -1,5 +1,5 @@
+import type { ExecutableTool } from '@keundal/agent'
 import type { FileSystemOptions } from '@keundal/fs'
-import type { ExecutableTool } from '@keundal/plugin-agent-simple'
 import { Service, type Context } from 'cordis'
 
 declare module 'cordis' {
