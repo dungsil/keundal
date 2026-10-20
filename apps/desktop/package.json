@@ -11,7 +11,7 @@
     "dev:ui": "pnpm --filter @keundal/web exec nuxt dev --envName desktop --no-open",
     "tauri": "tauri",
     "prepare:sidecar": "pnpm build:sidecar && node scripts/prepare-sidecar.mjs",
-    "build:tauri": "pnpm prepare:sidecar && pnpm build",
+    "build:tauri": "pnpm exec turbo run build:sidecar build:desktop --filter=@keundal/desktop --filter=@keundal/web && node scripts/prepare-sidecar.mjs",
     "build:sidecar": "tsdown --config tsdown.sidecar.config.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

@@ -18,6 +18,7 @@ concurrency:
 env:
   SKIP_INSTALL_SIMPLE_GIT_HOOKS: '1'
   TURBO_TELEMETRY_DISABLED: '1'
+  TURBO_RUN_SUMMARY: 'true'
 
 defaults:
   run:
@@ -80,13 +81,13 @@ jobs:
           cache: true
           require-lockfile: true
 
-      - name: Turbo 캐시 설정
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Turbo 공유 캐시 설정
+        uses: rharkor/caching-for-turbo@760158c05c47e7a764f78e9a22ca3b5a6ed8c52e # v2.5.2
         with:
-          path: .turbo/cache
-          key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
-          restore-keys: |
-            turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+          provider: github
+          cache-prefix: turbo-v3-${{ runner.os }}-${{ runner.arch }}-
+          use-relative-cache-path: true
+          server-port: 0
 
       - name: 패키지와 예제 빌드
         run: pnpm exec turbo run build --filter='!@keundal/web' --filter='!@keundal/desktop'
@@ -98,10 +99,21 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cloudflare-workers
+          overwrite: true
           path: apps/web/.output
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
+
+      - name: Turbo 실행 요약 업로드
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: turbo-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}
+          path: .turbo/runs/*.json
+          if-no-files-found: ignore
+          retention-days: 3
+          overwrite: true
 
   build-platforms:
     needs: changes
@@ -136,21 +148,23 @@ jobs:
           cache: true
           require-lockfile: true
 
-      - name: Turbo 캐시 설정
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Turbo 공유 캐시 설정
+        uses: rharkor/caching-for-turbo@760158c05c47e7a764f78e9a22ca3b5a6ed8c52e # v2.5.2
         with:
-          path: .turbo/cache
-          key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
-          restore-keys: |
-            turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+          provider: github
+          cache-prefix: turbo-v3-${{ runner.os }}-${{ runner.arch }}-
+          use-relative-cache-path: true
+          server-port: 0
 
       - name: Linux 빌드 의존성 설치
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev patchelf xdg-utils
+          echo "NATIVE_SYSTEM_DEPS=$(dpkg-query --show --showformat='${Package}=${Version};' libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev patchelf xdg-utils)" >> "$GITHUB_ENV"
 
       - name: Rust stable 설정
+        id: rust
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: stable
@@ -168,11 +182,12 @@ jobs:
       - name: 데스크톱 설치 파일 빌드
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
         env:
+          RUSTC_CACHE_KEY: ${{ steps.rust.outputs.cachekey }}
           APPIMAGE_EXTRACT_AND_RUN: '1'
           APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && '-' || '' }}
         with:
           projectPath: apps/desktop
-          tauriScript: pnpm tauri
+          tauriScript: pnpm exec turbo run tauri --filter=@keundal/desktop --
           args: -- --locked
           # macOS의 hdiutil이 일시적으로 Resource busy를 반환하면 다시 시도한다.
           retryAttempts: ${{ runner.os == 'macOS' && 2 || 0 }}
@@ -203,9 +218,20 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-${{ matrix.name }}
+          overwrite: true
           path: ${{ matrix.artifact-path }}
           if-no-files-found: error
           retention-days: 7
+
+      - name: Turbo 실행 요약 업로드
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: turbo-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}
+          path: .turbo/runs/*.json
+          if-no-files-found: ignore
+          retention-days: 3
+          overwrite: true
 
   typecheck:
     needs: changes
@@ -226,16 +252,26 @@ jobs:
           save-cache: false
           require-lockfile: true
 
-      - name: Turbo 캐시 설정
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Turbo 공유 캐시 설정
+        uses: rharkor/caching-for-turbo@760158c05c47e7a764f78e9a22ca3b5a6ed8c52e # v2.5.2
         with:
-          path: .turbo/cache
-          key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
-          restore-keys: |
-            turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+          provider: github
+          cache-prefix: turbo-v3-${{ runner.os }}-${{ runner.arch }}-
+          use-relative-cache-path: true
+          server-port: 0
 
       - name: 타입 검사
         run: pnpm typecheck
+
+      - name: Turbo 실행 요약 업로드
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: turbo-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}
+          path: .turbo/runs/*.json
+          if-no-files-found: ignore
+          retention-days: 3
+          overwrite: true
 
   test:
     needs: changes
@@ -256,16 +292,26 @@ jobs:
           save-cache: false
           require-lockfile: true
 
-      - name: Turbo 캐시 설정
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Turbo 공유 캐시 설정
+        uses: rharkor/caching-for-turbo@760158c05c47e7a764f78e9a22ca3b5a6ed8c52e # v2.5.2
         with:
-          path: .turbo/cache
-          key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
-          restore-keys: |
-            turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+          provider: github
+          cache-prefix: turbo-v3-${{ runner.os }}-${{ runner.arch }}-
+          use-relative-cache-path: true
+          server-port: 0
 
       - name: 테스트
         run: pnpm test
+
+      - name: Turbo 실행 요약 업로드
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: turbo-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}
+          path: .turbo/runs/*.json
+          if-no-files-found: ignore
+          retention-days: 3
+          overwrite: true
 
   lint:
     name: 린트 및 형식 검사
