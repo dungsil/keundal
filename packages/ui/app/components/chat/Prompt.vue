@@ -54,6 +54,7 @@ function appendTranscript(text: string) {
     :error="error"
     :disabled="uploading || disabled"
     :placeholder="placeholder"
+    :aria-label="t('chat.prompt')"
     color="neutral"
     variant="subtle"
     :ui="{ base: ['px-1.5', dictation !== 'idle' && 'placeholder:italic'] }"

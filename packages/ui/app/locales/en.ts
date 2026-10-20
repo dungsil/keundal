@@ -79,6 +79,7 @@ export default {
   'file.imagesOnly': 'Keundal currently supports image attachments only',
   'file.tooLarge': 'File exceeds 8MB',
   'file.failed': 'Upload failed',
+  'model.select': 'Select model',
   'model.defaultTitle': 'Default model',
   'model.defaultLabel': 'Model',
   'model.defaultDescription':

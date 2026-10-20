@@ -10,6 +10,28 @@ import { createKeundalChat as createChat } from '../shared/utils/keundal'
 import { ChatStore } from '../shared/utils/chat-store'
 import { defaultLLMSettings, providerSettingsSchema } from '../shared/utils/llm-settings'
 
+test('공급자 모듈을 불러오는 동안 취소하면 모델 조회를 중단한다', async () => {
+  const ctx = new Context()
+  const llm = ctx.plugin(browserLLMPlugin, { getSettings: defaultLLMSettings })
+  await llm
+  onTestFinished(() => llm.dispose())
+  const controller = new AbortController()
+  const pending = ctx.llm.getModel('openai/test-model', { signal: controller.signal })
+  controller.abort(new Error('모델 조회 취소'))
+  await expect(pending).rejects.toThrow('모델 조회 취소')
+})
+
+test('공급자 모듈을 불러오는 동안 서비스를 해제하면 공급자를 새로 만들지 않는다', async () => {
+  const ctx = new Context()
+  const llm = ctx.plugin(browserLLMPlugin, { getSettings: defaultLLMSettings })
+  await llm
+  onTestFinished(() => llm.dispose())
+  const pending = ctx.llm.getModel('openai/test-model')
+  const rejected = expect(pending).rejects.toThrow('Browser LLM service is disposed')
+  await llm.dispose()
+  await rejected
+})
+
 async function createKeundalChat(name: string, options: { webSearch?: boolean, reasoning?: boolean }, env: Record<string, string>) {
   const ctx = new Context()
   const llm = ctx.plugin(browserLLMPlugin, { getSettings: () => ({

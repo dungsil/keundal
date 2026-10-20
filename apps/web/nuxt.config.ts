@@ -52,6 +52,10 @@ export default defineNuxtConfig({
     '#agent-host-runtime': fileURLToPath(new URL('./server/agent/runtime-node.ts', import.meta.url))
   },
 
+  features: {
+    inlineStyles: true
+  },
+
   experimental: {
     viewTransition: true
   },
@@ -98,7 +102,7 @@ export default defineNuxtConfig({
 
   fonts: {
     families: [
-      { name: 'Pretendard', provider: 'npm', weights: [400, 500, 700], global: true, preload: true }
+      { name: 'Pretendard', provider: 'npm', weights: [400, 500, 700], global: true, display: 'swap', preload: false }
     ]
   }
 })

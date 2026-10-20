@@ -1,11 +1,12 @@
-import { listAnthropicModels } from '@keundal/plugin-llm-anthropic'
-import { listGeminiModels } from '@keundal/plugin-llm-gemini'
-import { listOpenAIModels } from '@keundal/plugin-llm-openai'
 import { z } from 'zod'
 import { LLM_PROVIDERS, providerCredentials, providerError, type LLMSettings, type LLMProvider } from './llm-settings'
 
 export const MODEL_CACHE_TTL = 60 * 60 * 1000
-const modelLoaders = { openai: listOpenAIModels, anthropic: listAnthropicModels, google: listGeminiModels }
+const modelLoaders = {
+  openai: () => import('@keundal/plugin-llm-openai').then(module => module.listOpenAIModels),
+  anthropic: () => import('@keundal/plugin-llm-anthropic').then(module => module.listAnthropicModels),
+  google: () => import('@keundal/plugin-llm-gemini').then(module => module.listGeminiModels)
+}
 
 const modelSchema = z.object({
   value: z.string().min(1),
@@ -50,7 +51,9 @@ export async function loadModels(provider: LLMProvider, settings: LLMSettings, s
   }
   const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000)
   try {
-    const models = await modelLoaders[provider]({ ...credentials, dangerouslyAllowBrowser: true }, { signal })
+    const load = await modelLoaders[provider]()
+    options.signal?.throwIfAborted()
+    const models = await load({ ...credentials, dangerouslyAllowBrowser: true }, { signal })
     options.signal?.throwIfAborted()
     const result = models.map(model => ({
       value: `${provider}/${model.id}`,

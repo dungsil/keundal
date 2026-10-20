@@ -81,6 +81,7 @@ export default {
   'file.imagesOnly': '현재 Keundal은 이미지 첨부만 지원합니다.',
   'file.tooLarge': '파일 크기가 8MB를 초과합니다.',
   'file.failed': '파일 첨부 실패',
+  'model.select': '모델 선택',
   'model.defaultTitle': '기본 모델',
   'model.defaultLabel': '모델',
   'model.defaultDescription':
