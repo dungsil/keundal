@@ -86,6 +86,34 @@ test('입력이 예산 이내이면 요약을 생성하지 않고 기존 메시�
   expect(requests).toHaveLength(0)
 })
 
+test('force 옵션은 입력이 예산 이내여도 이전 대화를 축약한다', async (t) => {
+  const { compact, requests } = await setup(t)
+  const result = await compact(input, 10000, { force: true })
+  expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
+  expect(requests).toHaveLength(1)
+})
+
+test('최근 토큰 보존량을 채우도록 사용자 턴의 보존 범위를 넓힌다', async (t) => {
+  const { compact } = await setup(t, {
+    count: (request) =>
+      request.input.messages.reduce(
+        (sum, message) =>
+          sum + ('content' in message && typeof message.content === 'string' ? message.content.length : 0),
+        0
+      )
+  })
+  const recent = [
+    { id: 'u2', role: 'user' as const, content: 'x'.repeat(100) },
+    { id: 'a2', role: 'assistant' as const, content: 'y'.repeat(100) },
+    { id: 'u3', role: 'user' as const, content: 'continue' }
+  ]
+  const result = await compact({ ...input, messages: [...input.messages.slice(0, 3), ...recent] }, 1000, {
+    keepRecentTokens: 150
+  })
+  expect(result.messages.slice(-3)).toStrictEqual(recent)
+  expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
+})
+
 test('inputTokens 옵션을 전달하면 첫 카운트 호출을 건너뛴다', async (t) => {
   let counts = 0
   const withOption = await setup(t, {
@@ -374,4 +402,42 @@ test('잘못된 축약 설정을 거부한다', async () => {
   for (const value of [{ keepRecentMessages: 0 }, { maxSummaryTokens: -1 }, null, []]) {
     expect((await SummaryCompactionConfigSchema['~standard'].validate(value)).issues).toBeDefined()
   }
+})
+
+test('토큰 보존량을 계산할 때도 도구 호출과 결과가 분리되지 않는다', async (t) => {
+  const { compact } = await setup(t, {
+    count: (request) => {
+      const calls = new Set(
+        request.input.messages.flatMap((message) =>
+          message.role === 'assistant' ? (message.toolCalls ?? []).map((call) => call.id) : []
+        )
+      )
+      for (const message of request.input.messages) {
+        if (message.role === 'tool' && !calls.has(message.toolCallId)) throw new Error('tool result without call')
+      }
+      return JSON.stringify(request.input).length
+    }
+  })
+  const recent: RunAgentInput['messages'] = [
+    { id: 'u1', role: 'user', content: 'first turn' },
+    {
+      id: 'a1',
+      role: 'assistant',
+      toolCalls: [{ id: 'c1', type: 'function', function: { name: 'lookup', arguments: '{}' } }]
+    },
+    { id: 't1', role: 'tool', toolCallId: 'c1', content: 'first result' },
+    { id: 'u2', role: 'user', content: 'second turn' },
+    {
+      id: 'a2',
+      role: 'assistant',
+      toolCalls: [{ id: 'c2', type: 'function', function: { name: 'lookup', arguments: '{}' } }]
+    },
+    { id: 't2', role: 'tool', toolCallId: 'c2', content: 'second result' },
+    { id: 'u3', role: 'user', content: 'continue' }
+  ]
+  const data = { ...input, messages: [...input.messages.slice(0, 3), ...recent] }
+  const result = await compact(data, 2000, { force: true, keepRecentTokens: 300 })
+  expect(result.sourceMessageIds).toContain('old-user')
+  expect(result.messages).toContainEqual(recent[4])
+  expect(result.messages).toContainEqual(recent[5])
 })

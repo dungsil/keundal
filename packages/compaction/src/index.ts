@@ -15,9 +15,11 @@ import type { StandardSchemaV1 } from '@standard-schema/spec'
 export interface SummaryCompactionConfig {
   readonly keepRecentMessages?: number
   readonly maxSummaryTokens?: number
+  readonly keepRecentTokens?: number
 }
 
 export interface SummaryCompactionOptions extends SummaryCompactionConfig, ExecutionOptions {
+  readonly force?: boolean
   /** 호출자가 이미 세은 request.input의 입력 토큰 수입니다. 전달하면 첫 카운트 왕복을 건너뜁니다. */
   readonly inputTokens?: number
 }
@@ -28,7 +30,10 @@ function parseConfig(config: SummaryCompactionConfig) {
   for (const value of [keepRecentMessages, maxSummaryTokens]) {
     if (!Number.isSafeInteger(value) || value <= 0) throw new Error('compaction limits must be positive integers')
   }
-  return { keepRecentMessages, maxSummaryTokens }
+  const keepRecentTokens = config.keepRecentTokens
+  if (keepRecentTokens !== undefined && (!Number.isSafeInteger(keepRecentTokens) || keepRecentTokens < 0))
+    throw new Error('keepRecentTokens must be a non-negative integer')
+  return { keepRecentMessages, maxSummaryTokens, ...(keepRecentTokens === undefined ? {} : { keepRecentTokens }) }
 }
 
 export const SummaryCompactionConfigSchema = {
@@ -90,18 +95,11 @@ export async function compact(
     initialCount = await count(input)
   }
   if (!Number.isSafeInteger(initialCount) || initialCount < 0) throw new Error('invalid input token count')
-  if (initialCount <= request.maxInputTokens) {
+  if (!options.force && initialCount <= request.maxInputTokens) {
     return { messages: input.messages, summary: '', sourceMessageIds: [] }
   }
 
-  // 최근 사용자 턴 전체를 보존하여 도구 호출과 결과가 분리되지 않게 합니다.
-  let boundary = Math.max(0, input.messages.length - config.keepRecentMessages)
-  while (
-    boundary > 0 &&
-    (input.messages[boundary]?.role !== 'user' || input.messages[boundary].id.startsWith(CONTEXT_MESSAGE_PREFIX))
-  )
-    boundary--
-  // 도구 호출 id를 첫 어시스턴트 호스트의 위치에 연결해 경계 스캔의 조회를 상수 시간으로 만듭니다.
+  // 도구 호출 id를 첫 어시스턴트 호스트의 위치에 연결합니다.
   const callHosts = new Map<string, number>()
   for (let index = 0; index < input.messages.length; index++) {
     const message = input.messages[index]
@@ -110,20 +108,44 @@ export async function compact(
       if (!callHosts.has(call.id)) callHosts.set(call.id, index)
     }
   }
-  // 사용자 메시지 사이를 가로지르는 도구 결과도 호출과 함께 보존합니다.
-  for (let index = boundary; index < input.messages.length; index++) {
-    const message = input.messages[index]
-    if (message.role !== 'tool') continue
-    const callIndex = callHosts.get(message.toolCallId) ?? -1
-    if (callIndex >= 0 && callIndex < boundary) {
-      boundary = callIndex
-      while (
-        boundary > 0 &&
-        (input.messages[boundary]?.role !== 'user' || input.messages[boundary].id.startsWith(CONTEXT_MESSAGE_PREFIX))
-      )
-        boundary--
-      index = boundary - 1
+  const turnBoundary = (start: number) => {
+    while (
+      start > 0 &&
+      (input.messages[start]?.role !== 'user' || input.messages[start].id.startsWith(CONTEXT_MESSAGE_PREFIX))
+    )
+      start--
+    return start
+  }
+  const retainedBoundary = (start: number) => {
+    let boundary = turnBoundary(start)
+    // 사용자 턴을 가로지르는 결과도 원래 호출과 함께 보존합니다.
+    for (let index = boundary; index < input.messages.length; index++) {
+      const message = input.messages[index]
+      if (message.role !== 'tool') continue
+      const callIndex = callHosts.get(message.toolCallId) ?? -1
+      if (callIndex >= 0 && callIndex < boundary) {
+        boundary = turnBoundary(callIndex)
+        index = boundary - 1
+      }
     }
+    return boundary
+  }
+  let boundary = retainedBoundary(Math.max(0, input.messages.length - config.keepRecentMessages))
+  if (config.keepRecentTokens) {
+    const base = { ...input, state: {}, tools: [], context: [] }
+    const overhead = await count({ ...base, messages: [] })
+    let low = 0
+    let high = boundary
+    while (low <= high) {
+      const middle = Math.floor((low + high) / 2)
+      // 토큰 계산에도 도구 결과만 남은 잘못된 요청을 전달하지 않습니다.
+      const candidate = retainedBoundary(middle)
+      if ((await count({ ...base, messages: input.messages.slice(candidate) })) - overhead >= config.keepRecentTokens) {
+        boundary = candidate
+        low = middle + 1
+      } else high = middle - 1
+    }
+    if (high < 0) boundary = 0
   }
   const source = input.messages.slice(0, boundary).filter((message) => !isInstruction(message))
   if (!source.length) throw new Error('no older conversation can be compacted while preserving recent messages')
