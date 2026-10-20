@@ -1,5 +1,6 @@
 import { compact, SummaryCompactionConfigSchema, type SummaryCompactionConfig } from '@keundal/compaction'
 import {
+  EventType,
   parseRunAgentInput,
   type AGUIEvent,
   type CompactionResult,
@@ -14,6 +15,11 @@ import { SKILL_CATALOG_ID, skillTool, withSkillCatalog } from './skills.js'
 import { addTools, parseTools, streamWithTools, type ExecutableTool } from './tools.js'
 
 export type { ExecutableTool, ToolExecutionContext } from './tools.js'
+
+export const STEERING_EVENT = 'keundal.steering'
+export const STEER_EVENT = STEERING_EVENT
+export const FOLLOW_UP_EVENT = STEERING_EVENT
+export const QUEUE_EVENT = STEERING_EVENT
 
 export type ToolProvider = (options: ExecutionOptions) => readonly ExecutableTool[] | Promise<readonly ExecutableTool[]>
 
@@ -31,6 +37,10 @@ export interface AgentConfig {
   readonly maxToolRounds?: number
   /** 같은 응답의 도구 실행을 겹쳐 시작합니다. 기본값은 false로 순차 실행입니다. */
   readonly parallelTools?: boolean
+  readonly steering?: 'steer' | 'follow-up' | 'followUp' | 'followup' | 'reject'
+  readonly inputPolicy?: 'steer' | 'follow-up' | 'followUp' | 'followup' | 'reject'
+  readonly queuePolicy?: 'steer' | 'follow-up' | 'followUp' | 'followup' | 'reject'
+  readonly steeringPolicy?: 'steer' | 'follow-up' | 'followUp' | 'followup' | 'reject'
 }
 
 /**
@@ -76,6 +86,22 @@ export function parseAgentConfig(value: unknown): AgentConfig {
   }
   const parallelTools = 'parallelTools' in value ? value.parallelTools : false
   if (typeof parallelTools !== 'boolean') throw new Error('parallelTools must be a boolean')
+  const normalizePolicy = (raw: unknown): 'steer' | 'follow-up' | 'reject' => {
+    if (raw === 'followUp' || raw === 'followup') return 'follow-up'
+    if (raw === 'steer' || raw === 'follow-up' || raw === 'reject') return raw
+    throw new Error('steering policy must be steer, follow-up or reject')
+  }
+  const policyRaw =
+    'steering' in value
+      ? value.steering
+      : 'inputPolicy' in value
+        ? value.inputPolicy
+        : 'queuePolicy' in value
+          ? value.queuePolicy
+          : 'steeringPolicy' in value
+            ? value.steeringPolicy
+            : undefined
+  const steering = policyRaw === undefined ? undefined : normalizePolicy(policyRaw)
   return {
     model: value.model,
     maxOutputTokens: value.maxOutputTokens,
@@ -86,7 +112,10 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     skills,
     ...(systemPrompt === undefined ? {} : { systemPrompt }),
     maxToolRounds,
-    parallelTools
+    parallelTools,
+    ...(steering === undefined
+      ? {}
+      : { steering, inputPolicy: steering, queuePolicy: steering, steeringPolicy: steering })
   }
 }
 
@@ -117,6 +146,9 @@ declare module 'cordis' {
 export class Agent extends Service {
   private readonly active = new Set<AbortController>()
   private closed = false
+  private readonly steeringQueue: RunAgentInput[] = []
+  private readonly followUpQueue: RunAgentInput[] = []
+  private activeRun: { threadId: string; runId: string } | undefined
 
   constructor(
     ctx: Context,
@@ -129,6 +161,88 @@ export class Agent extends Service {
     })
   }
 
+  private inputPolicy(): 'steer' | 'follow-up' | 'reject' {
+    return (this.config.steering ??
+      this.config.inputPolicy ??
+      this.config.queuePolicy ??
+      this.config.steeringPolicy ??
+      'reject') as 'steer' | 'follow-up' | 'reject'
+  }
+
+  private normalizeQueuedInput(input: unknown): RunAgentInput {
+    if (Array.isArray(input)) {
+      if (!this.activeRun) throw new Error('agent has no active run')
+      return parseRunAgentInput({
+        threadId: this.activeRun.threadId,
+        runId: this.activeRun.runId,
+        state: {},
+        messages: input,
+        tools: [],
+        context: []
+      })
+    }
+    if (input && typeof input === 'object' && 'role' in (input as Record<string, unknown>)) {
+      if (!this.activeRun) throw new Error('agent has no active run')
+      return parseRunAgentInput({
+        threadId: this.activeRun.threadId,
+        runId: this.activeRun.runId,
+        state: {},
+        messages: [input],
+        tools: [],
+        context: []
+      })
+    }
+    return parseRunAgentInput(input)
+  }
+
+  steer(input: unknown): 'queued' {
+    if (this.closed) throw new Error('agent disposed')
+    this.steeringQueue.push(this.normalizeQueuedInput(input))
+    return 'queued'
+  }
+
+  followUp(input: unknown): 'queued' {
+    if (this.closed) throw new Error('agent disposed')
+    this.followUpQueue.push(this.normalizeQueuedInput(input))
+    return 'queued'
+  }
+
+  pendingInputs(): { steering: number; followUp: number } {
+    return { steering: this.steeringQueue.length, followUp: this.followUpQueue.length }
+  }
+
+  pending(): { steering: number; followUp: number } {
+    return this.pendingInputs()
+  }
+
+  queued(): { steering: number; followUp: number } {
+    return this.pendingInputs()
+  }
+
+  enqueue(input: unknown, mode: 'steer' | 'follow-up' | 'followUp' | 'followup' | 'reject' = 'steer'): 'queued' {
+    if (mode === 'follow-up' || mode === 'followUp' || mode === 'followup') return this.followUp(input)
+    if (mode === 'steer') return this.steer(input)
+    throw new Error('agent is already running')
+  }
+
+  queue(input: unknown, mode: 'steer' | 'follow-up' | 'followUp' | 'followup' | 'reject' = 'steer'): 'queued' {
+    return this.enqueue(input, mode)
+  }
+
+  takeSteeringInputs(): RunAgentInput[] {
+    const taken = [...this.steeringQueue]
+    this.steeringQueue.length = 0
+    return taken
+  }
+
+  private async *queuedIterator(policy: 'steer' | 'follow-up'): AsyncGenerator<AGUIEvent, void, unknown> {
+    yield {
+      type: EventType.CUSTOM,
+      name: 'keundal.steering',
+      value: { status: 'queued', policy }
+    }
+  }
+
   /**
    * 모든 실행에 앞서 모델에 전달할 시스템 지침입니다. 구현은 이 값을 바꿀 수 있습니다.
    */
@@ -138,6 +252,28 @@ export class Agent extends Service {
 
   run(input: RunAgentInput, options: ExecutionOptions = {}): AsyncIterableIterator<AGUIEvent> {
     if (this.closed) throw new Error('agent disposed')
+    if (this.active.size > 0) {
+      const requested =
+        (options as Record<string, unknown>).steering ??
+        (options as Record<string, unknown>).mode ??
+        (options as Record<string, unknown>).policy ??
+        (options as Record<string, unknown>).queue
+      const policy =
+        requested === undefined
+          ? this.inputPolicy()
+          : requested === 'followUp' || requested === 'followup'
+            ? 'follow-up'
+            : (requested as 'steer' | 'follow-up' | 'reject')
+      if (policy === 'steer') {
+        this.steer(input)
+        return this.queuedIterator('steer')
+      }
+      if (policy === 'follow-up') {
+        this.followUp(input)
+        return this.queuedIterator('follow-up')
+      }
+      throw new Error('agent is already running')
+    }
     const controller = new globalThis.AbortController()
     const externalSignal = options.signal
     const abort = () => controller.abort(externalSignal?.reason)
@@ -179,81 +315,93 @@ export class Agent extends Service {
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     try {
       signal.throwIfAborted()
-      const request = parseRunAgentInput(input)
-      for (const reserved of [SKILL_CATALOG_ID, SYSTEM_PROMPT_ID]) {
-        if (request.messages.some((message) => message.id === reserved)) {
-          throw new Error(`message id is reserved: ${reserved}`)
+      let currentInput: RunAgentInput = input
+      while (true) {
+        signal.throwIfAborted()
+        const request = parseRunAgentInput(currentInput)
+        this.activeRun = { threadId: request.threadId, runId: request.runId }
+        for (const reserved of [SKILL_CATALOG_ID, SYSTEM_PROMPT_ID]) {
+          if (request.messages.some((message) => message.id === reserved)) {
+            throw new Error(`message id is reserved: ${reserved}`)
+          }
         }
-      }
-      const options = { signal }
-      const prepared = await this.ctx.session.prepare(request, options)
-      signal.throwIfAborted()
-      const configuredTools = parseTools(
-        typeof this.config.tools === 'function' ? await this.config.tools(options) : this.config.tools
-      )
-      signal.throwIfAborted()
-      if (this.config.skills && configuredTools.some((tool) => tool.name === 'skill'))
-        throw new Error('skill tool name is reserved when skills are enabled')
-      const catalog = this.config.skills ? await this.ctx.skills.prepare(options) : undefined
-      signal.throwIfAborted()
-      const tools = [...configuredTools, ...(catalog ? [skillTool(catalog)] : [])]
-      const preparedInput = addTools(
-        withSystemPrompt(withSkillCatalog(parseRunAgentInput(prepared.input), catalog), this.systemPrompt()),
-        tools
-      )
-      if (preparedInput.threadId !== request.threadId || preparedInput.runId !== request.runId) {
-        throw new Error('session preparation must preserve threadId and runId')
-      }
-      if (!Number.isSafeInteger(prepared.revision) || prepared.revision < 0) {
-        throw new Error('session revision must be a non-negative integer')
-      }
+        const options = { signal }
+        const prepared = await this.ctx.session.prepare(request, options)
+        signal.throwIfAborted()
+        const configuredTools = parseTools(
+          typeof this.config.tools === 'function' ? await this.config.tools(options) : this.config.tools
+        )
+        signal.throwIfAborted()
+        if (this.config.skills && configuredTools.some((tool) => tool.name === 'skill'))
+          throw new Error('skill tool name is reserved when skills are enabled')
+        const catalog = this.config.skills ? await this.ctx.skills.prepare(options) : undefined
+        signal.throwIfAborted()
+        const tools = [...configuredTools, ...(catalog ? [skillTool(catalog)] : [])]
+        const preparedInput = addTools(
+          withSystemPrompt(withSkillCatalog(parseRunAgentInput(prepared.input), catalog), this.systemPrompt()),
+          tools
+        )
+        if (preparedInput.threadId !== request.threadId || preparedInput.runId !== request.runId) {
+          throw new Error('session preparation must preserve threadId and runId')
+        }
+        if (!Number.isSafeInteger(prepared.revision) || prepared.revision < 0) {
+          throw new Error('session revision must be a non-negative integer')
+        }
 
-      const model = await this.ctx.llm.getModel(this.config.model, options)
-      signal.throwIfAborted()
-      const maxOutputTokens = this.config.maxOutputTokens
-      if (
-        !Number.isSafeInteger(model.contextWindow) ||
-        !Number.isSafeInteger(model.maxOutputTokens) ||
-        maxOutputTokens > model.maxOutputTokens ||
-        maxOutputTokens >= model.contextWindow
-      ) {
-        throw new Error('requested output budget exceeds the model limits')
-      }
-      const maxInputTokens = model.contextWindow - maxOutputTokens
-      const fitted = await this.fitInput(preparedInput, maxInputTokens, signal)
+        const model = await this.ctx.llm.getModel(this.config.model, options)
+        signal.throwIfAborted()
+        const maxOutputTokens = this.config.maxOutputTokens
+        if (
+          !Number.isSafeInteger(model.contextWindow) ||
+          !Number.isSafeInteger(model.maxOutputTokens) ||
+          maxOutputTokens > model.maxOutputTokens ||
+          maxOutputTokens >= model.contextWindow
+        ) {
+          throw new Error('requested output budget exceeds the model limits')
+        }
+        const maxInputTokens = model.contextWindow - maxOutputTokens
+        const fitted = await this.fitInput(preparedInput, maxInputTokens, signal)
 
-      signal.throwIfAborted()
-      yield* this.ctx.generation.run(
-        {
-          input: fitted.input,
-          model: this.config.model,
-          maxOutputTokens,
-          ...(this.config.webSearch === undefined ? {} : { webSearch: this.config.webSearch }),
-          ...(this.config.reasoning === undefined ? {} : { reasoning: this.config.reasoning }),
-          sessionRevision: prepared.revision,
-          ...(fitted.compaction ? { compaction: fitted.compaction } : {})
-        },
-        {
-          signal,
-          ...(tools.length
-            ? {
-                stream: (request, execution) => {
-                  const generationSignal = execution?.signal ?? signal
-                  return streamWithTools(
-                    this.ctx.llm,
-                    request,
-                    tools,
-                    this.config.maxToolRounds ?? 8,
-                    async (next) => (await this.fitInput(next, maxInputTokens, generationSignal)).input,
-                    generationSignal,
-                    { parallel: this.config.parallelTools ?? false }
-                  )
+        signal.throwIfAborted()
+        yield* this.ctx.generation.run(
+          {
+            input: fitted.input,
+            model: this.config.model,
+            maxOutputTokens,
+            ...(this.config.webSearch === undefined ? {} : { webSearch: this.config.webSearch }),
+            ...(this.config.reasoning === undefined ? {} : { reasoning: this.config.reasoning }),
+            sessionRevision: prepared.revision,
+            ...(fitted.compaction ? { compaction: fitted.compaction } : {})
+          },
+          {
+            signal,
+            ...(tools.length
+              ? {
+                  stream: (request, execution) => {
+                    const generationSignal = execution?.signal ?? signal
+                    return streamWithTools(
+                      this.ctx.llm,
+                      request,
+                      tools,
+                      this.config.maxToolRounds ?? 8,
+                      async (next) => (await this.fitInput(next, maxInputTokens, generationSignal)).input,
+                      generationSignal,
+                      { parallel: this.config.parallelTools ?? false },
+                      () => this.takeSteeringInputs()
+                    )
+                  }
                 }
-              }
-            : {})
+              : {})
+          }
+        )
+        if (this.followUpQueue.length > 0) {
+          currentInput = this.followUpQueue.shift()!
+          continue
         }
-      )
+        break
+      }
     } finally {
+      this.activeRun = undefined
       cleanup()
     }
   }

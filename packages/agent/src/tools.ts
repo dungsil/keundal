@@ -69,7 +69,8 @@ export async function* streamWithTools(
   maxToolRounds: number,
   prepareInput: (input: RunAgentInput) => Promise<RunAgentInput>,
   signal: AbortSignal,
-  options: { parallel?: boolean } = {}
+  options: { parallel?: boolean } = {},
+  getSteeringInputs?: () => RunAgentInput[]
 ): AsyncGenerator<LLMEvent> {
   const registered = new Map(tools.map((tool) => [tool.name, tool]))
   const usedIds = new Set(
@@ -171,9 +172,21 @@ export async function* streamWithTools(
     }
     rounds++
     signal.throwIfAborted()
+    const steeringInputs = getSteeringInputs?.() ?? []
+    const steeringMessages = steeringInputs.flatMap((item) => item.messages)
+    if (steeringMessages.length > 0) {
+      yield {
+        type: EventType.CUSTOM,
+        name: 'keundal.steering',
+        value: { status: 'queued', count: steeringInputs.length, policy: 'steer' }
+      } as LLMEvent
+    }
     current = {
       ...current,
-      input: await prepareInput({ ...current.input, messages: [...current.input.messages, ...assembly.messages] })
+      input: await prepareInput({
+        ...current.input,
+        messages: [...current.input.messages, ...assembly.messages, ...steeringMessages]
+      })
     }
   }
 }
