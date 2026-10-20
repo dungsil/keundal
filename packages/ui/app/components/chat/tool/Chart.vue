@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { t, intlLocale } = useLocale()
+
 const props = defineProps<{
   invocation: ChartUIToolInvocation
 }>()
@@ -23,9 +25,9 @@ const icon = computed(() => {
 const message = computed(() => {
   return (
     {
-      'input-available': 'Generating chart...',
-      'output-error': "Can't generate chart, please try again"
-    }[props.invocation.state as string] || 'Loading chart data...'
+      'input-available': t('chart.generating'),
+      'output-error': t('chart.failed')
+    }[props.invocation.state as string] || t('chart.loading')
   )
 })
 
@@ -51,13 +53,13 @@ const categories = (invocation: ChartUIToolInvocation): Record<string, BulletLeg
 }
 
 const formatValue = (value: string | number | undefined): string => {
-  if (value === undefined || value === null) return 'N/A'
+  if (value === undefined || value === null) return t('common.unavailable')
   if (typeof value === 'string') return value
 
   if (Number.isInteger(value)) {
-    return value.toLocaleString()
+    return value.toLocaleString(intlLocale.value)
   }
-  return value.toLocaleString(undefined, {
+  return value.toLocaleString(intlLocale.value, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2
   })

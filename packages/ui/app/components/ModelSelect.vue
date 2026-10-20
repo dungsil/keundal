@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { t } = useLocale()
+
 const { selectedModel, models, loading, error, refresh } = useModels()
 </script>
 
@@ -29,11 +31,10 @@ const { selectedModel, models, loading, error, refresh } = useModels()
           {{ error }}
         </p>
         <p class="text-xs text-muted">
-          Provider models are cached in this browser for 1 hour. Listed models must support this app's text, tools and
-          token-counting APIs.
+          {{ t('model.cache') }}
         </p>
         <UButton
-          label="Refresh models"
+          :label="t('model.refresh')"
           icon="i-lucide-refresh-cw"
           size="xs"
           color="neutral"

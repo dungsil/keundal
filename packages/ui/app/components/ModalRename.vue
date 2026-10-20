@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { t } = useLocale()
+
 const props = defineProps<{
   title?: string
 }>()
@@ -17,8 +19,8 @@ function submit() {
 
 <template>
   <UModal
-    title="Rename chat"
-    description="Choose a new title for this chat."
+    :title="t('chat.renameTitle')"
+    :description="t('chat.renameDescription')"
     :ui="{
       footer: 'flex-row-reverse justify-start'
     }"
@@ -29,7 +31,7 @@ function submit() {
         v-model="value"
         autofocus
         size="lg"
-        placeholder="Chat title"
+        :placeholder="t('chat.titlePlaceholder')"
         class="w-full"
         :ui="{ root: 'w-full' }"
         @keydown.enter.prevent="submit"
@@ -37,8 +39,8 @@ function submit() {
     </template>
 
     <template #footer>
-      <UButton label="Save" :disabled="!trimmed" @click="submit" />
-      <UButton color="neutral" variant="ghost" label="Cancel" @click="emit('close', false)" />
+      <UButton :label="t('common.save')" :disabled="!trimmed" @click="submit" />
+      <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="emit('close', false)" />
     </template>
   </UModal>
 </template>

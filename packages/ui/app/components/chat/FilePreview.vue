@@ -2,6 +2,8 @@
 import type { AvatarProps } from '@nuxt/ui'
 import { AnimatePresence, Motion } from 'motion-v'
 
+const { t } = useLocale()
+
 interface ChatFilePreviewProps {
   name: string
   type: string
@@ -81,7 +83,7 @@ onUnmounted(() => {
       size="xs"
       color="neutral"
       class="absolute p-0 -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity rounded-full ring ring-bg"
-      aria-label="Remove file"
+      :aria-label="t('file.remove')"
       @click="emit('remove')"
     />
 

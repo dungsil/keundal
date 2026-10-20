@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Motion } from 'motion-v'
 
+const { t } = useLocale()
+
 defineProps<{
   show: boolean
 }>()
@@ -106,8 +108,8 @@ defineProps<{
           duration: 0.2
         }"
       >
-        <p class="text-lg/7 font-medium mt-4">Drop your files here</p>
-        <p class="text-sm/6 text-muted">Supported formats: Images, PDFs, CSV files</p>
+        <p class="text-lg/7 font-medium mt-4">{{ t('file.drop') }}</p>
+        <p class="text-sm/6 text-muted">{{ t('file.formats') }}</p>
       </Motion>
     </div>
   </div>

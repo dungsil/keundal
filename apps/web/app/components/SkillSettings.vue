@@ -3,6 +3,8 @@ import { parseSkillMarkdown } from '@keundal/plugin-skill-filesystem/markdown'
 
 import { managedSkillSchema, type LocalSkillFile, type ManagedSkill, type SkillSettings } from '#shared/utils/skills'
 
+const { t } = useLocale()
+
 defineProps<{ collapsed?: boolean }>()
 
 const { $skillManager } = useNuxtApp()
@@ -48,7 +50,7 @@ watch(open, async (value) => {
   try {
     settings.value = $skillManager.load()
   } catch {
-    error.value = 'Could not read saved skills. Check browser storage.'
+    error.value = t('skill.readFailed')
   }
   if (desktop) await refreshFiles()
 })
@@ -59,7 +61,7 @@ function persist(next: SkillSettings) {
     error.value = ''
     return true
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'Could not save skills in this browser.'
+    error.value = cause instanceof Error ? cause.message : t('skill.saveFailed')
     return false
   }
 }
@@ -81,11 +83,12 @@ function save() {
   if (selectedFile.value) return
   const parsed = managedSkillSchema.safeParse(draft.value)
   if (!parsed.success) {
-    error.value = parsed.error.issues[0]!.message
+    const field = parsed.error.issues[0]!.path[0]
+    error.value = t(field === 'name' ? 'skill.invalidName' : field === 'description' ? 'skill.descriptionRequired' : 'skill.instructionsRequired')
     return
   }
   if (settings.value.skills.some(skill => skill.name === parsed.data.name && skill.name !== originalName.value)) {
-    error.value = `A skill named "${parsed.data.name}" already exists.`
+    error.value = t('skill.duplicate', { name: parsed.data.name })
     return
   }
   const skills = settings.value.skills.filter(skill => skill.name !== originalName.value)
@@ -125,17 +128,17 @@ function toggleFile(path: string, enabled: boolean) {
 <template>
   <UModal
     v-model:open="open"
-    title="Skills"
-    description="Manage reusable instructions. The assistant loads enabled skills when needed."
+    :title="t('skill.title')"
+    :description="t('skill.description')"
     :ui="{ content: 'sm:max-w-3xl' }"
   >
     <UButton
-      :label="collapsed ? '' : 'Skills'"
+      :label="collapsed ? '' : t('skill.title')"
       icon="i-lucide-book-open"
       color="neutral"
       variant="ghost"
       class="w-full"
-      aria-label="Skills"
+      :aria-label="t('skill.title')"
     />
 
     <template #body>
@@ -144,14 +147,14 @@ function toggleFile(path: string, enabled: boolean) {
           color="neutral"
           variant="subtle"
           icon="i-lucide-info"
-          title="Instructions, not automatic actions"
-          description="Skills can change assistant behavior. Only add instructions you trust. Scripts and supporting files do not run automatically."
+          :title="t('skill.noticeTitle')"
+          :description="t('skill.notice')"
         />
 
         <template v-if="editing">
           <div class="flex items-center justify-between gap-3">
             <UButton
-              label="Back to skills"
+              :label="t('skill.back')"
               icon="i-lucide-arrow-left"
               variant="ghost"
               color="neutral"
@@ -159,71 +162,71 @@ function toggleFile(path: string, enabled: boolean) {
             />
             <UBadge
               v-if="selectedFile"
-              label="Local file · read only"
+              :label="t('skill.readOnly')"
               variant="subtle"
               color="neutral"
             />
-            <span v-else class="text-sm text-muted">{{ originalName ? 'Edit skill' : 'New skill' }}</span>
+            <span v-else class="text-sm text-muted">{{ originalName ? t('skill.edit') : t('skill.new') }}</span>
           </div>
           <p v-if="selectedFile" class="text-xs text-muted break-all">
             {{ selectedFile.path }}
           </p>
           <form id="skill-editor" class="space-y-4" @submit.prevent="save">
-            <UFormField label="Name" name="skill-name" description="Lowercase letters, numbers and single hyphens.">
+            <UFormField :label="t('common.name')" name="skill-name" :description="t('skill.nameDescription')">
               <UInput
                 id="skill-name"
                 v-model="draft.name"
-                aria-label="Skill name"
+                :aria-label="t('skill.nameLabel')"
                 placeholder="code-review"
                 class="w-full"
                 :readonly="!!selectedFile"
               />
             </UFormField>
             <UFormField
-              label="Description"
+              :label="t('common.description')"
               name="skill-description"
-              description="Tell the assistant when to use this skill."
+              :description="t('skill.descriptionHelp')"
             >
               <UTextarea
                 v-model="draft.description"
-                aria-label="Skill description"
-                placeholder="Review code changes for bugs and regression risks."
+                :aria-label="t('skill.descriptionLabel')"
+                :placeholder="t('skill.descriptionPlaceholder')"
                 :rows="2"
                 class="w-full"
                 :readonly="!!selectedFile"
               />
             </UFormField>
             <UFormField
-              label="Instructions"
+              :label="t('common.instructions')"
               name="skill-instructions"
-              description="Markdown is supported. Supporting files are not loaded automatically."
+              :description="t('skill.instructionsHelp')"
             >
               <UTextarea
                 v-model="draft.content"
-                aria-label="Skill instructions"
-                placeholder="Describe the steps the assistant must follow…"
+                :aria-label="t('skill.instructionsLabel')"
+                :placeholder="t('skill.instructionsPlaceholder')"
                 :rows="8"
                 class="w-full font-mono"
                 :readonly="!!selectedFile"
               />
             </UFormField>
-            <USwitch v-if="!selectedFile" v-model="draft.enabled" label="Enabled for new responses" />
+            <USwitch v-if="!selectedFile" v-model="draft.enabled" :label="t('skill.enabled')" />
           </form>
           <div
             v-if="deleting"
             class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-error/30 p-3"
           >
             <p class="text-sm">
-              Delete {{ originalName }}? This cannot be undone.
+              {{ t('skill.deleteDescription', { name: originalName ?? '' }) }}
             </p>
             <div class="flex gap-2">
               <UButton
-                label="Keep skill"
+                :label="t('skill.keep')"
                 color="neutral"
                 variant="ghost"
                 @click="deleting = false"
               />
-              <UButton label="Confirm delete" color="error" @click="remove" />
+              <UButton :label="t('skill.confirmDelete')" color="error" @click="remove" />
             </div>
           </div>
         </template>
@@ -231,25 +234,25 @@ function toggleFile(path: string, enabled: boolean) {
         <template v-else>
           <div class="flex flex-wrap items-center justify-between gap-3">
             <h3 class="text-sm font-semibold">
-              Saved in this {{ desktop ? 'app' : 'browser' }}
+              {{ t(desktop ? 'skill.savedApp' : 'skill.savedBrowser') }}
             </h3>
             <div class="flex gap-2">
               <input
                 ref="importInput"
                 type="file"
                 accept=".md,text/markdown"
-                aria-label="Import skill file"
+                :aria-label="t('skill.importFile')"
                 class="hidden"
                 @change="importFile"
               >
               <UButton
-                label="Import SKILL.md"
+                :label="t('skill.import')"
                 icon="i-lucide-upload"
                 color="neutral"
                 variant="outline"
                 @click="importInput?.click()"
               />
-              <UButton label="New skill" icon="i-lucide-plus" @click="edit()" />
+              <UButton :label="t('skill.new')" icon="i-lucide-plus" @click="edit()" />
             </div>
           </div>
           <div
@@ -258,10 +261,10 @@ function toggleFile(path: string, enabled: boolean) {
           >
             <UIcon name="i-lucide-book-open" class="size-7 text-dimmed" />
             <p class="mt-2 text-sm font-medium">
-              No saved skills yet
+              {{ t('skill.empty') }}
             </p>
             <p class="mt-1 text-sm text-muted">
-              Create a skill or import a SKILL.md file to get started.
+              {{ t('skill.emptyHelp') }}
             </p>
           </div>
           <ul v-else class="divide-y divide-default rounded-lg border border-default">
@@ -276,7 +279,7 @@ function toggleFile(path: string, enabled: boolean) {
               </div>
               <USwitch
                 :model-value="skill.enabled"
-                :aria-label="`Enable ${skill.name}`"
+                :aria-label="t('skill.enable', { name: skill.name })"
                 @update:model-value="
                   persist({
                     ...settings,
@@ -287,27 +290,27 @@ function toggleFile(path: string, enabled: boolean) {
                 "
               />
               <UButton
-                label="Edit"
+                :label="t('common.edit')"
                 color="neutral"
                 variant="ghost"
-                :aria-label="`Edit ${skill.name}`"
+                :aria-label="t('skill.editName', { name: skill.name })"
                 @click="edit(skill)"
               />
             </li>
           </ul>
           <p class="text-xs text-muted">
-            Changes apply to the next response. Saved skills stay on this device and are not synced.
+            {{ t('skill.persistence') }}
           </p>
 
           <div v-if="desktop" class="space-y-3 border-t border-default pt-5">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <USwitch
                 :model-value="settings.loadLocal"
-                label="Load .agents/skills"
+                :label="t('skill.loadLocal')"
                 @update:model-value="persist({ ...settings, loadLocal: $event })"
               />
               <UButton
-                label="Refresh files"
+                :label="t('skill.refresh')"
                 icon="i-lucide-refresh-cw"
                 color="neutral"
                 variant="ghost"
@@ -316,8 +319,7 @@ function toggleFile(path: string, enabled: boolean) {
               />
             </div>
             <p class="text-xs text-muted">
-              The app reads its launch directory and your home directory. Saved skills take priority, then
-              launch-directory files.
+              {{ t('skill.localHelp') }}
             </p>
             <p v-for="root in roots" :key="root" class="text-xs text-muted break-all">
               {{ root }}
@@ -325,17 +327,17 @@ function toggleFile(path: string, enabled: boolean) {
             <UAlert
               v-if="fileError"
               color="error"
-              title="Could not load local skills"
+              :title="t('skill.localFailed')"
               :description="fileError"
             />
             <p v-else-if="!loading && !files.length" class="text-sm text-muted">
-              No local SKILL.md files found. Add &lt;name&gt;/SKILL.md inside .agents/skills, then refresh.
+              {{ t('skill.localEmpty') }}
             </p>
             <ul v-else class="divide-y divide-default rounded-lg border border-default">
               <li v-for="file in files" :key="file.path" class="flex items-center gap-3 p-3">
                 <div class="min-w-0 flex-1">
                   <p class="truncate text-sm font-medium">
-                    {{ file.definition?.name ?? 'Invalid skill file' }}
+                    {{ file.definition?.name ?? t('skill.invalidFile') }}
                   </p>
                   <p class="truncate text-xs text-muted" :title="file.path">
                     {{ file.path }}
@@ -347,21 +349,21 @@ function toggleFile(path: string, enabled: boolean) {
                     v-else-if="settings.skills.some((skill) => skill.enabled && skill.name === file.definition?.name)"
                     class="text-xs text-muted"
                   >
-                    A saved skill with this name takes priority.
+                    {{ t('skill.priority') }}
                   </p>
                 </div>
                 <USwitch
                   :model-value="!settings.disabledFiles.includes(file.path)"
                   :disabled="!settings.loadLocal"
-                  :aria-label="`Enable file ${file.path}`"
+                  :aria-label="t('skill.enableFile', { path: file.path })"
                   @update:model-value="toggleFile(file.path, $event)"
                 />
                 <UButton
-                  label="View"
+                  :label="t('common.view')"
                   color="neutral"
                   variant="ghost"
                   :disabled="!file.definition"
-                  :aria-label="`View ${file.definition?.name ?? file.path}`"
+                  :aria-label="t('skill.viewName', { name: file.definition?.name ?? file.path })"
                   @click="edit(undefined, file)"
                 />
               </li>
@@ -378,7 +380,7 @@ function toggleFile(path: string, enabled: boolean) {
       <div class="flex items-center justify-between gap-3 w-full">
         <UButton
           v-if="editing && originalName && !selectedFile"
-          label="Delete skill"
+          :label="t('skill.delete')"
           icon="i-lucide-trash-2"
           color="error"
           variant="ghost"
@@ -386,19 +388,19 @@ function toggleFile(path: string, enabled: boolean) {
         />
         <span v-else class="text-xs text-muted">{{
           editing && selectedFile
-            ? 'Edit this file in your text editor.'
-            : 'Enabled skills are available in every chat.'
+            ? t('skill.editInEditor')
+            : t('skill.available')
         }}</span>
         <div class="flex gap-2">
           <UButton
-            :label="editing && !selectedFile ? 'Cancel' : 'Done'"
+            :label="editing && !selectedFile ? t('common.cancel') : t('common.done')"
             color="neutral"
             variant="ghost"
             @click="editing ? (editing = false) : (open = false)"
           />
           <UButton
             v-if="editing && !selectedFile"
-            label="Save skill"
+            :label="t('skill.save')"
             type="submit"
             form="skill-editor"
           />

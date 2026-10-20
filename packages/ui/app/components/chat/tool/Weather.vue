@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { t } = useLocale()
+
 const props = defineProps<{
   invocation: WeatherUIToolInvocation
 }>()
@@ -25,9 +27,9 @@ const icon = computed(() => {
 const message = computed(() => {
   return (
     {
-      'input-available': 'Loading weather data...',
-      'output-error': "Can't get weather data, please try again later"
-    }[props.invocation.state as string] || 'Loading weather data...'
+      'input-available': t('weather.loading'),
+      'output-error': t('weather.failed')
+    }[props.invocation.state as string] || t('weather.loading')
   )
 })
 </script>
@@ -45,7 +47,7 @@ const message = computed(() => {
             {{ invocation.output.location }}
           </div>
           <div class="text-xs text-white/70">
-            H:{{ invocation.output.temperatureHigh }}° L:{{ invocation.output.temperatureLow }}°
+            {{ t('weather.range', { high: invocation.output.temperatureHigh, low: invocation.output.temperatureLow }) }}
           </div>
         </div>
       </div>
@@ -89,7 +91,7 @@ const message = computed(() => {
       </div>
 
       <div v-else class="flex items-center justify-center py-3">
-        <div class="text-xs">No forecast available</div>
+        <div class="text-xs">{{ t('weather.noForecast') }}</div>
       </div>
     </template>
 

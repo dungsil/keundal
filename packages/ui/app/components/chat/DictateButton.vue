@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { t } = useLocale()
+
 defineProps<{
   disabled?: boolean
 }>()
@@ -44,13 +46,13 @@ watch(error, (value) => {
 })
 
 const tooltip = computed(() => {
-  if (!supported.value) return 'Dictation is not supported in this browser'
-  return 'Dictate'
+  if (!supported.value) return t('dictation.unsupported')
+  return t('dictation.dictate')
 })
 
 function fail(cause: Error) {
   toast.add({
-    title: 'Dictation failed',
+    title: t('dictation.failed'),
     description: cause.message,
     icon: 'i-lucide-alert-circle',
     color: 'error'
@@ -108,7 +110,7 @@ onBeforeUnmount(() => {
         color="neutral"
         variant="subtle"
         size="sm"
-        aria-label="Cancel dictation"
+        :aria-label="t('dictation.cancel')"
         @click="cancel()"
       />
       <UButton
@@ -116,7 +118,7 @@ onBeforeUnmount(() => {
         color="neutral"
         size="sm"
         :loading="finalizing"
-        aria-label="Finish dictation"
+        :aria-label="t('dictation.finish')"
         @click="finish"
       />
     </template>
@@ -128,7 +130,7 @@ onBeforeUnmount(() => {
         variant="ghost"
         size="sm"
         :disabled="disabled"
-        aria-label="Dictate"
+        :aria-label="t('dictation.dictate')"
         @click="record"
       />
     </UTooltip>

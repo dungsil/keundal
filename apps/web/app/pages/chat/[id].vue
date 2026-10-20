@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { ChatMessage } from '../../../shared/utils/chat-message'
 
+const { t } = useLocale()
+
 const route = useRoute()
 const toast = useToast()
 const { model } = useModels()
@@ -56,6 +58,7 @@ const { messages, status, error, sendMessage, regenerate, stop } = useKeundalCha
     }
 
     toast.add({
+      title: t('error.response'),
       description: message,
       icon: 'i-lucide-alert-circle',
       color: 'error',
@@ -89,7 +92,7 @@ async function saveEdit(message: ChatMessage, text: string) {
   try {
     await $chatStore.truncate(data.value!.id, message.id, 'edit')
   } catch {
-    toast.add({ description: 'Failed to save edit.', icon: 'i-lucide-alert-circle', color: 'error' })
+    toast.add({ description: t('chat.editFailed'), icon: 'i-lucide-alert-circle', color: 'error' })
     return
   }
 
@@ -101,7 +104,7 @@ async function regenerateMessage(message: ChatMessage) {
   try {
     await $chatStore.truncate(data.value!.id, message.id, 'regenerate')
   } catch {
-    toast.add({ description: 'Failed to regenerate.', icon: 'i-lucide-alert-circle', color: 'error' })
+    toast.add({ description: t('chat.regenerateFailed'), icon: 'i-lucide-alert-circle', color: 'error' })
     return
   }
 
@@ -131,7 +134,7 @@ async function vote(message: ChatMessage, isUpvoted: boolean) {
   } catch {
     votes.value = snapshot
     toast.add({
-      description: 'Failed to save vote',
+      description: t('chat.voteFailed'),
       icon: 'i-lucide-alert-circle',
       color: 'error'
     })
@@ -195,7 +198,7 @@ onBeforeUnmount(() => {
               <div class="flex items-center gap-1.5">
                 <ChatIndicator />
 
-                <UChatShimmer text="Thinking..." class="text-sm" />
+                <UChatShimmer :text="t('chat.thinking')" class="text-sm" />
               </div>
             </template>
 
@@ -203,7 +206,7 @@ onBeforeUnmount(() => {
               <ChatFilePreview
                 v-for="(part, index) in parts"
                 :key="`${message.id}-${index}`"
-                :name="part.filename || 'Attachment'"
+                :name="part.filename || t('chat.attachment')"
                 :type="part.mediaType"
                 :preview-url="part.url"
                 size="3xl"
@@ -252,6 +255,6 @@ onBeforeUnmount(() => {
   </UDashboardPanel>
 
   <UContainer v-else class="flex-1 flex flex-col gap-4 sm:gap-6">
-    <UError :error="{ statusMessage: 'Chat not found', statusCode: 404 }" class="min-h-full" />
+    <UError :error="{ statusMessage: t('chat.notFound'), statusCode: 404 }" class="min-h-full" />
   </UContainer>
 </template>

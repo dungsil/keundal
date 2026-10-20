@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
+const { t } = useLocale()
+
 const props = defineProps<{
   open: () => void
 }>()
@@ -23,7 +25,7 @@ defineShortcuts({
 const items = computed<DropdownMenuItem[][]>(() => [
   [
     {
-      label: 'Add files or photos',
+      label: t('prompt.files'),
       icon: 'i-lucide-paperclip',
       kbds: ['meta', 'U'],
       onSelect: () => props.open()
@@ -31,19 +33,19 @@ const items = computed<DropdownMenuItem[][]>(() => [
   ],
   [
     {
-      label: 'Web search',
+      label: t('prompt.search'),
       icon: 'i-lucide-globe',
       type: 'checkbox',
       checked: webSearch.value && supportsWebSearch.value,
       disabled: !supportsWebSearch.value,
-      description: supportsWebSearch.value ? undefined : 'Not available with this model',
+      description: supportsWebSearch.value ? undefined : t('prompt.unsupported'),
       onUpdateChecked: (checked: boolean) => {
         webSearch.value = checked
       },
       onSelect: (e: Event) => e.preventDefault()
     },
     {
-      label: 'Extended thinking',
+      label: t('prompt.reasoning'),
       icon: 'i-lucide-brain',
       type: 'checkbox',
       checked: reasoning.value,
@@ -68,7 +70,7 @@ const items = computed<DropdownMenuItem[][]>(() => [
       color="neutral"
       variant="ghost"
       size="sm"
-      aria-label="Open prompt menu"
+      :aria-label="t('prompt.menu')"
       class="data-[state=open]:bg-elevated"
     />
   </UDropdownMenu>
