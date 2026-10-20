@@ -19,10 +19,16 @@ export class AnthropicLLMService extends LLMService {
     super(ctx)
     const parsed = parseConfig(config)
     this.models = parsed.models
+    const noAuth = parsed.apiKey === ''
     this.client = new Anthropic({
       apiKey: parsed.apiKey,
       baseURL: parsed.baseURL,
-      defaultHeaders: parsed.headers,
+      // Explicit empty keys opt out of SDK authentication, including environment defaults.
+      ...(noAuth ? { authToken: null } : {}),
+      defaultHeaders: {
+        ...(noAuth ? { 'x-api-key': null, authorization: null } : {}),
+        ...parsed.headers
+      },
       dangerouslyAllowBrowser: parsed.dangerouslyAllowBrowser,
       maxRetries: 0
     })

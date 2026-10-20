@@ -20,10 +20,14 @@ export class OpenAILLMService extends LLMService {
     super(ctx)
     const parsed = parseConfig(config)
     this.models = parsed.models
+    const noAuth = parsed.apiKey === ''
     this.client = new OpenAI({
-      apiKey: parsed.apiKey,
+      // The SDK requires a key; null headers below omit the sentinel from requests.
+      apiKey: noAuth ? 'keundal-no-auth' : parsed.apiKey,
       baseURL: parsed.baseURL,
-      defaultHeaders: parsed.headers,
+      // Explicit empty keys opt out of SDK authentication, including environment defaults.
+      ...(noAuth ? { adminAPIKey: null } : {}),
+      defaultHeaders: { ...(noAuth ? { authorization: null, 'api-key': null } : {}), ...parsed.headers },
       dangerouslyAllowBrowser: parsed.dangerouslyAllowBrowser,
       maxRetries: 0
     })

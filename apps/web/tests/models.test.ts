@@ -151,3 +151,27 @@ test('취소한 모델 조회는 결과를 캐시하지 않는다', async () => 
   await cancelled
   expect(values.size).toBe(0)
 })
+
+test.each(['openai', 'anthropic', 'google'] as const)('%s 모델 목록은 빈 API 키일 때 기본 인증을 생략하고 커스텀 인증과 캐시 전환을 지원한다', async (provider) => {
+  const { settings, storage, requests } = await fixture((_req, res) => {
+    res.end(JSON.stringify(provider === 'google'
+      ? { models: [{ name: 'models/local', supportedGenerationMethods: ['generateContent'] }] }
+      : { data: [{ id: 'local' }] }))
+  })
+  settings[provider].apiKey = ''
+  expect((await loadModels(provider, settings, storage))[0]!.value).toBe(`${provider}/local`)
+  expect(requests).toHaveLength(1)
+  for (const header of ['authorization', 'x-api-key', 'x-goog-api-key']) expect(requests[0]!.headers[header]).toBeUndefined()
+  await loadModels(provider, settings, storage)
+  expect(requests).toHaveLength(1)
+  settings[provider].apiKey = 'new-key'
+  await loadModels(provider, settings, storage)
+  expect(requests).toHaveLength(2)
+  settings[provider].apiKey = ''
+  settings[provider].headers = { Authorization: 'Bearer gateway-token' }
+  await loadModels(provider, settings, storage)
+  expect(requests).toHaveLength(3)
+  expect(requests[2]!.headers.authorization).toBe('Bearer gateway-token')
+  expect(requests[2]!.headers['x-api-key']).toBeUndefined()
+  expect(requests[2]!.headers['x-goog-api-key']).toBeUndefined()
+})

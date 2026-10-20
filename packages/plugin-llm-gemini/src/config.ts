@@ -16,10 +16,14 @@ export function parseConfig(value: unknown): GeminiLLMConfig {
   if (!isRecord(value) || !isRecord(value.models) || !Object.keys(value.models).length) {
     throw new Error('at least one model with contextWindow and maxOutputTokens is required')
   }
-  for (const key of ['apiKey', 'baseURL']) {
-    if (value[key] !== undefined && (typeof value[key] !== 'string' || !value[key].trim())) {
-      throw new Error(`${key} must be a non-empty string`)
-    }
+  if (
+    value.apiKey !== undefined &&
+    (typeof value.apiKey !== 'string' || (value.apiKey !== '' && !value.apiKey.trim()))
+  ) {
+    throw new Error('apiKey must be empty or a non-blank string')
+  }
+  if (value.baseURL !== undefined && (typeof value.baseURL !== 'string' || !value.baseURL.trim())) {
+    throw new Error('baseURL must be a non-empty string')
   }
   if (
     value.headers !== undefined &&
