@@ -491,3 +491,47 @@ test('허용하지 않은 origin의 preflight는 403으로 거부한다', async 
   expect(response.status).toBe(403)
   expect(response.headers.get('access-control-allow-origin')).toBeNull()
 })
+
+test('SSE 연결을 중단하면 호스트 실행에 취소 신호를 전달한다', async (t) => {
+  const { base, services } = await setup(t)
+  let signal: AbortSignal | undefined
+  services.run = async function* (request, options) {
+    signal = options?.signal
+    yield { type: EventType.RUN_STARTED, threadId: request.threadId, runId: request.runId }
+    await new Promise<void>((resolve) => signal!.addEventListener('abort', () => resolve(), { once: true }))
+  }
+  const abort = new AbortController()
+  const response = await fetch(`${base}/runs`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+    signal: abort.signal
+  })
+  const reader = response.body!.getReader()
+  await reader.read()
+  abort.abort()
+  await expect.poll(() => signal?.aborted).toBe(true)
+  reader.releaseLock()
+})
+
+test('제목 요청 연결을 중단하면 공급자 호출에 취소 신호를 전달한다', async (t) => {
+  const { base, services } = await setup(t)
+  let signal: AbortSignal | undefined
+  services.title = async (_request, options) => {
+    signal = options?.signal
+    await new Promise<void>((resolve) => signal!.addEventListener('abort', () => resolve(), { once: true }))
+    signal!.throwIfAborted()
+    return ''
+  }
+  const abort = new AbortController()
+  const request = fetch(`${base}/title`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'test', message: input.messages[0] }),
+    signal: abort.signal
+  }).catch(() => undefined)
+  await expect.poll(() => signal).toBeDefined()
+  abort.abort()
+  await expect.poll(() => signal?.aborted).toBe(true)
+  await request
+})

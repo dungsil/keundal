@@ -160,9 +160,12 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
           return sendJson(response, 400, { error: `unknown model: ${requested}` })
         }
         const input = parseRunAgentInput(JSON.parse(await readBody(request, maxRequestBodyBytes)))
+        const abort = new AbortController()
+        const disconnect = () => abort.abort()
+        response.once('close', disconnect)
         response.writeHead(200, SSE_HEADERS)
         try {
-          for await (const raw of services.run(input, requested === undefined ? {} : { model: requested })) {
+          for await (const raw of services.run(input, { model: requested, signal: abort.signal })) {
             const event = parseAGUIEvent(raw)
             response.write(sseEvent(event))
             if (event.type === EventType.RUN_FINISHED || event.type === EventType.RUN_ERROR) break
@@ -178,6 +181,7 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
             )
           }
         } finally {
+          response.off('close', disconnect)
           response.end()
         }
         return
@@ -188,7 +192,14 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
         if (!models().some((model) => model.id === requestBody.model)) {
           return sendJson(response, 400, { error: `unknown model: ${requestBody.model}` })
         }
-        return sendJson(response, 200, { title: await services.title(requestBody) })
+        const abort = new AbortController()
+        const disconnect = () => abort.abort()
+        response.once('close', disconnect)
+        try {
+          return sendJson(response, 200, { title: await services.title(requestBody, { signal: abort.signal }) })
+        } finally {
+          response.off('close', disconnect)
+        }
       }
 
       if (request.method === 'GET' && segments[0] === 'threads') {

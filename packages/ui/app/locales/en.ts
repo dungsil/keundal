@@ -83,6 +83,7 @@ export default {
   'model.cache':
     "Provider models are cached in this browser for 1 hour. Listed models must support this app's text, tools and token-counting APIs.",
   'model.loadFailed': 'Could not load models',
+  'model.switchFailed': 'Could not switch the local model. Check LLM settings and try again.',
   'llm.title': 'LLM settings',
   'llm.provider': 'Provider',
   'llm.apiKey': 'API key',
@@ -101,8 +102,7 @@ export default {
   'llm.removed': 'Provider settings removed',
   'llm.savedOS': 'Settings saved in OS secret store',
   'llm.savedBrowser': 'Settings saved in this browser',
-  'llm.saveFailedOS':
-    'Could not save settings. Unlock your OS secret store and check its availability and size limits. No browser storage fallback is used.',
+  'llm.saveFailedOS': 'Could not save or apply settings. Check your OS secret store and local host, then try again.',
   'llm.saveFailedBrowser': 'Could not save settings. Check that browser storage is available.',
   'llm.descriptionOS': 'Your settings are saved in your OS secret store. Requests go directly to the provider.',
   'llm.descriptionBrowser': 'Your keys stay in this browser. Requests go directly to the provider.',

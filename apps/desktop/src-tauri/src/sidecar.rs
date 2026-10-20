@@ -18,6 +18,33 @@ struct Sidecar {
     endpoint: String,
     token: String,
     child: Child,
+    selection: Option<Selection>,
+}
+
+#[derive(Clone, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Selection {
+    provider: String,
+    model: String,
+    context_window: u32,
+    max_output_tokens: u32,
+}
+
+impl Selection {
+    fn validate(&self) -> Result<(), String> {
+        if !matches!(self.provider.as_str(), "openai" | "anthropic" | "google")
+            || self.model.trim().is_empty()
+            || self.model.len() > 1024
+            || self.model.chars().any(char::is_control)
+            || self.context_window > 128_000
+            || self.max_output_tokens == 0
+            || self.max_output_tokens > 4096
+            || self.max_output_tokens >= self.context_window
+        {
+            return Err("Invalid model selection".to_string());
+        }
+        Ok(())
+    }
 }
 
 impl SidecarState {
@@ -70,19 +97,45 @@ struct Provider {
     headers: Option<HashMap<String, String>>,
 }
 
-fn provider(settings: LlmSettings) -> Option<Provider> {
+fn provider(settings: LlmSettings, selected: Option<&Selection>) -> Provider {
+    if let Some(selected) = selected {
+        let (name, value) = match selected.provider.as_str() {
+            "openai" => ("openai", settings.openai),
+            "anthropic" => ("anthropic", settings.anthropic),
+            _ => ("gemini", settings.google),
+        };
+        return Provider {
+            name,
+            api_key: value.api_key,
+            base_url: value.base_url,
+            headers: value.headers,
+        };
+    }
     [
         ("openai", settings.openai),
         ("anthropic", settings.anthropic),
         ("gemini", settings.google),
     ]
     .into_iter()
-    .find(|(_, value)| !value.api_key.trim().is_empty())
+    .find(|(_, value)| {
+        !value.api_key.trim().is_empty()
+            || !value.base_url.trim().is_empty()
+            || value
+                .headers
+                .as_ref()
+                .is_some_and(|headers| !headers.is_empty())
+    })
     .map(|(name, value)| Provider {
         name,
         api_key: value.api_key,
         base_url: value.base_url,
         headers: value.headers,
+    })
+    .unwrap_or(Provider {
+        name: "openai",
+        api_key: String::new(),
+        base_url: String::new(),
+        headers: None,
     })
 }
 
@@ -106,7 +159,10 @@ fn sidecar_command() -> Result<(PathBuf, Vec<String>), String> {
             .join("../dist-sidecar/main.js")
             .canonicalize()
             .map_err(|_| "Build the desktop sidecar before starting the app".to_string())?;
-        return Ok((PathBuf::from("node"), vec![entry.to_string_lossy().into_owned()]));
+        return Ok((
+            PathBuf::from("node"),
+            vec![entry.to_string_lossy().into_owned()],
+        ));
     }
 
     let current = std::env::current_exe()
@@ -130,7 +186,10 @@ fn resource_entry(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .map_err(|_| "Could not locate the sidecar resources".to_string())
 }
 
-fn start(app: &tauri::AppHandle) -> Result<Sidecar, String> {
+fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar, String> {
+    if let Some(selected) = selection.as_ref() {
+        selected.validate()?;
+    }
     let saved = settings::load_llm_settings_json()?;
     let parsed: LlmSettings = saved
         .as_deref()
@@ -138,8 +197,7 @@ fn start(app: &tauri::AppHandle) -> Result<Sidecar, String> {
         .transpose()
         .map_err(|_| "Stored LLM settings are invalid".to_string())?
         .unwrap_or_default();
-    let provider = provider(parsed)
-        .ok_or_else(|| "Add an LLM API key in LLM settings before starting the local host".to_string())?;
+    let provider = provider(parsed, selection.as_ref());
 
     let (binary, mut args) = sidecar_command()?;
     if !cfg!(debug_assertions) {
@@ -154,9 +212,11 @@ fn start(app: &tauri::AppHandle) -> Result<Sidecar, String> {
     command
         .args(&args)
         .env("KEUNDAL_SIDECAR", "1")
+        .env("KEUNDAL_HOST", "127.0.0.1")
+        .env("PORT", "0")
         .env("KEUNDAL_PARENT_PID", std::process::id().to_string())
         .env("KEUNDAL_API_TOKEN", &token)
-        .env("KEUNDAL_MODEL", model_for(provider.name))
+        .env("KEUNDAL_MODEL", selection.as_ref().map(|value| value.model.clone()).unwrap_or_else(|| model_for(provider.name)))
         .env("KEUNDAL_PROVIDER", provider.name)
         .env(
             "KEUNDAL_CORS_ORIGINS",
@@ -164,21 +224,28 @@ fn start(app: &tauri::AppHandle) -> Result<Sidecar, String> {
         )
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
+    if let Some(selected) = selection.as_ref() {
+        command.env(
+            "KEUNDAL_CONTEXT_WINDOW",
+            selected.context_window.to_string(),
+        );
+        command.env(
+            "KEUNDAL_MAX_OUTPUT_TOKENS",
+            selected.max_output_tokens.to_string(),
+        );
+    }
+    for key in ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"] {
+        command.env_remove(key);
+    }
     match provider.name {
         "openai" => command.env("OPENAI_API_KEY", &provider.api_key),
         "anthropic" => command.env("ANTHROPIC_API_KEY", &provider.api_key),
         _ => command.env("GEMINI_API_KEY", &provider.api_key),
     };
-    if !provider.base_url.trim().is_empty() {
-        command.env("KEUNDAL_BASE_URL", &provider.base_url);
-    }
-    if let Some(headers) = provider.headers {
-        if !headers.is_empty() {
-            let value = serde_json::to_string(&headers)
-                .map_err(|_| "Could not encode request headers".to_string())?;
-            command.env("KEUNDAL_HEADERS", value);
-        }
-    }
+    command.env("KEUNDAL_BASE_URL", &provider.base_url);
+    let headers = serde_json::to_string(&provider.headers.unwrap_or_default())
+        .map_err(|_| "Could not encode request headers".to_string())?;
+    command.env("KEUNDAL_HEADERS", headers);
     if let Ok(data) = app.path().app_data_dir() {
         std::fs::create_dir_all(&data).ok();
         command.env("KEUNDAL_SQLITE_PATH", data.join("keundal.sqlite"));
@@ -199,7 +266,9 @@ fn start(app: &tauri::AppHandle) -> Result<Sidecar, String> {
             line.clear();
             match reader.read_line(&mut line) {
                 Ok(0) => {
-                    let _ = sender.send(Err("The local Keundal host stopped before it was ready".to_string()));
+                    let _ = sender.send(Err(
+                        "The local Keundal host stopped before it was ready".to_string()
+                    ));
                     return;
                 }
                 Ok(_) => {
@@ -209,7 +278,10 @@ fn start(app: &tauri::AppHandle) -> Result<Sidecar, String> {
                                 let _ = sender.send(Ok(ready));
                             }
                             Err(_) => {
-                                let _ = sender.send(Err("The local Keundal host returned an invalid ready message".to_string()));
+                                let _ = sender.send(Err(
+                                    "The local Keundal host returned an invalid ready message"
+                                        .to_string(),
+                                ));
                                 return;
                             }
                         }
@@ -221,7 +293,9 @@ fn start(app: &tauri::AppHandle) -> Result<Sidecar, String> {
                     eprintln!("[keundal-host] {line}");
                 }
                 Err(_) => {
-                    let _ = sender.send(Err("Could not read the local Keundal host output".to_string()));
+                    let _ = sender.send(Err(
+                        "Could not read the local Keundal host output".to_string()
+                    ));
                     return;
                 }
             }
@@ -233,13 +307,16 @@ fn start(app: &tauri::AppHandle) -> Result<Sidecar, String> {
             endpoint: ready.url,
             token,
             child,
+            selection,
         }),
         Ok(Err(error)) => {
             let _ = child.kill();
+            let _ = child.wait();
             Err(error)
         }
         Err(_) => {
             let _ = child.kill();
+            let _ = child.wait();
             Err("The local Keundal host did not become ready".to_string())
         }
     }
@@ -248,21 +325,83 @@ fn start(app: &tauri::AppHandle) -> Result<Sidecar, String> {
 #[tauri::command]
 pub async fn sidecar_info(
     app: tauri::AppHandle,
-    state: tauri::State<'_, SidecarState>,
+    selection: Option<Selection>,
+    restart: Option<bool>,
 ) -> Result<SidecarInfo, String> {
-    if let Some(sidecar) = state.0.lock().map_err(|_| "Sidecar state is poisoned".to_string())?.as_ref() {
-        return Ok(SidecarInfo {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<SidecarState>();
+        let mut current = state
+            .0
+            .lock()
+            .map_err(|_| "Sidecar state is poisoned".to_string())?;
+        if let Some(sidecar) = current.as_mut() {
+            if !restart.unwrap_or(false)
+                && sidecar.selection == selection
+                && matches!(sidecar.child.try_wait(), Ok(None))
+            {
+                return Ok(SidecarInfo {
+                    endpoint: sidecar.endpoint.clone(),
+                    token: sidecar.token.clone(),
+                });
+            }
+        }
+        // Keep the previous process and connection usable if replacement startup fails.
+        let sidecar = start(&app, selection)?;
+        let info = SidecarInfo {
             endpoint: sidecar.endpoint.clone(),
             token: sidecar.token.clone(),
-        });
+        };
+        *current = Some(sidecar);
+        Ok(info)
+    })
+    .await
+    .map_err(|_| "Could not start the local Keundal host".to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selection_uses_the_requested_provider_even_without_a_key() {
+        let selected = Selection {
+            provider: "google".into(),
+            model: "custom-model".into(),
+            context_window: 8000,
+            max_output_tokens: 1000,
+        };
+        assert!(selected.validate().is_ok());
+        let settings = LlmSettings {
+            openai: ProviderSettings {
+                api_key: "other-key".into(),
+                ..Default::default()
+            },
+            google: ProviderSettings {
+                base_url: "http://localhost:9000".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let chosen = provider(settings, Some(&selected));
+        assert_eq!(chosen.name, "gemini");
+        assert_eq!(chosen.api_key, "");
+        assert_eq!(chosen.base_url, "http://localhost:9000");
     }
-    let sidecar = tauri::async_runtime::spawn_blocking(move || start(&app))
-        .await
-        .map_err(|_| "Could not start the local Keundal host".to_string())??;
-    let info = SidecarInfo {
-        endpoint: sidecar.endpoint.clone(),
-        token: sidecar.token.clone(),
-    };
-    *state.0.lock().map_err(|_| "Sidecar state is poisoned".to_string())? = Some(sidecar);
-    Ok(info)
+
+    #[test]
+    fn selection_rejects_unknown_providers_and_invalid_budgets() {
+        let mut selected = Selection {
+            provider: "unknown".into(),
+            model: "custom-model".into(),
+            context_window: 8000,
+            max_output_tokens: 1000,
+        };
+        assert!(selected.validate().is_err());
+        selected.provider = "openai".into();
+        selected.max_output_tokens = selected.context_window;
+        assert!(selected.validate().is_err());
+        selected.max_output_tokens = 1000;
+        selected.model = "\n".into();
+        assert!(selected.validate().is_err());
+    }
 }
