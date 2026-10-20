@@ -180,8 +180,8 @@ catalogs:
       specifier: 24.13.6
       version: 24.13.6
     cordis:
-      specifier: 4.0.0-rc.10
-      version: 4.0.0-rc.10
+      specifier: 4.0.0-rc.11
+      version: 4.0.0-rc.11
     openai:
       specifier: 7.15.0
       version: 7.15.0
@@ -326,7 +326,7 @@ importers:
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
       date-fns:
         specifier: ^4.4.0
         version: 4.4.0
@@ -408,7 +408,7 @@ importers:
         version: link:../../packages/plugin-store-sqlite
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -442,7 +442,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/plugin-skill':
         specifier: workspace:*
@@ -494,7 +494,7 @@ importers:
         version: link:../plugin-store-sqlite
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/plugin-store-memory':
         specifier: workspace:*
@@ -534,7 +534,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/plugin-store-memory':
         specifier: workspace:*
@@ -596,7 +596,7 @@ importers:
         version: link:../fs
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/plugin-fs-local':
         specifier: workspace:*
@@ -633,7 +633,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -664,7 +664,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -711,7 +711,7 @@ importers:
         version: 24.13.6
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
       tsdown:
         specifier: 'catalog:'
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
@@ -732,7 +732,7 @@ importers:
         version: link:../fs
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -763,7 +763,7 @@ importers:
         version: link:../fs
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/plugin-fs-local':
         specifier: workspace:*
@@ -800,7 +800,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -837,7 +837,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -877,7 +877,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
       openai:
         specifier: 'catalog:'
         version: 7.15.0(undici@8.12.1)(ws@8.21.3)(zod@4.6.7)
@@ -917,7 +917,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -945,7 +945,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -973,7 +973,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
       yaml:
         specifier: 2.9.1
         version: 2.9.1
@@ -1010,7 +1010,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/store-conformance':
         specifier: workspace:*
@@ -1044,7 +1044,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/store-conformance':
         specifier: workspace:*
@@ -1078,7 +1078,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/store-conformance':
         specifier: workspace:*
@@ -1109,7 +1109,7 @@ importers:
         version: link:../fs
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/agent':
         specifier: workspace:*
@@ -1152,7 +1152,7 @@ importers:
         version: link:../plugin-shell-local
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/agent':
         specifier: workspace:*
@@ -1186,7 +1186,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.10
+        version: 4.0.0-rc.11
       openai:
         specifier: 'catalog:'
         version: 7.15.0(undici@8.12.1)(ws@8.21.3)(zod@4.6.7)
@@ -4997,12 +4997,12 @@ packages:
     resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
     engines: {node: '>=18'}
 
-  cordis@4.0.0-rc.10:
-    resolution: {integrity: sha512-xG90nPNQxR272cC4lR/m5LHevegIJvdddQBlKdEAdGz3n+zgH5lsgkg8o9fc2P3T/f+pO5D7FN1HZvkNBiABnw==}
+  cordis@4.0.0-rc.11:
+    resolution: {integrity: sha512-03PHbcYJzp84XRKnW7jd17g26bPvG5UvSyhyjxGIu/1VQs3bweNMACo3t1W0ikzoZ7q+wytHyk8jJsaIQOkPkA==}
     hasBin: true
     peerDependencies:
-      '@cordisjs/plugin-include': ^1.1.0
-      '@cordisjs/plugin-loader': ^1.0.0-rc.7
+      '@cordisjs/plugin-include': ^1.1.1
+      '@cordisjs/plugin-loader': ^1.0.0-rc.8
     peerDependenciesMeta:
       '@cordisjs/plugin-include':
         optional: true
@@ -12769,7 +12769,7 @@ snapshots:
 
   cookie@1.1.1: {}
 
-  cordis@4.0.0-rc.10:
+  cordis@4.0.0-rc.11:
     dependencies:
       '@standard-schema/spec': 1.1.0
       cosmokit: 1.8.1
