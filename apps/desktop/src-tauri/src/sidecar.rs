@@ -103,9 +103,9 @@ fn sidecar_command() -> Result<(PathBuf, Vec<String>), String> {
     if cfg!(debug_assertions) {
         let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let entry = manifest
-            .join("../../server/dist/main.js")
+            .join("../dist-sidecar/main.js")
             .canonicalize()
-            .map_err(|_| "Build @keundal/server before starting the desktop app".to_string())?;
+            .map_err(|_| "Build the desktop sidecar before starting the app".to_string())?;
         return Ok((PathBuf::from("node"), vec![entry.to_string_lossy().into_owned()]));
     }
 

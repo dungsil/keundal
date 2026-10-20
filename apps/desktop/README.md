@@ -78,7 +78,7 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 
 ## 로컬 호스트
 
-데스크톱은 Tauri 창과 함께 Node.js 호스트를 sidecar 프로세스로 실행합니다. 호스트는 `apps/server`의 sidecar 모드를 사용하며 SQLite 파일을 앱 데이터 디렉터리에 저장합니다.
+데스크톱은 Tauri 창과 함께 Node.js 호스트를 sidecar 프로세스로 실행합니다. 호스트 진입점인 `sidecar/main.ts`는 `@keundal/agent-host/runtime`을 직접 사용하며 SQLite 파일을 앱 데이터 디렉터리에 저장합니다. 웹 서버를 실행하거나 웹 서버 번들을 복사하지 않습니다.
 
 - 앱은 OS 보안 저장소의 LLM 설정에서 API 키가 있는 첫 공급자를 고릅니다. 공급자 순서는 OpenAI, Anthropic, Google Gemini입니다.
 - 모델은 `KEUNDAL_MODEL` 환경 변수로 바꿀 수 있습니다. 없으면 공급자별 기본 모델을 사용합니다.
@@ -86,7 +86,7 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 - 웹 UI는 호스트의 `/models`와 `/threads`를 사용합니다. API 키 설정은 호스트 시작 시에만 반영되므로 공급자를 바꾼 뒤 앱을 다시 시작합니다.
 - 호스트가 시작하지 못하면 웹 UI는 브라우저 저장소 모드로 돌아갑니다.
 
-`pnpm --filter @keundal/desktop dev`와 `bundle`은 `prepare:sidecar` 명령으로 `@keundal/server`를 먼저 빌드합니다. 이어서 `scripts/prepare-sidecar.mjs`가 현재 Node.js 실행 파일을 `src-tauri/binaries/keundal-host-<triple>`로 복사하고, 서버 번들을 `src-tauri/sidecar`에 복사합니다. 설치 파일에는 Node.js 런타임과 서버 번들이 포함되므로 앱 크기가 커집니다.
+`pnpm --filter @keundal/desktop dev`와 `bundle`은 `prepare:sidecar` 명령으로 데스크톱의 호스트 진입점을 `dist-sidecar`에 빌드합니다. 이어서 `scripts/prepare-sidecar.mjs`가 현재 Node.js 실행 파일을 `src-tauri/binaries/keundal-host-<triple>`로 복사하고, sidecar 번들을 `src-tauri/sidecar`에 복사합니다. 설치 파일에는 Node.js 런타임과 sidecar 번들이 포함되므로 앱 크기가 커집니다.
 
 ## 로컬 스킬
 

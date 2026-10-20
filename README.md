@@ -76,7 +76,7 @@ pnpm install
 pnpm --filter @keundal/web dev
 ```
 
-선택한 모델에 맞는 `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`를 `apps/web/.env`에 설정합니다. 받아쓰기는 별도로 OpenAI 키와 로그인이 필요합니다. `apps/server`·AI Gateway·D1·R2는 필요하지 않습니다. 로컬 대화는 계정/기기 간 동기화되지 않으며 공개 공유는 비활성화합니다. 저장소 교체 계약과 Cloudflare 배포 방법은 [웹 앱 문서](./apps/web/README.md)를 참고합니다.
+선택한 모델에 맞는 `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`를 `apps/web/.env`에 설정합니다. 받아쓰기는 별도로 OpenAI 키와 로그인이 필요합니다. AI Gateway·D1·R2는 필요하지 않습니다. Node.js에서는 웹 앱에 통합된 에이전트 API를 선택해 사용할 수 있습니다. 로컬 대화는 계정/기기 간 동기화되지 않으며 공개 공유는 비활성화합니다. 저장소 교체 계약과 Cloudflare 배포 방법은 [웹 앱 문서](./apps/web/README.md)를 참고합니다.
 
 ## 데스크톱 앱
 

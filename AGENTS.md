@@ -50,6 +50,10 @@
 
 다른 에이전트 구현은 `Agent`를 상속하고 `registerAgent()`에 구현 클래스를 넘깁니다. `@keundal/coding-agent`는 `Agent`를 상속해 코딩 작업용 시스템 지침을 넣고, `registerAgent()`로 같은 `ctx.agent` 서비스를 구성합니다. 도구 등록은 앱이 담당하며 이 패키지는 도구를 직접 등록하지 않습니다.
 
+## 앱의 호스트 실행
+
+`apps/web`의 Nitro API와 `apps/desktop`의 sidecar는 `@keundal/agent-host`를 직접 사용합니다. 공통 HTTP 계약은 `@keundal/agent-host/http`에 두고, 환경 변수로 호스트와 요청 리스너를 조립하는 기능은 `@keundal/agent-host/runtime`에 둡니다. 웹은 `/api/agent/**`에서 요청을 처리하고 Nitro 종료 때 호스트를 정리합니다. 데스크톱의 프로세스 진입점과 번들은 `apps/desktop/sidecar`와 `dist-sidecar`에 둡니다. 데스크톱 호스트는 웹 서버에 의존하지 않습니다.
+
 ## 개발과 검증
 
 Node.js와 pnpm 버전은 루트 `package.json`의 `devEngines`를 따릅니다.

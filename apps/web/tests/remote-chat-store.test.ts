@@ -10,10 +10,12 @@ import {
 } from '@keundal/core'
 import agentPlugin from '@keundal/agent'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
-import { createAgentApp, type AgentAppServices } from '@keundal/server'
+import { createAgentApp, type AgentAppServices } from '@keundal/agent-host/http'
 import { Context } from 'cordis'
+import { createApp, toNodeListener } from 'h3'
 import { onTestFinished, test, expect } from 'vitest'
 
+import { createAgentHandler } from '../server/agent/handler'
 import type { ChatMessage } from '../shared/utils/chat-message'
 import { RemoteChatStore } from '../shared/utils/remote-chat-store'
 
@@ -59,7 +61,9 @@ test('원격 저장소는 HTTP 호스트에서 대화·제목·투표·편집·�
     models: () => [{ id: 'gpt-5-nano', provider: 'openai', contextWindow: 128_000, maxOutputTokens: 4096 }],
     title: async () => '원격 제목'
   }
-  const server = createServer(createAgentApp(services, { token, allowedOrigins: ['http://localhost'] }))
+  const app = createApp()
+  app.use('/api/agent', createAgentHandler(async () => createAgentApp(services, { token })))
+  const server = createServer(toNodeListener(app))
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('server did not bind a port')
@@ -70,7 +74,9 @@ test('원격 저장소는 HTTP 호스트에서 대화·제목·투표·편집·�
     await llm.dispose()
   })
 
-  const chats = new RemoteChatStore({ endpoint: `http://127.0.0.1:${address.port}`, token })
+  const endpoint = `http://127.0.0.1:${address.port}/api/agent`
+  expect((await fetch(`${endpoint}/models`)).status).toBe(401)
+  const chats = new RemoteChatStore({ endpoint, token })
   await chats.create('chat', user, model)
   const events = await collect(chats.respond('chat', { model, messages: [user] }))
   expect(events.some(event => event.type === EventType.RUN_FINISHED)).toBe(true)
@@ -94,4 +100,21 @@ test('원격 저장소는 HTTP 호스트에서 대화·제목·투표·편집·�
   await chats.delete('chat')
   expect(await chats.get('chat')).toBeUndefined()
   expect(await chats.list()).toEqual([])
+})
+
+test('웹 API는 호스트 준비 실패를 503으로 알리고 내부 오류를 노출하지 않는다', async () => {
+  const app = createApp()
+  app.use('/api/agent', createAgentHandler(async () => {
+    throw new Error('private host configuration')
+  }))
+  const server = createServer(toNodeListener(app))
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  onTestFinished(async () => {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  })
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('server did not bind a port')
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/agent/models`)
+  expect(response.status).toBe(503)
+  expect(await response.text()).not.toContain('private host configuration')
 })

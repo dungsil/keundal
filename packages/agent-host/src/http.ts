@@ -3,7 +3,6 @@ import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http'
 import { URL } from 'node:url'
 
-import type { AgentHostModel, AgentHostRunOptions, AgentHostServices } from '@keundal/agent-host'
 import {
   EventType,
   parseAGUIEvent,
@@ -13,6 +12,8 @@ import {
   type RunAgentInput,
   type SessionCommit
 } from '@keundal/core'
+
+import type { AgentHostModel, AgentHostRunOptions, AgentHostServices } from './index.js'
 
 /** HTTP 계층이 접근하는 에이전트 표면입니다. `@keundal/agent-host`가 이 모양을 만듭니다. */
 export interface AgentAppServices extends Omit<AgentHostServices, 'run'> {

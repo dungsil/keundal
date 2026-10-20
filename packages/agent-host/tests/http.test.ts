@@ -1,10 +1,7 @@
-import { spawn, spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
 import { createServer, request as httpRequest } from 'node:http'
 import { connect } from 'node:net'
-import { networkInterfaces, tmpdir } from 'node:os'
-import { join } from 'node:path'
 
 import agentPlugin from '@keundal/agent'
 import {
@@ -19,8 +16,8 @@ import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { Context, type Fiber } from 'cordis'
 
 const fetch = globalThis.fetch
-import { createAgentApp, type AgentAppOptions, type AgentAppServices } from '@keundal/server'
-import { expect, onTestFinished, test, type TestContext } from 'vitest'
+import { createAgentApp, type AgentAppOptions, type AgentAppServices } from '@keundal/agent-host/http'
+import { expect, test, type TestContext } from 'vitest'
 
 const token = 'test-only-server-token'
 
@@ -246,77 +243,6 @@ test('GET 조회 경로와 404, recover를 노출한다', async (t) => {
   expect((recovered.json as { status: string }[]).map((run) => run.status)).toEqual(['completed'])
 })
 
-test('실행 파일은 토큰 누락·빈 토큰·빈 바인딩 주소에서 시작하지 않는다', () => {
-  for (const config of [
-    {},
-    { KEUNDAL_API_TOKEN: '' },
-    { KEUNDAL_API_TOKEN: ' ' },
-    { KEUNDAL_API_TOKEN: token, KEUNDAL_HOST: '' }
-  ]) {
-    const result = spawnSync(process.execPath, ['dist/main.js'], {
-      env: { PORT: '0', KEUNDAL_MODEL: 'test', OPENAI_API_KEY: 'test-only', ...config },
-      encoding: 'utf8',
-      timeout: 5000
-    })
-    expect(result.error).toBeUndefined()
-    expect(result.status).toBe(1)
-    expect(result.stderr).toMatch(/HTTP 인증 token|KEUNDAL_HOST/)
-    expect(result.stdout).not.toContain('listening')
-  }
-})
-
-test.each([undefined, '0.0.0.0'])('실행 파일은 기본 loopback과 명시적 외부 바인딩(%s)을 적용한다', async (host) => {
-  const directory = mkdtempSync(join(tmpdir(), 'keundal-server-'))
-  const child = spawn(process.execPath, ['dist/main.js'], {
-    env: {
-      PORT: '0',
-      KEUNDAL_MODEL: 'test',
-      OPENAI_API_KEY: 'test-only',
-      KEUNDAL_API_TOKEN: token,
-      KEUNDAL_SQLITE_PATH: join(directory, 'test.sqlite'),
-      ...(host === undefined ? {} : { KEUNDAL_HOST: host })
-    },
-    stdio: ['ignore', 'pipe', 'pipe']
-  })
-  onTestFinished(async () => {
-    if (child.exitCode === null && child.signalCode === null) {
-      const exited = once(child, 'exit')
-      child.kill()
-      await exited
-    }
-    rmSync(directory, { recursive: true, force: true })
-  })
-  let output = ''
-  child.stdout.on('data', (chunk) => {
-    output += String(chunk)
-  })
-  await expect.poll(() => output, { timeout: 5000 }).toContain(`http://${host ?? '127.0.0.1'}:`)
-  const port = /http:\/\/[^:]+:(\d+)/.exec(output)?.[1]
-  expect(port).toBeDefined()
-  const response = await fetch(`http://127.0.0.1:${port}/threads`, { headers: { authorization: `Bearer ${token}` } })
-  expect(response.status).toBe(200)
-  expect(await response.json()).toEqual([])
-  const denied = await fetch(`http://127.0.0.1:${port}/threads`)
-  expect(denied.status).toBe(401)
-  await denied.text()
-
-  const external = Object.values(networkInterfaces())
-    .flat()
-    .find((address) => address?.family === 'IPv4' && !address.internal)
-  if (external) {
-    const request = fetch(`http://${external.address}:${port}/threads`, {
-      headers: { authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(2000)
-    })
-    if (host === undefined) {
-      await expect(request).rejects.toThrow()
-    } else {
-      const exposed = await request
-      expect(exposed.status).toBe(200)
-      expect(await exposed.json()).toEqual([])
-    }
-  }
-})
 test.for(['content-length', 'chunked'] as const)(
   '%s 요청은 UTF-8 바이트 상한 이내와 경계값을 허용하고 1바이트 초과는 agent 실행 없이 거부한다',
   async (transfer, t) => {
@@ -439,7 +365,7 @@ test('잘못된 raw request target은 400을 반환하고 서버 프로세스와
       '-e',
       `
         import { createServer } from 'node:http'
-        import { createAgentApp } from ${JSON.stringify(import.meta.resolve('@keundal/server'))}
+        import { createAgentApp } from ${JSON.stringify(import.meta.resolve('@keundal/agent-host/http'))}
 
         const app = createAgentApp({
           agent: async function* () {},
