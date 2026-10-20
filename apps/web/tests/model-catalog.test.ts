@@ -2,7 +2,9 @@ import { createServer } from 'node:http'
 import { effectScope, ref } from 'vue'
 import { expect, onTestFinished, test, vi } from 'vitest'
 import { defaultLLMSettings } from '../shared/utils/llm-settings'
+import * as modelRequests from '../shared/utils/models'
 import { useModelCatalog } from '../app/composables/useModelCatalog'
+import { translate } from '../../../packages/ui/app/utils/locale'
 
 vi.mock('#shared/utils/llm-settings', async () => import('../shared/utils/llm-settings'))
 vi.mock('#shared/utils/models', async () => import('../shared/utils/models'))
@@ -48,4 +50,30 @@ test('API 키 없이 주소만 저장한 공급자의 모델을 조회하고 설
     expect(values.has('keundal:models:openai')).toBe(false)
   })
   expect(paths).toEqual(['/models'])
+})
+
+test('모델 조회의 일반 오류는 현재 표시 언어를 따르고 공급자 진단은 유지한다', async () => {
+  const request = vi.spyOn(modelRequests, 'loadModels').mockRejectedValue('unknown failure')
+  vi.stubGlobal('localStorage', { removeItem: vi.fn() })
+  const scope = effectScope()
+  onTestFinished(() => {
+    scope.stop()
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+  const settings = ref(defaultLLMSettings())
+  settings.value.openai.baseURL = 'http://localhost:1234'
+  const locale = ref<'en' | 'ko'>('ko')
+  const catalog = scope.run(() => useModelCatalog(settings, () => translate(locale.value, 'model.loadFailed')))!
+
+  await vi.waitFor(() => expect(catalog.loading.value).toBe(false))
+  expect(catalog.error.value.trim()).toBe('모델 목록을 불러오지 못했습니다.')
+
+  locale.value = 'en'
+  await catalog.refresh(true)
+  expect(catalog.error.value.trim()).toBe('Could not load models')
+
+  request.mockRejectedValueOnce(new Error('Provider diagnostic'))
+  await catalog.refresh(true)
+  expect(catalog.error.value.trim()).toBe('Provider diagnostic')
 })

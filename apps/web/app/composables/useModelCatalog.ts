@@ -4,8 +4,7 @@ import { LLM_PROVIDERS, type LLMSettings } from '#shared/utils/llm-settings'
 import { loadModels, type ModelOption } from '#shared/utils/models'
 
 /** Owned by the client plugin, shared by the selector and the browser LLM service. */
-export function useModelCatalog(settings: Ref<LLMSettings>) {
-  const { t } = useLocale()
+export function useModelCatalog(settings: Ref<LLMSettings>, loadErrorMessage = () => 'Could not load models') {
   const models = ref<ModelOption[]>([])
   const loading = ref(false)
   const error = ref('')
@@ -31,7 +30,7 @@ export function useModelCatalog(settings: Ref<LLMSettings>) {
           return await loadModels(provider.id, settings.value, localStorage, { force, signal: controller.signal })
         } catch (cause) {
           if (!controller.signal.aborted)
-            error.value += `${cause instanceof Error ? cause.message : t('model.loadFailed')} `
+            error.value += `${cause instanceof Error ? cause.message : loadErrorMessage()} `
           return models.value.filter(model => model.value.startsWith(`${provider.id}/`))
         }
       })

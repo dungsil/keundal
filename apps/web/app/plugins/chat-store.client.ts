@@ -31,7 +31,7 @@ export default defineNuxtPlugin(async () => {
     await storage.save(next)
     settings.value = next
   }
-  const modelCatalog = useModelCatalog(settings)
+  const modelCatalog = useModelCatalog(settings, () => t('model.loadFailed'))
   const skillManager = new SkillManager(localStorage, invokeNative)
   const runtime = useRuntimeConfig().public
   let remoteInfo: RemoteAgentInfo | undefined
