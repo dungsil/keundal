@@ -1,7 +1,7 @@
 // Nitro의 Wrangler 타입에 아직 없는 previews 설정도 생성 파일에 전달한다.
 const wrangler = {
   name: 'keundal-web',
-  preview_urls: false,
+  preview_urls: true,
   previews: {}
 }
 
