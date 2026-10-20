@@ -267,6 +267,9 @@ importers:
       '@comark/nuxt':
         specifier: ^0.7.0
         version: 0.7.0(magicast@0.5.5)(nuxt@4.6.2(f10f8451716ca2c6ce655b791cd5799d))(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
+      '@fontsource/pretendard':
+        specifier: 5.3.0
+        version: 5.3.0
       '@iconify-json/logos':
         specifier: ^1.2.15
         version: 1.2.16
@@ -1997,6 +2000,9 @@ packages:
 
   '@floating-ui/vue@1.1.11':
     resolution: {integrity: sha512-HzHKCNVxnGS35r9fCHBc3+uCnjw9IWIlCPL683cGgM9Kgj2BiAl8x1mS7vtvP6F9S/e/q4O6MApwSHj8hNLGfw==}
+
+  '@fontsource/pretendard@5.3.0':
+    resolution: {integrity: sha512-IDvI+QlHSFW9AkBX8cKXFi9nRJXdj7IQSGSqgemwFqII6EptpWQmWKcs3OfTZBT2yftzqt6VF6abQpUeAmHxMA==}
 
   '@google/genai@2.28.0':
     resolution: {integrity: sha512-hyNAJj+ywu3L46qlZod6KO/JvcT3QONz6VCiPevC/FWOjAD+LQb7DMLUoV8vzoLpt61Q0ruQX99iqbxEjPJWmw==}
@@ -9614,6 +9620,8 @@ snapshots:
     transitivePeerDependencies:
       - '@vue/composition-api'
       - vue
+
+  '@fontsource/pretendard@5.3.0': {}
 
   '@google/genai@2.28.0(supports-color@10.2.2)':
     dependencies:
