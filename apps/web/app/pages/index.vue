@@ -28,10 +28,12 @@ const {
 } = useFileUploadWithStatus()
 
 const { $chatStore } = useNuxtApp()
-const { model } = useModels()
+const { model, switching, applyDefaultModel } = useModels()
+onMounted(applyDefaultModel)
 const { ensureConfigured } = useLLMSettings()
 
 async function createChat(prompt: string) {
+  if (switching.value) return
   input.value = prompt
   if (!ensureConfigured(model.value)) return
   loading.value = true
@@ -110,7 +112,7 @@ const quickChats = computed(() => [
 
           <ChatPrompt
             v-model="input"
-            :disabled="loading"
+            :disabled="loading || switching"
             :files="files"
             :uploading="uploading"
             :open="open"
@@ -129,6 +131,7 @@ const quickChats = computed(() => [
               color="neutral"
               variant="outline"
               class="rounded-full"
+              :disabled="loading || switching"
               @click="createChat(quickChat.label)"
             />
           </div>
