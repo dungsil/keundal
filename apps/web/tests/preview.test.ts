@@ -43,6 +43,11 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(response.status, html).toBe(200)
     expect(response.headers.get('content-type')).toContain('text/html')
     expect(html).toContain('id="__nuxt"')
+    if (path === '/') {
+      const heading = /<h1\b[^>]*>([\s\S]*?)<\/h1>/.exec(html)?.[1]
+      expect(heading).toBeDefined()
+      expect(heading).not.toMatch(/좋은 (아침|오후|저녁)|Good (morning|afternoon|evening)/)
+    }
   }
   const localizedRequests: { headers: Record<string, string>, language: string, label: string }[] = [
     { headers: { 'accept-language': 'ko-KR,ko;q=0.9,en;q=0.8' }, language: 'ko', label: '새 대화' },

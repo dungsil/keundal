@@ -105,7 +105,12 @@ const quickChats = computed(() => [
 
         <UContainer class="flex-1 flex flex-col justify-center gap-4 sm:gap-6 py-8">
           <h1 class="text-3xl sm:text-4xl text-highlighted font-bold">
-            {{ greeting }}
+            <ClientOnly>
+              {{ greeting }}
+              <template #fallback>
+                <span aria-hidden="true">&nbsp;</span>
+              </template>
+            </ClientOnly>
           </h1>
 
           <ChatPrompt
