@@ -26,8 +26,6 @@ updates:
   - package-ecosystem: github-actions
     directories:
       - /
-      - /.github/actions/setup
-      - /.github/actions/codeql
     groups:
       codeql:
         patterns:

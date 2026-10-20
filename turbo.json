@@ -9,6 +9,10 @@
       "dependsOn": ["^build"],
       "outputs": [".nuxt/**", ".output/**"]
     },
+    "@keundal/web#build:cloudflare": {
+      "dependsOn": ["^build"],
+      "outputs": [".nuxt/**", ".output/**"]
+    },
     "@keundal/web#build:preview": {
       "dependsOn": ["build"],
       "outputs": [".nuxt/**", ".output/**"]
@@ -29,9 +33,24 @@
       "passThroughEnv": ["APPIMAGE_EXTRACT_AND_RUN", "CARGO_HOME", "CARGO_INCREMENTAL", "RUSTUP_HOME"],
       "outputs": ["dist/**", "src-tauri/target/release/bundle/**", "src-tauri/sidecar/**", "src-tauri/binaries/**"]
     },
-    "typecheck": {},
+    "typecheck": {
+      "dependsOn": ["build"]
+    },
+    "@keundal/web#typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "@keundal/desktop#build:sidecar": {
+      "dependsOn": ["@keundal/agent-host#build"],
+      "outputs": ["dist-sidecar/**"]
+    },
+    "@keundal/desktop#typecheck": {
+      "dependsOn": ["build:sidecar"]
+    },
     "test": {
       "dependsOn": ["build"]
+    },
+    "@keundal/desktop#test": {
+      "dependsOn": ["build:sidecar"]
     }
   }
 }

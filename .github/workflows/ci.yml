@@ -3,41 +3,33 @@ name: CI
 on:
   push:
     branches: [main]
-    paths:
-      - 'apps/**'
-      - 'examples/**'
-      - 'packages/**'
-      - 'tools/**'
-      - '!apps/**/*.md'
-      - '!examples/**/*.md'
-      - '!packages/**/*.md'
-      - '!tools/**/*.md'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'tsconfig*.json'
-      - 'turbo.json'
-      - '.oxlintrc.json'
-      - '.oxfmtrc.json'
-      - '.github/workflows/**'
-      - '.github/actions/**'
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
   workflow_dispatch:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
-  group: CI-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
+env:
+  SKIP_INSTALL_SIMPLE_GIT_HOOKS: '1'
+  TURBO_TELEMETRY_DISABLED: '1'
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   changes:
     name: 변경사항 확인
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      pull-requests: read # paths-filter가 PR의 변경 파일을 조회한다.
     outputs:
       source: ${{ github.event_name != 'pull_request' || steps.filter.outputs.source == 'true' }}
     steps:
@@ -47,44 +39,60 @@ jobs:
         id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
+          # 새 설정 파일도 검사 대상에 포함한다. 문서는 린트 작업에서 검사한다.
+          predicate-quantifier: every
           filters: |
             source:
-              - '{apps,examples,packages,tools}/**/!(*.md)'
-              - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'pnpm-workspace.yaml'
-              - 'tsconfig*.json'
-              - 'turbo.json'
-              - '.oxlintrc.json'
-              - '.oxfmtrc.json'
-              - '.github/workflows/**'
-              - '.github/actions/**'
-      - name: 전체 검사 선택
-        if: github.event_name != 'pull_request'
-        run: echo '전체 검사를 실행합니다.'
+              - '**'
+              - '!{README,CONTRIBUTING,CODE_OF_CONDUCT,AGENTS}.md'
+              - '!docs/**/*.md'
+              - '!{apps,examples,packages,tools}/*/README.md'
 
   build:
+    name: 빌드
+    needs: [changes, build-web, build-platforms]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: 전체 빌드 결과 확인
+        uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: ${{ needs.changes.outputs.source != 'true' && 'build-web,build-platforms' || '' }}
+
+  build-web:
     needs: changes
     if: needs.changes.outputs.source == 'true'
-    name: 빌드
-    runs-on: ubuntu-latest
+    name: 웹 및 패키지 빌드
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: 저장소 가져오기
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: 개발 환경 준비
-        uses: ./.github/actions/setup
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         with:
-          turbo-cache: true
+          cache: true
+          require-lockfile: true
 
-      - name: 빌드
-        run: pnpm build
+      - name: Turbo 캐시 설정
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+
+      - name: 패키지와 예제 빌드
+        run: pnpm exec turbo run build --filter='!@keundal/web' --filter='!@keundal/desktop'
 
       - name: Workers 빌드
-        run: pnpm --filter @keundal/web build:cloudflare
+        run: pnpm exec turbo run build:cloudflare --filter=@keundal/web
 
       - name: Workers 빌드 아티팩트 업로드
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -96,7 +104,8 @@ jobs:
           retention-days: 1
 
   build-platforms:
-    needs: build
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
     name: 빌드 (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -106,47 +115,60 @@ jobs:
         include:
           - os: ubuntu-24.04
             name: linux-x64
-          - os: windows-2022
+          - os: windows-2025
             name: windows-x64
           - os: macos-15
             name: macos-arm64
-    defaults:
-      run:
-        shell: bash
     steps:
       - name: 저장소 가져오기
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: 개발 환경 준비
-        uses: ./.github/actions/setup
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         with:
-          turbo-cache: true
+          cache: true
+          require-lockfile: true
+
+      - name: Turbo 캐시 설정
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
 
       - name: Linux 빌드 의존성 설치
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libdbus-1-dev patchelf xdg-utils
+          sudo apt-get install --no-install-recommends -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev patchelf xdg-utils
 
       - name: Rust stable 설정
-        run: |
-          rustup update stable --no-self-update
-          rustup default stable
-          echo "RUSTC_VERSION=$(rustc --version)" >> "$GITHUB_ENV"
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
 
       - name: Rust 빌드 캐시 설정
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: apps/desktop/src-tauri -> target
           key: desktop-${{ matrix.name }}
+          cache-bin: false
 
-      - name: 빌드
+      - name: 데스크톱이 사용하는 패키지 빌드
+        run: pnpm exec turbo run build --filter='./packages/*' --filter='./tools/*'
+
+      - name: 데스크톱 설치 파일 빌드
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
           APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && '-' || '' }}
-        run: pnpm build:preview
+        with:
+          projectPath: apps/desktop
+          tauriScript: pnpm tauri
+          args: -- --locked
 
       - name: 데스크톱 설치 파일 업로드
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -159,27 +181,33 @@ jobs:
             apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: error
           retention-days: 7
-          overwrite: true
 
   typecheck:
     needs: changes
     if: needs.changes.outputs.source == 'true'
     name: 타입 검사
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: 저장소 가져오기
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: 개발 환경 준비
-        uses: ./.github/actions/setup
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         with:
-          turbo-cache: true
+          cache: true
+          save-cache: false
+          require-lockfile: true
 
-      - name: 타입 검사에 필요한 패키지 빌드
-        run: pnpm build
+      - name: Turbo 캐시 설정
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
 
       - name: 타입 검사
         run: pnpm typecheck
@@ -188,37 +216,47 @@ jobs:
     needs: changes
     if: needs.changes.outputs.source == 'true'
     name: 테스트
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: 저장소 가져오기
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: 개발 환경 준비
-        uses: ./.github/actions/setup
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         with:
-          turbo-cache: true
+          cache: true
+          save-cache: false
+          require-lockfile: true
+
+      - name: Turbo 캐시 설정
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
 
       - name: 테스트
         run: pnpm test
 
   lint:
-    needs: changes
-    if: needs.changes.outputs.source == 'true'
     name: 린트 및 형식 검사
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: 저장소 가져오기
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: 개발 환경 준비
-        uses: ./.github/actions/setup
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+        with:
+          cache: true
+          require-lockfile: true
 
       - name: 린트 및 형식 검사
         id: lint
@@ -226,45 +264,13 @@ jobs:
 
       - name: 린트 및 형식 자동수정
         id: lintfix
-        if: >-
-          failure() && steps.lint.outcome == 'failure' &&
-          ((github.event_name != 'pull_request' &&
-            github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) ||
-           (github.event_name == 'pull_request' &&
-            github.event.pull_request.base.ref == github.event.repository.default_branch &&
-            github.event.pull_request.head.repo.full_name == github.repository &&
-            !github.event.pull_request.draft))
+        if: failure() && steps.lint.outcome == 'failure'
         run: pnpm lintfix
-
-      - name: PR 브랜치에 자동수정 반영
-        if: >-
-          !cancelled() && github.event_name == 'pull_request' &&
-          contains(fromJSON('["success", "failure"]'), steps.lintfix.outcome)
-        env:
-          GH_TOKEN: ${{ secrets.AUTOFIX_TOKEN }}
-          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
-          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          if git diff --quiet; then
-            exit 0
-          fi
-          if [ -z "$GH_TOKEN" ]; then
-            echo '::error::AUTOFIX_TOKEN이 필요합니다. Dependabot PR에서는 Dependabot secret에 등록해야 합니다.'
-            exit 1
-          fi
-          git config core.hooksPath /dev/null
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -u
-          git commit -m 'style: 코드 스타일을 통일한다'
-          gh auth setup-git
-          # CI 이후 브랜치가 변경되었다면 푸시를 거절한다.
-          git push --force-with-lease="refs/heads/$PR_BRANCH:$SOURCE_SHA" origin "HEAD:refs/heads/$PR_BRANCH"
 
       - name: 수정 패치 생성
         id: patch
         if: >-
-          !cancelled() && github.event_name != 'pull_request' &&
+          !cancelled() &&
           contains(fromJSON('["success", "failure"]'), steps.lintfix.outcome)
         run: |
           git diff --binary --full-index > "$RUNNER_TEMP/autofix.patch"
@@ -278,22 +284,30 @@ jobs:
         with:
           name: lintfix
           path: ${{ runner.temp }}/autofix.patch
+          if-no-files-found: error
           retention-days: 1
-          overwrite: true
 
   codeql:
     # 병합 규칙이 CodeQL 분석 결과를 요구하므로 변경 경로와 관계없이 실행한다.
     name: CodeQL 보안 검사
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
-      security-events: write
+      security-events: write # CodeQL 분석 결과를 업로드한다.
     steps:
       - name: 저장소 가져오기
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: CodeQL 보안 검사
-        uses: ./.github/actions/codeql
+      - name: CodeQL 초기화
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
+        with:
+          languages: javascript-typescript,actions
+
+      - name: CodeQL 분석
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
+        with:
+          # 주간 감사와 기존 main 분석이 같은 설정으로 비교되도록 유지한다.
+          category: .github/workflows/ci.yml:codeql

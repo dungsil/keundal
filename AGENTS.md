@@ -70,7 +70,7 @@ pnpm lint
 - 테스트는 각 패키지의 `tests/*.test.ts`에 작성하고 공개 진입점을 사용합니다. Turbo가 테스트 전에 패키지를 빌드합니다.
 - 테스트 케이스(`test`, `it`)와 그룹(`describe`) 이름은 한국어로 작성합니다. 케이스 이름은 실제로 검증하는 조건과 기대 동작을 드러내며, 코드 식별자와 프로토콜 값은 원문을 유지합니다.
 - `typecheck`는 `tsconfig.test.json`으로 테스트 코드까지 검사합니다.
-- CI 공통 환경과 의존성 설치는 `.github/actions/setup/action.yml`에서 관리합니다.
+- CI 환경과 의존성 설치는 `pnpm/setup`으로 처리하며, 버전은 루트 `package.json`의 `devEngines`를 따릅니다. CI 구성과 액션 검토 근거는 `docs/ci.md`를 참고합니다.
 
 커밋, 이슈, PR을 만들 때는 [CONTRIBUTING.md](CONTRIBUTING.md)를 따릅니다.
 
