@@ -79,6 +79,7 @@ export default {
   'file.imagesOnly': 'Keundal currently supports image attachments only',
   'file.tooLarge': 'File exceeds 8MB',
   'file.failed': 'Upload failed',
+  'model.select': 'Select model',
   'model.refresh': 'Refresh models',
   'model.cache':
     "Provider models are cached in this browser for 1 hour. Listed models must support this app's text, tools and token-counting APIs.",

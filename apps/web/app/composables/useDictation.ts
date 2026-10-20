@@ -1,4 +1,3 @@
-import openaiTranscriptionPlugin from '@keundal/plugin-transcription-openai'
 import type { TranscriptionSession } from '@keundal/plugin-transcription-openai/client'
 import { encodeRealtimeAudio, resampleAudio, streamTranscription } from '@keundal/plugin-transcription-openai/client'
 import { Context } from 'cordis'
@@ -126,6 +125,8 @@ export function useDictation() {
   }
 
   async function open(abort: AbortController, { onMaxDuration }: { onMaxDuration?: () => void }) {
+    const { default: openaiTranscriptionPlugin } = await import('@keundal/plugin-transcription-openai')
+    abort.signal.throwIfAborted()
     const context = new Context()
     const config = providerCredentials(settings.value, 'openai')
     const fiber = context.plugin(openaiTranscriptionPlugin, {

@@ -40,6 +40,10 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  ui: {
+    fonts: false
+  },
+
   runtimeConfig: {
     public: {
       desktop: false,
@@ -50,6 +54,10 @@ export default defineNuxtConfig({
   },
   alias: {
     '#agent-host-runtime': fileURLToPath(new URL('./server/agent/runtime-node.ts', import.meta.url))
+  },
+
+  features: {
+    inlineStyles: true
   },
 
   experimental: {
@@ -94,11 +102,5 @@ export default defineNuxtConfig({
         braceStyle: '1tbs'
       }
     }
-  },
-
-  fonts: {
-    families: [
-      { name: 'Pretendard', provider: 'npm', weights: [400, 500, 700], global: true, preload: true }
-    ]
   }
 })

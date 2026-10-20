@@ -81,6 +81,7 @@ export default {
   'file.imagesOnly': '현재 Keundal은 이미지 첨부만 지원합니다.',
   'file.tooLarge': '파일 크기가 8MB를 초과합니다.',
   'file.failed': '파일 첨부 실패',
+  'model.select': '모델 선택',
   'model.refresh': '모델 목록 새로고침',
   'model.cache':
     '공급자의 모델 목록은 이 브라우저에 1시간 동안 저장됩니다. 이 앱의 텍스트·도구·토큰 계산 API를 지원하는 모델만 표시됩니다.',

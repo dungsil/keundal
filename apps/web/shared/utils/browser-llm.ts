@@ -1,26 +1,32 @@
 import { LLMService, type LLMRequest, type ExecutionOptions, type LLMEvent } from '@keundal/core'
-import openaiLLMPlugin from '@keundal/plugin-llm-openai'
-import anthropicLLMPlugin from '@keundal/plugin-llm-anthropic'
-import geminiLLMPlugin from '@keundal/plugin-llm-gemini'
 import { Context, type Fiber } from 'cordis'
 import { providerCredentials, providerError, type LLMSettings } from './llm-settings'
 import { resolveModel, type ModelOption } from './models'
 
-const plugins = { openai: openaiLLMPlugin, anthropic: anthropicLLMPlugin, google: geminiLLMPlugin }
+const plugins = {
+  openai: () => import('@keundal/plugin-llm-openai').then(module => module.default),
+  anthropic: () => import('@keundal/plugin-llm-anthropic').then(module => module.default),
+  google: () => import('@keundal/plugin-llm-gemini').then(module => module.default)
+}
 
 /** Resolves browser-owned settings at call time; credentials never enter generation requests. */
 export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMSettings, getModels?: () => ModelOption[] }) {
   const active = new Set<Fiber>()
+  let disposed = false
   ctx.fiber.effect(() => async () => {
+    disposed = true
     await Promise.all([...active].map(fiber => fiber.dispose()))
   })
 
-  async function open(model: string) {
+  async function open(model: string, options?: ExecutionOptions) {
     const { provider, id, value } = resolveModel(model)
     const credentials = providerCredentials(config.getSettings(), provider)
     const metadata = config.getModels?.().find(item => item.value === value)
+    const plugin = await plugins[provider]()
+    options?.signal?.throwIfAborted()
+    if (disposed) throw new Error('Browser LLM service is disposed')
     const context = new Context()
-    const fiber = context.plugin(plugins[provider], {
+    const fiber = context.plugin(plugin, {
       ...credentials,
       dangerouslyAllowBrowser: true,
       // App budgets are upper bounds, not advertised limits for APIs without model metadata.
@@ -43,7 +49,7 @@ export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMS
   class BrowserLLM extends LLMService {
     async getModel(model: string, options?: ExecutionOptions) {
       options?.signal?.throwIfAborted()
-      const service = await open(model)
+      const service = await open(model, options)
       try {
         return await service.llm.getModel(service.id, options)
       } finally {
@@ -53,7 +59,7 @@ export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMS
 
     async countTokens(request: LLMRequest, options?: ExecutionOptions) {
       options?.signal?.throwIfAborted()
-      const service = await open(request.model)
+      const service = await open(request.model, options)
       try {
         return await service.llm.countTokens({ ...request, model: service.id }, options)
       } catch (error) {
@@ -66,7 +72,7 @@ export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMS
 
     async* stream(request: LLMRequest, options?: ExecutionOptions): AsyncIterable<LLMEvent> {
       options?.signal?.throwIfAborted()
-      const service = await open(request.model)
+      const service = await open(request.model, options)
       try {
         yield* service.llm.stream({ ...request, model: service.id }, options)
       } catch (error) {
