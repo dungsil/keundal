@@ -46,7 +46,7 @@
     "vue": "3.5.44",
     "zod": "^4.6.5",
     "@keundal/agent-host": "workspace:*",
-    "h3": "1.15.11"
+    "h3": "2.0.3"
   },
   "devDependencies": {
     "@keundal/plugin-store-memory": "workspace:*",
