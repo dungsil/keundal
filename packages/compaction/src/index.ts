@@ -1,4 +1,5 @@
 import {
+  CONTEXT_MESSAGE_PREFIX,
   EventType,
   parseRunAgentInput,
   type AgentMessage,
@@ -95,7 +96,11 @@ export async function compact(
 
   // 최근 사용자 턴 전체를 보존하여 도구 호출과 결과가 분리되지 않게 합니다.
   let boundary = Math.max(0, input.messages.length - config.keepRecentMessages)
-  while (boundary > 0 && input.messages[boundary]?.role !== 'user') boundary--
+  while (
+    boundary > 0 &&
+    (input.messages[boundary]?.role !== 'user' || input.messages[boundary].id.startsWith(CONTEXT_MESSAGE_PREFIX))
+  )
+    boundary--
   // 도구 호출 id를 첫 어시스턴트 호스트의 위치에 연결해 경계 스캔의 조회를 상수 시간으로 만듭니다.
   const callHosts = new Map<string, number>()
   for (let index = 0; index < input.messages.length; index++) {
@@ -112,7 +117,11 @@ export async function compact(
     const callIndex = callHosts.get(message.toolCallId) ?? -1
     if (callIndex >= 0 && callIndex < boundary) {
       boundary = callIndex
-      while (boundary > 0 && input.messages[boundary]?.role !== 'user') boundary--
+      while (
+        boundary > 0 &&
+        (input.messages[boundary]?.role !== 'user' || input.messages[boundary].id.startsWith(CONTEXT_MESSAGE_PREFIX))
+      )
+        boundary--
       index = boundary - 1
     }
   }

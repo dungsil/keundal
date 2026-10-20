@@ -3,6 +3,9 @@ import { EventType, type AGUIEvent, type AgentMessage } from './protocol.js'
 type AssistantMessage = Extract<AgentMessage, { role: 'assistant' }>
 type AssistantToolCall = NonNullable<AssistantMessage['toolCalls']>[number]
 
+export const CONTEXT_MESSAGE_PREFIX = 'keundal:context:'
+export const CONTEXT_MESSAGE_EVENT = 'keundal.context.message'
+
 /** 결과 없는 도구 호출과 서명 없는 추론을 제외합니다. 모델을 바꾸면 공급자 전용 상태도 제거합니다. */
 export function prepareReplayMessages(
   messages: readonly AgentMessage[],
@@ -66,6 +69,24 @@ export class MessageAssembly {
   /** 이벤트를 조립에 반영하고, 바뀐 메시지를 돌려줍니다. 메시지를 만들지 않는 이벤트는 undefined입니다. */
   apply(event: AGUIEvent): AgentMessage | undefined {
     switch (event.type) {
+      case EventType.CUSTOM: {
+        if (event.name !== CONTEXT_MESSAGE_EVENT) return undefined
+        const value: unknown = event.value
+        if (
+          typeof value !== 'object' ||
+          value === null ||
+          !('id' in value) ||
+          typeof value.id !== 'string' ||
+          !value.id.startsWith(CONTEXT_MESSAGE_PREFIX) ||
+          !('role' in value) ||
+          value.role !== 'user' ||
+          !('content' in value) ||
+          typeof value.content !== 'string'
+        )
+          throw new Error('invalid context message event')
+        this.open = undefined
+        return this.write({ id: value.id, role: 'user', content: value.content })
+      }
       case EventType.TEXT_MESSAGE_START:
         this.open = event.messageId
         return this.write({

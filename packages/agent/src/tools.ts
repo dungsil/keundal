@@ -1,4 +1,6 @@
 import {
+  CONTEXT_MESSAGE_EVENT,
+  CONTEXT_MESSAGE_PREFIX,
   EventType,
   MessageAssembly,
   type AgentTool,
@@ -69,8 +71,7 @@ export async function* streamWithTools(
   maxToolRounds: number,
   prepareInput: (input: RunAgentInput) => Promise<RunAgentInput>,
   signal: AbortSignal,
-  options: { parallel?: boolean } = {},
-  getSteeringInputs?: () => RunAgentInput[]
+  options: { parallel?: boolean } = {}
 ): AsyncGenerator<LLMEvent> {
   const registered = new Map(tools.map((tool) => [tool.name, tool]))
   const usedIds = new Set(
@@ -172,22 +173,17 @@ export async function* streamWithTools(
     }
     rounds++
     signal.throwIfAborted()
-    const steeringInputs = getSteeringInputs?.() ?? []
-    const steeringMessages = steeringInputs.flatMap((item) => item.messages)
-    if (steeringMessages.length > 0) {
-      yield {
-        type: EventType.CUSTOM,
-        name: 'keundal.steering',
-        value: { status: 'queued', count: steeringInputs.length, policy: 'steer' }
-      } as LLMEvent
+    const next = { ...current.input, messages: [...current.input.messages, ...assembly.messages] }
+    const prepared = await prepareInput(next)
+    signal.throwIfAborted()
+    const previousIds = new Set(next.messages.map((message) => message.id))
+    for (const message of prepared.messages) {
+      if (message.id.startsWith(CONTEXT_MESSAGE_PREFIX) && !previousIds.has(message.id)) {
+        yield { type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value: message }
+        signal.throwIfAborted()
+      }
     }
-    current = {
-      ...current,
-      input: await prepareInput({
-        ...current.input,
-        messages: [...current.input.messages, ...assembly.messages, ...steeringMessages]
-      })
-    }
+    current = { ...current, input: prepared }
   }
 }
 
