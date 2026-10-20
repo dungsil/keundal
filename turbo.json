@@ -64,7 +64,7 @@
     },
     "@keundal/desktop#test": {
       "dependsOn": ["build:sidecar"],
-      "inputs": ["tests/**", "package.json"]
+      "inputs": ["$TURBO_DEFAULT$", "!src-tauri/**", "!README.md"]
     },
     "@keundal/web#build:desktop": {
       "dependsOn": ["^build"],
