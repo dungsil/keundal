@@ -31,7 +31,7 @@ const {
 
 const votes = ref<NonNullable<typeof data.value>['votes']>([])
 
-const input = ref('')
+const input = useState(`chat-input-${route.params.id}`, () => '')
 
 const { messages, status, error, sendMessage, regenerate, stop } = useKeundalChat({
   respond: (messages, onMessage, signal) => $chatStore.respond(route.params.id as string, {
