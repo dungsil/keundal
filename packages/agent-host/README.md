@@ -14,7 +14,7 @@ const host = await createAgentHost({
   sqlitePath: 'keundal.sqlite'
 })
 
-await new Promise((resolve) => server.listen(8000, '127.0.0.1', resolve))
+// host.services를 HTTP 계층에 연결합니다. 예시는 apps/server를 참고합니다.
 ```
 
 `host.services`는 HTTP 계층이 사용하는 `run`, `session`, `generation`, `models`, `title`을 제공합니다.
