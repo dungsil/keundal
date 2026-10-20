@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@keundal/compaction": "workspace:*",
+    "@keundal/context": "workspace:*",
     "@keundal/core": "workspace:*",
     "@standard-schema/spec": "catalog:",
     "cordis": "catalog:"

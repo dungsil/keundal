@@ -140,6 +140,26 @@ test('최근 사용자 턴의 도구 호출과 결과를 함께 보존한다', a
   expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
 })
 
+test('주입한 컨텍스트를 새 사용자 턴으로 취급하지 않고 현재 요청과 도구 결과를 보존한다', async (t) => {
+  const { compact } = await setup(t)
+  const data: RunAgentInput = {
+    ...input,
+    messages: [
+      ...input.messages,
+      {
+        id: 'call',
+        role: 'assistant',
+        toolCalls: [{ id: 'tool-1', type: 'function', function: { name: 'lookup', arguments: '{}' } }]
+      },
+      { id: 'result', role: 'tool', toolCallId: 'tool-1', content: 'found' },
+      { id: 'keundal:context:time:reading', role: 'user', content: 'Current time: 2026-10-20T00:00:00Z' }
+    ]
+  }
+  const result = await compact(data, 1200)
+  expect(result.messages.slice(-4)).toStrictEqual(data.messages.slice(-4))
+  expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
+})
+
 test('사용자 턴을 가로지르는 도구 호출부터 결과까지 원래 순서로 보존한다', async (t) => {
   const { compact, requests } = await setup(t)
   const retained: RunAgentInput['messages'] = [

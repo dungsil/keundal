@@ -1,5 +1,9 @@
 import { compact, SummaryCompactionConfigSchema, type SummaryCompactionConfig } from '@keundal/compaction'
+import type {} from '@keundal/context'
 import {
+  CONTEXT_MESSAGE_EVENT,
+  EventType,
+  CONTEXT_MESSAGE_PREFIX,
   parseRunAgentInput,
   type AGUIEvent,
   type CompactionResult,
@@ -25,6 +29,7 @@ export interface AgentConfig {
   readonly compaction?: SummaryCompactionConfig
   readonly tools?: readonly ExecutableTool[] | ToolProvider
   readonly skills?: boolean
+  readonly context?: boolean
   /** 모든 실행에 앞서 모델에 전달할 시스템 지침입니다. */
   readonly systemPrompt?: string
   /** 도구를 실행하고 후속 생성을 요청할 최대 횟수입니다. 기본값은 8입니다. */
@@ -55,7 +60,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
   )
   if (compaction.issues)
     throw new Error(compaction.issues.map((issue) => issue.message).join('; ') || 'invalid compaction config')
-  for (const key of ['webSearch', 'reasoning', 'skills'] as const) {
+  for (const key of ['webSearch', 'reasoning', 'skills', 'context'] as const) {
     const option = (value as Record<string, unknown>)[key]
     if (option !== undefined && typeof option !== 'boolean') {
       throw new Error(`${key} must be a boolean`)
@@ -84,6 +89,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     compaction: compaction.value,
     tools,
     skills,
+    ...('context' in value ? { context: value.context as boolean | undefined } : {}),
     ...(systemPrompt === undefined ? {} : { systemPrompt }),
     maxToolRounds,
     parallelTools
@@ -185,6 +191,9 @@ export class Agent extends Service {
           throw new Error(`message id is reserved: ${reserved}`)
         }
       }
+      if (request.messages.some((message) => message.id.startsWith(CONTEXT_MESSAGE_PREFIX))) {
+        throw new Error('message id is reserved for request context')
+      }
       const options = { signal }
       const prepared = await this.ctx.session.prepare(request, options)
       signal.throwIfAborted()
@@ -220,7 +229,36 @@ export class Agent extends Service {
         throw new Error('requested output budget exceeds the model limits')
       }
       const maxInputTokens = model.contextWindow - maxOutputTokens
-      const fitted = await this.fitInput(preparedInput, maxInputTokens, signal)
+      let step = 1
+      const contextualInput = this.config.context
+        ? await this.ctx.requestContext.prepare(preparedInput, {
+            signal,
+            step,
+            request,
+            contextWindow: model.contextWindow
+          })
+        : preparedInput
+      const fitted = await this.fitInput(contextualInput, maxInputTokens, signal)
+      const previousIds = this.config.context ? new Set(preparedInput.messages.map((message) => message.id)) : undefined
+      const initialContext = previousIds
+        ? fitted.input.messages.filter(
+            (message) => message.id.startsWith(CONTEXT_MESSAGE_PREFIX) && !previousIds.has(message.id)
+          )
+        : []
+      const llm = this.ctx.llm
+      const maxToolRounds = this.config.maxToolRounds ?? 8
+      const parallel = this.config.parallelTools ?? false
+      const prepareNext = async (next: RunAgentInput, generationSignal: AbortSignal) => {
+        const contextual = this.config.context
+          ? await this.ctx.requestContext.prepare(next, {
+              signal: generationSignal,
+              step: ++step,
+              request,
+              contextWindow: model.contextWindow
+            })
+          : next
+        return (await this.fitInput(contextual, maxInputTokens, generationSignal)).input
+      }
 
       signal.throwIfAborted()
       yield* this.ctx.generation.run(
@@ -235,19 +273,26 @@ export class Agent extends Service {
         },
         {
           signal,
-          ...(tools.length
+          ...(tools.length || this.config.context
             ? {
-                stream: (request, execution) => {
+                stream: async function* (generationRequest, execution) {
                   const generationSignal = execution?.signal ?? signal
-                  return streamWithTools(
-                    this.ctx.llm,
-                    request,
-                    tools,
-                    this.config.maxToolRounds ?? 8,
-                    async (next) => (await this.fitInput(next, maxInputTokens, generationSignal)).input,
-                    generationSignal,
-                    { parallel: this.config.parallelTools ?? false }
-                  )
+                  for (const message of initialContext) {
+                    generationSignal.throwIfAborted()
+                    yield { type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value: message }
+                  }
+                  generationSignal.throwIfAborted()
+                  yield* tools.length
+                    ? streamWithTools(
+                        llm,
+                        generationRequest,
+                        tools,
+                        maxToolRounds,
+                        (next) => prepareNext(next, generationSignal),
+                        generationSignal,
+                        { parallel }
+                      )
+                    : llm.stream(generationRequest, { signal: generationSignal })
                 }
               }
             : {})
@@ -312,9 +357,10 @@ export type AgentImplementation = new (ctx: Context, config: AgentConfig) => Age
  * 준비하고, 서비스가 사라지면 진행 중 실행을 취소합니다.
  */
 export function registerAgent(ctx: Context, config: AgentConfig, implementation: AgentImplementation = Agent): void {
-  if (config.skills) {
-    ctx.inject(['skills'], (skillsCtx) => {
-      new implementation(skillsCtx, config)
+  const required = [...(config.skills ? ['skills'] : []), ...(config.context ? ['requestContext'] : [])]
+  if (required.length) {
+    ctx.inject(required, (injected) => {
+      new implementation(injected, config)
     })
   } else {
     new implementation(ctx, config)

@@ -9,6 +9,7 @@ Keundal("큰달"으로 읽음)은 개인용 오픈소스 에이전트 도구입�
 | `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다. |
 | `@keundal/agent`                       | 에이전트 구현 계약과 공통 실행 루프를 제공합니다.                      |
 | `@keundal/coding-agent`                | 에이전트 구현 계약을 확장한 코딩 작업용 에이전트입니다.                |
+| `@keundal/context`                     | 작업 지침·파일과 세션 참조·시간·실행 환경을 요청 컨텍스트로 제공합니다. |
 | `@keundal/plugin-skill`                | 스킬 공급자를 조합하고 목록 조회와 본문 로딩을 제공합니다.             |
 | `@keundal/plugin-skill-filesystem`     | 지정한 디렉터리의 `SKILL.md`를 스킬 공급자로 등록합니다.               |
 | `@keundal/mcp`                         | 외부 MCP 서버의 도구와 리소스를 기존 에이전트 도구에 연결합니다.       |
