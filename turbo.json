@@ -3,11 +3,18 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "dist-sidecar/**"]
+      "outputs": ["dist/**", "dist-sidecar/**"],
+      "inputs": ["$TURBO_DEFAULT$", "!tests/**", "!README.md", "!tsconfig.test.json"]
     },
     "@keundal/web#build": {
       "dependsOn": ["^build"],
-      "outputs": [".nuxt/**", ".output/**"]
+      "outputs": [".nuxt/**", ".output/**"],
+      "inputs": ["$TURBO_DEFAULT$", "!tests/**", "!README.md", "!tsconfig.test.json"]
+    },
+    "@keundal/web#build:cloudflare": {
+      "dependsOn": ["^build"],
+      "outputs": [".nuxt/**", ".output/**"],
+      "inputs": ["$TURBO_DEFAULT$", "!tests/**", "!README.md", "!tsconfig.test.json"]
     },
     "@keundal/web#build:preview": {
       "dependsOn": ["build"],
@@ -24,7 +31,8 @@
         "CARGO_ENCODED_RUSTFLAGS",
         "CARGO_BUILD_TARGET",
         "APPLE_SIGNING_IDENTITY",
-        "TAURI_ENV_TARGET_TRIPLE"
+        "TAURI_ENV_TARGET_TRIPLE",
+        "TAURI_BUNDLER_DMG_IGNORE_CI"
       ],
       "passThroughEnv": ["APPIMAGE_EXTRACT_AND_RUN", "CARGO_HOME", "CARGO_INCREMENTAL", "RUSTUP_HOME"],
       "outputs": [
@@ -35,9 +43,64 @@
         "src-tauri/binaries/**"
       ]
     },
-    "typecheck": {},
-    "test": {
+    "typecheck": {
       "dependsOn": ["build"]
+    },
+    "@keundal/web#typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "@keundal/desktop#build:sidecar": {
+      "dependsOn": ["@keundal/agent-host#build"],
+      "outputs": ["dist-sidecar/**"],
+      "inputs": ["sidecar/**", "tsdown.sidecar.config.ts", "tsconfig.json", "package.json"]
+    },
+    "@keundal/desktop#typecheck": {
+      "dependsOn": ["build:sidecar"],
+      "inputs": ["$TURBO_DEFAULT$", "!src-tauri/**", "!README.md"]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "inputs": ["$TURBO_DEFAULT$", "!README.md"]
+    },
+    "@keundal/desktop#test": {
+      "dependsOn": ["build:sidecar"],
+      "inputs": ["$TURBO_DEFAULT$", "!src-tauri/**", "!README.md"]
+    },
+    "@keundal/web#build:desktop": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "!tests/**", "!README.md", "!tsconfig.test.json"],
+      "outputs": [".nuxt-desktop/**", ".output-desktop/**", "$TURBO_ROOT$/apps/desktop/dist/**"]
+    },
+    "@keundal/desktop#build:native": {
+      "dependsOn": ["build:sidecar", "@keundal/web#build:desktop"],
+      "inputs": ["$TURBO_DEFAULT$", "!tests/**", "!README.md"],
+      "env": [
+        "ImageOS",
+        "ImageVersion",
+        "RUSTC_CACHE_KEY",
+        "NATIVE_SYSTEM_DEPS",
+        "DEVELOPER_DIR",
+        "SDKROOT",
+        "MACOSX_DEPLOYMENT_TARGET",
+        "RUSTUP_TOOLCHAIN",
+        "RUSTFLAGS",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "CARGO_BUILD_TARGET",
+        "APPLE_SIGNING_IDENTITY",
+        "TAURI_ENV_TARGET_TRIPLE",
+        "TAURI_BUNDLER_DMG_IGNORE_CI"
+      ],
+      "passThroughEnv": ["APPIMAGE_EXTRACT_AND_RUN", "CARGO_HOME", "CARGO_INCREMENTAL", "RUSTUP_HOME"],
+      "outputs": [
+        "src-tauri/target/release/keundal-desktop",
+        "src-tauri/target/release/keundal-desktop.exe",
+        "src-tauri/target/release/bundle/**",
+        "src-tauri/sidecar/**",
+        "src-tauri/binaries/**"
+      ]
     }
-  }
+  },
+  "globalDependencies": ["package.json"],
+  "globalEnv": ["RUNNER_OS", "RUNNER_ARCH"],
+  "globalPassThroughEnv": ["TURBO_API", "TURBO_TOKEN", "TURBO_TEAM"]
 }

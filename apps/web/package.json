@@ -12,7 +12,8 @@
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
     "test": "vitest run",
-    "typecheck": "nuxt typecheck && tsc -p tsconfig.test.json"
+    "typecheck": "nuxt typecheck && tsc -p tsconfig.test.json",
+    "build:desktop": "nuxt generate --envName desktop"
   },
   "dependencies": {
     "@comark/nuxt": "^0.7.0",
