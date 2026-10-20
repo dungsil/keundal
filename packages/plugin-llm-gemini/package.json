@@ -28,7 +28,7 @@
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",
-    "fake-indexeddb": "6.2.5",
+    "fake-indexeddb": "6.2.6",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

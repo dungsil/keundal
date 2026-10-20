@@ -38,7 +38,7 @@
     "cordis": "catalog:",
     "date-fns": "^4.4.0",
     "motion-v": "^2.6.0",
-    "nuxt": "^4.6.1",
+    "nuxt": "^4.6.2",
     "nuxt-charts": "^2.2.3",
     "shiki": "^4.5.0",
     "striptags": "3.2.0",
@@ -46,7 +46,7 @@
     "vue": "3.5.44",
     "zod": "^4.6.5",
     "@keundal/agent-host": "workspace:*",
-    "h3": "1.15.11"
+    "h3": "2.0.3"
   },
   "devDependencies": {
     "@keundal/plugin-store-memory": "workspace:*",

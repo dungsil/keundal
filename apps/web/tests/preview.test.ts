@@ -48,6 +48,8 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
       expect(heading).toBeDefined()
       expect(heading).not.toMatch(/좋은 (아침|오후|저녁)|Good (morning|afternoon|evening)/)
     }
+    expect(html.match(/<button\b[^>]*aria-label="Skills"/), path).not.toBeNull()
+    expect(html.match(/<a\b[^>]*aria-label="Settings"/), path).not.toBeNull()
   }
   const localizedRequests: { headers: Record<string, string>, language: string, label: string }[] = [
     { headers: { 'accept-language': 'ko-KR,ko;q=0.9,en;q=0.8' }, language: 'ko', label: '새 대화' },
@@ -61,6 +63,8 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(response.status).toBe(200)
     expect(html).toContain(`lang="${language}"`)
     expect(html).toContain(label)
+    expect(html).toContain(`aria-label="${language === 'ko' ? '스킬' : 'Skills'}"`)
+    expect(html).toContain(`aria-label="${language === 'ko' ? '설정' : 'Settings'}"`)
     const settings = await fetch(new URL('/settings', origin), { headers })
     const settingsHtml = await settings.text()
     expect(settings.status).toBe(200)
