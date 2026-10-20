@@ -79,6 +79,12 @@ Dependabot은 워크플로에 고정한 액션 SHA의 업데이트를 계속 제
 
 ## 검증 방법
 
+macOS의 DMG 생성은 [실행 39454203709](https://github.com/dungsil/keundal/actions/runs/39454203709)에서
+앱 컴파일·서명 이후 `hdiutil: create failed - Resource busy`로 실패했다. 동일 구성의 앞선 실행은 성공했다.
+Tauri 공식 액션의 `retryAttempts`를 macOS에서만 2로 지정한다. 액션이 각 실패 뒤 1~10초를 기다리고
+빌드를 최대 세 번 수행하며, 모두 실패하면 작업도 실패한다. Linux와 Windows는 추가 재시도를 하지 않는다.
+`src/runner.ts`와 `src/utils.ts`의 재시도 호출·횟수·최종 예외 전달을 확인했다.
+
 - `actionlint`로 변경한 CI와 주간 감사의 구문, 표현식, 작업 의존성을 검사한다.
 - `zizmor --offline`으로 권한, 고정 SHA, 비밀 정보 전달, PR 실행 경계를 검사한다.
 - Turbo의 `--dry=json`으로 타입 검사·테스트에 데스크톱 UI 빌드가 없는지, Workers 빌드와 데스크톱 패키지 빌드의 의존성이 올바른지 확인한다.
