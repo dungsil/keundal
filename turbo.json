@@ -71,7 +71,7 @@
       "inputs": ["$TURBO_DEFAULT$", "!tests/**", "!README.md", "!tsconfig.test.json"],
       "outputs": [".nuxt-desktop/**", ".output-desktop/**", "$TURBO_ROOT$/apps/desktop/dist/**"]
     },
-    "@keundal/desktop#tauri": {
+    "@keundal/desktop#build:native": {
       "dependsOn": ["build:sidecar", "@keundal/web#build:desktop"],
       "inputs": ["$TURBO_DEFAULT$", "!tests/**", "!README.md"],
       "env": [

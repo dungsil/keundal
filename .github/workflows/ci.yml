@@ -177,17 +177,19 @@ jobs:
           cache-bin: false
 
       - name: 데스크톱 설치 파일 빌드
-        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         env:
           RUSTC_CACHE_KEY: ${{ steps.rust.outputs.cachekey }}
           APPIMAGE_EXTRACT_AND_RUN: '1'
           APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && '-' || '' }}
+          TAURI_BUNDLER_DMG_IGNORE_CI: 'true'
         with:
-          projectPath: apps/desktop
-          tauriScript: pnpm exec turbo run tauri --filter=@keundal/desktop --
-          args: -- --locked
+          command: pnpm exec turbo run build:native --filter=@keundal/desktop
+          shell: bash
+          timeout_minutes: 30
+          retry_on: error
           # macOS의 hdiutil이 일시적으로 Resource busy를 반환하면 다시 시도한다.
-          retryAttempts: ${{ runner.os == 'macOS' && 2 || 0 }}
+          max_attempts: ${{ runner.os == 'macOS' && 3 || 1 }}
 
       - name: Windows 포터블 배포 파일 준비
         if: runner.os == 'Windows'

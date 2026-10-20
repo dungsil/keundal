@@ -13,6 +13,7 @@
     "prepare:sidecar": "pnpm build:sidecar && node scripts/prepare-sidecar.mjs",
     "build:tauri": "pnpm exec turbo run build:sidecar build:desktop --filter=@keundal/desktop --filter=@keundal/web && node scripts/prepare-sidecar.mjs",
     "build:sidecar": "tsdown --config tsdown.sidecar.config.ts",
+    "build:native": "tauri build -- --locked",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
