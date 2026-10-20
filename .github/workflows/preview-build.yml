@@ -1,0 +1,71 @@
+name: PR 프리뷰 빌드
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  SKIP_INSTALL_SIMPLE_GIT_HOOKS: '1'
+  TURBO_TELEMETRY_DISABLED: '1'
+  TURBO_RUN_SUMMARY: 'true'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build-web:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    name: 웹 및 패키지 빌드
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: 저장소 가져오기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 개발 환경 준비
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+        with:
+          cache: true
+          require-lockfile: true
+
+      - name: Turbo 공유 캐시 설정
+        uses: rharkor/caching-for-turbo@760158c05c47e7a764f78e9a22ca3b5a6ed8c52e # v2.5.2
+        with:
+          provider: github
+          cache-prefix: turbo-v3-${{ runner.os }}-${{ runner.arch }}-
+          use-relative-cache-path: true
+          server-port: 0
+
+      - name: Workers 빌드
+        run: pnpm exec turbo run build:cloudflare --filter=@keundal/web
+
+      - name: Workers 빌드 아티팩트 업로드
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cloudflare-workers
+          overwrite: true
+          path: apps/web/.output
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Turbo 실행 요약 업로드
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: turbo-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}
+          path: .turbo/runs/*.json
+          if-no-files-found: ignore
+          retention-days: 3
+          overwrite: true
