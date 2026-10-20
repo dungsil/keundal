@@ -4,27 +4,35 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm build:sidecar && pnpm --filter @keundal/web exec nuxt generate --envName desktop",
+    "build": "pnpm build:sidecar && pnpm build:ui",
     "build:preview": "pnpm bundle",
     "bundle": "tauri build",
     "dev": "pnpm prepare:sidecar && tauri dev",
-    "dev:ui": "pnpm --filter @keundal/web exec nuxt dev --envName desktop --no-open",
+    "dev:ui": "nuxt dev --no-open",
     "tauri": "tauri",
     "prepare:sidecar": "pnpm build:sidecar && node scripts/prepare-sidecar.mjs",
-    "build:tauri": "pnpm exec turbo run build:sidecar build:desktop --filter=@keundal/desktop --filter=@keundal/web && node scripts/prepare-sidecar.mjs",
+    "build:tauri": "pnpm exec turbo run build:sidecar build:ui --filter=@keundal/desktop && node scripts/prepare-sidecar.mjs",
     "build:sidecar": "tsdown --config tsdown.sidecar.config.ts",
     "build:native": "tauri build -- --locked",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "nuxt typecheck && tsc -p tsconfig.sidecar.json",
+    "build:ui": "nuxt generate",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@keundal/chat-app": "workspace:*",
+    "nuxt": "^4.6.2"
   },
   "devDependencies": {
     "@keundal/agent-host": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
-    "@keundal/web": "workspace:*",
     "@tauri-apps/cli": "2.12.3",
     "@types/node": "catalog:",
+    "eslint": "^10.12.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "vue-tsc": "^3.3.13"
   }
 }

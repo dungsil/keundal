@@ -1,0 +1,84 @@
+import assert from 'node:assert/strict'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { test, type TestContext } from 'node:test'
+
+import { checkWorkspaceBoundaries } from '../check.mjs'
+
+async function fixture(t: TestContext, files: Record<string, unknown>) {
+  const root = await mkdtemp(join(tmpdir(), 'keundal-boundaries-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const manifests = {
+    'apps/alpha/package.json': { name: '@fixture/alpha' },
+    'apps/beta/package.json': { name: '@fixture/beta' },
+    'packages/shared/package.json': { name: '@fixture/shared' }
+  }
+  for (const [file, content] of Object.entries({ ...manifests, ...files })) {
+    await mkdir(join(root, file, '..'), { recursive: true })
+    await writeFile(join(root, file), typeof content === 'string' ? content : JSON.stringify(content))
+  }
+  return root
+}
+
+test('앱은 공용 패키지와 자기 앱의 소스를 참조할 수 있다', async (t) => {
+  const root = await fixture(t, {
+    'apps/alpha/package.json': { name: '@fixture/alpha', dependencies: { '@fixture/shared': 'workspace:*' } },
+    'apps/alpha/nuxt.config.ts': "export default { extends: ['@fixture/shared'] }",
+    'apps/alpha/app.vue': '<script setup>import x from "./local"</script>',
+    'packages/shared/index.ts': 'export const value = 1'
+  })
+  assert.deepEqual(await checkWorkspaceBoundaries(root), [])
+})
+
+test('모든 의존성 구역에서 앱 의존성과 별칭을 거부한다', async (t) => {
+  for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+    const root = await fixture(t, {
+      'apps/alpha/package.json': {
+        name: '@fixture/alpha',
+        [field]: { '@fixture/beta': 'workspace:*', alias: 'workspace:@fixture/beta@*' }
+      }
+    })
+    assert.equal((await checkWorkspaceBoundaries(root)).length, 2)
+  }
+})
+
+test('상대 경로와 Nuxt 상속, 동적 import, 재노출로 앱 경계를 우회할 수 없다', async (t) => {
+  const root = await fixture(t, {
+    'apps/alpha/nuxt.config.ts': "export default { extends: ['../beta'] }",
+    'apps/alpha/app.vue': '<script setup>import x from "../beta/code"</script>',
+    'packages/shared/index.ts': "export * from '../../apps/beta/code'; const x = import('@fixture/alpha/code')",
+    'packages/shared/tsconfig.json': { compilerOptions: { paths: { '#other': ['../../apps/beta/*'] } } }
+  })
+  assert.equal((await checkWorkspaceBoundaries(root)).length, 5)
+})
+
+test('패키지에서 앱을 참조하거나 스크립트로 다른 앱을 실행하면 실패한다', async (t) => {
+  const root = await fixture(t, {
+    'packages/shared/package.json': { name: '@fixture/shared', dependencies: { '@fixture/alpha': 'workspace:*' } },
+    'apps/alpha/package.json': { name: '@fixture/alpha', scripts: { build: 'pnpm --filter @fixture/beta build' } }
+  })
+  assert.equal((await checkWorkspaceBoundaries(root)).length, 2)
+})
+
+test('file과 link, workspace 상대 경로로 앱 의존성을 선언하면 실패한다', async (t) => {
+  for (const protocol of ['file:', 'link:', 'workspace:']) {
+    const root = await fixture(t, {
+      'apps/alpha/package.json': { name: '@fixture/alpha', dependencies: { alias: `${protocol}../beta` } }
+    })
+    assert.equal((await checkWorkspaceBoundaries(root)).length, 1)
+  }
+})
+
+test('baseUrl과 상속한 paths 별칭으로 앱 경계를 우회할 수 없다', async (t) => {
+  const root = await fixture(t, {
+    'packages/shared/tsconfig.base.json': {
+      compilerOptions: { baseUrl: '../..', paths: { '@other/*': ['apps/beta/*'] } }
+    },
+    'apps/alpha/tsconfig.json': { extends: '../../packages/shared/tsconfig.base.json' },
+    'apps/alpha/index.ts': "import '@other/index'"
+  })
+  const errors = await checkWorkspaceBoundaries(root)
+  assert.equal(errors.length, 2)
+  assert.ok(errors.some((error) => error.startsWith(`${join('apps', 'alpha', 'tsconfig.json')}:`)))
+})
