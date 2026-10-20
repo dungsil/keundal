@@ -7,8 +7,8 @@
 LLM 플러그인과 저장소 플러그인을 등록한 `ctx`에서 사용합니다.
 
 ```ts
+import agentPlugin from '@keundal/agent'
 import { McpClient } from '@keundal/mcp'
-import simpleAgentPlugin from '@keundal/plugin-agent-simple'
 
 const mcp = await McpClient.connect({
   serverName: 'documents',
@@ -24,7 +24,7 @@ const mcp = await McpClient.connect({
 // MCP 연결은 이를 생성한 플러그인이 해제될 때 닫습니다.
 ctx.fiber.effect(() => () => mcp.close())
 
-await ctx.plugin(simpleAgentPlugin, {
+await ctx.plugin(agentPlugin, {
   model: 'your-model',
   maxOutputTokens: 1024,
   tools: (options) => mcp.tools(options)
@@ -37,7 +37,7 @@ await ctx.plugin(simpleAgentPlugin, {
 
 ```ts
 const tools = await mcp.tools()
-await ctx.plugin(simpleAgentPlugin, { model: 'your-model', maxOutputTokens: 1024, tools })
+await ctx.plugin(agentPlugin, { model: 'your-model', maxOutputTokens: 1024, tools })
 ```
 
 두 서버의 도구는 한 공급자에서 합칩니다. 서버마다 서로 다른 `serverName`을 지정합니다. 같은 이름을 지정해 도구 이름이 중복되면 에이전트가 생성을 시작하기 전에 거부합니다.

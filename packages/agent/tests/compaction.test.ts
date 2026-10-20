@@ -1,6 +1,6 @@
+import agentPlugin from '@keundal/agent'
 import { EventType, LLMService, type LLMEvent, type LLMRequest } from '@keundal/core'
 import type { RunAgentInput } from '@keundal/core'
-import simpleAgentPlugin from '@keundal/plugin-agent-simple'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { Context } from 'cordis'
 import { expect, test } from 'vitest'
@@ -45,7 +45,7 @@ test('에이전트와 메모리 저장소를 조합하면 축약 후 커밋하�
   const llm = await ctx.plugin(LLM)
   t.onTestFinished(() => llm.dispose())
   const store = await ctx.plugin(memoryStorePlugin)
-  const agent = await ctx.plugin(simpleAgentPlugin, {
+  const agent = await ctx.plugin(agentPlugin, {
     model: 'test',
     maxOutputTokens: 100,
     compaction: { keepRecentMessages: 1, maxSummaryTokens: 100 }
@@ -99,7 +99,7 @@ test('축약 후 입력이 예산 안에 들면 재카운트 없이 실행한다
   const llm = await ctx.plugin(LLM)
   t.onTestFinished(() => llm.dispose())
   const store = await ctx.plugin(memoryStorePlugin)
-  const agent = await ctx.plugin(simpleAgentPlugin, {
+  const agent = await ctx.plugin(agentPlugin, {
     model: 'test',
     maxOutputTokens: 200,
     compaction: { keepRecentMessages: 1, maxSummaryTokens: 100 }

@@ -6,6 +6,7 @@ import { connect } from 'node:net'
 import { networkInterfaces, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import agentPlugin from '@keundal/agent'
 import {
   EventType,
   LLMService,
@@ -14,7 +15,6 @@ import {
   type ExecutionOptions,
   type LLMEvent
 } from '@keundal/core'
-import agentPlugin from '@keundal/plugin-agent-simple'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { Context, type Fiber } from 'cordis'
 

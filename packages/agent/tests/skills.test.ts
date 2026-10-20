@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import agentPlugin, { AgentConfigSchema, type AgentConfig } from '@keundal/agent'
 import {
   EventType,
   LLMService,
@@ -11,7 +12,6 @@ import {
   type RunAgentInput,
   type SkillProvider
 } from '@keundal/core'
-import simpleAgentPlugin, { SimpleAgentConfigSchema, type SimpleAgentConfig } from '@keundal/plugin-agent-simple'
 import skillPlugin from '@keundal/plugin-skill'
 import filesystemSkillPlugin from '@keundal/plugin-skill-filesystem'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
@@ -45,7 +45,7 @@ async function setup(
   t: TestContext,
   scripts: LLMEvent[][] = [answer],
   count?: (request: LLMRequest) => number,
-  tools?: SimpleAgentConfig['tools']
+  tools?: AgentConfig['tools']
 ) {
   const ctx = new Context()
   const requests: LLMRequest[] = []
@@ -73,7 +73,7 @@ async function setup(
     await store.dispose()
     await llm.dispose()
   })
-  const agent = await ctx.plugin(simpleAgentPlugin, { model: 'test', maxOutputTokens: 100, skills: true, tools })
+  const agent = await ctx.plugin(agentPlugin, { model: 'test', maxOutputTokens: 100, skills: true, tools })
   t.onTestFinished(() => agent.dispose())
   return { ctx, requests, counted, registry, agent }
 }
@@ -131,7 +131,7 @@ test('현재 목록으로 기존 메시지를 대체하고 빈 목록과 사용 
   expect(requests[1].input.messages.find((message) => message.id === catalog.id)?.content).toContain('(none)')
   expect(JSON.stringify(requests[1].input.messages)).not.toContain('One two')
   await agent.dispose()
-  const disabled = await ctx.plugin(simpleAgentPlugin, { model: 'test', maxOutputTokens: 100 })
+  const disabled = await ctx.plugin(agentPlugin, { model: 'test', maxOutputTokens: 100 })
   t.onTestFinished(() => disabled.dispose())
   await collect(ctx.agent.run({ ...input, runId: 'disabled' }))
   expect(requests[2].input.tools).toEqual([])
@@ -233,10 +233,10 @@ test('스킬 서비스가 돌아오면 활성화한 에이전트를 다시 구�
 
 test('스킬 설정은 boolean만 받고 자동 로더와 같은 이름의 도구를 거부한다', async () => {
   const config = { model: 'test', maxOutputTokens: 100 }
-  expect((await SimpleAgentConfigSchema['~standard'].validate({ ...config, skills: 'yes' })).issues).toBeDefined()
+  expect((await AgentConfigSchema['~standard'].validate({ ...config, skills: 'yes' })).issues).toBeDefined()
   expect(
     (
-      await SimpleAgentConfigSchema['~standard'].validate({
+      await AgentConfigSchema['~standard'].validate({
         ...config,
         skills: true,
         tools: [{ name: 'skill', description: 'custom', parameters: {}, execute: () => '' }]

@@ -1,5 +1,11 @@
 import { getEventListeners } from 'node:events'
 
+import agentPlugin, {
+  AgentConfigSchema,
+  type ExecutableTool,
+  type AgentConfig,
+  type ToolExecutionContext
+} from '@keundal/agent'
 import {
   EventType,
   LLMService,
@@ -10,12 +16,6 @@ import {
   type LLMRequest,
   type RunAgentInput
 } from '@keundal/core'
-import simpleAgentPlugin, {
-  SimpleAgentConfigSchema,
-  type ExecutableTool,
-  type SimpleAgentConfig,
-  type ToolExecutionContext
-} from '@keundal/plugin-agent-simple'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { Context } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
@@ -53,7 +53,7 @@ async function collect(stream: AsyncIterable<AGUIEvent>) {
 async function setup(
   t: TestContext,
   scripts: readonly (readonly LLMEvent[])[],
-  config: Partial<SimpleAgentConfig> = {},
+  config: Partial<AgentConfig> = {},
   overrides: { stream?: LLMService['stream']; countTokens?: LLMService['countTokens'] } = {}
 ) {
   const ctx = new Context()
@@ -79,7 +79,7 @@ async function setup(
   }
   const llm = await ctx.plugin(LLM)
   const store = await ctx.plugin(memoryStorePlugin)
-  const agent = await ctx.plugin(simpleAgentPlugin, {
+  const agent = await ctx.plugin(agentPlugin, {
     model: 'test',
     maxOutputTokens: 100,
     tools: [tool()],
@@ -149,7 +149,7 @@ test.for([true, false])(
 )
 
 test.each(['webSearch', 'reasoning'] as const)('$0가 boolean이 아니면 에이전트 설정을 거부한다', async (key) => {
-  const result = await SimpleAgentConfigSchema['~standard'].validate({
+  const result = await AgentConfigSchema['~standard'].validate({
     model: 'test',
     maxOutputTokens: 100,
     [key]: 'true'
@@ -489,7 +489,7 @@ test('요청과 설정에 같은 도구를 정의하면 생성을 시작하기 �
 
 test('설정은 실행 함수를 보존하고 중복 도구와 잘못된 반복 한도를 거부한다', async () => {
   const execute = () => 'ok'
-  const valid = await SimpleAgentConfigSchema['~standard'].validate({
+  const valid = await AgentConfigSchema['~standard'].validate({
     model: 'test',
     maxOutputTokens: 10,
     tools: [tool(execute)]
@@ -502,7 +502,7 @@ test('설정은 실행 함수를 보존하고 중복 도구와 잘못된 반복 
     { maxToolRounds: 0 },
     { maxToolRounds: 1.5 }
   ]) {
-    const result = await SimpleAgentConfigSchema['~standard'].validate({
+    const result = await AgentConfigSchema['~standard'].validate({
       model: 'test',
       maxOutputTokens: 10,
       ...invalid

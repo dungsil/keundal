@@ -22,7 +22,7 @@
     "@iconify-json/simple-icons": "^1.2.99",
     "@keundal/core": "workspace:*",
     "@keundal/ui": "workspace:*",
-    "@keundal/plugin-agent-simple": "workspace:*",
+    "@keundal/agent": "workspace:*",
     "@keundal/plugin-llm-anthropic": "workspace:*",
     "@keundal/plugin-llm-gemini": "workspace:*",
     "@keundal/plugin-llm-openai": "workspace:*",

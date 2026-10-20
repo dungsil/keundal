@@ -34,7 +34,7 @@ const catalog = await ctx.skills.prepare({ signal })
 const definition = await catalog.load('review', { signal })
 ```
 
-파일을 사용하려면 [파일시스템 공급자](../plugin-skill-filesystem/README.md)를 등록합니다. 모델 연결은 [에이전트의 스킬 설정](../plugin-agent-simple/README.md#스킬-사용)을 사용합니다.
+파일을 사용하려면 [파일시스템 공급자](../plugin-skill-filesystem/README.md)를 등록합니다. 모델 연결은 [에이전트의 스킬 설정](../agent/README.md#스킬-사용)을 사용합니다.
 
 ## 선택과 오류
 
