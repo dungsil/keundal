@@ -11,6 +11,7 @@ import { createLLMSettingsStorage, LLM_SETTINGS_KEY } from '../../shared/utils/l
 import { SkillManager } from '../../shared/utils/skills'
 
 export default defineNuxtPlugin(async () => {
+  const { t } = useLocale()
   const ctx = new Context()
   const desktop = useRuntimeConfig().public.desktop
   const invokeNative = desktop ? (await import('@tauri-apps/api/core')).invoke : undefined
@@ -23,14 +24,14 @@ export default defineNuxtPlugin(async () => {
     try {
       settings.value = await storage.load()
     } catch {
-      throw createError({ statusCode: 503, statusMessage: 'Secure storage unavailable', message: 'Could not load LLM settings. Unlock your OS secret store and restart the app. No browser storage fallback is used.' })
+      throw createError({ statusCode: 503, statusMessage: t('error.secureStorage'), message: t('error.secureStorageDescription') })
     }
   }
   async function saveLLMSettings(next: LLMSettings) {
     await storage.save(next)
     settings.value = next
   }
-  const modelCatalog = useModelCatalog(settings)
+  const modelCatalog = useModelCatalog(settings, () => t('model.loadFailed'))
   const skillManager = new SkillManager(localStorage, invokeNative)
   const runtime = useRuntimeConfig().public
   let remoteInfo: RemoteAgentInfo | undefined

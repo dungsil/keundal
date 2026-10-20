@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { ChatStatus } from '#shared/utils/chat-message'
 
+const { t } = useLocale()
+
 const props = withDefaults(
   defineProps<{
     status?: ChatStatus
@@ -30,8 +32,10 @@ const input = defineModel<string>({ default: '' })
 const dictation = ref<'idle' | 'recording' | 'transcribing'>('idle')
 const dictationPreview = ref('')
 const placeholder = computed(() => {
-  if (dictation.value === 'idle') return undefined
-  return dictationPreview.value || (dictation.value === 'recording' ? 'Listening...' : 'Transcribing...')
+  if (dictation.value === 'idle') return t('chat.prompt')
+  return (
+    dictationPreview.value || (dictation.value === 'recording' ? t('dictation.listening') : t('dictation.transcribing'))
+  )
 })
 
 const canDictate = computed(

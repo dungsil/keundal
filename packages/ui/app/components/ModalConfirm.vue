@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { t } = useLocale()
+
 defineProps<{
   title: string
   description: string
@@ -19,8 +21,8 @@ const emit = defineEmits<{ close: [boolean] }>()
     :dismissible="false"
   >
     <template #footer>
-      <UButton :color="color" label="Delete" @click="emit('close', true)" />
-      <UButton color="neutral" variant="ghost" label="Cancel" @click="emit('close', false)" />
+      <UButton :color="color" :label="t('common.delete')" @click="emit('close', true)" />
+      <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="emit('close', false)" />
     </template>
   </UModal>
 </template>

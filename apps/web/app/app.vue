@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { en, ko } from '@nuxt/ui/locale'
+
+const { locale, t } = useLocale()
+const uiLocale = computed(() => locale.value === 'ko' ? ko : en)
+
 const colorMode = useColorMode()
 
 const color = computed(() => colorMode.value === 'dark' ? '#1b1718' : 'white')
@@ -13,12 +18,12 @@ useHead({
     { rel: 'icon', href: '/favicon.ico' }
   ],
   htmlAttrs: {
-    lang: 'en'
+    lang: locale
   }
 })
 
-const title = 'Nuxt AI Chatbot template'
-const description = 'A full-featured, hackable Nuxt AI chatbot template made with Nuxt UI.'
+const title = computed(() => t('seo.title'))
+const description = computed(() => t('seo.description'))
 
 useSeoMeta({
   title,
@@ -31,7 +36,7 @@ useSeoMeta({
 </script>
 
 <template>
-  <UApp :toaster="{ position: 'top-right' }" :tooltip="{ delayDuration: 200 }">
+  <UApp :locale="uiLocale" :toaster="{ position: 'top-right' }" :tooltip="{ delayDuration: 200 }">
     <NuxtLoadingIndicator color="var(--ui-primary)" />
 
     <NuxtLayout>

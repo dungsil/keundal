@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { ChatMessage } from '#shared/utils/chat-message'
 
+const { t } = useLocale()
+
 const props = defineProps<{
   message: ChatMessage
   text: string
@@ -19,10 +21,10 @@ const editingText = ref(props.text)
     <UTextarea v-model="editingText" autofocus autoresize :rows="1" size="xl" variant="none" :ui="{ base: 'p-0' }" />
 
     <div class="flex gap-1.5 justify-end">
-      <UButton size="sm" variant="soft" color="neutral" label="Cancel" @click="emit('cancel')" />
+      <UButton size="sm" variant="soft" color="neutral" :label="t('common.cancel')" @click="emit('cancel')" />
       <UButton
         size="sm"
-        label="Save"
+        :label="t('common.save')"
         :disabled="!editingText.trim() || editingText === text"
         @click="emit('save', message, editingText)"
       />

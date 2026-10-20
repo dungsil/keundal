@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
+const { t } = useLocale()
+
 const props = defineProps<{
   chatId: string
   title?: string | null
@@ -13,7 +15,7 @@ const emit = defineEmits<{
 
 const { renameChat, deleteChat } = useChatActions()
 
-const displayTitle = computed(() => props.title || 'Untitled')
+const displayTitle = computed(() => props.title || t('chat.untitled'))
 
 async function rename() {
   const newTitle = await renameChat(props.chatId, props.title)
@@ -23,14 +25,14 @@ async function rename() {
 const items = computed<DropdownMenuItem[][]>(() => [
   [
     {
-      label: 'Rename',
+      label: t('common.rename'),
       icon: 'i-lucide-pencil',
       onSelect: rename
     }
   ],
   [
     {
-      label: 'Delete',
+      label: t('common.delete'),
       icon: 'i-lucide-trash',
       color: 'error' as const,
       onSelect: () => deleteChat(props.chatId)

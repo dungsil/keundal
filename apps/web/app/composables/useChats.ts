@@ -3,11 +3,13 @@ import { isToday, isYesterday, subMonths } from 'date-fns'
 export interface UIChat {
   id: string
   label: string
+  untitled?: boolean
   icon: string
   createdAt: string
 }
 
 export function useChats(chats: Ref<UIChat[] | undefined>) {
+  const { t, intlLocale } = useLocale()
   const groups = computed(() => {
     // Group chats by date
     const today: UIChat[] = []
@@ -31,11 +33,7 @@ export function useChats(chats: Ref<UIChat[] | undefined>) {
       } else if (chatDate >= oneMonthAgo) {
         lastMonth.push(chat)
       } else {
-        // Format: "January 2023", "February 2023", etc.
-        const monthYear = chatDate.toLocaleDateString('en-US', {
-          month: 'long',
-          year: 'numeric'
-        })
+        const monthYear = `${chatDate.getFullYear()}-${String(chatDate.getMonth() + 1).padStart(2, '0')}`
 
         if (!older[monthYear]) {
           older[monthYear] = []
@@ -46,11 +44,7 @@ export function useChats(chats: Ref<UIChat[] | undefined>) {
     })
 
     // Sort older chats by month-year in descending order (newest first)
-    const sortedMonthYears = Object.keys(older).sort((a, b) => {
-      const dateA = new Date(a)
-      const dateB = new Date(b)
-      return dateB.getTime() - dateA.getTime()
-    })
+    const sortedMonthYears = Object.keys(older).sort().reverse()
 
     // Create formatted groups for navigation
     const formattedGroups = [] as Array<{
@@ -63,7 +57,7 @@ export function useChats(chats: Ref<UIChat[] | undefined>) {
     if (today.length) {
       formattedGroups.push({
         id: 'today',
-        label: 'Today',
+        label: t('date.today'),
         items: today
       })
     }
@@ -71,7 +65,7 @@ export function useChats(chats: Ref<UIChat[] | undefined>) {
     if (yesterday.length) {
       formattedGroups.push({
         id: 'yesterday',
-        label: 'Yesterday',
+        label: t('date.yesterday'),
         items: yesterday
       })
     }
@@ -79,7 +73,7 @@ export function useChats(chats: Ref<UIChat[] | undefined>) {
     if (lastWeek.length) {
       formattedGroups.push({
         id: 'last-week',
-        label: 'Last week',
+        label: t('date.lastWeek'),
         items: lastWeek
       })
     }
@@ -87,7 +81,7 @@ export function useChats(chats: Ref<UIChat[] | undefined>) {
     if (lastMonth.length) {
       formattedGroups.push({
         id: 'last-month',
-        label: 'Last month',
+        label: t('date.lastMonth'),
         items: lastMonth
       })
     }
@@ -97,7 +91,7 @@ export function useChats(chats: Ref<UIChat[] | undefined>) {
       if (older[monthYear]?.length) {
         formattedGroups.push({
           id: monthYear,
-          label: monthYear,
+          label: new Date(`${monthYear}-01T12:00:00`).toLocaleDateString(intlLocale.value, { year: 'numeric', month: 'long' }),
           items: older[monthYear]
         })
       }

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { ChatMessage } from '#shared/utils/chat-message'
 
+const { t } = useLocale()
+
 defineProps<{
   message: ChatMessage
   editing: boolean
@@ -33,10 +35,10 @@ const emit = defineEmits<{
         v-else-if="part.type === 'tool-skill'"
         :text="
           part.state === 'output-error'
-            ? 'Skill loading interrupted'
+            ? t('tool.skillInterrupted')
             : isToolStreaming(part)
-              ? 'Loading skill...'
-              : 'Loaded skill'
+              ? t('tool.skillLoading')
+              : t('tool.skillLoaded')
         "
         :suffix="(part.input as { name?: string })?.name"
         :streaming="isToolStreaming(part)"
@@ -48,7 +50,7 @@ const emit = defineEmits<{
       </UChatTool>
       <UChatTool
         v-else-if="part.type === 'tool-web_search' || part.type === 'tool-google_search'"
-        :text="isToolStreaming(part) ? 'Searching the web...' : 'Searched the web'"
+        :text="isToolStreaming(part) ? t('tool.searching') : t('tool.searched')"
         :suffix="getSearchQuery(part)"
         :streaming="isToolStreaming(part)"
         chevron="leading"

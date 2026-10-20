@@ -36,6 +36,7 @@ interface Session {
  * from the browser with a short-lived token, and exposes the transcript as it arrives.
  */
 export function useDictation() {
+  const { t } = useLocale()
   const { settings } = useLLMSettings()
 
   // Assumed on the server so the button renders in the SSR output, checked once mounted
@@ -166,7 +167,7 @@ export function useDictation() {
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch((cause: Error) => {
       abort.abort()
-      throw cause.name === 'NotAllowedError' ? new Error('Microphone access was denied') : cause
+      throw cause.name === 'NotAllowedError' ? new Error(t('dictation.denied')) : cause
     })
     if (cancelled) {
       // Cancelled while the permission prompt was open

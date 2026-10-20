@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { t } = useLocale()
+
 const props = defineProps<{
   chatId: string
   visibility: 'public' | 'private'
@@ -10,30 +12,26 @@ defineEmits<{
 
 const isShared = computed(() => props.visibility === 'public')
 
-const options = [
+const options = computed(() => [
   {
     value: 'private' as const,
-    label: 'Keep private',
-    description: 'Only you have access',
+    label: t('chat.private'),
+    description: t('chat.privateDescription'),
     icon: 'i-lucide-lock'
   },
   {
     value: 'public' as const,
-    label: 'Shared',
-    description: 'Anyone with the link can view',
+    label: t('chat.shared'),
+    description: t('chat.sharedDescription'),
     icon: 'i-lucide-globe'
   }
-]
+])
 </script>
 
 <template>
-  <UModal
-    :title="isShared ? 'Chat shared' : 'Share chat'"
-    description="Stored only in this browser. Public sharing is unavailable."
-    close
-  >
-    <UTooltip text="Share chat">
-      <UButton color="neutral" variant="ghost" icon="i-lucide-share" aria-label="Share chat" />
+  <UModal :title="isShared ? t('chat.sharedTitle') : t('chat.share')" :description="t('chat.sharingUnavailable')" close>
+    <UTooltip :text="t('chat.share')">
+      <UButton color="neutral" variant="ghost" icon="i-lucide-share" :aria-label="t('chat.share')" />
     </UTooltip>
 
     <template #body>

@@ -9,19 +9,14 @@ interface ChatListItem {
 }
 
 export function useChatActions() {
+  const { t } = useLocale()
   const route = useRoute()
   const toast = useToast()
   const overlay = useOverlay()
   const { $chatStore } = useNuxtApp()
 
   const renameModal = overlay.create(LazyModalRename)
-  const deleteModal = overlay.create(LazyModalConfirm, {
-    props: {
-      title: 'Delete chat',
-      description: 'Are you sure you want to delete this chat? This cannot be undone.',
-      color: 'error'
-    }
-  })
+  const deleteModal = overlay.create(LazyModalConfirm)
 
   async function renameChat(id: string, currentTitle?: string | null): Promise<string | null> {
     const instance = renameModal.open({ title: currentTitle ?? '' })
@@ -45,7 +40,7 @@ export function useChatActions() {
       return result
     } catch {
       toast.add({
-        description: 'Failed to rename chat',
+        description: t('chat.renameFailed'),
         icon: 'i-lucide-alert-circle',
         color: 'error'
       })
@@ -55,7 +50,11 @@ export function useChatActions() {
   }
 
   async function deleteChat(id: string): Promise<boolean> {
-    const instance = deleteModal.open()
+    const instance = deleteModal.open({
+      title: t('chat.deleteTitle'),
+      description: t('chat.deleteDescription'),
+      color: 'error'
+    })
     const result = await instance.result
 
     if (!result) return false
@@ -64,8 +63,8 @@ export function useChatActions() {
       await $chatStore.delete(id)
 
       toast.add({
-        title: 'Chat deleted',
-        description: 'Your chat has been deleted',
+        title: t('chat.deleted'),
+        description: t('chat.deletedDescription'),
         icon: 'i-lucide-trash'
       })
 
@@ -81,7 +80,7 @@ export function useChatActions() {
       return true
     } catch {
       toast.add({
-        description: 'Failed to delete chat',
+        description: t('chat.deleteFailed'),
         icon: 'i-lucide-alert-circle',
         color: 'error'
       })

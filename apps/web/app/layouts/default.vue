@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
+const { t } = useLocale()
+
 const { renameChat, deleteChat } = useChatActions()
 
 const route = useRoute()
@@ -12,14 +14,19 @@ const { data: chats } = await useAsyncData('chats', () => $chatStore.list(), {
   server: false,
   transform: data => data.map(chat => ({
     id: chat.id,
-    label: chat.title || 'Untitled',
+    label: chat.title || '',
     to: `/chat/${chat.id}`,
     icon: 'i-lucide-message-circle',
     createdAt: chat.createdAt
   }))
 })
 
-const { groups } = useChats(chats)
+const localizedChats = computed(() => chats.value?.map(chat => ({
+  ...chat,
+  untitled: !chat.label,
+  label: chat.label || t('chat.untitled')
+})))
+const { groups } = useChats(localizedChats)
 
 const items = computed(() => groups.value?.flatMap((group) => {
   return [{
@@ -29,20 +36,20 @@ const items = computed(() => groups.value?.flatMap((group) => {
     ...item,
     slot: 'chat' as const,
     icon: undefined,
-    class: item.label === 'Untitled' ? 'text-muted' : ''
+    class: item.untitled ? 'text-muted' : ''
   }))]
 }))
 
-function getChatActions(item: { id: string, label: string }): DropdownMenuItem[][] {
+function getChatActions(item: { id: string, label: string, untitled?: boolean }): DropdownMenuItem[][] {
   return [[
     {
-      label: 'Rename',
+      label: t('common.rename'),
       icon: 'i-lucide-pencil',
-      onSelect: () => renameChat(item.id, item.label === 'Untitled' ? '' : item.label)
+      onSelect: () => renameChat(item.id, item.untitled ? '' : item.label)
     }
   ], [
     {
-      label: 'Delete',
+      label: t('common.delete'),
       icon: 'i-lucide-trash',
       color: 'error' as const,
       onSelect: () => deleteChat(item.id)
@@ -84,12 +91,12 @@ defineShortcuts({
       <template #default="{ collapsed }">
         <UNavigationMenu
           :items="[{
-            label: 'New chat',
+            label: t('chat.new'),
             to: '/',
             kbds: ['meta', 'o'],
             icon: 'i-lucide-circle-plus'
           }, {
-            label: 'Search',
+            label: t('chat.search'),
             icon: 'i-lucide-search',
             kbds: ['meta', 'k'],
             onSelect: () => {
@@ -135,7 +142,7 @@ defineShortcuts({
                 variant="link"
                 size="sm"
                 class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50 data-[state=open]:bg-accented/50"
-                aria-label="Chat actions"
+                :aria-label="t('chat.actions')"
                 tabindex="-1"
                 @click.stop.prevent
               />
@@ -149,13 +156,13 @@ defineShortcuts({
           <div class="flex flex-col gap-1 w-full">
             <SkillSettings :collapsed="collapsed" />
             <UButton
-              :label="collapsed ? '' : '설정'"
+              :label="collapsed ? '' : t('settings.title')"
               :to="{ path: '/settings', query: route.path === '/settings' ? route.query : { returnTo: route.path } }"
               icon="i-lucide-settings-2"
               color="neutral"
               :variant="route.path === '/settings' ? 'soft' : 'ghost'"
               class="w-full"
-              aria-label="설정"
+              :aria-label="t('settings.title')"
               @click="sidebarOpen = false"
             />
           </div>
@@ -165,11 +172,11 @@ defineShortcuts({
 
     <UDashboardSearch
       v-model:open="searchOpen"
-      placeholder="Search chats..."
+      :placeholder="t('chat.searchPlaceholder')"
       :groups="[{
         id: 'links',
         items: [{
-          label: 'New chat',
+          label: t('chat.new'),
           to: '/',
           icon: 'i-lucide-circle-plus',
           kbds: ['meta', 'o']

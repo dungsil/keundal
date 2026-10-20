@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { LLM_PROVIDERS, defaultLLMSettings, providerSettingsSchema, type LLMProvider } from '#shared/utils/llm-settings'
 
+const { t } = useLocale()
+
 defineProps<{ returnTo: string }>()
 
 const { settings } = useLLMSettings()
@@ -63,19 +65,22 @@ async function save(forget = false) {
         .filter((row) => row.key || row.value)
       if (rows.some((row) => !row.key)) {
         provider.value = item.id
-        error.value = 'Enter a key for every request header value.'
+        error.value = t('llm.headerKeyRequired')
         return
       }
       if (new Set(rows.map((row) => row.key.toLowerCase())).size !== rows.length) {
         provider.value = item.id
-        error.value = 'Duplicate request header names'
+        error.value = t('llm.duplicateHeaders')
         return
       }
       draft.value[item.id].headers = Object.fromEntries(rows.map((row) => [row.key, row.value]))
       const parsed = providerSettingsSchema.safeParse(draft.value[item.id])
       if (!parsed.success) {
         provider.value = item.id
-        error.value = parsed.error.issues[0]!.message
+        const field = parsed.error.issues[0]!.path[0]
+        error.value = t(
+          field === 'apiKey' ? 'llm.invalidKey' : field === 'baseURL' ? 'llm.invalidURL' : 'llm.invalidHeaders'
+        )
         return
       }
       next[item.id] = parsed.data
@@ -86,19 +91,13 @@ async function save(forget = false) {
     await $chatStore.stop()
     await $saveLLMSettings(next)
     toast.add({
-      title: forget
-        ? 'Provider settings removed'
-        : desktop
-          ? 'Settings saved in OS secret store'
-          : 'Settings saved in this browser',
+      title: forget ? t('llm.removed') : desktop ? t('llm.savedOS') : t('llm.savedBrowser'),
       icon: 'i-lucide-check',
       color: 'success'
     })
     loadDraft()
   } catch {
-    error.value = desktop
-      ? 'Could not save settings. Unlock your OS secret store and check its availability and size limits. No browser storage fallback is used.'
-      : 'Could not save settings. Check that browser storage is available.'
+    error.value = desktop ? t('llm.saveFailedOS') : t('llm.saveFailedBrowser')
   } finally {
     saving.value = false
   }
@@ -110,15 +109,11 @@ async function save(forget = false) {
     <div class="space-y-2">
       <h2 id="llm-settings-title" class="text-lg font-semibold text-highlighted">LLM</h2>
       <p class="text-sm text-muted">
-        {{
-          desktop
-            ? 'Your settings are saved in your OS secret store. Requests go directly to the provider.'
-            : 'Your keys stay in this browser. Requests go directly to the provider.'
-        }}
+        {{ desktop ? t('llm.descriptionOS') : t('llm.descriptionBrowser') }}
       </p>
     </div>
     <form id="llm-settings" class="flex flex-col gap-5" @submit.prevent="save()">
-      <UFormField label="Provider" name="provider">
+      <UFormField :label="t('llm.provider')" name="provider">
         <USelect
           v-model="provider"
           :items="[...LLM_PROVIDERS]"
@@ -129,29 +124,21 @@ async function save(forget = false) {
         />
       </UFormField>
       <p class="text-sm text-muted">
-        Models are loaded automatically from this provider after saving. Choose the active model in the chat composer.
+        {{ t('llm.modelsDescription') }}
       </p>
-      <UFormField
-        label="API key (optional)"
-        name="apiKey"
-        description="Leave empty for endpoints that do not require authentication. Custom request headers still apply."
-      >
+      <UFormField :label="t('llm.apiKey')" name="apiKey">
         <UInput
           v-model="draft[provider].apiKey"
           type="password"
           autocomplete="off"
           autocapitalize="off"
           :spellcheck="false"
-          placeholder="Leave empty for no authentication"
+          :placeholder="t('llm.apiKeyPlaceholder')"
           class="w-full"
           :disabled="saving"
         />
       </UFormField>
-      <UFormField
-        label="API base URL (optional)"
-        name="baseURL"
-        description="Leave empty for the official endpoint. A custom endpoint receives your key and must support browser CORS."
-      >
+      <UFormField :label="t('llm.baseURL')" name="baseURL" :description="t('llm.baseURLDescription')">
         <UInput
           v-model="draft[provider].baseURL"
           :placeholder="current.baseURL"
@@ -162,17 +149,16 @@ async function save(forget = false) {
         />
       </UFormField>
       <fieldset class="space-y-3">
-        <legend class="text-sm font-medium text-highlighted">Request headers (optional)</legend>
+        <legend class="text-sm font-medium text-highlighted">{{ t('llm.headers') }}</legend>
         <p class="text-sm text-muted">
-          Custom headers override provider defaults for HTTP requests, including model discovery. Your endpoint must
-          allow them via CORS; browser-forbidden headers cannot be set. WebSocket connections cannot use custom headers.
+          {{ t('llm.headersDescription') }}
         </p>
         <div v-for="(row, index) in headerRows[provider]" :key="row.id" class="flex items-start gap-2">
           <UInput
             :id="row.id"
             v-model="row.key"
-            :aria-label="`Header ${index + 1} key`"
-            placeholder="Key"
+            :aria-label="t('llm.headerKey', { index: index + 1 })"
+            :placeholder="t('common.key')"
             autocomplete="off"
             autocapitalize="off"
             :spellcheck="false"
@@ -181,8 +167,8 @@ async function save(forget = false) {
           />
           <UInput
             v-model="row.value"
-            :aria-label="`Header ${index + 1} value`"
-            placeholder="Value"
+            :aria-label="t('llm.headerValue', { index: index + 1 })"
+            :placeholder="t('common.value')"
             autocomplete="off"
             autocapitalize="off"
             :spellcheck="false"
@@ -192,7 +178,7 @@ async function save(forget = false) {
           <UButton
             type="button"
             icon="i-lucide-trash-2"
-            :aria-label="`Remove header ${index + 1}`"
+            :aria-label="t('llm.removeHeader', { index: index + 1 })"
             color="neutral"
             variant="ghost"
             :disabled="saving"
@@ -201,7 +187,7 @@ async function save(forget = false) {
         </div>
         <UButton
           type="button"
-          label="Add header"
+          :label="t('llm.addHeader')"
           icon="i-lucide-plus"
           color="neutral"
           variant="outline"
@@ -213,12 +199,8 @@ async function save(forget = false) {
         :icon="desktop ? 'i-lucide-shield-check' : 'i-lucide-shield-alert'"
         color="neutral"
         variant="subtle"
-        :title="desktop ? 'Protected by your OS secret store' : 'Browser storage is not a secure vault'"
-        :description="
-          desktop
-            ? 'API keys, URLs and headers are saved in macOS Keychain, Windows Credential Manager or Linux Secret Service, not localStorage. Settings are available in app memory while in use and are not synced to your account.'
-            : 'Keys and headers are stored unencrypted in localStorage. Scripts on this site and browser extensions may read them. Do not use a shared browser. Settings are not synced to your account.'
-        "
+        :title="desktop ? t('llm.protectedOS') : t('llm.browserWarning')"
+        :description="desktop ? t('llm.storageOS') : t('llm.storageBrowser')"
       />
     </form>
     <div class="flex flex-wrap items-center justify-between gap-3 w-full">
@@ -226,7 +208,7 @@ async function save(forget = false) {
         {{ error }}
       </p>
       <UButton
-        label="Forget provider"
+        :label="t('llm.forget')"
         color="error"
         variant="ghost"
         :disabled="
@@ -238,9 +220,9 @@ async function save(forget = false) {
         @click="save(true)"
       />
       <div class="flex gap-2">
-        <UButton label="취소" :to="returnTo" color="neutral" variant="ghost" :disabled="saving" />
+        <UButton :label="t('common.cancel')" :to="returnTo" color="neutral" variant="ghost" :disabled="saving" />
         <UButton
-          :label="desktop ? 'Save in OS secret store' : 'Save in this browser'"
+          :label="desktop ? t('llm.saveOS') : t('llm.saveBrowser')"
           type="submit"
           form="llm-settings"
           :loading="saving"

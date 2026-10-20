@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import type { ChatMessage } from '../../shared/utils/chat-message'
 
+const { t } = useLocale()
+
 const input = useState('new-chat-input', () => '')
 const loading = ref(false)
 const chatId = crypto.randomUUID()
 
 const greeting = computed(() => {
   const hour = new Date().getHours()
-  let timeGreeting = 'Good evening'
-  if (hour < 12) timeGreeting = 'Good morning'
-  else if (hour < 18) timeGreeting = 'Good afternoon'
+  let timeGreeting = t('greeting.evening')
+  if (hour < 12) timeGreeting = t('greeting.morning')
+  else if (hour < 18) timeGreeting = t('greeting.afternoon')
 
   return timeGreeting
 })
@@ -55,36 +57,36 @@ async function onSubmit() {
   if (await createChat(input.value)) clearFiles()
 }
 
-const quickChats = [
+const quickChats = computed(() => [
   {
-    label: 'Why use Nuxt UI?',
+    label: t('suggestion.nuxt'),
     icon: 'i-logos-nuxt-icon'
   },
   {
-    label: 'Help me create a Vue composable',
+    label: t('suggestion.vue'),
     icon: 'i-logos-vue'
   },
   {
-    label: 'Tell me more about UnJS',
+    label: t('suggestion.unjs'),
     icon: 'i-logos-unjs'
   },
   {
-    label: 'Why should I consider VueUse?',
+    label: t('suggestion.vueuse'),
     icon: 'i-logos-vueuse'
   },
   {
-    label: 'Tailwind CSS best practices',
+    label: t('suggestion.tailwind'),
     icon: 'i-logos-tailwindcss-icon'
   },
   {
-    label: 'What is the weather in Bordeaux?',
+    label: t('suggestion.weather'),
     icon: 'i-lucide-sun'
   },
   {
-    label: 'Show me a chart of sales data',
+    label: t('suggestion.chart'),
     icon: 'i-lucide-line-chart'
   }
-]
+])
 </script>
 
 <template>

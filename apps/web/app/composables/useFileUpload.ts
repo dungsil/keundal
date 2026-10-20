@@ -3,6 +3,7 @@ function createObjectUrl(file: File): string {
 }
 
 export function useFileUploadWithStatus() {
+  const { t } = useLocale()
   const files = ref<FileWithStatus[]>([])
   const toast = useToast()
 
@@ -22,8 +23,8 @@ export function useFileUploadWithStatus() {
 
       try {
         if (!fileWithStatus.file.type.startsWith('image/'))
-          throw new Error('Keundal currently supports image attachments only')
-        if (fileWithStatus.file.size > 8 * 1024 * 1024) throw new Error('File exceeds 8MB')
+          throw new Error(t('file.imagesOnly'))
+        if (fileWithStatus.file.size > 8 * 1024 * 1024) throw new Error(t('file.tooLarge'))
         const url = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
           reader.onload = () => resolve(reader.result as string)
@@ -38,9 +39,9 @@ export function useFileUploadWithStatus() {
         })
       } catch (error) {
         const errorMessage
-          = (error as { data?: { message?: string } }).data?.message || (error as Error).message || 'Upload failed'
+          = (error as { data?: { message?: string } }).data?.message || (error as Error).message || t('file.failed')
         toast.add({
-          title: 'Upload failed',
+          title: t('file.failed'),
           description: errorMessage,
           icon: 'i-lucide-alert-circle',
           color: 'error'
