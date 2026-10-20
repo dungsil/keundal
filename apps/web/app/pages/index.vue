@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ChatMessage } from '../../shared/utils/chat-message'
 
-const input = ref('')
+const input = useState('new-chat-input', () => '')
 const loading = ref(false)
 const chatId = crypto.randomUUID()
 
@@ -43,6 +43,7 @@ async function createChat(prompt: string) {
   try {
     const chat = await $chatStore.create(chatId, { id: crypto.randomUUID(), role: 'user', parts }, model.value)
     await refreshNuxtData('chats')
+    input.value = ''
     await navigateTo(`/chat/${chat.id}`)
     return true
   } finally {
