@@ -47,7 +47,7 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(html).toContain('id="__nuxt"')
     if (path === '/') {
       const head = /<head\b[^>]*>([\s\S]*?)<\/head>/.exec(html)?.[1] ?? ''
-      const script = [...head.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
+      const script = [...head.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
         .map(match => match[1])
         .find(content => content?.includes('dataset.greetingTime'))
       expect(script, '앱 스크립트 실행 전에 인사말을 선택해야 한다').toBeDefined()
