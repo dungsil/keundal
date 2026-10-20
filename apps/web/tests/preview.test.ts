@@ -1,7 +1,9 @@
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { createServer } from 'node:net'
+import { runInNewContext } from 'node:vm'
 import { expect, onTestFinished, test } from 'vitest'
+import { translate } from '../../../packages/ui/app/utils/locale'
 
 test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이 렌더링한다', async () => {
   const listener = createServer().listen(0, '127.0.0.1')
@@ -44,9 +46,19 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(response.headers.get('content-type')).toContain('text/html')
     expect(html).toContain('id="__nuxt"')
     if (path === '/') {
-      const heading = /<h1\b[^>]*>([\s\S]*?)<\/h1>/.exec(html)?.[1]
-      expect(heading).toBeDefined()
-      expect(heading).not.toMatch(/좋은 (아침|오후|저녁)|Good (morning|afternoon|evening)/)
+      const head = /<head\b[^>]*>([\s\S]*?)<\/head>/.exec(html)?.[1] ?? ''
+      const script = [...head.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
+        .map(match => match[1])
+        .find(content => content?.includes('dataset.greetingTime'))
+      expect(script, '앱 스크립트 실행 전에 인사말을 선택해야 한다').toBeDefined()
+      for (const [hour, period] of [[0, 'morning'], [11, 'morning'], [12, 'afternoon'], [17, 'afternoon'], [18, 'evening'], [23, 'evening']] as const) {
+        const dataset: Record<string, string> = {}
+        runInNewContext(script!, {
+          document: { documentElement: { dataset } },
+          Date: class { getHours() { return hour } }
+        })
+        expect(dataset.greetingTime, `${hour}시`).toBe(period)
+      }
     }
     expect(html.match(/<button\b[^>]*aria-label="Skills"/), path).not.toBeNull()
     expect(html.match(/<a\b[^>]*aria-label="Settings"/), path).not.toBeNull()
@@ -63,6 +75,12 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(response.status).toBe(200)
     expect(html).toContain(`lang="${language}"`)
     expect(html).toContain(label)
+    const heading = /<h1\b[^>]*>([\s\S]*?)<\/h1>/.exec(html)?.[1]
+    expect(heading).toBeDefined()
+    for (const period of ['morning', 'afternoon', 'evening'] as const) {
+      expect(heading).toContain(`data-greeting="${period}"`)
+      expect(heading).toContain(translate(language === 'ko' ? 'ko' : 'en', `greeting.${period}`))
+    }
     expect(html).toContain(`aria-label="${language === 'ko' ? '스킬' : 'Skills'}"`)
     expect(html).toContain(`aria-label="${language === 'ko' ? '설정' : 'Settings'}"`)
     const settings = await fetch(new URL('/settings', origin), { headers })

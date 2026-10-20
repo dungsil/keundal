@@ -17,6 +17,16 @@ useHead({
   link: [
     { rel: 'icon', href: '/favicon.ico' }
   ],
+  script: [
+    {
+      key: 'greeting-time',
+      tagPriority: 'critical',
+      innerHTML: `(() => {
+        const hour = new Date().getHours()
+        document.documentElement.dataset.greetingTime = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'
+      })()`
+    }
+  ],
   htmlAttrs: {
     lang: locale
   }

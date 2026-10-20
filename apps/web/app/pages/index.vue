@@ -7,15 +7,6 @@ const input = useState('new-chat-input', () => '')
 const loading = ref(false)
 const chatId = crypto.randomUUID()
 
-const greeting = computed(() => {
-  const hour = new Date().getHours()
-  let timeGreeting = t('greeting.evening')
-  if (hour < 12) timeGreeting = t('greeting.morning')
-  else if (hour < 18) timeGreeting = t('greeting.afternoon')
-
-  return timeGreeting
-})
-
 const {
   dropzoneRef,
   dragging,
@@ -105,12 +96,9 @@ const quickChats = computed(() => [
 
         <UContainer class="flex-1 flex flex-col justify-center gap-4 sm:gap-6 py-8">
           <h1 class="text-3xl sm:text-4xl text-highlighted font-bold">
-            <ClientOnly>
-              {{ greeting }}
-              <template #fallback>
-                <span aria-hidden="true">&nbsp;</span>
-              </template>
-            </ClientOnly>
+            <span data-greeting="morning">{{ t('greeting.morning') }}</span>
+            <span data-greeting="afternoon">{{ t('greeting.afternoon') }}</span>
+            <span data-greeting="evening">{{ t('greeting.evening') }}</span>
           </h1>
 
           <ChatPrompt
@@ -142,3 +130,15 @@ const quickChats = computed(() => [
     </template>
   </UDashboardPanel>
 </template>
+
+<style scoped>
+[data-greeting] {
+  display: none;
+}
+
+html[data-greeting-time='morning'] [data-greeting='morning'],
+html[data-greeting-time='afternoon'] [data-greeting='afternoon'],
+html[data-greeting-time='evening'] [data-greeting='evening'] {
+  display: inline;
+}
+</style>
