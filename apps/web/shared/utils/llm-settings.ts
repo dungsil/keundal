@@ -1,3 +1,4 @@
+import { isContextOverflow } from '@keundal/core'
 import { z } from 'zod'
 
 export const LLM_PROVIDERS = [
@@ -84,5 +85,6 @@ export function providerError(provider: LLMProvider, error: unknown, credentials
   }
   // eslint-disable-next-line no-control-regex -- Remove control characters from untrusted provider diagnostics.
   detail = detail.replace(/[\x00-\x1f\x7f]/g, ' ').trim().slice(0, 1000)
-  return new Error(`${provider} request failed${status ? ` (HTTP ${status})` : ''}. ${detail || 'Check your API key, API URL and the endpoint\'s browser CORS permissions.'}`)
+  const redacted = new Error(`${provider} request failed${status ? ` (HTTP ${status})` : ''}. ${detail || 'Check your API key, API URL and the endpoint\'s browser CORS permissions.'}`)
+  return isContextOverflow(error) ? Object.assign(redacted, { code: 'context_length_exceeded' }) : redacted
 }

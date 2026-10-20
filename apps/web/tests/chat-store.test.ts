@@ -246,3 +246,56 @@ test('IndexedDB를 다시 열면 미완료 journal을 한 번 복구하고 LLM�
   expect(result.messages[1]!.id).toBe('interrupted')
   expect(result.messages[1]!.parts).toContainEqual({ type: 'text', text: '저장된 부분 응답' })
 })
+
+test('웹 대화가 다음 턴에서도 준비한 축약을 재사용하고 최신 화면 상태와 메시지를 보존한다', async () => {
+  const ctx = new Context()
+  const gate = Promise.withResolvers<undefined>()
+  const ready = Promise.withResolvers<undefined>()
+  const started = Promise.withResolvers<AbortSignal>()
+  const requests: LLMRequest[] = []
+  class LLM extends LLMService {
+    async getModel() { return { contextWindow: 10000, maxOutputTokens: 1000 } }
+    async countTokens(request: LLMRequest) {
+      if (request.input.messages.some(message => 'content' in message && typeof message.content === 'string' && message.content.startsWith('Summary of earlier'))) ready.resolve(undefined)
+      return request.input.messages.some(message => message.id === 'history-0') ? 8000 : 100
+    }
+
+    async* stream(request: LLMRequest, execution?: { signal?: AbortSignal }): AsyncIterable<LLMEvent> {
+      const summary = request.input.messages.some(message => message.role === 'system' && message.content.startsWith('Summarize the conversation data'))
+      const title = request.input.messages.some(message => message.role === 'system' && message.content.startsWith('Generate a chat title'))
+      if (summary) {
+        started.resolve(execution!.signal!)
+        await gate.promise
+      } else if (!title) requests.push(request)
+      const messageId = crypto.randomUUID()
+      yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' }
+      yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: summary ? 'Earlier facts.' : 'Response' }
+      yield { type: EventType.TEXT_MESSAGE_END, messageId }
+    }
+  }
+  const llm = await ctx.plugin(LLM)
+  const store = await ctx.plugin(memoryStorePlugin)
+  const chats = new ChatStore(ctx)
+  onTestFinished(async () => {
+    gate.resolve(undefined)
+    await chats.stop()
+    await store.dispose()
+    await llm.dispose()
+  })
+  const messages: ChatMessage[] = Array.from({ length: 9 }, (_, index) => ({
+    id: `history-${index}`, role: index % 2 ? 'assistant' : 'user', parts: [{ type: 'text', text: `Message ${index}` }]
+  }))
+  await chats.create('proactive', messages[0]!, model)
+  expect((await collect(chats.respond('proactive', { model, messages }))).at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect((await started.promise).aborted).toBe(false)
+  gate.resolve(undefined)
+  await ready.promise
+  await new Promise(resolve => setTimeout(resolve, 0))
+  const saved = (await chats.get('proactive'))!
+  const next: ChatMessage = { id: 'new-question', role: 'user', parts: [{ type: 'text', text: 'Next question' }] }
+  expect((await collect(chats.respond('proactive', { model, messages: [...saved.messages, next] }))).at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(requests).toHaveLength(2)
+  expect(requests[1]!.input.messages.some(message => message.id === 'history-0')).toBe(false)
+  expect(requests[1]!.input.messages.some(message => message.id === next.id)).toBe(true)
+  expect((requests[1]!.input.state as { web: { messages: ChatMessage[] } }).web.messages.at(-1)).toEqual(next)
+})

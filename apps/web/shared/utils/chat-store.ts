@@ -20,9 +20,20 @@ type ChatState = { web: LocalChat }
 
 /** Uses only Keundal service contracts: swapping the store plugin needs no UI/agent changes. */
 export class ChatStore {
+  private readonly runtimes = new Map<string, { key: string, runtime: Awaited<ReturnType<typeof createKeundalChat>> }>()
   private readonly active = new Map<string, { abort: AbortController, done: Promise<void> }>()
 
   constructor(private readonly ctx: Context) {}
+
+  private async trimRuntimes(limit: number) {
+    while (this.runtimes.size > limit) {
+      const idle = [...this.runtimes.keys()].find(id => !this.active.has(id))
+      if (!idle) return
+      const entry = this.runtimes.get(idle)!
+      this.runtimes.delete(idle)
+      await entry.runtime.dispose()
+    }
+  }
 
   private chat(snapshot: SessionSnapshot | undefined): LocalChat | undefined {
     return (snapshot?.state as ChatState | undefined)?.web
@@ -106,6 +117,8 @@ export class ChatStore {
     }
     const snapshot = await this.ctx.session.get(id)
     await this.ctx.session.delete(id, snapshot?.revision ?? 0)
+    await this.runtimes.get(id)?.runtime.dispose()
+    this.runtimes.delete(id)
   }
 
   async* respond(id: string, request: {
@@ -132,7 +145,20 @@ export class ChatStore {
       const runId = crypto.randomUUID()
       let chat = { ...current, messages: request.messages, model: request.model, started: true, pendingRunId: runId }
       const saved = await this.save(snapshot, chat)
-      runtime = await createKeundalChat(this.ctx, request.model, { ...request, maxOutputTokens: Math.min(4096, limits.maxOutputTokens, limits.contextWindow - 1) })
+      const maxOutputTokens = Math.min(4096, limits.maxOutputTokens, limits.contextWindow - 1)
+      const key = JSON.stringify([request.model, request.webSearch, request.reasoning, maxOutputTokens, !!this.ctx.skills])
+      let cached = this.runtimes.get(id)
+      if (cached && cached.key !== key) {
+        await cached.runtime.dispose()
+        this.runtimes.delete(id)
+        cached = undefined
+      }
+      if (!cached) {
+        await this.trimRuntimes(7)
+        cached = { key, runtime: await createKeundalChat(this.ctx, request.model, { ...request, maxOutputTokens }) }
+        this.runtimes.set(id, cached)
+      }
+      runtime = cached.runtime
       const titleGenerated = !chat.title
       if (titleGenerated) {
         chat = { ...chat, title: await runtime.title(chat.messages[0]!, combined) }
@@ -149,10 +175,10 @@ ${request.webSearch && !request.model.startsWith('google/') ? 'Use native web se
         }
       })
     } finally {
+      this.active.delete(id)
       try {
-        await runtime?.dispose()
+        await this.trimRuntimes(8)
       } finally {
-        this.active.delete(id)
         release()
       }
     }
@@ -174,12 +200,18 @@ ${request.webSearch && !request.model.startsWith('google/') ? 'Use native web se
           await this.complete(id, run.request.input.runId, message)
         }
       })
-      for await (const _event of events) { /* Drain the journal projection and persist it. */ }
+      try {
+        for await (const _event of events) { /* Drain the journal projection and persist it. */ }
+      } finally {
+        await runtime.dispose()
+      }
     }
   }
 
   async stop() {
     for (const active of this.active.values()) active.abort.abort()
     await Promise.all([...this.active.values()].map(active => active.done))
+    await Promise.all([...this.runtimes.values()].map(entry => entry.runtime.dispose()))
+    this.runtimes.clear()
   }
 }

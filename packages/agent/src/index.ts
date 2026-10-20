@@ -1,22 +1,34 @@
-import { compact, SummaryCompactionConfigSchema, type SummaryCompactionConfig } from '@keundal/compaction'
+import { compact } from '@keundal/compaction'
 import type {} from '@keundal/context'
 import {
   CONTEXT_MESSAGE_EVENT,
   EventType,
+  isContextOverflow,
   CONTEXT_MESSAGE_PREFIX,
   parseRunAgentInput,
   type AGUIEvent,
   type CompactionResult,
   type ExecutionOptions,
+  type LLMRequest,
+  type LLMEvent,
   type RunAgentInput
 } from '@keundal/core'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { Service, type Context } from 'cordis'
 
+import {
+  parseCompactionConfig,
+  applyPrepared,
+  matchesPrepared,
+  waitForPreparation,
+  type AgentCompactionConfig,
+  type PreparedCompaction
+} from './compaction.js'
 import { SYSTEM_PROMPT_ID, withSystemPrompt } from './prompt.js'
 import { SKILL_CATALOG_ID, skillTool, withSkillCatalog } from './skills.js'
 import { addTools, parseTools, streamWithTools, type ExecutableTool } from './tools.js'
 
+export type { AgentCompactionConfig, CompactionPolicy } from './compaction.js'
 export type { ExecutableTool, ToolExecutionContext } from './tools.js'
 
 export type ToolProvider = (options: ExecutionOptions) => readonly ExecutableTool[] | Promise<readonly ExecutableTool[]>
@@ -26,7 +38,7 @@ export interface AgentConfig {
   readonly maxOutputTokens: number
   readonly webSearch?: boolean
   readonly reasoning?: boolean
-  readonly compaction?: SummaryCompactionConfig
+  readonly compaction?: AgentCompactionConfig
   readonly tools?: readonly ExecutableTool[] | ToolProvider
   readonly skills?: boolean
   readonly context?: boolean
@@ -55,11 +67,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
   ) {
     throw new Error('model and a positive integer maxOutputTokens are required')
   }
-  const compaction = SummaryCompactionConfigSchema['~standard'].validate(
-    'compaction' in value ? value.compaction : undefined
-  )
-  if (compaction.issues)
-    throw new Error(compaction.issues.map((issue) => issue.message).join('; ') || 'invalid compaction config')
+  const compaction = parseCompactionConfig('compaction' in value ? value.compaction : undefined)
   for (const key of ['webSearch', 'reasoning', 'skills', 'context'] as const) {
     const option = (value as Record<string, unknown>)[key]
     if (option !== undefined && typeof option !== 'boolean') {
@@ -86,7 +94,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     maxOutputTokens: value.maxOutputTokens,
     ...('webSearch' in value ? { webSearch: value.webSearch as boolean | undefined } : {}),
     ...('reasoning' in value ? { reasoning: value.reasoning as boolean | undefined } : {}),
-    compaction: compaction.value,
+    compaction,
     tools,
     skills,
     ...('context' in value ? { context: value.context as boolean | undefined } : {}),
@@ -123,14 +131,22 @@ declare module 'cordis' {
 export class Agent extends Service {
   private readonly active = new Set<AbortController>()
   private closed = false
+  private readonly preparations = new Map<string, PreparedCompaction>()
+  private readonly compactionPolicy: ReturnType<Agent['resolveCompactionPolicy']>
 
   constructor(
     ctx: Context,
     protected readonly config: AgentConfig
   ) {
     super(ctx, 'agent')
+    this.compactionPolicy = this.resolveCompactionPolicy()
     ctx.fiber.effect(() => () => {
       this.closed = true
+      for (const entry of this.preparations.values()) {
+        entry.detach()
+        entry.controller.abort(new Error('agent disposed'))
+      }
+      this.preparations.clear()
       for (const controller of this.active) controller.abort(new Error('agent disposed'))
     })
   }
@@ -228,7 +244,9 @@ export class Agent extends Service {
       ) {
         throw new Error('requested output budget exceeds the model limits')
       }
-      const maxInputTokens = model.contextWindow - maxOutputTokens
+      const maxInputTokens = model.contextWindow - maxOutputTokens - (this.compactionPolicy.reserveTokens ?? 0)
+      if (!Number.isSafeInteger(maxInputTokens) || maxInputTokens <= 0)
+        throw new Error('compaction reserveTokens exceeds the model input budget')
       let step = 1
       const contextualInput = this.config.context
         ? await this.ctx.requestContext.prepare(preparedInput, {
@@ -246,6 +264,8 @@ export class Agent extends Service {
           )
         : []
       const llm = this.ctx.llm
+      const stream = (request: LLMRequest, execution?: ExecutionOptions) =>
+        this.streamWithRetry(request, maxInputTokens, execution?.signal ?? signal)
       const maxToolRounds = this.config.maxToolRounds ?? 8
       const parallel = this.config.parallelTools ?? false
       const prepareNext = async (next: RunAgentInput, generationSignal: AbortSignal) => {
@@ -257,11 +277,11 @@ export class Agent extends Service {
               contextWindow: model.contextWindow
             })
           : next
-        return (await this.fitInput(contextual, maxInputTokens, generationSignal)).input
+        return (await this.fitInput(contextual, maxInputTokens, generationSignal, false, signal)).input
       }
 
       signal.throwIfAborted()
-      yield* this.ctx.generation.run(
+      const generation = this.ctx.generation.run(
         {
           input: fitted.input,
           model: this.config.model,
@@ -273,40 +293,126 @@ export class Agent extends Service {
         },
         {
           signal,
-          ...(tools.length || this.config.context
-            ? {
-                stream: async function* (generationRequest, execution) {
-                  const generationSignal = execution?.signal ?? signal
-                  for (const message of initialContext) {
-                    generationSignal.throwIfAborted()
-                    yield { type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value: message }
-                  }
-                  generationSignal.throwIfAborted()
-                  yield* tools.length
-                    ? streamWithTools(
-                        llm,
-                        generationRequest,
-                        tools,
-                        maxToolRounds,
-                        (next) => prepareNext(next, generationSignal),
-                        generationSignal,
-                        { parallel }
-                      )
-                    : llm.stream(generationRequest, { signal: generationSignal })
-                }
-              }
-            : {})
+          stream: async function* (generationRequest, execution) {
+            const generationSignal = execution?.signal ?? signal
+            for (const message of initialContext) {
+              generationSignal.throwIfAborted()
+              yield { type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value: message }
+            }
+            generationSignal.throwIfAborted()
+            yield* tools.length
+              ? streamWithTools(
+                  llm,
+                  generationRequest,
+                  tools,
+                  maxToolRounds,
+                  (next) => prepareNext(next, generationSignal),
+                  generationSignal,
+                  { parallel, stream }
+                )
+              : stream(generationRequest, { signal: generationSignal })
+          }
         }
       )
+      for await (const event of generation) {
+        if (event.type === EventType.RUN_FINISHED) {
+          for (const entry of this.preparations.values()) if (entry.sourceSignal === signal) entry.detach()
+        }
+        yield event
+      }
     } finally {
       cleanup()
+    }
+  }
+
+  private resolveCompactionPolicy() {
+    const config = parseCompactionConfig(this.config.compaction)
+    return config.models?.[this.config.model] ?? config
+  }
+
+  private discardPreparation(threadId: string, entry: PreparedCompaction) {
+    if (this.preparations.get(threadId) === entry) this.preparations.delete(threadId)
+    entry.detach()
+    entry.controller.abort(new Error('compaction preparation discarded'))
+  }
+
+  private prepareCompaction(input: RunAgentInput, maxInputTokens: number, inputTokens: number, signal: AbortSignal) {
+    if (this.preparations.has(input.threadId)) return
+    // 준비 결과와 진행 중 작업의 수를 함께 제한합니다.
+    if (this.preparations.size >= 32) {
+      const oldest = this.preparations.entries().next().value
+      if (oldest) this.discardPreparation(...oldest)
+    }
+    let snapshot: RunAgentInput
+    try {
+      snapshot = globalThis.structuredClone(input)
+      JSON.stringify(snapshot)
+    } catch {
+      // 복제·비교할 수 없는 상태는 준비를 생략하고 정상 생성을 계속합니다.
+      return
+    }
+    const controller = new globalThis.AbortController()
+    const abort = () => controller.abort(signal.reason)
+    const detach = () => signal.removeEventListener('abort', abort)
+    signal.addEventListener('abort', abort, { once: true })
+    const entry: PreparedCompaction = {
+      input: snapshot,
+      controller,
+      sourceSignal: signal,
+      detach,
+      task: Promise.resolve(undefined)
+    }
+    this.preparations.set(input.threadId, entry)
+    entry.task = compact(
+      this.ctx.llm,
+      {
+        input: entry.input,
+        model: this.config.model,
+        maxInputTokens
+      },
+      { ...this.compactionPolicy, signal: controller.signal, inputTokens, force: true }
+    ).then(
+      (result) => {
+        if (!controller.signal.aborted && this.preparations.get(input.threadId) === entry) entry.result = result
+        detach()
+        return entry.result
+      },
+      () => {
+        detach()
+        // 준비 실패는 실제 생성에 영향을 주지 않습니다. 필요해지면 동기 축약으로 재시도합니다.
+        if (this.preparations.get(input.threadId) === entry) this.preparations.delete(input.threadId)
+        return undefined
+      }
+    )
+  }
+
+  private async *streamWithRetry(
+    request: LLMRequest,
+    maxInputTokens: number,
+    signal: AbortSignal
+  ): AsyncGenerator<LLMEvent> {
+    let emitted = false
+    try {
+      for await (const event of this.ctx.llm.stream(request, { signal })) {
+        signal.throwIfAborted()
+        emitted = true
+        yield event
+      }
+    } catch (error) {
+      signal.throwIfAborted()
+      if (emitted || !isContextOverflow(error)) throw error
+      const fitted = await this.fitInput(request.input, maxInputTokens, signal, true)
+      signal.throwIfAborted()
+      yield* this.ctx.llm.stream({ ...request, input: fitted.input }, { signal })
     }
   }
 
   private async fitInput(
     input: RunAgentInput,
     maxInputTokens: number,
-    signal: AbortSignal
+    signal: AbortSignal,
+    force = false,
+    backgroundSignal = signal
   ): Promise<{ input: RunAgentInput; compaction?: CompactionResult }> {
     signal.throwIfAborted()
     const countTokens = async (candidate: RunAgentInput) => {
@@ -326,7 +432,30 @@ export class Agent extends Service {
     }
 
     const count = await countTokens(input)
-    if (count <= maxInputTokens) return { input }
+    const entry = this.preparations.get(input.threadId)
+    if (entry && matchesPrepared(entry, input)) {
+      if (count > maxInputTokens || force) await waitForPreparation(entry.task, signal)
+      signal.throwIfAborted()
+      const ready = applyPrepared(entry, input)
+      if (entry.result && !ready) this.discardPreparation(input.threadId, entry)
+      if (ready) {
+        const candidate = { ...input, messages: ready.messages }
+        const tokens = await countTokens(candidate)
+        this.discardPreparation(input.threadId, entry)
+        if (tokens <= maxInputTokens && tokens < count) return { input: candidate, compaction: ready }
+      }
+    } else if (entry) this.discardPreparation(input.threadId, entry)
+    if (!force && count <= maxInputTokens) {
+      const policy = this.compactionPolicy
+      if (
+        count >= maxInputTokens * (policy.threshold ?? 0.8) &&
+        input.messages.length > (policy.keepRecentMessages ?? 6) &&
+        input.messages.filter((message) => message.role === 'user' && !message.id.startsWith(CONTEXT_MESSAGE_PREFIX))
+          .length > 1
+      )
+        this.prepareCompaction(input, maxInputTokens, count, backgroundSignal)
+      return { input }
+    }
 
     const compaction = await compact(
       this.ctx.llm,
@@ -335,7 +464,7 @@ export class Agent extends Service {
         model: this.config.model,
         maxInputTokens
       },
-      { ...this.config.compaction, signal, inputTokens: count }
+      { ...this.compactionPolicy, signal, inputTokens: count, force }
     )
     signal.throwIfAborted()
     const compacted = { ...input, messages: compaction.messages }
