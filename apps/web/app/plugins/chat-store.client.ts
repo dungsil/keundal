@@ -4,7 +4,8 @@ import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
 import skillPlugin from '@keundal/plugin-skill'
 import { ChatStore, type ChatStoreLike } from '../../shared/utils/chat-store'
 import { RemoteChatStore, type RemoteAgentInfo } from '../../shared/utils/remote-chat-store'
-import type { ModelOption } from '../../shared/utils/models'
+import { createDesktopChatStore } from '../../shared/utils/desktop-chat-store'
+import { resolveModel, type ModelOption } from '../../shared/utils/models'
 import { browserLLMPlugin } from '../../shared/utils/browser-llm'
 import { defaultLLMSettings, type LLMSettings } from '../../shared/utils/llm-settings'
 import { createLLMSettingsStorage, LLM_SETTINGS_KEY } from '../../shared/utils/llm-settings-storage'
@@ -29,19 +30,48 @@ export default defineNuxtPlugin(async () => {
   }
   async function saveLLMSettings(next: LLMSettings) {
     await storage.save(next)
+    if (desktopStore) {
+      try {
+        await desktopStore.reloadSettings()
+      } catch (error) {
+        await storage.save(settings.value)
+        throw error
+      }
+    }
     settings.value = next
   }
   const modelCatalog = useModelCatalog(settings, () => t('model.loadFailed'))
   const skillManager = new SkillManager(localStorage, invokeNative)
   const runtime = useRuntimeConfig().public
-  let remoteInfo: RemoteAgentInfo | undefined
+  let desktopStore: Awaited<ReturnType<typeof createDesktopChatStore>> | undefined
+  const selectModel = desktop && invokeNative ? (value: string) => desktopStore!.selectModel(value) : undefined
   if (desktop && invokeNative) {
+    let initial: string | undefined
     try {
-      remoteInfo = await invokeNative<RemoteAgentInfo>('sidecar_info')
+      const saved = localStorage.getItem('keundal:model')
+      if (saved) initial = resolveModel(saved).value
     } catch {
-      // Desktop keeps the browser-only mode when the local host cannot start.
+      // Ignore invalid or unavailable non-sensitive model preferences.
     }
-  } else if (runtime.agentEndpoint) {
+    desktopStore = await createDesktopChatStore(invokeNative, () => modelCatalog.models.value, initial)
+    useState('chat-model', () => desktopStore!.selectedModel)
+    await desktopStore.recover()
+    if (import.meta.hot) import.meta.hot.dispose(() => desktopStore!.stop())
+    return {
+      provide: {
+        chatStore: desktopStore as ChatStoreLike,
+        remoteAgent: true,
+        remoteModels: undefined as Ref<ModelOption[]> | undefined,
+        selectModel,
+        llmSettings: settings,
+        saveLLMSettings,
+        modelCatalog,
+        skillManager
+      }
+    }
+  }
+  let remoteInfo: RemoteAgentInfo | undefined
+  if (runtime.agentEndpoint) {
     remoteInfo = { endpoint: runtime.agentEndpoint, token: runtime.agentToken ?? '' }
   }
 
@@ -60,6 +90,7 @@ export default defineNuxtPlugin(async () => {
         chatStore,
         remoteAgent: true,
         remoteModels,
+        selectModel,
         llmSettings: settings,
         saveLLMSettings,
         modelCatalog,
@@ -87,6 +118,7 @@ export default defineNuxtPlugin(async () => {
       chatStore,
       remoteAgent: false,
       remoteModels,
+      selectModel,
       llmSettings: settings,
       saveLLMSettings,
       modelCatalog,

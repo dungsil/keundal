@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const { t } = useLocale()
 
-const { selectedModel, models, loading, error, refresh } = useModels()
+const { selectedModel, models, loading, switching, error, refresh } = useModels()
 </script>
 
 <template>
@@ -9,6 +9,7 @@ const { selectedModel, models, loading, error, refresh } = useModels()
     v-model="selectedModel"
     :items="models"
     :loading="loading"
+    :disabled="switching"
     size="sm"
     :icon="models.find((m) => m.value === selectedModel)?.icon"
     color="neutral"

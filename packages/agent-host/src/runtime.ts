@@ -22,7 +22,8 @@ export async function createAgentRuntime(
     provider === 'openai' ? env.OPENAI_API_KEY : provider === 'gemini' ? env.GEMINI_API_KEY : env.ANTHROPIC_API_KEY
   const model = env.KEUNDAL_MODEL
   if (!model?.trim()) throw new Error('KEUNDAL_MODEL 환경 변수를 설정하세요.')
-  if (!apiKey?.trim()) throw new Error('OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY 중 하나를 설정하세요.')
+  if (!env.KEUNDAL_PROVIDER && !apiKey?.trim())
+    throw new Error('OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY 중 하나를 설정하세요.')
   const contextWindow = Number(env.KEUNDAL_CONTEXT_WINDOW ?? 128_000)
   const maxOutputTokens = Number(env.KEUNDAL_MAX_OUTPUT_TOKENS ?? 4_096)
   const options: AgentAppOptions = {
@@ -38,7 +39,7 @@ export async function createAgentRuntime(
   if (sqlitePath !== ':memory:') mkdirSync(dirname(sqlitePath), { recursive: true })
   const host = await createAgentHost({
     provider,
-    apiKey,
+    apiKey: apiKey ?? '',
     model,
     models: { [model]: { contextWindow, maxOutputTokens } },
     sqlitePath,

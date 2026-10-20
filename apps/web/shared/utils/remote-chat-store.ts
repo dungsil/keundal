@@ -31,9 +31,14 @@ export class RemoteChatStore implements ChatStoreLike {
   private modelsCache: RemoteModel[] | undefined
 
   constructor(
-    private readonly connection: RemoteAgentInfo,
+    private connection: RemoteAgentInfo,
     private readonly request: typeof globalThis.fetch = globalThis.fetch
   ) {}
+
+  protected reconnect(connection: RemoteAgentInfo) {
+    this.connection = connection
+    this.modelsCache = undefined
+  }
 
   private url(path: string) {
     return `${this.connection.endpoint.replace(/\/+$/, '')}${path}`
@@ -176,17 +181,20 @@ export class RemoteChatStore implements ChatStoreLike {
   private async model(raw: string): Promise<RemoteModel> {
     if (!this.modelsCache) await this.models()
     const value = resolveModel(raw)
-    const found = this.modelsCache?.find(model => model.id === value.id || model.id === raw)
+    const found = this.modelsCache?.find(model =>
+      (model.provider === 'gemini' ? 'google' : model.provider) === value.provider
+      && (model.id === value.id || model.id === raw))
     if (!found) throw new Error(`Keundal host does not provide this model: ${raw}`)
     return found
   }
 
-  private async title(model: RemoteModel, message: ChatMessage): Promise<string> {
+  private async title(model: RemoteModel, message: ChatMessage, signal?: AbortSignal): Promise<string> {
     const provider = model.provider === 'gemini' ? 'google' : model.provider
     const first = toMessages([message], `${provider}/${model.id}`)[0]
     if (!first) return ''
     const response = await this.call('/title', {
       method: 'POST',
+      signal,
       body: JSON.stringify({ model: model.id, message: first })
     })
     const result = await response.json() as { title: string }
@@ -218,13 +226,14 @@ export class RemoteChatStore implements ChatStoreLike {
       const saved = await this.save(snapshot, chat)
       if (!chat.title && chat.messages[0]) {
         try {
-          chat = { ...chat, title: await this.title(selected, chat.messages[0]) }
+          chat = { ...chat, title: await this.title(selected, chat.messages[0], combined) }
           await this.save(saved, chat)
           request.onTitle?.(chat.title!)
         } catch {
           // A title failure must not discard the saved conversation.
         }
       }
+      combined.throwIfAborted()
       const projection = new ChatMessageAssembly(runId)
       let finished: Extract<AGUIEvent, { type: 'RUN_FINISHED' }> | undefined
       let failed = false

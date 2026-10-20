@@ -85,6 +85,7 @@ export default {
   'model.cache':
     '공급자의 모델 목록은 이 브라우저에 1시간 동안 저장됩니다. 이 앱의 텍스트·도구·토큰 계산 API를 지원하는 모델만 표시됩니다.',
   'model.loadFailed': '모델 목록을 불러오지 못했습니다.',
+  'model.switchFailed': '로컬 모델을 전환하지 못했습니다. LLM 설정을 확인한 뒤 다시 시도하세요.',
   'llm.title': 'LLM 설정',
   'llm.provider': '공급자',
   'llm.apiKey': 'API 키',
@@ -104,7 +105,7 @@ export default {
   'llm.savedOS': '운영체제 보안 저장소에 설정을 저장했습니다.',
   'llm.savedBrowser': '이 브라우저에 설정을 저장했습니다.',
   'llm.saveFailedOS':
-    '설정을 저장하지 못했습니다. 운영체제 보안 저장소의 잠금을 해제하고 사용 가능 여부와 용량 제한을 확인하세요. 브라우저 저장소에는 대신 저장하지 않습니다.',
+    '설정을 저장하거나 적용하지 못했습니다. 운영체제 보안 저장소와 로컬 호스트를 확인한 뒤 다시 시도하세요.',
   'llm.saveFailedBrowser': '설정을 저장하지 못했습니다. 브라우저 저장소를 사용할 수 있는지 확인하세요.',
   'llm.descriptionOS': '설정은 운영체제 보안 저장소에 저장됩니다. 요청은 공급자에게 직접 전송됩니다.',
   'llm.descriptionBrowser': 'API 키는 이 브라우저에 저장됩니다. 요청은 공급자에게 직접 전송됩니다.',

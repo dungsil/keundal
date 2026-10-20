@@ -18,6 +18,7 @@ import { onTestFinished, test, expect } from 'vitest'
 import { createAgentHandler } from '../server/agent/handler'
 import type { ChatMessage } from '../shared/utils/chat-message'
 import { RemoteChatStore } from '../shared/utils/remote-chat-store'
+import { createDesktopChatStore } from '../shared/utils/desktop-chat-store'
 
 const token = 'remote-test-token'
 const model = 'openai/gpt-5-nano'
@@ -29,7 +30,7 @@ async function collect(events: AsyncIterable<AGUIEvent>) {
   return result
 }
 
-test('원격 저장소는 HTTP 호스트에서 대화·제목·투표·편집·삭제를 수행한다', async () => {
+test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제목·투표·편집·삭제를 수행한다 (desktop=%s)', async (desktop) => {
   const ctx = new Context()
   class ScriptedLLM extends LLMService {
     async getModel() { return { contextWindow: 128_000, maxOutputTokens: 4096 } }
@@ -76,7 +77,9 @@ test('원격 저장소는 HTTP 호스트에서 대화·제목·투표·편집·�
 
   const endpoint = `http://127.0.0.1:${address.port}/api/agent`
   expect((await fetch(`${endpoint}/models`)).status).toBe(401)
-  const chats = new RemoteChatStore({ endpoint, token })
+  const chats = desktop
+    ? await createDesktopChatStore(async <T>() => ({ endpoint, token }) as T, () => [], model)
+    : new RemoteChatStore({ endpoint, token })
   await chats.create('chat', user, model)
   const events = await collect(chats.respond('chat', { model, messages: [user] }))
   expect(events.some(event => event.type === EventType.RUN_FINISHED)).toBe(true)

@@ -79,3 +79,60 @@ test.each([undefined, '0.0.0.0'])('실행 파일은 기본 loopback과 명시적
     }
   }
 })
+
+test('명시한 공급자는 키 없는 사용자 지정 API를 사용하고 같은 SQLite를 새 공급자에서도 보존한다', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-sidecar-switch-'))
+  const path = join(directory, 'test.sqlite')
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
+  const start = async (provider: string, model: string) => {
+    const child = spawn(process.execPath, ['dist-sidecar/main.js'], {
+      env: {
+        PORT: '0',
+        KEUNDAL_SIDECAR: '1',
+        KEUNDAL_PROVIDER: provider,
+        KEUNDAL_MODEL: model,
+        KEUNDAL_API_TOKEN: token,
+        KEUNDAL_SQLITE_PATH: path,
+        KEUNDAL_BASE_URL: 'http://127.0.0.1:1'
+      },
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    const stop = async () => {
+      if (child.exitCode === null && child.signalCode === null) {
+        const exited = once(child, 'exit')
+        child.kill()
+        await exited
+      }
+    }
+    onTestFinished(stop)
+    let output = ''
+    child.stdout.on('data', (chunk) => {
+      output += String(chunk)
+    })
+    await expect.poll(() => output, { timeout: 5000 }).toContain('"kind":"keundal-sidecar"')
+    const endpoint = /http:\/\/127\.0\.0\.1:\d+/.exec(output)![0]
+    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
+    return { stop, call: (route: string, init?: RequestInit) => fetch(`${endpoint}${route}`, { ...init, headers }) }
+  }
+  const first = await start('openai', 'first')
+  const created = await first.call('/threads/saved', {
+    method: 'PUT',
+    body: JSON.stringify({
+      expectedRevision: 0,
+      messages: [{ id: 'user', role: 'user', content: '보존할 대화' }],
+      state: { retained: true }
+    })
+  })
+  expect(created.ok).toBe(true)
+  await created.text()
+  await first.stop()
+  const second = await start('anthropic', 'second')
+  expect(await (await second.call('/models')).json()).toEqual({
+    models: [{ id: 'second', provider: 'anthropic', contextWindow: 128000, maxOutputTokens: 4096 }]
+  })
+  expect(await (await second.call('/threads/saved')).json()).toMatchObject({
+    messages: [{ id: 'user', role: 'user', content: '보존할 대화' }],
+    state: { retained: true }
+  })
+  await second.stop()
+})

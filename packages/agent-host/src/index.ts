@@ -85,7 +85,6 @@ const titleInstructions =
  * HTTP 전송과 프로세스 수명은 호출자가 담당합니다.
  */
 export async function createAgentHost(options: AgentHostOptions): Promise<AgentHost> {
-  if (!options.apiKey.trim()) throw new Error('model provider API key is required')
   if (!options.model.trim()) throw new Error('model is required')
   const configured = options.models ?? {
     [options.model]: { contextWindow: 128_000, maxOutputTokens: 4_096 }
