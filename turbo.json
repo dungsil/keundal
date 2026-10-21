@@ -52,10 +52,10 @@
     "@keundal/desktop#build:sidecar": {
       "dependsOn": ["@keundal/agent-host#build"],
       "outputs": ["dist-sidecar/**"],
-      "inputs": ["sidecar/**", "tsdown.sidecar.config.ts", "tsconfig.json", "package.json"]
+      "inputs": ["sidecar/**", "tsdown.sidecar.config.ts", "tsconfig.sidecar.json", "package.json"]
     },
     "@keundal/desktop#typecheck": {
-      "dependsOn": ["build:sidecar"],
+      "dependsOn": ["^build", "build:sidecar"],
       "inputs": ["$TURBO_DEFAULT$", "!src-tauri/**", "!README.md"]
     },
     "test": {
@@ -66,13 +66,8 @@
       "dependsOn": ["build:sidecar"],
       "inputs": ["$TURBO_DEFAULT$", "!src-tauri/**", "!README.md"]
     },
-    "@keundal/web#build:desktop": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "!tests/**", "!README.md", "!tsconfig.test.json"],
-      "outputs": [".nuxt-desktop/**", ".output-desktop/**", "$TURBO_ROOT$/apps/desktop/dist/**"]
-    },
     "@keundal/desktop#build:native": {
-      "dependsOn": ["build:sidecar", "@keundal/web#build:desktop"],
+      "dependsOn": ["build:sidecar", "build:ui"],
       "inputs": ["$TURBO_DEFAULT$", "!tests/**", "!README.md"],
       "env": [
         "ImageOS",
@@ -98,6 +93,29 @@
         "src-tauri/sidecar/**",
         "src-tauri/binaries/**"
       ]
+    },
+    "@keundal/desktop#build:ui": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!tests/**",
+        "!README.md",
+        "!tsconfig.test.json",
+        "!src-tauri/**",
+        "!sidecar/**",
+        "!scripts/**",
+        "!tsdown.sidecar.config.ts",
+        "!tsconfig.sidecar.json"
+      ],
+      "outputs": [".nuxt/**", ".output/**", "dist/**"]
+    },
+    "@keundal/desktop#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".nuxt/**", ".output/**", "dist/**", "dist-sidecar/**"],
+      "inputs": ["$TURBO_DEFAULT$", "!tests/**", "!README.md"]
+    },
+    "@keundal/chat-app#typecheck": {
+      "dependsOn": ["^build"]
     }
   },
   "globalDependencies": ["package.json"],

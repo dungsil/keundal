@@ -1,0 +1,5 @@
+{
+  "extends": "@keundal/tsconfig/node.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["sidecar", "tests", "tsdown.sidecar.config.ts"]
+}

@@ -94,7 +94,7 @@ pnpm/setup의 `src/lockfile-verification-cache/index.ts`는 설치 직후 검증
 로컬 캐시 서버의 주소·토큰·팀 값은 중첩 Turbo 호출에 전달하되 작업 해시에는 넣지 않는다.
 
 - 패키지 빌드는 테스트·README·테스트 전용 TypeScript 설정 변경으로 무효화하지 않는다. 테스트 자체는 변경 시 다시 실행한다.
-- 웹의 `build:desktop`은 데스크톱 UI와 Nuxt 준비 산출물을 캐시한다. `apps/desktop/dist`도 루트 기준 출력으로 명시한다.
+- 데스크톱의 `build:ui`는 공용 채팅 레이어로 생성한 UI와 Nuxt 준비 산출물을 캐시한다. 출력은 `apps/desktop`의 `.nuxt`, `.output`, `dist`에 둔다.
 - 데스크톱 `build:sidecar`는 호스트 소스와 빌드 설정만 입력으로 삼는다. Rust나 UI만 바뀌면 호스트 번들을 재사용한다.
 - `turbo run build:native`는 고정된 `tauri build -- --locked` 명령을 실행한다. 호스트·UI 의존 작업을 먼저 복원하고, 빌드 훅에서도 같은 작업을 재사용한 뒤 sidecar 자원을 준비한다. 각 OS에서 모든 패키지를 미리 빌드하는 별도 단계는 두지 않는다.
 - `build:native`는 실행 파일·플랫폼 번들·sidecar 자원까지 캐시한다. OS·아키텍처 외에 러너 이미지, Rust 컴파일러 지문, Linux 시스템 라이브러리 버전, macOS SDK·대상·플래그·서명 설정이 바뀌면 다시 패키징한다.

@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["apps/web/**"],
+  "ignorePatterns": ["apps/web/**", "packages/chat-app/**", "apps/desktop/**"],
   "semi": false,
   "singleQuote": true,
   "jsxSingleQuote": true,

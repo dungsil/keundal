@@ -236,161 +236,90 @@ importers:
         version: 6.0.3
 
   apps/desktop:
-    devDependencies:
-      '@keundal/agent-host':
-        specifier: workspace:*
-        version: link:../../packages/agent-host
-      '@keundal/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@keundal/web':
-        specifier: workspace:*
-        version: link:../web
-      '@tauri-apps/cli':
-        specifier: 2.12.3
-        version: 2.12.3
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.13.6
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-
-  apps/web:
     dependencies:
-      '@comark/nuxt':
-        specifier: ^0.7.0
-        version: 0.7.0(magicast@0.5.5)(nuxt@4.6.2(f10f8451716ca2c6ce655b791cd5799d))(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
-      '@fontsource/pretendard':
-        specifier: 5.3.0
-        version: 5.3.0
-      '@iconify-json/logos':
-        specifier: ^1.2.15
-        version: 1.2.16
-      '@iconify-json/lucide':
-        specifier: ^1.2.142
-        version: 1.2.142
-      '@iconify-json/simple-icons':
-        specifier: ^1.2.99
-        version: 1.2.100
-      '@keundal/agent':
+      "@keundal/chat-app":
         specifier: workspace:*
-        version: link:../../packages/agent
-      '@keundal/agent-host':
-        specifier: workspace:*
-        version: link:../../packages/agent-host
-      '@keundal/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@keundal/plugin-llm-anthropic':
-        specifier: workspace:*
-        version: link:../../packages/plugin-llm-anthropic
-      '@keundal/plugin-llm-gemini':
-        specifier: workspace:*
-        version: link:../../packages/plugin-llm-gemini
-      '@keundal/plugin-llm-openai':
-        specifier: workspace:*
-        version: link:../../packages/plugin-llm-openai
-      '@keundal/plugin-skill':
-        specifier: workspace:*
-        version: link:../../packages/plugin-skill
-      '@keundal/plugin-skill-filesystem':
-        specifier: workspace:*
-        version: link:../../packages/plugin-skill-filesystem
-      '@keundal/plugin-store-indexeddb':
-        specifier: workspace:*
-        version: link:../../packages/plugin-store-indexeddb
-      '@keundal/plugin-transcription-openai':
-        specifier: workspace:*
-        version: link:../../packages/plugin-transcription-openai
-      '@keundal/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
-      '@nuxt/ui':
-        specifier: ^4.11.3
-        version: 4.11.3(3d9f6d5515484cabff85320d640f6c3d)
-      '@shikijs/langs':
-        specifier: ^4.5.0
-        version: 4.5.0
-      '@tauri-apps/api':
-        specifier: 2.12.4
-        version: 2.12.4
-      '@vueuse/core':
-        specifier: ^14.4.0
-        version: 14.4.0(vue@3.5.44(typescript@6.0.3))
-      cordis:
-        specifier: 'catalog:'
-        version: 4.0.0-rc.11
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
-      h3:
-        specifier: 1.15.11
-        version: 1.15.11
-      motion-v:
-        specifier: ^2.6.0
-        version: 2.7.0(@vueuse/core@14.4.0(vue@3.5.44(typescript@6.0.3)))(vue@3.5.44(typescript@6.0.3))
+        version: link:../../packages/chat-app
       nuxt:
         specifier: ^4.6.2
         version: 4.6.2(f10f8451716ca2c6ce655b791cd5799d)
-      nuxt-charts:
-        specifier: ^2.2.3
-        version: 2.2.3(supports-color@10.2.2)(vue@3.5.44(typescript@6.0.3))
-      shiki:
-        specifier: ^4.5.0
-        version: 4.5.0
-      striptags:
-        specifier: 3.2.0
-        version: 3.2.0
-      tailwindcss:
-        specifier: ^4.3.3
-        version: 4.3.3
-      vue:
-        specifier: 3.5.44
-        version: 3.5.44(typescript@6.0.3)
-      zod:
-        specifier: ^4.6.5
-        version: 4.6.7
     devDependencies:
-      '@keundal/plugin-store-memory':
+      "@keundal/agent-host":
         specifier: workspace:*
-        version: link:../../packages/plugin-store-memory
-      '@keundal/plugin-store-sqlite':
+        version: link:../../packages/agent-host
+      "@keundal/tsconfig":
         specifier: workspace:*
-        version: link:../../packages/plugin-store-sqlite
-      '@nuxt/eslint':
+        version: link:../../tools/tsconfig
+      "@tauri-apps/cli":
+        specifier: 2.12.3
+        version: 2.12.3
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      eslint:
+        specifier: ^10.12.0
+        version: 10.12.0(jiti@2.7.0)(supports-color@10.2.2)
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+      vue-tsc:
+        specifier: ^3.3.13
+        version: 3.3.13(typescript@6.0.3)
+
+  apps/web:
+    dependencies:
+      "@keundal/chat-app":
+        specifier: workspace:*
+        version: link:../../packages/chat-app
+      "@keundal/agent-host":
+        specifier: workspace:*
+        version: link:../../packages/agent-host
+      nuxt:
+        specifier: ^4.6.2
+        version: 4.6.2(f10f8451716ca2c6ce655b791cd5799d)
+      h3:
+        specifier: 1.15.11
+        version: 1.15.11
+    devDependencies:
+      "@nuxt/eslint":
         specifier: ^1.17.0
         version: 1.17.0(@nuxt/schema@4.6.2)(@typescript-eslint/utils@8.71.2(eslint@10.12.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(@vue/compiler-sfc@3.5.44)(confbox@0.3.1)(dotenv@17.4.2)(esbuild@0.28.2)(eslint@10.12.0(jiti@2.7.0)(supports-color@10.2.2))(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(rolldown@1.2.14)(rollup@4.64.7)(srvx@1.0.5)(supports-color@10.2.2)(typescript@6.0.3)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-      '@types/node':
+      "@types/node":
         specifier: ^24.19.2
         version: 24.19.2
       eslint:
         specifier: ^10.12.0
         version: 10.12.0(jiti@2.7.0)(supports-color@10.2.2)
-      eslint-plugin-better-tailwindcss:
-        specifier: ^4.9.0
-        version: 4.9.1(eslint@10.12.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(tailwindcss@4.3.3)(typescript@6.0.3)
-      fake-indexeddb:
-        specifier: 6.2.6
-        version: 6.2.6
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
       vue-tsc:
         specifier: ^3.3.13
         version: 3.3.13(typescript@6.0.3)
       wrangler:
         specifier: 4.151.1
         version: 4.151.1(@types/node@24.19.2)
+      "@keundal/core":
+        specifier: workspace:*
+        version: link:../../packages/core
+      "@keundal/agent":
+        specifier: workspace:*
+        version: link:../../packages/agent
+      "@keundal/plugin-store-memory":
+        specifier: workspace:*
+        version: link:../../packages/plugin-store-memory
+      cordis:
+        specifier: "catalog:"
+        version: 4.0.0-rc.11
 
   examples/basic:
     dependencies:
@@ -1283,6 +1212,140 @@ importers:
       tsdown:
         specifier: 'catalog:'
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+
+  packages/chat-app:
+    dependencies:
+      "@comark/nuxt":
+        specifier: ^0.7.0
+        version: 0.7.0(magicast@0.5.5)(nuxt@4.6.2(f10f8451716ca2c6ce655b791cd5799d))(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
+      "@fontsource/pretendard":
+        specifier: 5.3.0
+        version: 5.3.0
+      "@iconify-json/logos":
+        specifier: ^1.2.15
+        version: 1.2.16
+      "@iconify-json/lucide":
+        specifier: ^1.2.142
+        version: 1.2.142
+      "@iconify-json/simple-icons":
+        specifier: ^1.2.99
+        version: 1.2.100
+      "@keundal/core":
+        specifier: workspace:*
+        version: link:../core
+      "@keundal/ui":
+        specifier: workspace:*
+        version: link:../ui
+      "@keundal/agent":
+        specifier: workspace:*
+        version: link:../agent
+      "@keundal/plugin-llm-anthropic":
+        specifier: workspace:*
+        version: link:../plugin-llm-anthropic
+      "@keundal/plugin-llm-gemini":
+        specifier: workspace:*
+        version: link:../plugin-llm-gemini
+      "@keundal/plugin-llm-openai":
+        specifier: workspace:*
+        version: link:../plugin-llm-openai
+      "@keundal/plugin-skill":
+        specifier: workspace:*
+        version: link:../plugin-skill
+      "@keundal/plugin-skill-filesystem":
+        specifier: workspace:*
+        version: link:../plugin-skill-filesystem
+      "@keundal/plugin-store-indexeddb":
+        specifier: workspace:*
+        version: link:../plugin-store-indexeddb
+      "@keundal/plugin-transcription-openai":
+        specifier: workspace:*
+        version: link:../plugin-transcription-openai
+      "@nuxt/ui":
+        specifier: ^4.11.3
+        version: 4.11.3(3d9f6d5515484cabff85320d640f6c3d)
+      "@shikijs/langs":
+        specifier: ^4.5.0
+        version: 4.5.0
+      "@tauri-apps/api":
+        specifier: 2.12.4
+        version: 2.12.4
+      "@vueuse/core":
+        specifier: ^14.4.0
+        version: 14.4.0(vue@3.5.44(typescript@6.0.3))
+      cordis:
+        specifier: "catalog:"
+        version: 4.0.0-rc.11
+      date-fns:
+        specifier: ^4.4.0
+        version: 4.4.0
+      motion-v:
+        specifier: ^2.6.0
+        version: 2.7.0(@vueuse/core@14.4.0(vue@3.5.44(typescript@6.0.3)))(vue@3.5.44(typescript@6.0.3))
+      nuxt:
+        specifier: ^4.6.2
+        version: 4.6.2(f10f8451716ca2c6ce655b791cd5799d)
+      nuxt-charts:
+        specifier: ^2.2.3
+        version: 2.2.3(supports-color@10.2.2)(vue@3.5.44(typescript@6.0.3))
+      shiki:
+        specifier: ^4.5.0
+        version: 4.5.0
+      striptags:
+        specifier: 3.2.0
+        version: 3.2.0
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
+      vue:
+        specifier: 3.5.44
+        version: 3.5.44(typescript@6.0.3)
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.7
+    devDependencies:
+      "@keundal/plugin-store-memory":
+        specifier: workspace:*
+        version: link:../plugin-store-memory
+      "@keundal/plugin-store-sqlite":
+        specifier: workspace:*
+        version: link:../plugin-store-sqlite
+      "@nuxt/eslint":
+        specifier: ^1.17.0
+        version: 1.17.0(@nuxt/schema@4.6.2)(@typescript-eslint/utils@8.71.2(eslint@10.12.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(@vue/compiler-sfc@3.5.44)(confbox@0.3.1)(dotenv@17.4.2)(esbuild@0.28.2)(eslint@10.12.0(jiti@2.7.0)(supports-color@10.2.2))(giget@3.3.1)(jiti@2.7.0)(magic-string@1.4.3)(rolldown@1.2.14)(rollup@4.64.7)(srvx@1.0.5)(supports-color@10.2.2)(typescript@6.0.3)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+      "@types/node":
+        specifier: ^24.19.2
+        version: 24.19.2
+      eslint:
+        specifier: ^10.12.0
+        version: 10.12.0(jiti@2.7.0)(supports-color@10.2.2)
+      eslint-plugin-better-tailwindcss:
+        specifier: ^4.9.0
+        version: 4.9.1(eslint@10.12.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(tailwindcss@4.3.3)(typescript@6.0.3)
+      fake-indexeddb:
+        specifier: 6.2.6
+        version: 6.2.6
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+      vue-tsc:
+        specifier: ^3.3.13
+        version: 3.3.13(typescript@6.0.3)
+
+  tools/workspace-boundaries:
+    dependencies:
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../tsconfig
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
 
 packages:
 
