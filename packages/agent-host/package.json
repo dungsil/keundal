@@ -26,11 +26,13 @@
   },
   "dependencies": {
     "@keundal/agent": "workspace:*",
+    "@keundal/agent-plugins": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/mcp": "workspace:*",
     "@keundal/plugin-llm-anthropic": "workspace:*",
     "@keundal/plugin-llm-gemini": "workspace:*",
     "@keundal/plugin-llm-openai": "workspace:*",
+    "@keundal/plugin-skill": "workspace:*",
     "@keundal/plugin-store-sqlite": "workspace:*",
     "cordis": "catalog:"
   },

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -277,4 +277,32 @@ test('런타임에 등록한 도구를 실행하고 결과를 후속 요청에 �
   expect(events).toContainEqual(expect.objectContaining({ type: 'TEXT_MESSAGE_CONTENT', delta: '보르도는 흐립니다.' }))
   expect(events.at(-1)?.type).toBe('RUN_FINISHED')
   expect(await host.services.generation.get('weather-run')).toMatchObject({ status: 'completed' })
+})
+
+test('Agent Plugin 스킬을 호스트에 등록하고 종료하면 사용할 수 없다', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-host-plugins-'))
+  directories.push(directory)
+  const root = join(directory, 'plugin')
+  mkdirSync(join(root, 'skills', 'hello'), { recursive: true })
+  writeFileSync(
+    join(root, 'plugin.json'),
+    JSON.stringify({
+      $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+      name: 'test'
+    })
+  )
+  writeFileSync(join(root, 'skills/hello/SKILL.md'), '---\nname: hello\ndescription: Test\n---\nHello')
+  const host = await createAgentHost({
+    provider: 'openai',
+    apiKey: 'test',
+    model: 'small',
+    sqlitePath: sqlitePath(),
+    plugins: [{ root, dataDirectory: join(directory, 'data') }]
+  })
+  hosts.push(host)
+  expect(host.plugins).toHaveLength(1)
+  expect((await host.ctx.skills.prepare()).skills).toEqual([{ name: 'hello', description: 'Test' }])
+  const catalog = await host.ctx.skills.prepare()
+  await host.dispose()
+  await expect(catalog.load('hello')).rejects.toThrow()
 })
