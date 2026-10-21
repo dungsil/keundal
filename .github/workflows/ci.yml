@@ -214,6 +214,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Portable smoke test failed' }
 
       - name: 데스크톱 배포 파일 업로드
+        if: github.event_name != 'push'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-${{ matrix.name }}
