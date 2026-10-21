@@ -22,7 +22,7 @@ useHead(() => ({ title: t('settings.title') }))
     </template>
 
     <template #body>
-      <UContainer class="w-full max-w-3xl pt-(--ui-header-height) pb-6 sm:pb-8">
+      <UContainer class="w-full max-w-3xl py-6 sm:py-8">
         <UButton
           :label="t('settings.back')"
           :to="returnTo"
@@ -32,8 +32,17 @@ useHead(() => ({ title: t('settings.title') }))
           class="mb-6"
         />
         <ClientOnly>
-          <ModelSettings />
-          <LLMSettings :return-to="returnTo" />
+          <div class="flex flex-col gap-6">
+            <UCard>
+              <ModelSettings />
+            </UCard>
+            <UCard>
+              <LLMSettings :return-to="returnTo" />
+            </UCard>
+            <UCard>
+              <SkillSettings />
+            </UCard>
+          </div>
         </ClientOnly>
       </UContainer>
     </template>
