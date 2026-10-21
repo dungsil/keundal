@@ -173,6 +173,9 @@ export async function loadRuntimePlugins(
   const plugins: ResolvedModule[] = []
   for (const spec of manifest.plugins) plugins.push(await resolveModule(spec, options))
   const agent = await resolveModule(manifest.agent, options)
+  if (hasOwn(agent.config, 'tools')) {
+    throw new TypeError('agent.config.tools is not allowed; configure tools with manifest.tools or options.tools')
+  }
   const tools: ResolvedToolFactory[] = []
   for (const spec of manifest.tools ?? []) tools.push(await resolveToolFactory(spec, options))
 
