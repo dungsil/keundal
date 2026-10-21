@@ -1,5 +1,5 @@
 export default {
-  urls: ['/', '/settings'],
+  urls: ['/', '/settings/appearance', '/settings/llm', '/settings/models', '/settings/mcp', '/settings/skills'],
   outputPath: `.unlighthouse/run-${process.env.LIGHTHOUSE_RUN || 'local'}`,
   cache: false,
   scanner: {
@@ -7,11 +7,13 @@ export default {
     crawler: false,
     sitemap: false,
     skipJavascript: false,
-    device: 'mobile'
+    device: 'mobile',
+    throttle: true
   },
   puppeteerOptions: process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {},
   puppeteerClusterOptions: { maxConcurrency: 1 },
   lighthouseOptions: {
+    throttling: { cpuSlowdownMultiplier: 4 },
     onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo']
   },
   ci: { reporter: 'jsonExpanded' }

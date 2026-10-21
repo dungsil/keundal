@@ -1,5 +1,4 @@
 import type { ExecutionOptions, SkillCatalog, SkillDefinition, SkillProvider } from '@keundal/core'
-import { parseSkillMarkdown } from '@keundal/skill-markdown'
 import { z } from 'zod'
 
 export const SKILL_SETTINGS_KEY = 'keundal:skills'
@@ -85,6 +84,7 @@ export class SkillManager {
   async listFiles(): Promise<{ roots: string[]; files: LocalSkillFile[] }> {
     if (!this.fileSource) return { roots: [], files: [] }
     const result = await this.fileSource.list()
+    const { parseSkillMarkdown } = await import('@keundal/skill-markdown')
     return {
       roots: result.roots,
       files: result.files.map(({ root, path, markdown }) => {
@@ -130,6 +130,7 @@ export class SkillManager {
         const file = selected.get(name)
         if (!file) return undefined
         const markdown = await this.fileSource!.read(file.path)
+        const { parseSkillMarkdown } = await import('@keundal/skill-markdown')
         combined.throwIfAborted()
         let definition: SkillDefinition
         try {
