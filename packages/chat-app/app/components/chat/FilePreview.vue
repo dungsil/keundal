@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { getFileIcon, removeRandomSuffix } from '@keundal/chat/file'
+
 import type { AvatarProps } from '@nuxt/ui'
 import { AnimatePresence, Motion } from 'motion-v'
 

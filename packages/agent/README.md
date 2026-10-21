@@ -1,8 +1,8 @@
 # @keundal/agent
 
-에이전트 구현의 계약과 공통 실행 루프를 제공합니다. `llm`, `session`, `generation` 서비스를 조합하여 `ctx.agent.run()`을 만들고, 입력이 모델의 컨텍스트 예산을 넘으면 이전 대화를 축약합니다. 도구 실행 함수를 등록하면 도구 호출 수집, 실행, 결과 메시지 작성, 후속 생성을 자동으로 처리합니다.
+`@keundal/agent-contract`의 계약을 구현하는 기본 실행 루프를 제공합니다. `llm`, `session`, `generation` 서비스를 조합하여 `ctx.agent.run()`을 만들고, 입력이 모델의 컨텍스트 예산을 넘으면 이전 대화를 축약합니다. 도구 실행 함수를 등록하면 도구 호출 수집, 실행, 결과 메시지 작성, 후속 생성을 자동으로 처리합니다.
 
-범용 대화 에이전트로 바로 쓸 수도 있고, 다른 에이전트 구현이 이 계약을 확장할 수도 있습니다. [`@keundal/coding-agent`](../coding-agent/README.md)는 코딩 작업용 지침을 얹은 구현입니다.
+범용 대화 에이전트로 바로 쓸 수도 있고, 다른 에이전트 구현이 이 루프를 확장할 수도 있습니다. 독립적인 구현은 `@keundal/agent-contract`의 `AgentService`를 상속합니다. [`@keundal/coding-agent`](../coding-agent/README.md)는 코딩 작업용 지침을 얹은 구현입니다.
 
 ## 구현 확장
 

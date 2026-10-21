@@ -7,7 +7,7 @@ import {
   registeredProviders,
   providerSettingsSchema,
   type LLMProvider
-} from '../../shared/utils/llm-settings'
+} from '@keundal/chat/llm-settings'
 
 const { t } = useLocale()
 
@@ -16,7 +16,7 @@ const mounted = useMounted()
 const route = useRoute()
 const { model } = useModels()
 const { $chatStore, $saveLLMSettings } = useNuxtApp()
-const desktop = useRuntimeConfig().public.desktop
+const secureSettings = useRuntimeConfig().public.chatCapabilities.secureSettings
 const toast = useToast()
 const provider = ref('')
 const adding = ref(false)
@@ -130,14 +130,14 @@ async function save(forget = false) {
     await $chatStore.stop()
     await $saveLLMSettings(next)
     toast.add({
-      title: forget ? t('llm.removed') : desktop ? t('llm.savedOS') : t('llm.savedBrowser'),
+      title: forget ? t('llm.removed') : secureSettings ? t('llm.savedOS') : t('llm.savedBrowser'),
       icon: 'i-lucide-check',
       color: 'success'
     })
     loadDraft()
     if (!providers.value.some(item => item.id === provider.value)) provider.value = providers.value[0]?.id ?? ''
   } catch {
-    error.value = desktop ? t('llm.saveFailedOS') : t('llm.saveFailedBrowser')
+    error.value = secureSettings ? t('llm.saveFailedOS') : t('llm.saveFailedBrowser')
   } finally {
     saving.value = false
   }
@@ -151,7 +151,7 @@ async function save(forget = false) {
         LLM
       </h2>
       <p class="text-sm text-muted">
-        {{ desktop ? t('llm.descriptionOS') : t('llm.descriptionBrowser') }}
+        {{ secureSettings ? t('llm.descriptionOS') : t('llm.descriptionBrowser') }}
       </p>
     </div>
     <div class="space-y-3">
@@ -310,11 +310,11 @@ async function save(forget = false) {
         />
       </fieldset>
       <UAlert
-        :icon="desktop ? 'i-lucide-shield-check' : 'i-lucide-shield-alert'"
+        :icon="secureSettings ? 'i-lucide-shield-check' : 'i-lucide-shield-alert'"
         color="neutral"
         variant="subtle"
-        :title="desktop ? t('llm.protectedOS') : t('llm.browserWarning')"
-        :description="desktop ? t('llm.storageOS') : t('llm.storageBrowser')"
+        :title="secureSettings ? t('llm.protectedOS') : t('llm.browserWarning')"
+        :description="secureSettings ? t('llm.storageOS') : t('llm.storageBrowser')"
       />
     </form>
     <div class="flex flex-wrap items-center justify-between gap-3 w-full">
@@ -338,7 +338,7 @@ async function save(forget = false) {
       />
       <UButton
         v-if="current"
-        :label="desktop ? t('llm.saveOS') : t('llm.saveBrowser')"
+        :label="secureSettings ? t('llm.saveOS') : t('llm.saveBrowser')"
         type="submit"
         form="llm-settings"
         :loading="saving"

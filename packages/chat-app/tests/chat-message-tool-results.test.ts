@@ -1,6 +1,6 @@
 import { EventType, type AGUIEvent } from '@keundal/core'
 import { expect, test } from 'vitest'
-import { ChatMessageAssembly } from '@keundal/chat-app/shared/utils/chat-message'
+import { ChatMessageAssembly } from '@keundal/chat/chat-message'
 
 type ToolResult = Extract<AGUIEvent, { type: typeof EventType.TOOL_CALL_RESULT }>
 

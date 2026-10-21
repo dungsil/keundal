@@ -1,9 +1,10 @@
+import { mountAgent } from './fixtures/agent'
 import { Context } from 'cordis'
 import { EventType, LLMService, type LLMEvent } from '@keundal/core'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { expect, onTestFinished, test } from 'vitest'
-import { createKeundalChat } from '../shared/utils/keundal'
-import { ChatStore } from '../shared/utils/chat-store'
+import { createKeundalChat } from '@keundal/plugin-chat-local/keundal'
+import { ChatStore } from '@keundal/plugin-chat-local'
 import { validateChatTitle } from '../shared/utils/chat-title'
 
 const model = 'openai/test'
@@ -29,7 +30,7 @@ for (const chunks of [['x'.repeat(101)], ['x'.repeat(60), 'x'.repeat(41)], [' '.
     }
     const llm = await ctx.plugin(LLM)
     const store = await ctx.plugin(memoryStorePlugin)
-    const chats = new ChatStore(ctx)
+    const chats = new ChatStore(ctx, mountAgent)
     onTestFinished(async () => {
       await chats.stop()
       await store.dispose()
@@ -57,7 +58,7 @@ test('일반 생성 제목은 공백만 제거하고 보존한다', async () => 
   }
   const llm = await ctx.plugin(LLM)
   const store = await ctx.plugin(memoryStorePlugin)
-  const runtime = await createKeundalChat(ctx, model)
+  const runtime = await createKeundalChat(ctx, model, {}, mountAgent)
   onTestFinished(async () => {
     await runtime.dispose()
     await store.dispose()

@@ -1,27 +1,15 @@
+import type { ExecutableTool, ToolExecutionContext } from '@keundal/agent-contract'
 import {
   CONTEXT_MESSAGE_EVENT,
   CONTEXT_MESSAGE_PREFIX,
   EventType,
   MessageAssembly,
-  type AgentTool,
   type LLMEvent,
   type LLMRequest,
   type LLMService,
   type RunAgentInput
 } from '@keundal/core'
-
-export interface ToolExecutionContext {
-  readonly threadId: string
-  readonly runId: string
-  readonly toolCallId: string
-  readonly signal: AbortSignal
-}
-
-export interface ExecutableTool extends AgentTool {
-  /** JSON 객체로 해석한 인자를 검증하고 실행합니다. 반환한 문자열은 도구 결과 메시지가 됩니다. */
-  readonly execute: (args: Record<string, unknown>, context: ToolExecutionContext) => string | Promise<string>
-}
-
+export type { ExecutableTool, ToolExecutionContext } from '@keundal/agent-contract'
 export function parseTools(value: unknown): ExecutableTool[] {
   if (value === undefined) return []
   if (!Array.isArray(value)) throw new Error('tools must be an array')

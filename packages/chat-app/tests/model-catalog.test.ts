@@ -1,8 +1,8 @@
 import { createServer } from 'node:http'
 import { effectScope, ref } from 'vue'
 import { expect, onTestFinished, test, vi } from 'vitest'
-import { defaultLLMSettings } from '../shared/utils/llm-settings'
-import * as modelRequests from '../shared/utils/models'
+import { defaultLLMSettings } from '@keundal/chat/llm-settings'
+import * as modelRequests from '@keundal/plugin-llm-browser/models'
 import { useModelCatalog } from '../app/composables/useModelCatalog'
 import { translate } from '../../../packages/ui/app/utils/locale'
 
@@ -33,7 +33,7 @@ test('API 키 없이 주소만 저장한 공급자의 모델을 조회하고 설
     vi.unstubAllGlobals()
   })
   const settings = ref(defaultLLMSettings())
-  const catalog = scope.run(() => useModelCatalog(settings))!
+  const catalog = scope.run(() => useModelCatalog(settings, (...args) => modelRequests.loadModels(...args)))!
   await vi.waitFor(() => expect(catalog.loading.value).toBe(false))
   expect(paths).toEqual([])
   settings.value.openai.baseURL = `http://127.0.0.1:${address.port}`
@@ -69,7 +69,7 @@ test('모델 조회의 일반 오류는 현재 표시 언어를 따르고 공급
   const settings = ref(defaultLLMSettings())
   settings.value.openai.baseURL = 'http://localhost:1234'
   const locale = ref<'en' | 'ko'>('ko')
-  const catalog = scope.run(() => useModelCatalog(settings, () => translate(locale.value, 'model.loadFailed')))!
+  const catalog = scope.run(() => useModelCatalog(settings, (...args) => modelRequests.loadModels(...args), () => translate(locale.value, 'model.loadFailed')))!
 
   await vi.waitFor(() => expect(catalog.loading.value).toBe(false))
   expect(catalog.error.value.trim()).toBe('모델 목록을 불러오지 못했습니다.')

@@ -18,7 +18,18 @@
     "@keundal/chat-app": "workspace:*",
     "@keundal/agent-host": "workspace:*",
     "nuxt": "^4.6.2",
-    "h3": "2.0.3"
+    "h3": "2.0.3",
+    "@keundal/agent-runtime-node": "workspace:*",
+    "@keundal/chat": "workspace:*",
+    "@keundal/agent": "workspace:*",
+    "@keundal/plugin-store-indexeddb": "workspace:*",
+    "@keundal/plugin-skill": "workspace:*",
+    "@keundal/plugin-chat-local": "workspace:*",
+    "@keundal/plugin-chat-remote": "workspace:*",
+    "@keundal/plugin-chat-browser": "workspace:*",
+    "@keundal/plugin-llm-browser": "workspace:*",
+    "cordis": "catalog:",
+    "@keundal/plugin-transcription-browser": "workspace:*"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.17.0",
@@ -30,8 +41,8 @@
     "vue-tsc": "^3.3.13",
     "wrangler": "4.151.1",
     "@keundal/core": "workspace:*",
-    "@keundal/agent": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",
-    "cordis": "catalog:"
+    "fake-indexeddb": "6.2.6",
+    "@keundal/plugin-chat-desktop": "workspace:*"
   }
 }

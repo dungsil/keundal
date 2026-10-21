@@ -1,9 +1,9 @@
-import { createAgentRuntime, type AgentRuntime } from '@keundal/agent-host/runtime'
+import { createAgentRuntime, createNodeComposition, type AgentRuntime } from '@keundal/agent-runtime-node'
 
 let runtime: Promise<AgentRuntime> | undefined
 
 export async function getAgentApp() {
-  const current = runtime ??= createAgentRuntime()
+  const current = runtime ??= createAgentRuntime(process.env, { compose: createNodeComposition })
   try {
     return (await current).app
   } catch (error) {

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { importSkillFile } from '../../shared/utils/skill-import'
 
-import { managedSkillSchema, type LocalSkillFile, type ManagedSkill, type SkillSettings } from '../../shared/utils/skills'
+import { managedSkillSchema, type LocalSkillFile, type ManagedSkill, type SkillSettings } from '@keundal/chat/skills'
 
 const { t } = useLocale()
 
 const { $skillManager } = useNuxtApp()
-const desktop = useRuntimeConfig().public.desktop
+const localSkills = useRuntimeConfig().public.chatCapabilities.localSkills
 const settings = ref<SkillSettings>({ skills: [], disabledFiles: [], loadLocal: true })
 const files = ref<LocalSkillFile[]>([])
 const roots = ref<string[]>([])
@@ -48,7 +48,7 @@ onMounted(async () => {
   } catch {
     error.value = t('skill.readFailed')
   }
-  if (desktop) await refreshFiles()
+  if (localSkills) await refreshFiles()
 })
 
 function persist(next: SkillSettings) {
@@ -223,7 +223,7 @@ function toggleFile(path: string, enabled: boolean) {
       <template v-else>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h3 class="text-sm font-semibold">
-            {{ t(desktop ? 'skill.savedApp' : 'skill.savedBrowser') }}
+            {{ t(localSkills ? 'skill.savedApp' : 'skill.savedBrowser') }}
           </h3>
           <div class="flex gap-2">
             <input
@@ -294,7 +294,7 @@ function toggleFile(path: string, enabled: boolean) {
           {{ t('skill.persistence') }}
         </p>
 
-        <div v-if="desktop" class="space-y-3 border-t border-default pt-5">
+        <div v-if="localSkills" class="space-y-3 border-t border-default pt-5">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <USwitch
               :model-value="settings.loadLocal"

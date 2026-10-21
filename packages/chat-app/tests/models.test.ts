@@ -3,8 +3,8 @@ import { listAnthropicModels } from '@keundal/plugin-llm-anthropic'
 import { listGeminiModels } from '@keundal/plugin-llm-gemini'
 import { listOpenAIModels } from '@keundal/plugin-llm-openai'
 import { expect, test, onTestFinished, vi } from 'vitest'
-import { loadModels, MODEL_CACHE_TTL } from '../shared/utils/models'
-import { defaultLLMSettings } from '../shared/utils/llm-settings'
+import { loadModels, MODEL_CACHE_TTL } from '@keundal/plugin-llm-browser/models'
+import { defaultLLMSettings } from '@keundal/chat/llm-settings'
 
 async function fixture(handler: (req: IncomingMessage, res: ServerResponse) => void) {
   const requests: IncomingMessage[] = []
