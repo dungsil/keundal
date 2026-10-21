@@ -193,3 +193,11 @@ test('같은 종류의 공급자는 모델 ID가 같아도 인증·모델 선택
   expect(values.size).toBe(2)
   expect([...values.values()].join('')).not.toContain('work-key')
 })
+
+test.each(['openai', 'anthropic', 'google'] as const)('%s의 한도를 넘는 모델 목록은 캐시하지 않는다', async (provider) => {
+  const { settings, storage, values } = await fixture((_req, res) => {
+    res.end(' '.repeat(1024 * 1024 + 1))
+  })
+  await expect(loadModels(provider, settings, storage)).rejects.toThrow()
+  expect(values.size).toBe(0)
+})

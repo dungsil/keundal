@@ -1,4 +1,5 @@
 import type { ExecutionOptions, LLMModelInfo } from '@keundal/core'
+import { MODEL_CATALOG_LIMITS, ModelCatalogBudget } from '@keundal/core'
 import { z } from 'zod'
 
 import type { AnthropicLLMConfig } from './config.js'
@@ -8,6 +9,7 @@ export async function listAnthropicModels(
   config: Omit<AnthropicLLMConfig, 'models' | 'apiKey'> & { readonly apiKey: string },
   options: ExecutionOptions = {}
 ): Promise<LLMModelInfo[]> {
+  const budget = new ModelCatalogBudget()
   const configuredURL = config.baseURL ?? 'https://api.anthropic.com'
   let end = configuredURL.length
   while (configuredURL[end - 1] === '/') end--
@@ -20,6 +22,7 @@ export async function listAnthropicModels(
     const url = new globalThis.URL(`${baseURL}/v1/models`)
     url.searchParams.set('limit', '1000')
     if (cursor) url.searchParams.set('after_id', cursor)
+    budget.beginPage()
     const response = await globalThis.fetch(url, {
       headers: {
         ...(config.apiKey ? { 'x-api-key': config.apiKey } : {}),
@@ -31,25 +34,28 @@ export async function listAnthropicModels(
       cache: 'no-store',
       credentials: 'omit'
     })
-    if (!response.ok)
+    if (!response.ok) {
+      if (response.status !== 400) await response.body?.cancel()
       throw {
         status: response.status,
-        error: response.status === 400 ? await response.json().catch(() => undefined) : undefined
+        error: response.status === 400 ? await budget.readJSON(response).catch(() => undefined) : undefined
       }
+    }
     const page = z
       .object({
         data: z.array(
           z.object({
-            id: z.string().min(1),
-            display_name: z.string().optional(),
+            id: z.string().min(1).max(MODEL_CATALOG_LIMITS.fieldLength),
+            display_name: z.string().max(MODEL_CATALOG_LIMITS.fieldLength).optional(),
             max_input_tokens: z.number().positive().nullish(),
             max_tokens: z.number().positive().nullish()
           })
         ),
         has_more: z.boolean().optional(),
-        last_id: z.string().nullish()
+        last_id: z.string().max(MODEL_CATALOG_LIMITS.cursorLength).nullish()
       })
-      .parse(await response.json())
+      .parse(await budget.readJSON(response))
+    budget.acceptEntries(page.data.length)
     for (const model of page.data)
       models.set(model.id, {
         id: model.id,
