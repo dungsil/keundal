@@ -93,6 +93,7 @@ export default defineNuxtPlugin({
         llmSettings: settings,
         saveLLMSettings,
         modelCatalog,
+        promptCatalog: async (options?: import('@keundal/core').ExecutionOptions) => await connection.catalog?.(options) ?? { skills: [], tools: [] },
         skillManager,
         mcpManager,
         saveMcpSettings

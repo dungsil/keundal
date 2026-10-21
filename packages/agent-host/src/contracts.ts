@@ -6,7 +6,8 @@ import type {
   GenerationService,
   Reasoning,
   RunAgentInput,
-  SessionService
+  SessionService,
+  SkillSummary
 } from '@keundal/core'
 import type { Context, Fiber } from 'cordis'
 
@@ -32,6 +33,7 @@ export interface AgentHostOptions {
   /** The application installs services within this owned plugin scope. */
   readonly setup: (ctx: Context) => Promise<void>
   readonly mountAgent: (ctx: Context, config: AgentMountConfig) => Promise<Fiber>
+  readonly toolCatalog?: (options: ExecutionOptions) => Promise<readonly SkillSummary[]>
 }
 
 export interface AgentHostRunOptions extends ExecutionOptions {
@@ -50,6 +52,7 @@ export interface AgentHostServices {
   session: Pick<SessionService, 'get' | 'list' | 'commit' | 'delete'>
   generation: Pick<GenerationService, 'get' | 'list' | 'recover'>
   models(): readonly AgentHostModel[]
+  catalog?(options?: ExecutionOptions): Promise<{ skills: readonly SkillSummary[]; tools: readonly SkillSummary[] }>
   title(request: AgentHostTitleRequest, options?: ExecutionOptions): Promise<string>
 }
 

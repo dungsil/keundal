@@ -29,7 +29,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         const store = new RemoteChatStore({ endpoint: runtime.agentEndpoint, token: runtime.agentToken ?? '' })
         try {
           await store.recover()
-          return { store, remoteAgent: true, remoteModels: await store.models(), dispose: () => store.stop() }
+          return { store, remoteAgent: true, remoteModels: await store.models(), catalog: execution => store.catalog(execution), dispose: () => store.stop() }
         } catch (error) {
           await store.stop()
           throw error
@@ -49,6 +49,10 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         return {
           store,
           remoteAgent: false,
+          catalog: async execution => ({
+            skills: (await root.skills.prepare(execution)).skills,
+            tools: (await mcp.tools(execution)).map(({ name, description }) => ({ name, description }))
+          }),
           dispose: async () => {
             try {
               await store!.stop()

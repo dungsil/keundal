@@ -28,7 +28,7 @@ export interface NodeHostOptions {
   readonly headers?: Readonly<Record<string, string>>
 }
 
-export type HostComposition = Pick<AgentHostOptions, 'setup' | 'mountAgent'> & {
+export type HostComposition = Pick<AgentHostOptions, 'setup' | 'mountAgent' | 'toolCatalog'> & {
   plugins?: readonly LoadedAgentPlugin[]
 }
 export type HostCompositionFactory = (options: NodeHostOptions) => HostComposition

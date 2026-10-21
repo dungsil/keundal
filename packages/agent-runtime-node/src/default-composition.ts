@@ -10,6 +10,7 @@ import openai from '@keundal/plugin-llm-openai'
 import { McpClient } from '@keundal/plugin-mcp-client'
 import skillPlugin from '@keundal/plugin-skill'
 import sqlite from '@keundal/plugin-store-sqlite'
+import type { ToolProvider } from '@keundal/tools'
 
 import type { HostCompositionFactory } from './index.js'
 
@@ -19,8 +20,38 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
   const mcpServers = parseMcpServers(options.mcpServers ?? [])
   const mcpClients = new Map<string, Promise<McpClient>>()
   const mcpLifetime = new globalThis.AbortController()
+  const tools: ToolProvider = async (execution) => {
+    const signal = execution.signal
+      ? globalThis.AbortSignal.any([execution.signal, mcpLifetime.signal])
+      : mcpLifetime.signal
+    const result = [...(typeof options.tools === 'function' ? await options.tools({ signal }) : (options.tools ?? []))]
+    for (const server of mcpServers) {
+      signal.throwIfAborted()
+      let pending = mcpClients.get(server.serverName)
+      if (!pending) {
+        pending = McpClient.connect(server, { signal: mcpLifetime.signal })
+        mcpClients.set(server.serverName, pending)
+        void pending.catch(() => {
+          if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
+        })
+      }
+      try {
+        const client = await pending
+        signal.throwIfAborted()
+        result.push(...(await client.tools({ signal })))
+      } catch (error) {
+        if (signal.aborted) throw error
+        if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
+        await pending.then((client) => client.close()).catch(() => {})
+        throw error
+      }
+    }
+    for (const plugin of plugins) result.push(...(await plugin.tools({ signal })))
+    return result
+  }
   return {
     plugins,
+    toolCatalog: async (execution) => (await tools(execution)).map(({ name, description }) => ({ name, description })),
     async setup(ctx) {
       ctx.effect(() => async () => {
         mcpLifetime.abort()
@@ -52,35 +83,7 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
         subagents: options.subagents ?? true,
         maxActiveSubagents: options.maxActiveSubagents,
         parallelTools: true,
-        tools: async (execution) => {
-          const signal = execution.signal
-            ? globalThis.AbortSignal.any([execution.signal, mcpLifetime.signal])
-            : mcpLifetime.signal
-          const tools = [
-            ...(typeof options.tools === 'function' ? await options.tools({ signal }) : (options.tools ?? []))
-          ]
-          for (const server of mcpServers) {
-            signal.throwIfAborted()
-            let pending = mcpClients.get(server.serverName)
-            if (!pending) {
-              pending = McpClient.connect(server, { signal })
-              mcpClients.set(server.serverName, pending)
-              void pending.catch(() => {
-                if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
-              })
-            }
-            try {
-              tools.push(...(await (await pending).tools({ signal })))
-            } catch (error) {
-              if (signal.aborted) throw error
-              if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
-              await pending.then((client) => client.close()).catch(() => {})
-              throw error
-            }
-          }
-          for (const plugin of plugins) tools.push(...(await plugin.tools({ signal })))
-          return tools
-        }
+        tools
       })
   }
 }

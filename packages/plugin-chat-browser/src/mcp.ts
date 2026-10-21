@@ -61,13 +61,14 @@ export class McpManager {
       signal.throwIfAborted()
       let pending = this.clients.get(server.serverName)
       if (!pending) {
-        pending = McpClient.connect(server, { signal })
+        pending = McpClient.connect(server, { signal: this.lifetime.signal })
         this.clients.set(server.serverName, pending)
         void pending.catch(() => {
           if (this.clients.get(server.serverName) === pending) this.clients.delete(server.serverName)
         })
       }
       const client = await pending
+      signal.throwIfAborted()
       try {
         result.push(...(await client.tools({ signal })))
       } catch (error) {
