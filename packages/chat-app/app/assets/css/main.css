@@ -1,9 +1,8 @@
 @import "tailwindcss" theme(static);
 @import "@nuxt/ui";
-@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 
 @theme static {
-  --font-sans: 'Pretendard Variable', sans-serif;
+  --font-sans: 'Pretendard', sans-serif;
 }
 
 @layer base {

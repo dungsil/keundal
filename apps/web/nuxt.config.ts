@@ -9,18 +9,13 @@ export default defineNuxtConfig({
   alias: {
     '#agent-host-runtime': fileURLToPath(new URL('./server/agent/runtime-node.ts', import.meta.url))
   },
-  features: { inlineStyles: false },
+  features: { inlineStyles: true },
   nitro: {
-    compressPublicAssets: true,
     externals: { inline: ['zod'] },
     cloudflare: { nodeCompat: true, deployConfig: true, wrangler },
     experimental: { openAPI: true }
   },
   hooks: {
-    'build:manifest'(manifest) {
-      // Optional chunks are loaded by their dynamic imports when needed.
-      for (const entry of Object.values(manifest)) entry.prefetch = false
-    },
     'nitro:config'(config) {
       if (String(config.preset ?? '').startsWith('cloudflare')) {
         config.alias ??= {}
