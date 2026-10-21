@@ -29,6 +29,7 @@
     "@vueuse/core": "^14.4.0",
     "cordis": "catalog:",
     "date-fns": "^4.4.0",
+    "fflate": "0.8.2",
     "motion-v": "^2.6.0",
     "nuxt": "^4.6.2",
     "nuxt-charts": "^2.2.3",
