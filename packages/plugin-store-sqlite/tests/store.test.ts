@@ -357,6 +357,23 @@ test('저장된 실행을 다른 스레드의 종료 커밋으로 되돌리면 �
   expect(await ctx.session.get('elsewhere')).toBeUndefined()
 })
 
+test('외부 종료 커밋이 명시한 빈 메시지는 journal에서 다시 만들지 않는다', async (t) => {
+  const { ctx } = await setup(t, { events: [] })
+  await ctx.session.commit({
+    threadId: 'thread',
+    expectedRevision: 0,
+    messages: [],
+    state: undefined,
+    generation: {
+      request: request('imported-empty'),
+      status: 'completed',
+      journal: [{ sequence: 0, event: { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'reply', delta: 'ignored' } }],
+      messages: []
+    }
+  })
+  expect((await ctx.generation.get('imported-empty'))?.messages).toEqual([])
+})
+
 test('LLM 스트림 실패는 실행을 failed로 확정하고 부분 응답만 남긴다', async (t) => {
   const { ctx } = await setup(t, {
     events: reply.slice(0, 2),
@@ -421,7 +438,7 @@ test('소비자가 순회를 중단한 실행은 interrupted로 확정한다', a
   expect(types(run?.journal.map((entry) => entry.event) ?? [])).toEqual([EventType.RUN_STARTED])
 })
 
-test('실행 중에도 확정된 배치까지 journal과 부분 응답이 데이터베이스 행으로 남는다', async (t) => {
+test('실행 중에는 확정된 journal만 기록하고 부분 응답은 journal에서 복원한다', async (t) => {
   const { ctx, path, held } = await setup(t, {
     events: [
       { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' },
@@ -457,7 +474,8 @@ test('실행 중에도 확정된 배치까지 journal과 부분 응답이 데이
       .all('run') as {
       message: string
     }[]
-    expect(messages.map((row) => JSON.parse(row.message))).toEqual([
+    expect(messages).toEqual([])
+    expect((await ctx.generation.get('run'))?.messages).toEqual([
       { id: 'reply', role: 'assistant', content: Array.from({ length: 30 }, (_, i) => String(i)).join('') }
     ])
   } finally {
