@@ -1,6 +1,6 @@
 # @keundal/plugin-store-memory
 
-`ctx.session`과 `ctx.generation`을 하나의 `MemoryStore`로 제공합니다. `llm` 서비스를 등록한 뒤 사용합니다. `store`를 생략하면 등록할 때 새 저장소를 만듭니다.
+`ctx.session`과 `ctx.generation`을 하나의 `MemoryStore`로 제공합니다. `generation`은 `llm` 서비스가 등록되면 사용할 수 있습니다. `store`를 생략하면 플러그인 등록마다 새 저장소를 만듭니다. LLM을 교체하면 실행 중인 생성을 취소하고 `generation`을 다시 구성하며, `session`과 저장소에 보관한 journal은 유지합니다. 플러그인 자체를 해제하고 다시 등록할 때도 상태를 유지하려면 `store`를 전달합니다.
 
 ```ts
 import memoryStorePlugin, { MemoryStore } from '@keundal/plugin-store-memory'

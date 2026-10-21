@@ -81,7 +81,15 @@ export class ChatMessageAssembly {
       }
       case EventType.TOOL_CALL_RESULT: {
         const { part } = this.calls.get(event.toolCallId)!
-        Object.assign(part, { state: 'output-available', output: part.type === 'tool-skill' ? event.content : JSON.parse(event.content as string) })
+        let output: unknown = event.content
+        if (part.type !== 'tool-skill' && typeof event.content === 'string') {
+          try {
+            output = JSON.parse(event.content)
+          } catch {
+            output = event.content
+          }
+        }
+        Object.assign(part, { state: 'output-available', output })
         break
       }
       case EventType.CUSTOM:
