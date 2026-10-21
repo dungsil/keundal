@@ -542,3 +542,35 @@ test('list는 스레드와 실행을 등록 순서로 돌려준다', async (t) =
   expect(runs.map((snapshot) => snapshot.request.input.runId)).toEqual(['run'])
   expect(runs[0]?.status).toBe('completed')
 })
+
+test('큰 사용자 정의 이벤트는 기록하지 않고 이전 출력과 실패 상태를 보존한다', async (t) => {
+  const { ctx } = await setup(t, { events: [] })
+  let closed = false
+  const delivered: AGUIEvent[] = []
+  await expect(
+    (async () => {
+      for await (const event of ctx.generation.run(request('limited'), {
+        stream: async function* () {
+          try {
+            yield { type: EventType.TEXT_MESSAGE_START, messageId: 'partial', role: 'assistant' }
+            yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'partial', delta: 'saved' }
+            yield { type: EventType.CUSTOM, name: 'large', value: { nested: 'x'.repeat(8 * 1024 * 1024 + 1) } }
+          } finally {
+            closed = true
+          }
+        }
+      }))
+        delivered.push(event)
+    })()
+  ).rejects.toThrow('stream byte limit exceeded')
+  expect(closed).toBe(true)
+  const run = await ctx.generation.get('limited')
+  expect(run?.status).toBe('failed')
+  expect(run?.messages).toContainEqual({ id: 'partial', role: 'assistant', content: 'saved' })
+  expect(run?.journal.map((entry) => entry.event)).toEqual(delivered)
+  expect(delivered.some((event) => event.type === EventType.CUSTOM || event.type === EventType.RUN_FINISHED)).toBe(
+    false
+  )
+  await ctx.generation.recover()
+  expect((await ctx.generation.get('limited'))?.status).toBe('failed')
+})

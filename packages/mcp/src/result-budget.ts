@@ -1,9 +1,9 @@
-import { AsyncLocalStorage } from 'node:async_hooks'
-
 import type { Transport } from '@modelcontextprotocol/client'
 
 export const DEFAULT_MAX_RESULT_BYTES = 1024 * 1024
 const MAX_RESULT_DEPTH = 64
+const RESULT_OPERATION_KEY = 'io.keundal/result-operation'
+const RESULT_METHODS = new Set(['tools/call', 'resources/list', 'resources/templates/list', 'resources/read'])
 
 const exceeded = () => new Error('MCP result exceeds the configured size or nesting limit')
 
@@ -103,7 +103,7 @@ export async function boundedMcpPages<T extends { nextCursor?: string }, Item>(
 
 /** SDK가 결과 검증이나 오류 변환을 수행하기 전에 해석된 응답의 크기를 제한합니다. */
 export class McpResultBudget {
-  private readonly active = new AsyncLocalStorage<Set<number>>()
+  private readonly active = new Map<string, Set<number>>()
   private readonly pending = new Map<number, Set<number>>()
 
   constructor(
@@ -112,12 +112,19 @@ export class McpResultBudget {
   ) {
     const send = transport.send.bind(transport)
     transport.send = async (message, options) => {
-      if ('id' in message && 'method' in message) {
-        const requests = this.active.getStore()
-        if (requests) {
-          requests.add(Number(message.id))
-          this.pending.set(Number(message.id), requests)
-        }
+      if ('id' in message && 'method' in message && RESULT_METHODS.has(message.method)) {
+        const token = message.params?._meta?.[RESULT_OPERATION_KEY]
+        const requests = typeof token === 'string' ? this.active.get(token) : undefined
+        if (!requests) throw new Error('MCP result request has no active budget')
+        requests.add(Number(message.id))
+        this.pending.set(Number(message.id), requests)
+        const metadata = { ...message.params?._meta }
+        delete metadata[RESULT_OPERATION_KEY]
+        const params = { ...message.params }
+        if (Object.keys(metadata).length) params._meta = metadata
+        else delete params._meta
+        await send({ ...message, params }, options)
+        return
       }
       await send(message, options)
     }
@@ -155,11 +162,14 @@ export class McpResultBudget {
     }
   }
 
-  async run<T>(operation: () => Promise<T>): Promise<T> {
+  async run<T>(operation: (metadata: Record<string, unknown>) => Promise<T>): Promise<T> {
     const requests = new Set<number>()
+    const token = globalThis.crypto.randomUUID()
+    this.active.set(token, requests)
     try {
-      return await this.active.run(requests, () => boundedMcpRequest(operation, this.limit))
+      return await boundedMcpRequest(() => operation({ [RESULT_OPERATION_KEY]: token }), this.limit)
     } finally {
+      this.active.delete(token)
       for (const id of requests) this.pending.delete(id)
     }
   }

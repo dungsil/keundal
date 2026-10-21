@@ -1,1 +1,4 @@
-export { default } from '@keundal/tsdown'
+import config from '@keundal/tsdown'
+import { defineConfig } from 'tsdown'
+
+export default defineConfig({ ...config, entry: ['src/index.ts', 'src/browser.ts'] })

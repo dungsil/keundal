@@ -1,13 +1,14 @@
 import { createServer } from 'node:http'
 
 import { createAgentRuntime } from '@keundal/agent-host/runtime'
+import { createChatTools } from '@keundal/chat-app/shared/utils/tools/agent'
 
 const sidecar = process.env.KEUNDAL_SIDECAR === '1'
 const host = process.env.KEUNDAL_HOST ?? '127.0.0.1'
 const port = Number(process.env.PORT ?? (sidecar ? 0 : 8000))
 if (!host.trim()) throw new Error('KEUNDAL_HOST는 비어 있을 수 없습니다.')
 if (!Number.isSafeInteger(port) || port < 0 || port > 65_535) throw new Error('PORT가 올바르지 않습니다.')
-const agentHost = await createAgentRuntime()
+const agentHost = await createAgentRuntime(process.env, { tools: createChatTools() })
 const app = agentHost.app
 
 const server = createServer(app).listen(port, host, () => {
@@ -42,3 +43,10 @@ const shutdown = async () => {
 }
 process.once('SIGINT', shutdown)
 process.once('SIGTERM', shutdown)
+
+if (sidecar && process.env.KEUNDAL_SHUTDOWN_ON_STDIN === '1') {
+  process.stdin.once('end', () => {
+    void shutdown()
+  })
+  process.stdin.resume()
+}

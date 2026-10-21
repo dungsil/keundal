@@ -30,18 +30,26 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
+      contents: read
       pull-requests: read # paths-filter가 PR의 변경 파일을 조회한다.
     outputs:
-      source: ${{ github.event_name != 'pull_request' || steps.filter.outputs.source == 'true' }}
+      source: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.source == 'true' }}
+      web: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.web == 'true' }}
+      desktop: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.desktop == 'true' }}
     steps:
-      # PR은 경로 확인을 항상 실행하여 배포와 무관한 변경도 필수 검사 결과를 남긴다.
+      - name: 저장소 가져오기
+        if: github.event_name != 'pull_request' && github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
       - name: 변경 경로 확인
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'workflow_dispatch'
         id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
-          # 프리뷰와 같은 제외 경로를 사용한다. 린트와 CodeQL은 항상 실행한다.
-          # tools/tsdown과 tools/tsconfig 및 새 설정 파일은 검사 대상에 포함한다.
+          base: ${{ github.event.merge_group.base_sha || github.event.before || github.base_ref }}
           predicate-quantifier: every
           filters: |
             source:
@@ -55,6 +63,30 @@ jobs:
               - '!apps/*/README.md'
               - '!packages/*/README.md'
               - '!tools/*/README.md'
+            web:
+              - '**'
+              - '!.github/**'
+              - '!ci/**'
+              - '!docs/**'
+              - '!examples/**'
+              - '!tools/store-conformance/**'
+              - '!*.md'
+              - '!apps/*/README.md'
+              - '!packages/*/README.md'
+              - '!tools/*/README.md'
+              - '!apps/desktop/**'
+            desktop:
+              - '**'
+              - '!.github/**'
+              - '!ci/**'
+              - '!docs/**'
+              - '!examples/**'
+              - '!tools/store-conformance/**'
+              - '!*.md'
+              - '!apps/*/README.md'
+              - '!packages/*/README.md'
+              - '!tools/*/README.md'
+              - '!apps/web/**'
 
   build:
     name: 빌드
@@ -68,11 +100,11 @@ jobs:
         uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: ${{ needs.changes.outputs.source != 'true' && 'build-web,build-platforms' || '' }}
+          allowed-skips: ${{ needs.changes.outputs.web != 'true' && (needs.changes.outputs.desktop != 'true' && 'build-web,build-platforms' || 'build-web') || (needs.changes.outputs.desktop != 'true' && 'build-platforms' || '') }}
 
   build-web:
     needs: changes
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.web == 'true'
     name: 웹 및 패키지 빌드
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -125,7 +157,7 @@ jobs:
 
   build-platforms:
     needs: changes
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.desktop == 'true'
     name: 빌드 (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -271,7 +303,14 @@ jobs:
             turbo-v4-${{ runner.os }}-${{ runner.arch }}-
 
       - name: 타입 검사
-        run: pnpm typecheck
+        env:
+          WEB_CHANGED: ${{ needs.changes.outputs.web }}
+          DESKTOP_CHANGED: ${{ needs.changes.outputs.desktop }}
+        run: |
+          filters=()
+          if [ "$WEB_CHANGED" != 'true' ]; then filters+=(--filter='!@keundal/web'); fi
+          if [ "$DESKTOP_CHANGED" != 'true' ]; then filters+=(--filter='!@keundal/desktop'); fi
+          pnpm exec turbo run typecheck "${filters[@]}"
 
       - name: Turbo 실행 요약 업로드
         if: ${{ !cancelled() }}
@@ -312,7 +351,14 @@ jobs:
             turbo-v4-${{ runner.os }}-${{ runner.arch }}-
 
       - name: 테스트
-        run: pnpm test
+        env:
+          WEB_CHANGED: ${{ needs.changes.outputs.web }}
+          DESKTOP_CHANGED: ${{ needs.changes.outputs.desktop }}
+        run: |
+          filters=()
+          if [ "$WEB_CHANGED" != 'true' ]; then filters+=(--filter='!@keundal/web'); fi
+          if [ "$DESKTOP_CHANGED" != 'true' ]; then filters+=(--filter='!@keundal/desktop'); fi
+          pnpm exec turbo run test "${filters[@]}"
 
       - name: Turbo 실행 요약 업로드
         if: ${{ !cancelled() }}

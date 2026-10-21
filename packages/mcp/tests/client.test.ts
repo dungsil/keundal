@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url'
 
 import agentPlugin, { type ExecutableTool, type ToolExecutionContext } from '@keundal/agent'
 import { EventType, LLMService, type LLMEvent, type LLMRequest } from '@keundal/core'
-import { McpClient, type McpPermissions } from '@keundal/mcp'
+import { McpClient, type McpPermissions, parseMcpServers } from '@keundal/mcp'
+import { McpClient as BrowserMcpClient } from '@keundal/mcp/browser'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { WebStandardStreamableHTTPServerTransport, type ServerCapabilities } from '@modelcontextprotocol/server'
 import { Context } from 'cordis'
@@ -30,6 +31,7 @@ async function httpFixture(t: TestContext, capabilities?: ServerCapabilities) {
   const servers = new Set([fixture.server])
   const clients = new Set<McpClient>()
   const headers: string[] = []
+  const requests: Record<string, unknown>[] = []
   const http = createServer(async (req, res) => {
     headers.push(req.headers.authorization ?? '')
     const sessionId = req.headers['mcp-session-id']
@@ -49,6 +51,7 @@ async function httpFixture(t: TestContext, capabilities?: ServerCapabilities) {
     }
     const body: Buffer[] = []
     for await (const chunk of req) body.push(Buffer.from(chunk))
+    if (body.length) requests.push(JSON.parse(Buffer.concat(body).toString()))
     let response = await transport.handleRequest(
       new Request('http://localhost/mcp', {
         method: req.method,
@@ -115,7 +118,7 @@ async function httpFixture(t: TestContext, capabilities?: ServerCapabilities) {
     clients.add(client)
     return client
   }
-  return { ...fixture, headers, connect }
+  return { ...fixture, headers, requests, connect, url: `http://127.0.0.1:${address.port}/mcp` }
 }
 
 test('stdio로 도구를 실행하고 명시한 환경만 전달하며 종료 후 자식 프로세스를 정리한다', async (t) => {
@@ -655,3 +658,103 @@ test.for(['orphan-body', 'orphan-id'] as const)(
     expect(oversized).toHaveLength(1)
   }
 )
+test('브라우저 진입점으로 HTTP 도구를 조회하고 실행한다', async (t) => {
+  const { url } = await httpFixture(t)
+  const client = await BrowserMcpClient.connect({
+    serverName: 'browser',
+    transport: 'streamable-http',
+    url,
+    permissions: { tools: ['subtract'] }
+  })
+  t.onTestFinished(() => client.close())
+  expect(await execute(await client.tools(), 'mcp__browser__tool__subtract', { left: 9, right: 4 })).toMatchObject({
+    structuredContent: { difference: 5 }
+  })
+  await expect(BrowserMcpClient.connect({ serverName: 'local', transport: 'stdio', command: 'node' })).rejects.toThrow(
+    'Node.js'
+  )
+})
+
+test('MCP 설정 검증은 잘못된 권한과 전송 설정을 거부하고 원본을 복사한다', () => {
+  const server = {
+    serverName: 'remote',
+    transport: 'streamable-http',
+    url: 'https://example.com/mcp',
+    permissions: { tools: ['search'] }
+  }
+  const parsed = parseMcpServers([server], false)
+  server.permissions.tools.push('delete')
+  expect(parsed[0]?.permissions?.tools).toEqual(['search'])
+  expect(parseMcpServers([{ ...server, maxResultBytes: 256 }])[0]?.maxResultBytes).toBe(256)
+  for (const change of [
+    { transport: 'sse' },
+    { url: 'file:///tmp/server' },
+    { permissions: { tools: true } },
+    { timeoutMs: -1 },
+    { maxResultBytes: 0 },
+    { maxResultBytes: 0.5 },
+    { maxResultBytes: Number.MAX_SAFE_INTEGER + 1 },
+    { headers: { Authorization: 'line\nbreak' } }
+  ]) {
+    expect(() => parseMcpServers([{ ...server, ...change }])).toThrow()
+  }
+})
+
+test('브라우저에서도 누적 목록 예산을 분리하고 과도한 응답을 거부하며 내부 토큰을 전송하지 않는다', async (t) => {
+  const { url, state, requests } = await httpFixture(t)
+  const client = await BrowserMcpClient.connect({
+    serverName: 'browser',
+    transport: 'streamable-http',
+    url,
+    permissions: { tools: '*' }
+  })
+  t.onTestFinished(() => client.close())
+  state.catalog = [
+    Array.from({ length: 128 }, (_, i) => catalogTool(`a${i}`)),
+    Array.from({ length: 128 }, (_, i) => catalogTool(`b${i}`))
+  ]
+  expect((await Promise.all([client.tools(), client.tools()])).map((tools) => tools.length)).toEqual([256, 256])
+  state.catalog[1]!.push(catalogTool('extra'))
+  await expect(client.tools()).rejects.toThrow('catalog exceeds')
+  state.stringifyResponseIds = true
+  state.catalog = [[catalogTool('large', '가'.repeat(6000))]]
+  await expect(client.tools()).rejects.toThrow('catalog exceeds')
+  state.catalog = [[catalogTool('safe')]]
+  expect((await client.tools())[0]!.description).toBe('safe')
+  expect(JSON.stringify(requests)).not.toContain('io.keundal/catalog-discovery')
+})
+
+test('브라우저의 도구와 리소스에도 결과 예산을 적용하고 내부 토큰은 전송하지 않는다', async (t) => {
+  const { url, state, requests } = await httpFixture(t)
+  state.names = ['subtract', 'small']
+  const client = await BrowserMcpClient.connect({
+    serverName: 'browser',
+    transport: 'streamable-http',
+    url,
+    permissions: { tools: '*', resources: '*' },
+    maxResultBytes: 256
+  })
+  t.onTestFinished(() => client.close())
+  const tools = await client.tools()
+  expect(await execute(tools, 'mcp__browser__tool__subtract', { left: 9, right: 4 })).toMatchObject({
+    structuredContent: { difference: 5 }
+  })
+  state.resultText = 'REMOTE_PAYLOAD'.repeat(100)
+  await Promise.all([
+    expect(execute(tools, 'mcp__browser__tool__subtract')).rejects.toThrow('size or nesting limit'),
+    expect(execute(tools, 'mcp__browser__tool__small')).resolves.toMatchObject({ structuredContent: { name: 'small' } })
+  ])
+  state.resultMode = 'id-alias'
+  await expect(execute(tools, 'mcp__browser__tool__subtract')).rejects.toThrow('size or nesting limit')
+  state.resultMode = 'text'
+  state.resourceText = state.listText = state.templateText = state.resultText
+  await expect(client.readResource('fixture://public')).rejects.toThrow('size or nesting limit')
+  await expect(client.listResources()).rejects.toThrow('size or nesting limit')
+  await expect(client.listResourceTemplates()).rejects.toThrow('size or nesting limit')
+  for (const name of ['read', 'list', 'templates'])
+    await expect(execute(tools, `mcp__browser__resource__${name}`, { uri: 'fixture://public' })).rejects.toThrow(
+      'size or nesting limit'
+    )
+  expect(JSON.stringify(requests)).not.toContain('io.keundal/result-operation')
+  expect(JSON.stringify(requests)).not.toContain('io.keundal/catalog-discovery')
+})

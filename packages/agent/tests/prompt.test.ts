@@ -44,7 +44,7 @@ async function setup(t: TestContext, systemPrompt?: string) {
     }
     async *stream(request: LLMRequest) {
       requests.push(structuredClone(request))
-      yield* answer
+      yield* answer.map((event) => ({ ...event, messageId: `answer:${request.input.runId}` }))
     }
   }
   const llm = await ctx.plugin(LLM)
