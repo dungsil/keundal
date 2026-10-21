@@ -1,6 +1,6 @@
 import { defineConfig } from 'tsdown'
 export default defineConfig({
-  entry: ['src/index.ts', 'src/mcp.ts'],
+  entry: ['src/index.ts', 'src/mcp.ts', 'src/skills.ts'],
   format: 'esm',
   fixedExtension: false,
   platform: 'browser',

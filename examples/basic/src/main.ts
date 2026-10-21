@@ -1,5 +1,5 @@
-import agentPlugin from '@keundal/agent'
 import { EventType, parseAGUIEvent, type AgentMessage, type RunAgentInput } from '@keundal/core'
+import agentPlugin from '@keundal/plugin-agent-chat'
 import openaiLLMPlugin from '@keundal/plugin-llm-openai'
 import sqliteStorePlugin from '@keundal/plugin-store-sqlite'
 import { Context } from 'cordis'

@@ -3,9 +3,10 @@ import { constants } from 'node:fs'
 import { access, mkdir, readFile, realpath } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-import type { ExecutableTool } from '@keundal/agent-contract'
 import type { ExecutionOptions, SkillProvider } from '@keundal/core'
-import { McpClient, type McpClientConfig, type McpPermissions } from '@keundal/mcp'
+import type { McpClientConfig, McpPermissions } from '@keundal/mcp'
+import { McpClient } from '@keundal/plugin-mcp-client'
+import type { ExecutableTool } from '@keundal/tools'
 
 import { contained, exists } from './files.js'
 import { skills } from './skills.js'

@@ -1,4 +1,4 @@
-import type { AgentConfig } from '@keundal/agent-contract'
+import type {} from '@keundal/agent'
 import type {
   AGUIEvent,
   AgentMessage,
@@ -18,15 +18,18 @@ export interface AgentHostModel {
 
 export type AgentHostProvider = string
 
+export interface AgentMountConfig {
+  readonly model: string
+  readonly maxOutputTokens: number
+}
+
 export interface AgentHostOptions {
   readonly model: string
   readonly models: readonly AgentHostModel[]
   readonly maxOutputTokens?: number
-  readonly tools?: AgentConfig['tools']
-  readonly maxToolRounds?: number
   /** The application installs services within this owned plugin scope. */
   readonly setup: (ctx: Context) => Promise<void>
-  readonly mountAgent: (ctx: Context, config: AgentConfig) => Promise<Fiber>
+  readonly mountAgent: (ctx: Context, config: AgentMountConfig) => Promise<Fiber>
 }
 
 export interface AgentHostRunOptions extends ExecutionOptions {

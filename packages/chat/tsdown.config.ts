@@ -3,7 +3,6 @@ export default defineConfig({
   entry: [
     'src/chat-message.ts',
     'src/chat-message-publisher.ts',
-    'src/llm-settings.ts',
     'src/model-preferences.ts',
     'src/skills.ts',
     'src/file.ts',
@@ -12,7 +11,6 @@ export default defineConfig({
     'src/platform.ts',
     'src/messages.ts',
     'src/index.ts',
-    'src/tools/agent.ts',
     'src/tools/chart.ts',
     'src/tools/weather.ts'
   ],

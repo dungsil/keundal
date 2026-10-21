@@ -5,6 +5,7 @@ import type { AGUIEvent, SessionSnapshot } from '@keundal/core'
 import type { Context } from 'cordis'
 
 import { createKeundalChat, toMessages } from './keundal'
+export type { MountAgent } from './keundal'
 
 type ChatState = { web: LocalChat }
 

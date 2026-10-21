@@ -15,18 +15,25 @@ web과 desktop은 공통 UI를 사용하면서 각 앱의 `app/platform.ts`에�
 | 공급자와 무관한 호스트와 HTTP 연결          | `@keundal/agent-host`                   |
 | Node.js 환경 설정과 기본 플러그인 구성      | `@keundal/agent-runtime-node`           |
 
-`@keundal/agent-contract`, `@keundal/shell`, `@keundal/transcription`, `@keundal/fs`는 구현을 가져오지 않는 서비스 계약입니다. 기본 실행 루프는 `@keundal/agent`가 제공합니다. 독립적인 에이전트는 `AgentService`를 구현하며, 기본 루프를 재사용할 때는 기존 `Agent`를 상속할 수 있습니다. 스킬의 Markdown 형식 해석은 파일시스템 구현과 분리한 `@keundal/skill-markdown`이 담당합니다.
+`@keundal/agent`, `@keundal/tools`, `@keundal/context`, `@keundal/mcp`는 구현을 가져오지 않는 계약입니다. `@keundal/shell`, `@keundal/transcription`, `@keundal/fs`도 서비스 계약만 제공합니다. 기본 실행 루프와 축약·도구 정책은 `@keundal/agent-loop`가 소유합니다. 독립적인 에이전트는 `AgentService`를 구현하고, 기본 루프를 재사용할 때는 `agent-loop`의 `Agent`를 상속합니다.
+
+`@keundal/plugin-agent-chat`과 `@keundal/plugin-agent-coding`은 같은 루프를 재사용하는 별도 구현입니다. 코딩 구현은 채팅 구현에 의존하지 않습니다. `@keundal/plugin-context`는 환경에 독립적인 컨텍스트 공급자를, `@keundal/plugin-context-node`는 로컬 파일·에이전트 지침·tmux 공급자를 제공합니다. 스킬의 Markdown 형식 해석은 `@keundal/skill-markdown`이 담당합니다.
 
 ## 구현 교체
 
 - web의 `apps/web/app/platform.ts`에서 IndexedDB 플러그인, LLM 플러그인, `mountAgent`와 도구를 선택합니다. `agentEndpoint`를 설정하면 HTTP 연결 구현을 사용합니다.
 - desktop의 `apps/desktop/app/platform.ts`에서 네이티브 설정 저장소, 스킬 파일 공급자, sidecar 연결을 선택합니다. 공통 UI에는 Tauri 의존성이 없습니다.
 - MCP 설정과 연결은 앱이 `ChatPlatform.mcp`로 제공합니다. Node.js의 MCP와 Agent Plugins 구성은 `@keundal/agent-runtime-node`가 담당합니다.
+- MCP 설정과 검증은 `@keundal/mcp`, SDK 연결은 `@keundal/plugin-mcp-client`가 담당합니다. 연결 관리자는 설정 저장소를 주입받으며, 브라우저와 네이티브 저장소 선택은 앱이 담당합니다.
+- `@keundal/chat`은 화면 계약과 데이터 변환을 제공합니다. 공급자 설정 정책은 `@keundal/llm-settings`, 날씨·차트 실행은 `@keundal/plugin-tool-chat`, 스킬 저장·로딩은 플랫폼 구현에 둡니다.
 - 두 앱 모두 `loadModels`와 `transcription`을 교체할 수 있습니다. 기본 설정 화면은 기존 OpenAI·Anthropic·Gemini API 설정 형식을 유지합니다.
 - `createAgentHost()`에는 `setup(ctx)`와 `mountAgent(ctx, config)`를 전달합니다. 호스트 내부에는 LLM 공급자 목록, SQLite 등록, 기본 에이전트 선택이 없습니다.
+- 호스트의 `AgentMountConfig`는 모델과 출력 예산만 전달합니다. 도구와 반복 횟수는 각 조립 함수에서 구현 설정으로 연결합니다.
 - Node.js 앱은 `createAgentRuntime(env, { compose })`를 호출합니다. 기본값을 사용할 때도 `createNodeComposition`을 명시합니다. 다른 구성을 넘기면 환경 변수와 HTTP 처리를 유지하면서 구현만 바꿀 수 있습니다. 환경 변수 형식 자체를 바꿀 때는 앱에서 `createAgentHost()`와 `createAgentApp()`을 직접 조립합니다.
 
 플러그인은 전달받은 Cordis 컨텍스트에 등록해야 합니다. 호스트가 생성한 범위는 초기화 실패와 종료 시 하위 플러그인을 정리합니다. 모델별 에이전트는 격리된 범위에서 실행하며, 등록이 실패한 범위도 정리합니다. 앱 연결의 `dispose()`는 진행 중인 대화를 중단하고 소유한 자원을 해제해야 합니다.
+
+저장소와 `session`의 수명은 LLM에 종속시키지 않습니다. LLM을 교체하면 `generation`과 에이전트만 다시 구성하며 기존 세션과 journal은 유지합니다. 플러그인 전체를 해제할 때는 진행 중인 생성을 먼저 정리한 뒤 소유한 저장소를 닫습니다.
 
 `chatCapabilities.secureSettings`와 `chatCapabilities.localSkills`는 화면에 표시할 저장소 설명과 스킬 파일 설정을 정합니다. 구현 선택은 이 플래그가 아니라 앱의 조립 코드가 담당합니다. 저장소 키, IndexedDB 이름, SQLite 형식과 보안 저장소 이전 규칙은 유지합니다.
 

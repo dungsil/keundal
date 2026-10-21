@@ -15,6 +15,7 @@
     "@iconify-json/simple-icons": "^1.2.99",
     "@keundal/core": "workspace:*",
     "@keundal/mcp": "workspace:*",
+    "@keundal/llm-settings": "workspace:*",
     "@keundal/ui": "workspace:*",
     "@nuxt/ui": "^4.11.3",
     "@shikijs/langs": "^4.5.0",
@@ -34,6 +35,7 @@
     "@keundal/skill-markdown": "workspace:*"
   },
   "devDependencies": {
+    "@keundal/plugin-chat-browser": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/plugin-store-sqlite": "workspace:*",
     "@nuxt/eslint": "^1.17.0",
@@ -44,7 +46,8 @@
     "typescript": "^6.0.3",
     "vitest": "catalog:",
     "vue-tsc": "^3.3.13",
-    "@keundal/agent": "workspace:*",
+    "@keundal/plugin-agent-chat": "workspace:*",
+    "@keundal/plugin-tool-chat": "workspace:*",
     "@keundal/plugin-llm-anthropic": "workspace:*",
     "@keundal/plugin-llm-gemini": "workspace:*",
     "@keundal/plugin-llm-openai": "workspace:*",
@@ -57,9 +60,8 @@
     "@keundal/plugin-chat-local": "workspace:*",
     "@keundal/plugin-chat-remote": "workspace:*",
     "@keundal/plugin-chat-desktop": "workspace:*",
-    "@keundal/plugin-chat-browser": "workspace:*",
     "@keundal/plugin-llm-browser": "workspace:*",
-    "@keundal/agent-contract": "workspace:*"
+    "@keundal/agent-loop": "workspace:*"
   },
   "version": "0.0.0",
   "main": "./nuxt.config.ts",

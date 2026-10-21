@@ -8,8 +8,8 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "@keundal/agent": "workspace:*",
     "@keundal/core": "workspace:*",
+    "@keundal/plugin-agent-chat": "workspace:*",
     "@keundal/plugin-llm-openai": "workspace:*",
     "@keundal/plugin-store-sqlite": "workspace:*",
     "cordis": "catalog:"

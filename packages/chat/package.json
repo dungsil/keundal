@@ -10,10 +10,6 @@
       "types": "./dist/chat-message.d.ts",
       "import": "./dist/chat-message.js"
     },
-    "./llm-settings": {
-      "types": "./dist/llm-settings.d.ts",
-      "import": "./dist/llm-settings.js"
-    },
     "./model-preferences": {
       "types": "./dist/model-preferences.d.ts",
       "import": "./dist/model-preferences.js"
@@ -46,10 +42,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./tools/agent": {
-      "types": "./dist/tools/agent.d.ts",
-      "import": "./dist/tools/agent.js"
-    },
     "./tools/chart": {
       "types": "./dist/tools/chart.d.ts",
       "import": "./dist/tools/chart.js"
@@ -68,11 +60,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@keundal/agent-contract": "workspace:*",
     "@keundal/core": "workspace:*",
+    "@keundal/llm-settings": "workspace:*",
     "@keundal/mcp": "workspace:*",
-    "@keundal/skill-markdown": "workspace:*",
-    "cordis": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
-import { defaultLLMSettings, llmSettingsSchema, type LLMSettings } from '@keundal/chat/llm-settings'
 import type { NativeInvoke, SettingsStorage } from '@keundal/chat/platform'
 import { LLM_SETTINGS_KEY } from '@keundal/chat/platform'
+import { defaultLLMSettings, llmSettingsSchema, type LLMSettings } from '@keundal/llm-settings'
 
 export function createNativeSettingsStorage(
   storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>,

@@ -9,7 +9,7 @@ import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { browserLLMPlugin } from '@keundal/plugin-llm-browser'
 import { createKeundalChat as createChat } from '@keundal/plugin-chat-local/keundal'
 import { ChatStore } from '@keundal/plugin-chat-local'
-import { defaultLLMSettings, providerSettingsSchema } from '@keundal/chat/llm-settings'
+import { defaultLLMSettings, providerSettingsSchema } from '@keundal/llm-settings'
 
 test('공급자 모듈을 불러오는 동안 취소하면 모델 조회를 중단한다', async () => {
   const ctx = new Context()

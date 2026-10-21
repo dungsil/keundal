@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./skills": {
+      "types": "./dist/skills.d.ts",
+      "import": "./dist/skills.js"
+    },
     "./mcp": {
       "types": "./dist/mcp.d.ts",
       "import": "./dist/mcp.js"
@@ -21,7 +25,11 @@
   },
   "dependencies": {
     "@keundal/chat": "workspace:*",
-    "@keundal/mcp": "workspace:*"
+    "@keundal/core": "workspace:*",
+    "@keundal/llm-settings": "workspace:*",
+    "@keundal/mcp": "workspace:*",
+    "@keundal/plugin-mcp-client": "workspace:*",
+    "@keundal/skill-markdown": "workspace:*"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",

@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest'
 import { createDesktopPlatform } from '../app/platform'
-import { defaultLLMSettings } from '@keundal/chat/llm-settings'
+import { defaultLLMSettings } from '@keundal/llm-settings'
 import type { NativeInvoke } from '@keundal/chat/platform'
 
 test('데스크톱 조립은 보안 저장소와 로컬 스킬을 제공하고 sidecar에 연결한다', async () => {
@@ -33,7 +33,7 @@ test('데스크톱 조립은 보안 저장소와 로컬 스킬을 제공하고 s
     const settings = await platform.settings.load()
     expect(settings).toEqual(defaultLLMSettings())
     await platform.settings.save(settings)
-    expect(await platform.skillFiles?.list()).toEqual({ roots: [], files: [] })
+    expect(await platform.skills.listFiles()).toEqual({ roots: [], files: [] })
     const connection = await platform.connect({ getSettings: () => settings, getModels: () => [], initialModel: 'openai/test', skills: [] })
     try {
       expect(connection.remoteAgent).toBe(true)

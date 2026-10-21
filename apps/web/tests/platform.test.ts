@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { expect, test } from 'vitest'
 import { createWebPlatform } from '../app/platform'
-import { defaultLLMSettings } from '@keundal/chat/llm-settings'
+import { defaultLLMSettings } from '@keundal/llm-settings'
 
 function storage(): Storage {
   const data = new Map<string, string>()
@@ -21,7 +21,7 @@ test('웹 조립은 네이티브 IPC 없이 IndexedDB 대화를 저장하고 재
   await expect(platform.mcp.save([{ serverName: 'local', transport: 'stdio', command: 'node' }], async () => {})).rejects.toThrow('Streamable HTTP')
   const settings = defaultLLMSettings()
   const options = { getSettings: () => settings, getModels: () => [], skills: [] }
-  expect(platform.skillFiles).toBeUndefined()
+  expect(await platform.skills.listFiles()).toEqual({ roots: [], files: [] })
   const first = await platform.connect(options)
   const id = crypto.randomUUID()
   try {

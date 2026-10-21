@@ -1,4 +1,5 @@
-import type { AgentConfig } from '@keundal/agent-contract'
+import type { AgentConfig } from '@keundal/agent-loop'
+import '@keundal/agent'
 import { ChatMessageAssembly, type ChatMessage } from '@keundal/chat/chat-message'
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
 import { validateChatTitle } from '@keundal/chat/chat-store'
@@ -10,6 +11,7 @@ export { toMessages } from '@keundal/chat/messages'
 import { resolveModel } from '@keundal/chat/models'
 
 const randomUUID = () => globalThis.crypto.randomUUID()
+export type MountAgent = (ctx: Context, config: AgentConfig) => Promise<Fiber>
 const input = (
   messages: AgentMessage[],
   threadId: string = randomUUID(),
@@ -21,7 +23,7 @@ export async function createKeundalChat(
   context: Context,
   name: string,
   options: { webSearch?: boolean; reasoning?: boolean; maxOutputTokens?: number },
-  mountAgent: (ctx: Context, config: AgentConfig) => Promise<Fiber>
+  mountAgent: MountAgent
 ) {
   const config = resolveModel(name)
   const maxOutputTokens = options.maxOutputTokens ?? 4096

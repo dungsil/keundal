@@ -72,9 +72,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
       const owned = isolated.plugin(async (child: Context) => {
         await options.mountAgent(child, {
           model: selected.id,
-          maxOutputTokens,
-          tools: options.tools,
-          maxToolRounds: options.maxToolRounds ?? 4
+          maxOutputTokens
         })
       })
       try {

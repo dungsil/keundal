@@ -1,25 +1,103 @@
-export { parseMcpServers } from './config.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
-import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
+export interface McpPermissions {
+  readonly tools?: '*' | readonly string[]
+  readonly resources?: '*' | readonly string[]
+}
 
-import { McpClient as BrowserClient, type McpClientConfig, type McpRequestOptions } from './browser.js'
+export type McpClientConfig = {
+  readonly serverName: string
+  readonly permissions?: McpPermissions
+  readonly timeoutMs?: number
+  readonly maxResultBytes?: number
+} & (
+  | {
+      readonly transport: 'stdio'
+      readonly command: string
+      readonly args?: string[]
+      readonly env?: Record<string, string>
+      readonly cwd?: string
+    }
+  | {
+      readonly transport: 'streamable-http'
+      readonly url: string
+      readonly headers?: Record<string, string>
+      readonly redirect?: 'error'
+      readonly allowInsecureHttp?: boolean
+    }
+)
 
-export type { McpClientConfig, McpPermissions, McpRequestOptions } from './browser.js'
+export interface McpRequestOptions {
+  readonly signal?: AbortSignal
+}
 
-export class McpClient extends BrowserClient {
-  static override async connect(config: McpClientConfig, options: McpRequestOptions = {}): Promise<BrowserClient> {
-    return super.connect(config, options, (config) =>
-      config.transport === 'stdio'
-        ? new StdioClientTransport({
-            command: config.command,
-            args: config.args,
-            env: config.env,
-            cwd: config.cwd,
-            stderr: 'ignore'
-          })
-        : new StreamableHTTPClientTransport(new globalThis.URL(config.url), {
-            requestInit: { headers: config.headers, redirect: 'error' }
-          })
+export interface McpSettingsStorage {
+  load(): Promise<string | null>
+  save(settings: string | null): Promise<void>
+}
+
+/** Remote plaintext MCP requires an explicit per-server opt-in. */
+export function parseMcpHttpUrl(value: string, allowInsecureHttp?: boolean): URL {
+  if (allowInsecureHttp !== undefined && typeof allowInsecureHttp !== 'boolean')
+    throw new Error('MCP allowInsecureHttp must be a boolean')
+  const url = new globalThis.URL(value)
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash)
+    throw new Error('MCP URL must use HTTP or HTTPS without embedded credentials or fragment')
+  const loopback = url.hostname === 'localhost' || url.hostname === '[::1]' || /^127\.\d+\.\d+\.\d+$/.test(url.hostname)
+  if (url.protocol === 'http:' && !loopback && allowInsecureHttp !== true)
+    throw new Error('Remote MCP URLs must use HTTPS')
+  return url
+}
+
+/** Validate persisted configuration before opening connections or starting processes. */
+export function parseMcpServers(value: unknown, allowStdio = true): McpClientConfig[] {
+  if (!Array.isArray(value)) throw new Error('MCP servers must be an array')
+  const names = new Set<string>()
+  const record = (value: unknown): value is Record<string, unknown> =>
+    !!value && typeof value === 'object' && !Array.isArray(value)
+  const strings = (value: unknown): value is string[] =>
+    Array.isArray(value) && value.every((item) => typeof item === 'string')
+  const dictionary = (value: unknown) => record(value) && Object.values(value).every((item) => typeof item === 'string')
+  return value.map((server) => {
+    if (!record(server) || typeof server.serverName !== 'string' || !/^[A-Za-z0-9_-]{1,32}$/.test(server.serverName))
+      throw new Error('Each MCP server needs a name with 1–32 letters, digits, underscores or hyphens')
+    if (names.has(server.serverName)) throw new Error(`Duplicate MCP server name: ${server.serverName}`)
+    names.add(server.serverName)
+    if (
+      server.timeoutMs !== undefined &&
+      (!Number.isSafeInteger(server.timeoutMs) || (server.timeoutMs as number) <= 0)
     )
-  }
+      throw new Error('MCP timeout must be a positive integer')
+    if (
+      server.maxResultBytes !== undefined &&
+      (!Number.isSafeInteger(server.maxResultBytes) || (server.maxResultBytes as number) <= 0)
+    )
+      throw new Error('MCP maxResultBytes must be a positive integer')
+    if (server.permissions !== undefined) {
+      if (
+        !record(server.permissions) ||
+        Object.entries(server.permissions).some(
+          ([key, scope]) => !['tools', 'resources'].includes(key) || (scope !== '*' && !strings(scope))
+        )
+      )
+        throw new Error('MCP permissions must be "*" or arrays of names')
+    }
+    if (server.transport === 'streamable-http') {
+      if (typeof server.url !== 'string') throw new Error('MCP HTTP URL is required')
+      parseMcpHttpUrl(server.url, server.allowInsecureHttp as boolean | undefined)
+      if (
+        server.headers !== undefined &&
+        (!dictionary(server.headers) ||
+          Object.entries(server.headers as Record<string, string>).some(
+            ([key, value]) => !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(key) || /[\r\n]/.test(value)
+          ))
+      )
+        throw new Error('Invalid MCP HTTP headers')
+    } else if (server.transport === 'stdio' && allowStdio) {
+      if (typeof server.command !== 'string' || !server.command.trim()) throw new Error('MCP command is required')
+      if (server.args !== undefined && !strings(server.args)) throw new Error('MCP arguments must be strings')
+      if (server.env !== undefined && !dictionary(server.env)) throw new Error('MCP environment values must be strings')
+      if (server.cwd !== undefined && typeof server.cwd !== 'string')
+        throw new Error('MCP working directory must be a string')
+    } else throw new Error(allowStdio ? 'Unsupported MCP transport' : 'Web MCP connections require Streamable HTTP')
+    return globalThis.structuredClone(server) as McpClientConfig
+  })
 }
