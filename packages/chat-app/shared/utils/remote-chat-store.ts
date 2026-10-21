@@ -1,3 +1,4 @@
+import { ChatMessagePublisher } from './chat-message-publisher'
 import { EventType, type AGUIEvent, type GenerationSnapshot, type SessionSnapshot } from '@keundal/core'
 import { ChatMessageAssembly } from './chat-message'
 import type { ChatMessage } from './chat-message'
@@ -237,6 +238,7 @@ export class RemoteChatStore implements ChatStoreLike {
       combined.throwIfAborted()
       const selected = await this.model(request.model)
       const projection = new ChatMessageAssembly(runId)
+      const publisher = new ChatMessagePublisher(request.onMessage)
       let finished: Extract<AGUIEvent, { type: 'RUN_FINISHED' }> | undefined
       let failed = false
       try {
@@ -258,7 +260,7 @@ export class RemoteChatStore implements ChatStoreLike {
         })
         for await (const event of this.events(response, combined)) {
           projection.apply(event)
-          request.onMessage?.(structuredClone(projection.message))
+          publisher.update(event, projection.message)
           if (event.type === EventType.RUN_FINISHED) finished = event
           else {
             if (event.type === EventType.RUN_ERROR) failed = true
@@ -274,7 +276,7 @@ export class RemoteChatStore implements ChatStoreLike {
         try {
           projection.finish(request.model)
           await this.complete(id, runId, projection.message)
-          request.onMessage?.(structuredClone(projection.message))
+          publisher.finish(projection.message)
         } finally {
           this.active.delete(id)
           release()

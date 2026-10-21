@@ -1,3 +1,4 @@
+import { ChatMessagePublisher } from './chat-message-publisher'
 import { EventType, parseRunAgentInput, prepareReplayMessages, type AgentMessage, type AGUIEvent } from '@keundal/core'
 import agentPlugin, { type ExecutableTool } from '@keundal/agent'
 import type { Context } from 'cordis'
@@ -92,6 +93,7 @@ export async function createKeundalChat(context: Context, name: string, options:
     }): AsyncGenerator<AGUIEvent> {
       const runId = request.runId ?? randomUUID()
       const projection = new ChatMessageAssembly(runId)
+      const publisher = new ChatMessagePublisher(request.onMessage)
       let finished: Extract<AGUIEvent, { type: 'RUN_FINISHED' }> | undefined
       let failed = false
       try {
@@ -100,7 +102,7 @@ export async function createKeundalChat(context: Context, name: string, options:
           ...toMessages(request.messages, name)
         ], request.threadId, runId, request.state), { signal: request.signal })) {
           projection.apply(event)
-          request.onMessage?.(structuredClone(projection.message))
+          publisher.update(event, projection.message)
           if (event.type === EventType.RUN_FINISHED) finished = event
           else {
             if (event.type === EventType.RUN_ERROR) failed = true
@@ -113,7 +115,7 @@ export async function createKeundalChat(context: Context, name: string, options:
       } finally {
         projection.finish(name)
         await request.onFinish?.(projection.message)
-        request.onMessage?.(structuredClone(projection.message))
+        publisher.finish(projection.message)
       }
       // The UI sees success only after the display message is durably saved too.
       if (finished) yield finished
