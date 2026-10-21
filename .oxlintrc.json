@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": ["apps/web/**"],
+  "ignorePatterns": ["apps/web/**", "packages/chat-app/**", "apps/desktop/**"],
   "env": { "builtin": true },
   "plugins": ["typescript", "unicorn", "oxc"],
   "categories": {

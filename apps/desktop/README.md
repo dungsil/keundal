@@ -1,6 +1,6 @@
 # Keundal Desktop
 
-`apps/web`의 Nuxt UI를 그대로 사용하는 Tauri 2 데스크톱 앱입니다. UI를 복사하지 않고 웹 앱의 `desktop` 환경 설정으로 정적 SPA를 생성해 앱에 포함합니다. 배포된 웹사이트나 별도 Node.js 서버 없이 실행합니다.
+`@keundal/chat-app` Nuxt 레이어를 사용하는 Tauri 2 데스크톱 앱입니다. `apps/desktop/nuxt.config.ts`에서 공용 레이어를 상속하고 정적 SPA를 생성해 앱에 포함합니다. 배포된 웹사이트나 별도 Node.js 서버 없이 실행합니다.
 
 ## 준비
 
@@ -26,7 +26,7 @@ pnpm build
 pnpm --filter @keundal/desktop dev
 ```
 
-Tauri가 `apps/web`의 개발 서버(포트 1420)를 시작하고 네이티브 창을 엽니다. 기존 웹 개발 서버의 기본 포트와 구분하며, `.nuxt-desktop`에 개발 산출물을 저장합니다. `dev:ui`는 Tauri용 UI 서버이며 보안 저장소 IPC가 필요하므로 일반 브라우저만으로 실행할 수 없습니다. 브라우저 UI 확인에는 `pnpm --filter @keundal/web dev`를 사용합니다.
+Tauri가 `apps/desktop`의 개발 서버(포트 1420)를 시작하고 네이티브 창을 엽니다. 기존 웹 개발 서버의 기본 포트와 구분하며, `apps/desktop/.nuxt`에 개발 산출물을 저장합니다. `dev:ui`는 Tauri용 UI 서버이며 보안 저장소 IPC가 필요하므로 일반 브라우저만으로 실행할 수 없습니다. 브라우저 UI 확인에는 `pnpm --filter @keundal/web dev`를 사용합니다.
 
 ## 빌드
 
@@ -46,7 +46,7 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 
 정적 UI는 `apps/desktop/dist`, 네이티브 실행 파일은 `apps/desktop/src-tauri/target/release`, 설치 파일은 그 아래 `bundle`에 생성됩니다. macOS·Windows·Linux 패키지는 해당 OS의 도구로 빌드해야 합니다. 코드 서명·공증·업데이트 배포는 포함하지 않습니다.
 
-`pnpm build`는 정적 UI까지만 빌드하므로 Rust나 OS 라이브러리가 필요하지 않습니다. `@keundal/web` 워크스페이스 의존성으로 공유 패키지 빌드 순서를 보장합니다.
+`pnpm build`는 정적 UI까지만 빌드하므로 Rust나 OS 라이브러리가 필요하지 않습니다. `@keundal/chat-app`과 `@keundal/agent-host` 워크스페이스 의존성으로 공유 패키지 빌드 순서를 보장합니다. 다른 앱에는 의존하지 않습니다.
 
 `pnpm build:preview`는 Turbo에서 웹 Workers와 데스크톱 배포 파일을 함께 빌드합니다. 웹과 데스크톱은 Nuxt 출력 경로를 분리하여 병렬로 빌드합니다. 배포 파일 형식은 운영체제별 Tauri 설정을 따릅니다. Windows는 설치 파일을 만들지 않습니다. CI는 `keundal-desktop.exe`, Node.js 런타임인 `keundal-host.exe`, `sidecar` 폴더를 `apps/desktop/src-tauri/target/release/portable`에 모아 배포합니다. 실행할 PC에는 WebView2가 필요합니다.
 
@@ -66,7 +66,7 @@ Windows 포터블 배포는 이 프로젝트에서 구성한 방식이며, Tauri
 
 ## 동작과 데이터
 
-- 채팅, 모델 선택, LLM settings와 IndexedDB 저장소는 [웹 앱](../web/README.md)의 구현을 공유합니다. API 키는 앱 안의 **LLM settings**에서 입력합니다.
+- 채팅, 모델 선택, LLM settings와 IndexedDB 저장소는 [공용 채팅 레이어](../../packages/chat-app/README.md)의 구현을 공유합니다. API 키는 앱 안의 **LLM settings**에서 입력합니다.
 - 데스크톱은 SSR을 끄고 정적 SPA로 실행합니다. 대화·실행 기록은 앱 데이터 디렉터리의 SQLite에 저장합니다. 공급자 설정이 없어도 로컬 호스트를 시작하며, 호스트 시작 실패는 오류로 알립니다.
 - 웹 브라우저 및 개발 모드와 배포 앱은 origin이 달라 대화를 자동 공유하거나 이전하지 않습니다.
 - API 키·URL·헤더를 포함한 LLM 설정은 `keyring`으로 macOS Keychain·Windows Credential Manager·Linux Secret Service에 저장합니다. **Save in OS secret store**로 저장하며 마지막 공급자 설정까지 지우면 보안 저장소 항목도 삭제합니다. 보안 저장소의 서비스명은 `com.keundal.desktop`, 계정명은 `llm-settings`입니다. 개발·배포 앱은 같은 OS 사용자 보안 저장소 항목을 사용합니다.
@@ -112,4 +112,4 @@ rustc --edition=2021 --test apps/desktop/src-tauri/src/skill_files.rs -o /tmp/ke
 /tmp/keundal-skill-files-tests
 ```
 
-아이콘은 `apps/web/public/favicon.ico`에서 Tauri CLI의 `icon` 명령으로 생성했습니다.
+아이콘은 `packages/chat-app/public/favicon.ico`에서 Tauri CLI의 `icon` 명령으로 생성했습니다.

@@ -16,9 +16,9 @@ import { createApp, toNodeListener } from 'h3'
 import { onTestFinished, test, expect } from 'vitest'
 
 import { createAgentHandler } from '../server/agent/handler'
-import type { ChatMessage } from '../shared/utils/chat-message'
-import { RemoteChatStore } from '../shared/utils/remote-chat-store'
-import { createDesktopChatStore } from '../shared/utils/desktop-chat-store'
+import type { ChatMessage } from '@keundal/chat-app/shared/utils/chat-message'
+import { RemoteChatStore } from '@keundal/chat-app/shared/utils/remote-chat-store'
+import { createDesktopChatStore } from '@keundal/chat-app/shared/utils/desktop-chat-store'
 
 const token = 'remote-test-token'
 const model = 'openai/gpt-5-nano'
