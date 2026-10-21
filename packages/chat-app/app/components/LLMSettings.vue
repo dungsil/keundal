@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useMounted } from '@vueuse/core'
 import {
   LLM_PROVIDERS,
   defaultLLMSettings,
@@ -10,9 +11,8 @@ import {
 
 const { t } = useLocale()
 
-defineProps<{ returnTo: string }>()
-
 const { settings } = useLLMSettings()
+const mounted = useMounted()
 const route = useRoute()
 const { model } = useModels()
 const { $chatStore, $saveLLMSettings } = useNuxtApp()
@@ -62,10 +62,11 @@ function loadDraft() {
     }))
 }
 
-loadDraft()
+onMounted(loadDraft)
 watch(
-  [() => route.query.provider, model],
-  ([value]) => {
+  [() => route.query.provider, model, mounted],
+  ([value, , ready]) => {
+    if (!ready) return
     provider.value
       = registeredProviders(settings.value).find(item => item.id === value)?.id
         ?? registeredProviders(settings.value).find(item => model.value.startsWith(`${item.id}/`))?.id
@@ -164,7 +165,7 @@ async function save(forget = false) {
             class="flex w-full items-center justify-between rounded-lg border p-4 text-left"
             :class="provider === item.id ? 'border-primary bg-primary/5' : 'border-default'"
             :aria-expanded="provider === item.id"
-            :disabled="saving"
+            :disabled="!mounted || saving"
             @click="provider = provider === item.id ? '' : item.id"
           >
             <span>
@@ -179,7 +180,7 @@ async function save(forget = false) {
         type="button"
         icon="i-lucide-plus"
         :label="t('llm.addProvider')"
-        :disabled="saving"
+        :disabled="!mounted || saving"
         @click="adding = true"
       />
     </div>
@@ -230,7 +231,7 @@ async function save(forget = false) {
           v-model="currentDraft.name"
           :placeholder="current.label"
           :maxlength="100"
-          :disabled="saving"
+          :disabled="!mounted || saving"
           class="w-full"
         />
       </UFormField>
@@ -246,7 +247,7 @@ async function save(forget = false) {
           :spellcheck="false"
           :placeholder="t('llm.apiKeyPlaceholder')"
           class="w-full"
-          :disabled="saving"
+          :disabled="!mounted || saving"
         />
       </UFormField>
       <UFormField :label="t('llm.baseURL')" name="baseURL" :description="t('llm.baseURLDescription')">
@@ -256,7 +257,7 @@ async function save(forget = false) {
           type="url"
           autocomplete="off"
           class="w-full"
-          :disabled="saving"
+          :disabled="!mounted || saving"
         />
       </UFormField>
       <fieldset class="space-y-3">
@@ -276,7 +277,7 @@ async function save(forget = false) {
             autocapitalize="off"
             :spellcheck="false"
             class="min-w-0 flex-1"
-            :disabled="saving"
+            :disabled="!mounted || saving"
           />
           <UInput
             v-model="row.value"
@@ -286,7 +287,7 @@ async function save(forget = false) {
             autocapitalize="off"
             :spellcheck="false"
             class="min-w-0 flex-1"
-            :disabled="saving"
+            :disabled="!mounted || saving"
           />
           <UButton
             type="button"
@@ -294,7 +295,7 @@ async function save(forget = false) {
             :aria-label="t('llm.removeHeader', { index: index + 1 })"
             color="neutral"
             variant="ghost"
-            :disabled="saving"
+            :disabled="!mounted || saving"
             @click="currentHeaders.splice(index, 1)"
           />
         </div>
@@ -304,7 +305,7 @@ async function save(forget = false) {
           icon="i-lucide-plus"
           color="neutral"
           variant="outline"
-          :disabled="saving"
+          :disabled="!mounted || saving"
           @click="addHeader"
         />
       </fieldset>
@@ -335,22 +336,13 @@ async function save(forget = false) {
         "
         @click="save(true)"
       />
-      <div class="flex gap-2">
-        <UButton
-          :label="t('common.cancel')"
-          :to="returnTo"
-          color="neutral"
-          variant="ghost"
-          :disabled="saving"
-        />
-        <UButton
-          v-if="current"
-          :label="desktop ? t('llm.saveOS') : t('llm.saveBrowser')"
-          type="submit"
-          form="llm-settings"
-          :loading="saving"
-        />
-      </div>
+      <UButton
+        v-if="current"
+        :label="desktop ? t('llm.saveOS') : t('llm.saveBrowser')"
+        type="submit"
+        form="llm-settings"
+        :loading="saving"
+      />
     </div>
   </section>
 </template>

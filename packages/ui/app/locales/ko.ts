@@ -15,6 +15,8 @@ export default {
   'common.value': '값',
   'common.unavailable': '정보 없음',
   'language.label': '언어',
+  'settings.appearance': '화면 설정',
+  'settings.colorMode': '컬러 모드',
   'chat.new': '새 대화',
   'chat.search': '검색',
   'chat.searchPlaceholder': '대화 검색...',

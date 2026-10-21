@@ -14,6 +14,8 @@ const { data, status: loadStatus } = await useAsyncData(`chat-${route.params.id}
 
 const loading = computed(() => loadStatus.value === 'idle' || loadStatus.value === 'pending')
 
+useStartupPending('chat', loadStatus)
+
 const isOwner = computed(() => data.value?.isOwner ?? false)
 const visibility = ref<'public' | 'private'>(data.value?.visibility ?? 'private')
 const title = ref<string | null>(data.value?.title ?? null)
