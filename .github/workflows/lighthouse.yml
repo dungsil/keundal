@@ -20,6 +20,17 @@ on:
       - 'packages/ui/shared/**'
       - 'packages/ui/nuxt.config.ts'
       - 'packages/ui/package.json'
+    paths-ignore:
+      - 'apps/desktop/**'
+      - '.github/**'
+      - 'ci/**'
+      - 'docs/**'
+      - 'examples/**'
+      - 'tools/store-conformance/**'
+      - '*.md'
+      - 'apps/*/README.md'
+      - 'packages/*/README.md'
+      - 'tools/*/README.md'
 
 permissions:
   contents: read

@@ -1,10 +1,12 @@
 import { Buffer } from 'node:buffer'
 import { timingSafeEqual } from 'node:crypto'
+import { once } from 'node:events'
 import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http'
 import { URL } from 'node:url'
 
 import {
   EventType,
+  StreamBudget,
   parseAGUIEvent,
   parseRunAgentInput,
   type AGUIEvent,
@@ -164,21 +166,25 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
         const disconnect = () => abort.abort()
         response.once('close', disconnect)
         response.writeHead(200, SSE_HEADERS)
+        const budget = new StreamBudget()
+        const write = async (event: AGUIEvent) => {
+          abort.signal.throwIfAborted()
+          if (!response.write(sseEvent(event))) await once(response, 'drain', { signal: abort.signal })
+        }
         try {
           for await (const raw of services.run(input, { model: requested, signal: abort.signal })) {
+            budget.accept(raw)
             const event = parseAGUIEvent(raw)
-            response.write(sseEvent(event))
+            await write(event)
             if (event.type === EventType.RUN_FINISHED || event.type === EventType.RUN_ERROR) break
           }
         } catch (error) {
           // SSE로 응답이 시작된 뒤에는 상태 코드를 바꿀 수 없으므로 오류 이벤트로 마칩니다.
-          if (!response.writableEnded) {
-            response.write(
-              sseEvent({
-                type: EventType.RUN_ERROR,
-                message: String((error as Error)?.message ?? error)
-              })
-            )
+          if (!response.writableEnded && !response.destroyed && !abort.signal.aborted) {
+            await write({
+              type: EventType.RUN_ERROR,
+              message: String((error as Error)?.message ?? error).slice(0, 4096)
+            })
           }
         } finally {
           response.off('close', disconnect)

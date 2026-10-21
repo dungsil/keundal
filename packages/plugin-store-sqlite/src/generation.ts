@@ -3,6 +3,7 @@ import { clearInterval, setInterval } from 'node:timers'
 
 import {
   EventType,
+  StreamBudget,
   GenerationService,
   type AGUIEvent,
   type ExecutionOptions,
@@ -196,9 +197,11 @@ export class SqliteGenerationService extends GenerationService {
       run.recorder.record(started)
       yield started
       signal.throwIfAborted()
+      const budget = new StreamBudget()
       const events = stream ? stream(request, { signal }) : this.ctx.llm.stream(request, { signal })
       for await (const event of events) {
         signal.throwIfAborted()
+        budget.accept(event)
         // 실행이 종료를 확정했거나 다른 소유자가 넘겨받았으면 기록을 멈춥니다.
         if (!run.recorder.record(event)) return
         yield event

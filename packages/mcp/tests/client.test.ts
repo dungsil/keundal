@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url'
 
 import agentPlugin, { type ExecutableTool, type ToolExecutionContext } from '@keundal/agent'
 import { EventType, LLMService, type LLMEvent, type LLMRequest } from '@keundal/core'
-import { McpClient, type McpPermissions } from '@keundal/mcp'
+import { McpClient, type McpPermissions, parseMcpServers } from '@keundal/mcp'
+import { McpClient as BrowserMcpClient } from '@keundal/mcp/browser'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { WebStandardStreamableHTTPServerTransport, type ServerCapabilities } from '@modelcontextprotocol/server'
 import { Context } from 'cordis'
@@ -85,7 +86,7 @@ async function httpFixture(t: TestContext, capabilities?: ServerCapabilities) {
     clients.add(client)
     return client
   }
-  return { ...fixture, headers, connect }
+  return { ...fixture, headers, connect, url: `http://127.0.0.1:${address.port}/mcp` }
 }
 
 test('stdio로 도구를 실행하고 명시한 환경만 전달하며 종료 후 자식 프로세스를 정리한다', async (t) => {
@@ -315,4 +316,42 @@ test('서버 이름이 잘못됐거나 이미 취소했으면 연결하지 않�
   await expect(
     McpClient.connect({ ...config, serverName: 'valid' }, { signal: AbortSignal.abort(new Error('cancelled')) })
   ).rejects.toThrow('cancelled')
+})
+
+test('브라우저 진입점으로 HTTP 도구를 조회하고 실행한다', async (t) => {
+  const { url } = await httpFixture(t)
+  const client = await BrowserMcpClient.connect({
+    serverName: 'browser',
+    transport: 'streamable-http',
+    url,
+    permissions: { tools: ['subtract'] }
+  })
+  t.onTestFinished(() => client.close())
+  expect(await execute(await client.tools(), 'mcp__browser__tool__subtract', { left: 9, right: 4 })).toMatchObject({
+    structuredContent: { difference: 5 }
+  })
+  await expect(BrowserMcpClient.connect({ serverName: 'local', transport: 'stdio', command: 'node' })).rejects.toThrow(
+    'Node.js'
+  )
+})
+
+test('MCP 설정 검증은 잘못된 권한과 전송 설정을 거부하고 원본을 복사한다', () => {
+  const server = {
+    serverName: 'remote',
+    transport: 'streamable-http',
+    url: 'https://example.com/mcp',
+    permissions: { tools: ['search'] }
+  }
+  const parsed = parseMcpServers([server], false)
+  server.permissions.tools.push('delete')
+  expect(parsed[0]?.permissions?.tools).toEqual(['search'])
+  for (const change of [
+    { transport: 'sse' },
+    { url: 'file:///tmp/server' },
+    { permissions: { tools: true } },
+    { timeoutMs: -1 },
+    { headers: { Authorization: 'line\nbreak' } }
+  ]) {
+    expect(() => parseMcpServers([{ ...server, ...change }])).toThrow()
+  }
 })

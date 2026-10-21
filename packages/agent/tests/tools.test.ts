@@ -500,7 +500,8 @@ test('설정은 실행 함수를 보존하고 중복 도구와 잘못된 반복 
     { tools: [tool(), tool()] },
     { tools: [{ ...tool(), execute: null }] },
     { maxToolRounds: 0 },
-    { maxToolRounds: 1.5 }
+    { maxToolRounds: 1.5 },
+    ...[0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, '2', null].map((maxToolCalls) => ({ maxToolCalls }))
   ]) {
     const result = await AgentConfigSchema['~standard'].validate({
       model: 'test',
@@ -693,3 +694,88 @@ test('병렬 실행에서 먼저 실패한 호출의 오류를 순서대로 전�
   // 겹쳐 시작된 나머지 실행은 이미 수행됐지만 결과는 기록되지 않습니다.
   expect(markers).toEqual(['boom-start', 'good-start', 'good-done'])
 })
+
+test.for([false, true])(
+  'parallelTools=%s에서 호출 한도를 넘는 응답은 실행 전에 거부하고 스트림을 닫는다',
+  async (parallelTools, t) => {
+    let executions = 0
+    let consumed = 0
+    let closed = false
+    const { ctx, requests } = await setup(
+      t,
+      [],
+      {
+        parallelTools,
+        tools: [
+          tool(() => {
+            executions++
+            return 'result'
+          })
+        ]
+      },
+      {
+        stream: async function* () {
+          try {
+            for (let i = 0; i < 1000; i++) {
+              consumed++
+              yield* call(`call-${i}`)
+            }
+          } finally {
+            closed = true
+          }
+        }
+      }
+    )
+    await expect(collect(ctx.agent.run(input))).rejects.toThrow('maximum tool calls exceeded: 32')
+    expect(consumed).toBe(33)
+    expect(closed).toBe(true)
+    expect(executions).toBe(0)
+    expect(requests).toHaveLength(1)
+    expect((await ctx.generation.get(input.runId))?.status).toBe('failed')
+  }
+)
+
+test.for([false, true])(
+  'parallelTools=%s에서 여러 응답의 호출을 합산하고 초과 응답 전체를 거부한다',
+  async (parallelTools, t) => {
+    const executions: string[] = []
+    const { ctx, requests } = await setup(t, [call('first'), [...call('second'), ...call('third')]], {
+      parallelTools,
+      maxToolCalls: 2,
+      tools: [
+        tool((_args, context) => {
+          executions.push(context.toolCallId)
+          return 'result'
+        })
+      ]
+    })
+    await expect(collect(ctx.agent.run(input))).rejects.toThrow('maximum tool calls exceeded: 2')
+    expect(executions).toEqual(['first'])
+    expect(requests).toHaveLength(2)
+    expect((await ctx.generation.get(input.runId))?.messages).toContainEqual(
+      expect.objectContaining({ role: 'tool', toolCallId: 'first', content: 'result' })
+    )
+  }
+)
+
+test.for([false, true])(
+  'parallelTools=%s에서 설정한 호출 한도까지 실행한 뒤 최종 답변을 받는다',
+  async (parallelTools, t) => {
+    let executions = 0
+    const { ctx, requests } = await setup(t, [[...call('first'), ...call('second')], call('third'), answer], {
+      parallelTools,
+      maxToolCalls: 3,
+      tools: [
+        tool(() => {
+          executions++
+          return 'result'
+        })
+      ]
+    })
+    const events = await collect(ctx.agent.run(input))
+    expect(executions).toBe(3)
+    expect(requests).toHaveLength(3)
+    expect(events.filter((event) => event.type === EventType.TOOL_CALL_RESULT)).toHaveLength(3)
+    expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  }
+)

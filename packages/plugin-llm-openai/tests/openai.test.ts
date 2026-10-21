@@ -959,3 +959,17 @@ test.for(['signal', 'dispose'] as const)(
     if (mode === 'signal') expect(await ctx.llm.countTokens(request)).toBe(9)
   }
 )
+
+test('큰 중첩 공급자 payload를 변환하거나 반환하기 전에 거부한다', { timeout: 30_000 }, async (t) => {
+  const oversized = 'x'.repeat(8 * 1024 * 1024 + 1)
+  const { ctx } = await setup(t, (_request, response) =>
+    send(response, [{ type: 'response.completed', response: { output: [{ encrypted_content: oversized }] } }])
+  )
+  const accepted: LLMEvent[] = []
+  await expect(
+    (async () => {
+      for await (const event of ctx.llm.stream(request)) accepted.push(event)
+    })()
+  ).rejects.toThrow('stream byte limit exceeded')
+  expect(accepted).toHaveLength(0)
+})
