@@ -32,7 +32,7 @@ export interface NodeHostOptions {
   readonly headers?: Readonly<Record<string, string>>
 }
 
-export type HostComposition = Pick<AgentHostOptions, 'setup' | 'mountAgent'> & {
+export type HostComposition = Pick<AgentHostOptions, 'setup' | 'mountAgent' | 'tools'> & {
   plugins?: readonly LoadedAgentPlugin[]
 }
 export type HostCompositionFactory = (options: NodeHostOptions) => HostComposition
@@ -69,37 +69,37 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
     mountAgent: async (ctx, config) =>
       ctx.plugin(agentPlugin, {
         ...config,
-        skills: plugins.length > 0,
-        tools: async (execution) => {
-          const signal = execution?.signal
-            ? globalThis.AbortSignal.any([execution.signal, mcpLifetime.signal])
-            : mcpLifetime.signal
-          const tools = [
-            ...(typeof options.tools === 'function' ? await options.tools({ signal }) : (options.tools ?? []))
-          ]
-          for (const server of mcpServers) {
-            signal.throwIfAborted()
-            let pending = mcpClients.get(server.serverName)
-            if (!pending) {
-              pending = McpClient.connect(server, { signal })
-              mcpClients.set(server.serverName, pending)
-              void pending.catch(() => {
-                if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
-              })
-            }
-            try {
-              tools.push(...(await (await pending).tools({ signal })))
-            } catch (error) {
-              if (signal.aborted) throw error
-              if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
-              await pending.then((client) => client.close()).catch(() => {})
-              throw error
-            }
-          }
-          for (const plugin of plugins) tools.push(...(await plugin.tools({ signal })))
-          return tools
+        skills: plugins.length > 0
+      }),
+    tools: async (execution) => {
+      const signal = execution?.signal
+        ? globalThis.AbortSignal.any([execution.signal, mcpLifetime.signal])
+        : mcpLifetime.signal
+      const tools = [...(typeof options.tools === 'function' ? await options.tools({ signal }) : (options.tools ?? []))]
+      for (const server of mcpServers) {
+        signal.throwIfAborted()
+        let pending = mcpClients.get(server.serverName)
+        if (!pending) {
+          pending = McpClient.connect(server, { signal: mcpLifetime.signal })
+          mcpClients.set(server.serverName, pending)
+          void pending.catch(() => {
+            if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
+          })
         }
-      })
+        try {
+          const client = await pending
+          signal.throwIfAborted()
+          tools.push(...(await client.tools({ signal })))
+        } catch (error) {
+          if (signal.aborted) throw error
+          if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
+          await pending.then((client) => client.close()).catch(() => {})
+          throw error
+        }
+      }
+      for (const plugin of plugins) tools.push(...(await plugin.tools({ signal })))
+      return tools
+    }
   }
 }
 

@@ -64,6 +64,13 @@ export class RemoteChatStore implements ChatStoreLike {
     return response
   }
 
+  async catalog(options: import('@keundal/core').ExecutionOptions = {}): Promise<{
+    skills: readonly import('@keundal/core').SkillSummary[]
+    tools: readonly import('@keundal/core').SkillSummary[]
+  }> {
+    return (await this.call('/catalog', { signal: options.signal })).json()
+  }
+
   private snapshot(value: unknown): SessionSnapshot {
     return value as SessionSnapshot
   }

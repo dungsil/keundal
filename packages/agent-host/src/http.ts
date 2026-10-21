@@ -156,6 +156,21 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
         return sendJson(response, 200, { models: models() })
       }
 
+      if (request.method === 'GET' && segments.join('/') === 'catalog') {
+        const abort = new AbortController()
+        const disconnect = () => abort.abort()
+        response.once('close', disconnect)
+        try {
+          return sendJson(
+            response,
+            200,
+            (await services.catalog?.({ signal: abort.signal })) ?? { skills: [], tools: [] }
+          )
+        } finally {
+          response.off('close', disconnect)
+        }
+      }
+
       if (request.method === 'POST' && segments.join('/') === 'runs') {
         const requested = modelId(request.headers['x-keundal-model'])
         if (requested !== undefined && !models().some((model) => model.id === requested)) {

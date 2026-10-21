@@ -168,6 +168,7 @@ test('모든 경로는 인증 누락과 잘못된 인증을 401로 거부하고 
     ['GET', '/threads/thread'],
     ['GET', '/runs'],
     ['GET', '/runs/r1'],
+    ['GET', '/catalog'],
     ['POST', '/runs'],
     ['POST', '/recover'],
     ['GET', '/nope']
@@ -217,6 +218,18 @@ test('POST /runs는 AG-UI 이벤트를 SSE로 스트리밍하고 저장소에 �
   expect(thread.messages.map((message) => message.id)).toEqual(['reply:r1'])
   const run = (await requestJson('GET', '/runs/r1')).json as { status: string }
   expect(run.status).toBe('completed')
+})
+
+test('GET /catalog는 등록 목록을 반환하며 생성과 대화 저장을 시작하지 않는다', async (t) => {
+  const server = await setup(t)
+  const catalog = {
+    skills: [{ name: 'review', description: 'Review code' }],
+    tools: [{ name: 'mcp__docs__tool__search', description: 'Search docs' }]
+  }
+  server.services.catalog = async () => catalog
+  expect(await server.requestJson('GET', '/catalog')).toEqual({ status: 200, json: catalog })
+  expect(server.agentCalls).toBe(0)
+  expect((await server.requestJson('GET', '/threads')).json).toEqual([])
 })
 
 test('POST /runs는 잘못된 입력을 400으로 거부한다', async (t) => {

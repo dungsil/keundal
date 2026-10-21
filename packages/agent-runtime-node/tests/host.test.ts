@@ -154,6 +154,20 @@ test.each(['array', 'provider'])('호스트는 기본 도구(%s)와 MCP 도구�
   })
   hosts.push(host)
   try {
+    const abort = new AbortController()
+    const cancelled = expect(host.services.catalog!({ signal: abort.signal })).rejects.toThrow('dismissed')
+    await Promise.resolve()
+    const catalog = host.services.catalog!()
+    abort.abort(new Error('dismissed'))
+    await cancelled
+    expect(await catalog).toEqual({
+      skills: [],
+      tools: [
+        { name: 'local_tool', description: 'Local' },
+        { name: 'mcp__fixture__tool__search', description: 'Search' }
+      ]
+    })
+    expect(requests).toEqual([])
     const events = []
     for await (const event of host.services.run({
       threadId: 'thread',
@@ -305,6 +319,7 @@ test('Agent Plugin 스킬을 호스트에 등록하고 종료하면 사용할 �
   hosts.push(host)
   expect(host.plugins).toHaveLength(1)
   expect((await host.ctx.skills.prepare()).skills).toEqual([{ name: 'hello', description: 'Test' }])
+  expect(await host.services.catalog?.()).toEqual({ skills: [{ name: 'hello', description: 'Test' }], tools: [] })
   const catalog = await host.ctx.skills.prepare()
   await host.dispose()
   await expect(catalog.load('hello')).rejects.toThrow()

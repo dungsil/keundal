@@ -122,6 +122,12 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         recover: (runOptions) => servicesContext.generation.recover(runOptions)
       },
       models: () => models,
+      async catalog(execution = {}) {
+        if (closed) throw new Error('agent host disposed')
+        const skills = servicesContext.skills ? (await servicesContext.skills.prepare(execution)).skills : []
+        const tools = typeof options.tools === 'function' ? await options.tools(execution) : (options.tools ?? [])
+        return { skills, tools: tools.map(({ name, description }) => ({ name, description })) }
+      },
       async title(request, runOptions) {
         const selected = model(request.model)
         const maxOutputTokens = Math.min(256, selected.maxOutputTokens, selected.contextWindow - 1)

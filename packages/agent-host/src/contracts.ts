@@ -5,7 +5,8 @@ import type {
   ExecutionOptions,
   GenerationService,
   RunAgentInput,
-  SessionService
+  SessionService,
+  SkillSummary
 } from '@keundal/core'
 import type { Context, Fiber } from 'cordis'
 
@@ -44,6 +45,7 @@ export interface AgentHostServices {
   session: Pick<SessionService, 'get' | 'list' | 'commit' | 'delete'>
   generation: Pick<GenerationService, 'get' | 'list' | 'recover'>
   models(): readonly AgentHostModel[]
+  catalog?(options?: ExecutionOptions): Promise<{ skills: readonly SkillSummary[]; tools: readonly SkillSummary[] }>
   title(request: AgentHostTitleRequest, options?: ExecutionOptions): Promise<string>
 }
 

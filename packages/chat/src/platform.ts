@@ -1,5 +1,5 @@
 import type { AgentConfig } from '@keundal/agent-contract'
-import type { SkillProvider } from '@keundal/core'
+import type { ExecutionOptions, SkillProvider, SkillSummary } from '@keundal/core'
 import type { Context, Fiber } from 'cordis'
 
 import type { ChatStoreLike } from './chat-store'
@@ -27,6 +27,7 @@ export interface ChatConnection {
   remoteModels?: ModelOption[]
   selectedModel?: string
   selectModel?: (value: string) => Promise<void>
+  catalog?(options?: ExecutionOptions): Promise<{ skills: readonly SkillSummary[]; tools: readonly SkillSummary[] }>
   mcpChanged?: () => Promise<void>
   settingsChanged?: (next: LLMSettings) => Promise<void>
   dispose(): Promise<void>
