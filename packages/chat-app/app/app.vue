@@ -6,6 +6,33 @@ const { locale, t } = useLocale()
 const uiLocale = computed(() => locale.value === 'ko' ? ko : en)
 
 const colorMode = useColorMode()
+const startupReady = ref(false)
+const mounted = ref(false)
+const startupPending = useState<Record<string, boolean>>('startup-pending', () => ({}))
+const modelSwitching = useState('model-switching', () => false)
+
+onNuxtReady(() => {
+  mounted.value = true
+})
+
+watch(
+  () => mounted.value && !colorMode.unknown && !modelSwitching.value
+    && !Object.values(startupPending.value).some(Boolean),
+  async (ready, _, onCleanup) => {
+    if (!ready || startupReady.value) return
+    let cancelled = false
+    onCleanup(() => {
+      cancelled = true
+    })
+    await nextTick()
+    // Force layout so fonts used by the hydrated first screen begin loading.
+    document.body.getBoundingClientRect()
+    await document.fonts.ready
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    if (!cancelled) startupReady.value = true
+  },
+  { flush: 'post' }
+)
 
 const color = computed(() => colorMode.value === 'dark' ? '#1b1718' : 'white')
 
@@ -45,10 +72,13 @@ useSeoMeta({
 
 <template>
   <UApp :locale="uiLocale" :toaster="{ position: 'top-right' }" :tooltip="{ delayDuration: 200 }">
-    <NuxtLoadingIndicator color="var(--ui-primary)" />
+    <StartupSplash v-if="!startupReady" />
+    <div :inert="!startupReady" :aria-busy="!startupReady" style="display: contents;">
+      <NuxtLoadingIndicator color="var(--ui-primary)" />
 
-    <NuxtLayout>
-      <NuxtPage />
-    </NuxtLayout>
+      <NuxtLayout>
+        <NuxtPage />
+      </NuxtLayout>
+    </div>
   </UApp>
 </template>
