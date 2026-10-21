@@ -24,7 +24,11 @@ useHead(() => ({ title: t('settings.title') }))
 </script>
 
 <template>
-  <UDashboardPanel id="settings" class="min-h-0">
+  <UDashboardPanel
+    id="settings"
+    class="min-h-0"
+    :ui="{ body: '[scrollbar-gutter:stable]' }"
+  >
     <template #header>
       <Navbar>
         <template #title>
