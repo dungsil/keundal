@@ -809,3 +809,17 @@ test.for([
   await closed.promise
   expect(getEventListeners(external.signal, 'abort')).toHaveLength(0)
 })
+
+test('큰 중첩 공급자 payload를 변환하거나 반환하기 전에 거부한다', { timeout: 30_000 }, async (t) => {
+  const oversized = 'x'.repeat(8 * 1024 * 1024 + 1)
+  const { ctx } = await setup(t, (_request, response) =>
+    send(response, [{ type: 'message_start', message: { id: 'msg', content: [], extra: { citations: oversized } } }])
+  )
+  const accepted: LLMEvent[] = []
+  await expect(
+    (async () => {
+      for await (const event of ctx.llm.stream(request)) accepted.push(event)
+    })()
+  ).rejects.toThrow('stream byte limit exceeded')
+  expect(accepted).toHaveLength(0)
+})
