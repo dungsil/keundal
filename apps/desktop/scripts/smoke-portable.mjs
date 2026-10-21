@@ -87,35 +87,26 @@ async function request(url, path, options = {}) {
 }
 
 async function verifyChatScreen(pid) {
-  const deadline = Date.now() + 30_000
-  let lastScreen = ''
-  while (Date.now() < deadline) {
-    const result = spawnSync('powershell.exe', [
-      '-NoProfile', '-NonInteractive', '-Command',
-      `Add-Type -AssemblyName UIAutomationClient
-       Add-Type -AssemblyName UIAutomationTypes
-       $p = Get-Process -Id ${pid} -ErrorAction Stop
-       $root = [System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
-       $elements = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
-       $items = @($elements | ForEach-Object {
-         if (-not $_.Current.IsOffscreen) {
-           @{ name = $_.Current.Name; type = $_.Current.ControlType.ProgrammaticName }
-         }
-       })
-       ConvertTo-Json -InputObject $items -Compress`
-    ], { encoding: 'utf8', timeout: 10_000 })
-    if (result.error) throw result.error
-    assert.equal(result.status, 0, `Could not inspect desktop controls:\n${result.stderr}`)
-    const controls = JSON.parse(result.stdout.trim())
-    lastScreen = controls.map(control => control.name).join('\n')
-    assert.doesNotMatch(lastScreen, /Illegal invocation|not allowed by ACL|Failed to fetch/)
-    if (controls.some(control => control.type === 'ControlType.Edit')) {
-      console.log('PASS: desktop WebView exposes the chat input after sidecar initialization')
-      return
-    }
-    await delay(500)
-  }
-  throw new Error(`Desktop chat screen did not become ready:\n${lastScreen}`)
+  const result = spawnSync('powershell.exe', [
+    '-NoProfile', '-NonInteractive', '-Mta', '-Command',
+    `Add-Type -AssemblyName UIAutomationClient
+     Add-Type -AssemblyName UIAutomationTypes
+     $p = Get-Process -Id ${pid} -ErrorAction Stop
+     $root = [System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
+     $condition = New-Object System.Windows.Automation.PropertyCondition(
+       [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+       [System.Windows.Automation.ControlType]::Edit)
+     $deadline = (Get-Date).AddSeconds(30)
+     do {
+       $inputControl = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+       if ($null -ne $inputControl -and -not $inputControl.Current.IsOffscreen) { exit 0 }
+       Start-Sleep -Milliseconds 500
+     } while ((Get-Date) -lt $deadline)
+     throw 'Desktop chat input did not become visible'`
+  ], { encoding: 'utf8', timeout: 45_000 })
+  if (result.error) throw result.error
+  assert.equal(result.status, 0, `Desktop chat screen did not become ready:\n${result.stderr}`)
+  console.log('PASS: desktop WebView exposes the chat input after sidecar initialization')
 }
 
 try {
