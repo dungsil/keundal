@@ -2,10 +2,10 @@
 definePageMeta({
   middleware: (to) => {
     const { section, ...query } = to.query
-    const sections = ['appearance', 'models', 'llm', 'mcp', 'skills']
-    const target = typeof section === 'string' && sections.includes(section)
+    const sections = ['appearance', 'llm', 'models', 'mcp', 'skills'] as const
+    const target = typeof section === 'string' && sections.some(item => item === section)
       ? section
-      : query.provider ? 'llm' : 'models'
+      : query.provider ? 'llm' : sections[0]
     return navigateTo({ path: `/settings/${target}`, query }, { replace: true })
   }
 })

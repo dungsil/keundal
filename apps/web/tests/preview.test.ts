@@ -107,8 +107,8 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(settings.status).toBe(200)
     expect(settingsHtml).toContain(`lang="${language}"`)
     expect(settingsHtml).toContain(language === 'ko' ? '대화로 돌아가기' : 'Back to chat')
-    expect(settingsHtml).toContain('id="model-settings-title"')
-    expect(new URL(settings.url).pathname).toBe('/settings/models')
+    expect(settingsHtml).toContain('id="appearance-settings-title"')
+    expect(new URL(settings.url).pathname).toBe('/settings/appearance')
     expect(settingsHtml).not.toContain('id="llm-settings-title"')
     const llm = await fetch(new URL('/settings/llm', origin), { headers })
     expect(await llm.text()).toContain('id="llm-settings-title"')
@@ -118,7 +118,7 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     ['section=skills', 'skills'],
     ['section=mcp', 'mcp'],
     ['provider=openai', 'llm'],
-    ['section=invalid', 'models']
+    ['section=invalid', 'appearance']
   ] as const) {
     const response = await fetch(new URL(`/settings?${query}&returnTo=/chat/preview-smoke-test`, origin), { redirect: 'manual' })
     expect(response.status).toBe(302)

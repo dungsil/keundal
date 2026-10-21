@@ -177,7 +177,7 @@ defineShortcuts({
         <div class="flex flex-col gap-1 w-full">
           <UButton
             :label="collapsed ? '' : t('settings.title')"
-            :to="{ path: isSettings ? route.path : '/settings/models', query: isSettings ? route.query : { returnTo: route.path } }"
+            :to="{ path: isSettings ? route.path : '/settings', query: isSettings ? route.query : { returnTo: route.path } }"
             icon="i-lucide-settings-2"
             color="neutral"
             :variant="isSettings ? 'soft' : 'ghost'"
