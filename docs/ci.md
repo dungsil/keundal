@@ -282,9 +282,21 @@ Cloudflare 배포 환경의 점수는 아니며, 실행 중인 다른 프로세�
 
 ## 린터의 실행 환경
 
+루트 `pnpm lint`는 앱 의존성 경계 검사, Oxlint, Oxfmt 검사를 차례로 실행한다.
+`pnpm lintfix`는 Oxlint 자동 수정과 Oxfmt를 실행한다. 커밋 전 검사에도 Vue 파일을 포함한다.
+웹·데스크톱·공유 채팅 패키지의 `lint` 명령은 같은 루트 Oxlint 설정으로 해당 패키지를 검사한다.
+ESLint 실행·설정·의존성과 Nuxt 모듈은 제거했다.
+`.pnpmfile.cjs`는 Nuxt가 사용하는 `vite-plugin-checker`의 선택적 ESLint peer도 제거하여 ESLint 재설치를 방지한다.
+
 Oxlint의 Node 환경은 `packages/agent-host/src/**`에도 적용한다. Node가 제공하는 `AbortController`를
 미정의 변수로 처리하지 않으며, 다른 패키지에 Node 전역을 일괄 허용하지 않는다.
 
-`packages/ui/nuxt.config.ts`에는 `defineNuxtConfig`를, UI 앱 파일에는 사용하는 Nuxt·Vue 자동 import를
-읽기 전용 전역으로 등록한다. 브라우저 환경은 UI 앱 파일에만 적용하고 `defineProps`, `defineEmits`는
-Vue 파일에만 허용한다. UI 파일을 린트 대상에서 제외하거나 미정의 변수 검사를 끄지는 않는다.
+Nuxt 설정 파일에는 Node 환경과 `defineNuxtConfig`를 적용한다. UI 앱 파일에는 사용하는 Nuxt·Vue 자동 import를
+읽기 전용 전역으로 등록한다. 공유 채팅 전용 자동 import와 서버의 `defineNitroPlugin`은 해당 경로에서만 허용한다.
+브라우저 환경은 UI 앱 파일에 적용하고 Vue 컴파일러 매크로는 Vue 파일에만 허용한다.
+UI 파일을 린트 대상에서 제외하거나 미정의 변수 검사를 끄지는 않는다.
+
+Oxlint의 기본 검사와 내장 Vue 플러그인은 JavaScript·TypeScript와 Vue 스크립트를 검사한다.
+[Oxlint는 아직 Vue 템플릿 검사를 지원하지 않는다](https://oxc.rs/compatibility.html).
+기존 템플릿 속성 배치 규칙과 템플릿 내부 Tailwind 클래스 검사는 이전하지 않았다.
+웹·데스크톱·공유 채팅 소스의 Oxfmt 제외 설정은 유지하여 일괄 재포맷하지 않는다.

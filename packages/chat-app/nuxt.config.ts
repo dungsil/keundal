@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 
 export default defineNuxtConfig({
   extends: ['@keundal/ui'],
-  modules: ['@nuxt/eslint', '@nuxt/ui', '@comark/nuxt', 'nuxt-charts'],
+  modules: ['@nuxt/ui', '@comark/nuxt', 'nuxt-charts'],
   app: { head: { style: [{ innerHTML: 'html.dark { --startup-bg: #09090b; --startup-fg: #fafafa; }' }] } },
   css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],
   ui: { fonts: false },
@@ -14,7 +14,6 @@ export default defineNuxtConfig({
   },
   compatibilityDate: '2026-06-30',
   vite: { optimizeDeps: { include: ['striptags'] } },
-  eslint: { config: { stylistic: { commaDangle: 'never', braceStyle: '1tbs' } } },
   icon: {
     provider: 'none',
     clientBundle: {

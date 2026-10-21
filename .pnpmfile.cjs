@@ -6,6 +6,10 @@ module.exports = {
         delete pkg.peerDependencies?.ai
         delete pkg.peerDependenciesMeta?.ai
       }
+      if (pkg.name === 'vite-plugin-checker') {
+        delete pkg.peerDependencies?.eslint
+        delete pkg.peerDependenciesMeta?.eslint
+      }
       return pkg
     }
   }
