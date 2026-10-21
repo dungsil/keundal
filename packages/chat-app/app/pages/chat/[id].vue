@@ -10,7 +10,9 @@ const { webSearch, reasoning } = useChatSettings()
 const { ensureConfigured } = useLLMSettings()
 const { $chatStore } = useNuxtApp()
 
-const { data } = await useAsyncData(`chat-${route.params.id}`, () => $chatStore.get(route.params.id as string), { server: false })
+const { data, status: chatStatus } = await useAsyncData(`chat-${route.params.id}`, () => $chatStore.get(route.params.id as string), { server: false })
+
+useStartupPending('chat', chatStatus)
 
 const isOwner = computed(() => data.value?.isOwner ?? false)
 const visibility = ref<'public' | 'private'>(data.value?.visibility ?? 'private')
