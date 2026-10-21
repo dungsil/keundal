@@ -109,6 +109,16 @@ jobs:
             echo 'LIGHTHOUSE_REPORT'
           } >> "$GITHUB_OUTPUT"
 
+      - name: Lighthouse 상세 보고서 보관
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lighthouse-${{ github.event.pull_request.head.sha }}
+          path: .unlighthouse/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: 검사 오류 표시
         id: failure
         if: failure()

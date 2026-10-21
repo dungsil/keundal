@@ -62,9 +62,9 @@ useHead(() => ({ title: t('settings.title') }))
             />
           </nav>
           <div class="min-w-0 flex-1">
+            <ModelSettings v-show="activeSection === 'models'" />
+            <LLMSettings v-show="activeSection === 'llm'" :return-to="returnTo" />
             <ClientOnly>
-              <ModelSettings v-show="activeSection === 'models'" />
-              <LLMSettings v-show="activeSection === 'llm'" :return-to="returnTo" />
               <SkillSettings v-show="activeSection === 'skills'" />
             </ClientOnly>
           </div>
