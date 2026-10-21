@@ -68,6 +68,44 @@ test('Vue script 태그의 대소문자가 달라도 다른 앱의 참조를 거
   }
 })
 
+test('Vue script 닫는 태그에 공백이 있어도 각 스크립트의 앱 참조를 거부한다', async (t) => {
+  for (const whitespace of [' ', '\t', '\n', '\r', '\f', ' \t\r\n\f ']) {
+    const root = await fixture(t, {
+      'apps/alpha/app.vue': [
+        `<script>import x from "@fixture/beta/code"</script${whitespace}>`,
+        '<template><div /></template>',
+        `<ScRiPt setup>import y from "@fixture/beta/setup"</sCrIpT${whitespace}>`
+      ].join('\n')
+    })
+    assert.deepEqual(await checkWorkspaceBoundaries(root), [
+      `${join('apps', 'alpha', 'app.vue')}: @fixture/beta/code references app @fixture/beta`,
+      `${join('apps', 'alpha', 'app.vue')}: @fixture/beta/setup references app @fixture/beta`
+    ])
+  }
+})
+
+test('Vue script 닫는 태그에 속성이나 슬래시가 있어도 앱 참조를 거부한다', async (t) => {
+  for (const ending of [' foo="bar"', '/', ' /', ' foo="bar"/']) {
+    const root = await fixture(t, {
+      'apps/alpha/app.vue': `<script setup>import x from "@fixture/beta/code"</script${ending}>`
+    })
+    assert.deepEqual(await checkWorkspaceBoundaries(root), [
+      `${join('apps', 'alpha', 'app.vue')}: @fixture/beta/code references app @fixture/beta`
+    ])
+  }
+})
+
+test('script와 이름이 비슷한 문자열 뒤의 앱 참조도 검사한다', async (t) => {
+  for (const name of ['script-foo', 'script:foo', 'script.foo', 'script_foo', 'scripture']) {
+    const root = await fixture(t, {
+      'apps/alpha/app.vue': `<script setup>const marker = "</${name}>"; import x from "@fixture/beta/code";</script>`
+    })
+    assert.deepEqual(await checkWorkspaceBoundaries(root), [
+      `${join('apps', 'alpha', 'app.vue')}: @fixture/beta/code references app @fixture/beta`
+    ])
+  }
+})
+
 test('패키지에서 앱을 참조하거나 스크립트로 다른 앱을 실행하면 실패한다', async (t) => {
   const root = await fixture(t, {
     'packages/shared/package.json': { name: '@fixture/shared', dependencies: { '@fixture/alpha': 'workspace:*' } },
