@@ -28,6 +28,7 @@ export type McpClientConfig = {
       readonly transport: 'streamable-http'
       readonly url: string
       readonly headers?: Record<string, string>
+      readonly redirect?: 'error'
     }
 )
 
@@ -98,7 +99,10 @@ export class McpClient {
       : new StreamableHTTPClientTransport(
           new globalThis.URL((config as Extract<McpClientConfig, { transport: 'streamable-http' }>).url),
           {
-            requestInit: { headers: (config as Extract<McpClientConfig, { transport: 'streamable-http' }>).headers }
+            requestInit: {
+              headers: (config as Extract<McpClientConfig, { transport: 'streamable-http' }>).headers,
+              redirect: (config as Extract<McpClientConfig, { transport: 'streamable-http' }>).redirect
+            }
           }
         )
     const client = new Client(

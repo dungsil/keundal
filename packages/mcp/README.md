@@ -54,7 +54,7 @@ tools: async (options) => [...(await documents.tools(options)), ...(await issues
 
 stdio 설정은 `command`, `args`, `env`, `cwd`를 받습니다. 셸을 거치지 않고 실행 파일과 인자를 전달합니다. SDK의 기본 환경에 `env`로 명시한 값을 추가합니다. 부모 프로세스의 전체 환경을 복사하지 않으므로 필요한 자격 증명은 `env`에 명시합니다. 자식 프로세스의 stderr는 출력하지 않습니다.
 
-Streamable HTTP는 서버 URL과 선택적인 HTTP 헤더를 받습니다. 자격 증명은 호출자가 관리합니다.
+Streamable HTTP는 서버 URL과 선택적인 HTTP 헤더를 받습니다. `redirect: 'error'`를 지정하면 HTTP 리디렉션을 거부합니다. 자격 증명은 호출자가 관리합니다.
 
 ```ts
 const remote = await McpClient.connect(

@@ -18,7 +18,7 @@ export class McpClient extends BrowserClient {
             stderr: 'ignore'
           })
         : new StreamableHTTPClientTransport(new globalThis.URL(config.url), {
-            requestInit: { headers: config.headers }
+            requestInit: { headers: config.headers, redirect: config.redirect }
           })
     )
   }

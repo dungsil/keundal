@@ -1,4 +1,5 @@
 import agentPlugin, { type AgentConfig } from '@keundal/agent'
+import { loadAgentPlugin, type AgentPluginOptions, type LoadedAgentPlugin } from '@keundal/agent-plugins'
 import {
   EventType,
   type AGUIEvent,
@@ -12,6 +13,7 @@ import { McpClient, parseMcpServers, type McpClientConfig } from '@keundal/mcp'
 import anthropicLLMPlugin from '@keundal/plugin-llm-anthropic'
 import geminiLLMPlugin from '@keundal/plugin-llm-gemini'
 import openaiLLMPlugin from '@keundal/plugin-llm-openai'
+import skillPlugin from '@keundal/plugin-skill'
 import sqliteStorePlugin from '@keundal/plugin-store-sqlite'
 import { Context, type Fiber } from 'cordis'
 
@@ -35,6 +37,7 @@ export interface AgentHostOptions {
   readonly sqlitePath: string
   readonly maxOutputTokens?: number
   readonly tools?: AgentConfig['tools']
+  readonly plugins?: readonly AgentPluginOptions[]
   readonly maxToolRounds?: number
   readonly baseURL?: string
   readonly headers?: Readonly<Record<string, string>>
@@ -61,6 +64,7 @@ export interface AgentHostServices {
 export interface AgentHost {
   readonly ctx: Context
   readonly model: string
+  readonly plugins: readonly LoadedAgentPlugin[]
   readonly services: AgentHostServices
   dispose(): Promise<void>
 }
@@ -104,18 +108,35 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
   const mcpLifetime = new globalThis.AbortController()
   const ctx = new Context()
   const fibers: Fiber[] = []
+  const plugins: LoadedAgentPlugin[] = []
   const agents = new Map<string, Promise<Fiber>>()
 
   const dispose = async () => {
     mcpLifetime.abort()
     const created = await Promise.allSettled(agents.values())
     agents.clear()
+    const errors: unknown[] = []
     for (const result of created) {
-      if (result.status === 'fulfilled') await result.value.dispose()
+      if (result.status === 'fulfilled') {
+        try {
+          await result.value.dispose()
+        } catch (error) {
+          errors.push(error)
+        }
+      }
     }
-    for (const fiber of fibers.toReversed()) await fiber.dispose()
+    for (const fiber of fibers.toReversed()) {
+      try {
+        await fiber.dispose()
+      } catch (error) {
+        errors.push(error)
+      }
+    }
     await Promise.allSettled([...mcpClients.values()].map(async (client) => (await client).close()))
     mcpClients.clear()
+    const results = await Promise.allSettled(plugins.map((plugin) => plugin.close()))
+    for (const result of results) if (result.status === 'rejected') errors.push(result.reason)
+    if (errors.length) throw new AggregateError(errors, 'failed to dispose agent host')
   }
 
   const model = (id: string | undefined): AgentHostModel => {
@@ -142,6 +163,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
       return isolated.plugin(agentPlugin, {
         model: selected.id,
         maxOutputTokens,
+        skills: plugins.length > 0,
         maxToolRounds: options.maxToolRounds ?? 4,
         tools: async (execution) => {
           const signal = execution?.signal
@@ -169,6 +191,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
               throw error
             }
           }
+          for (const plugin of plugins) tools.push(...(await plugin.tools({ signal })))
           return tools
         }
       })
@@ -179,6 +202,9 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
   }
 
   try {
+    for (const config of options.plugins ?? []) plugins.push(await loadAgentPlugin(config))
+    if (plugins.length)
+      fibers.push(await ctx.plugin(skillPlugin, { providers: plugins.map((plugin) => plugin.skillProvider) }))
     fibers.push(
       await ctx.plugin(providerPlugins[options.provider], {
         apiKey: options.apiKey,
@@ -240,7 +266,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
       }
     }
 
-    return { ctx, model: options.model, services, dispose }
+    return { ctx, model: options.model, plugins: Object.freeze(plugins), services, dispose }
   } catch (error) {
     await dispose()
     throw error
