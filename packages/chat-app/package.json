@@ -35,6 +35,7 @@
     "@keundal/skill-markdown": "workspace:*"
   },
   "devDependencies": {
+    "@comark/vue": "^0.7.0",
     "@keundal/plugin-chat-browser": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/plugin-store-sqlite": "workspace:*",
