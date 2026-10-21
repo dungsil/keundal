@@ -1,3 +1,4 @@
+import type { ChatMessage } from './chat-message'
 import type { invoke } from '@tauri-apps/api/core'
 import { RemoteChatStore, type RemoteAgentInfo } from './remote-chat-store'
 import { resolveModel, type ModelOption } from './models'
@@ -37,12 +38,16 @@ class DesktopChatStore extends RemoteChatStore {
     return this.change(() => selection(model, this.getModels()), restart)
   }
 
-  private change(getSelection: () => ReturnType<typeof selection>, restart: boolean) {
+  private async change(getSelection: () => ReturnType<typeof selection>, restart: boolean, stopActive = true) {
+    await this.pending
+    if (!restart && JSON.stringify(getSelection()) === JSON.stringify(this.selected)) return
+    // Do not hold the switch queue while stopping: an active title request must
+    // be able to restore its chat model before it can finish cancellation.
+    if (stopActive) await this.stop()
     const change = this.pending.then(async () => {
       const next = getSelection()
       if (!restart && JSON.stringify(next) === JSON.stringify(this.selected)) return
       await this.recovery?.catch(() => {})
-      await this.stop()
       const connection = await this.invokeNative<RemoteAgentInfo>('sidecar_info', { selection: next, restart })
       this.reconnect(connection)
       this.selected = next
@@ -54,6 +59,20 @@ class DesktopChatStore extends RemoteChatStore {
 
   reloadSettings() {
     return this.change(() => selection(`${this.selected.provider}/${this.selected.model}`, this.getModels()), true)
+  }
+
+  protected override async generateTitle(model: string, message: ChatMessage, signal?: AbortSignal) {
+    const chatModel = this.selectedModel
+    if (model === chatModel) return super.generateTitle(model, message, signal)
+    try {
+      signal?.throwIfAborted()
+      // No response stream has started yet; keep this request's cancellation active.
+      await this.change(() => selection(model, this.getModels()), false, false)
+      signal?.throwIfAborted()
+      return await super.generateTitle(model, message, signal)
+    } finally {
+      await this.change(() => selection(chatModel, this.getModels()), false, false)
+    }
   }
 
   override async* respond(...args: Parameters<RemoteChatStore['respond']>) {

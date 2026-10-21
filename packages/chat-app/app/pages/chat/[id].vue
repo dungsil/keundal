@@ -5,7 +5,7 @@ const { t } = useLocale()
 
 const route = useRoute()
 const toast = useToast()
-const { model } = useModels()
+const { model, titleModel } = useModels()
 const { webSearch, reasoning } = useChatSettings()
 const { ensureConfigured } = useLLMSettings()
 const { $chatStore } = useNuxtApp()
@@ -37,7 +37,7 @@ const input = useState(`chat-input-${route.params.id}`, () => '')
 
 const { messages, status, error, sendMessage, regenerate, stop } = useKeundalChat({
   respond: (messages, onMessage, signal) => $chatStore.respond(route.params.id as string, {
-    messages, model: model.value, webSearch: webSearch.value, reasoning: reasoning.value,
+    messages, model: model.value, titleModel: titleModel.value || undefined, webSearch: webSearch.value, reasoning: reasoning.value,
     onMessage,
     onTitle: (value) => {
       title.value = value

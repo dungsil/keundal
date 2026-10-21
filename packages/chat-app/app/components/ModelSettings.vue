@@ -1,20 +1,33 @@
 <script setup lang="ts">
 const { t } = useLocale()
-const { models, defaultModel, saveDefaultModel, loading, error: modelError, refresh } = useModels()
+const {
+  models,
+  defaultModel,
+  saveDefaultModel,
+  titleModel,
+  saveTitleModel,
+  loading,
+  error: modelError,
+  refresh
+} = useModels()
 const draft = ref(defaultModel.value)
+const titleDraft = ref(titleModel.value)
 const error = ref('')
 const toast = useToast()
-const items = computed(() => {
+function modelItems(value: string, fallback: string) {
   const available = [...models.value]
-  if (draft.value && !available.some(({ value }) => value === draft.value))
-    available.unshift({ value: draft.value, label: draft.value, icon: 'i-lucide-bot' })
-  return [{ value: '', label: t('model.noDefault'), icon: 'i-lucide-history' }, ...available]
-})
+  if (value && !available.some((item) => item.value === value))
+    available.unshift({ value, label: value, icon: 'i-lucide-bot' })
+  return [{ value: '', label: fallback, icon: 'i-lucide-bot' }, ...available]
+}
+const items = computed(() => modelItems(draft.value, t('model.noDefault')))
+const titleItems = computed(() => modelItems(titleDraft.value, t('model.useChatModel')))
 
 function save() {
   error.value = ''
   try {
     saveDefaultModel(draft.value)
+    saveTitleModel(titleDraft.value)
     toast.add({ title: t('model.defaultSaved'), icon: 'i-lucide-check', color: 'success' })
   } catch {
     error.value = t('model.defaultSaveFailed')
@@ -32,6 +45,20 @@ function save() {
         <USelectMenu
           v-model="draft"
           :items="items"
+          value-key="value"
+          :loading="loading"
+          class="w-full"
+          @update:open="
+            (open) => {
+              if (open) refresh(false)
+            }
+          "
+        />
+      </UFormField>
+      <UFormField :label="t('model.titleLabel')" :description="t('model.titleDescription')" name="titleModel">
+        <USelectMenu
+          v-model="titleDraft"
+          :items="titleItems"
           value-key="value"
           :loading="loading"
           class="w-full"
