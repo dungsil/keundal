@@ -26,9 +26,11 @@ import {
 } from './compaction.js'
 import { SYSTEM_PROMPT_ID, withSystemPrompt } from './prompt.js'
 import { SKILL_CATALOG_ID, skillTool, withSkillCatalog } from './skills.js'
+import { subagentTool, SUBAGENT_TOOL_NAME } from './subagents.js'
 import { addTools, parseTools, streamWithTools, type ExecutableTool } from './tools.js'
 
 export type { AgentCompactionConfig, CompactionPolicy } from './compaction.js'
+export { TOOL_PROGRESS_EVENT } from './tools.js'
 export type { ExecutableTool, ToolExecutionContext } from './tools.js'
 
 export type ToolProvider = (options: ExecutionOptions) => readonly ExecutableTool[] | Promise<readonly ExecutableTool[]>
@@ -40,6 +42,7 @@ export interface AgentConfig {
   readonly reasoning?: boolean
   readonly compaction?: AgentCompactionConfig
   readonly tools?: readonly ExecutableTool[] | ToolProvider
+  readonly subagents?: boolean
   readonly skills?: boolean
   readonly context?: boolean
   /** 모든 실행에 앞서 모델에 전달할 시스템 지침입니다. */
@@ -70,7 +73,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     throw new Error('model and a positive integer maxOutputTokens are required')
   }
   const compaction = parseCompactionConfig('compaction' in value ? value.compaction : undefined)
-  for (const key of ['webSearch', 'reasoning', 'skills', 'context'] as const) {
+  for (const key of ['webSearch', 'reasoning', 'skills', 'context', 'subagents'] as const) {
     const option = (value as Record<string, unknown>)[key]
     if (option !== undefined && typeof option !== 'boolean') {
       throw new Error(`${key} must be a boolean`)
@@ -78,6 +81,9 @@ export function parseAgentConfig(value: unknown): AgentConfig {
   }
   const configuredTools = 'tools' in value ? value.tools : undefined
   const tools = typeof configuredTools === 'function' ? (configuredTools as ToolProvider) : parseTools(configuredTools)
+  const subagents = 'subagents' in value ? (value.subagents as boolean | undefined) : undefined
+  if (subagents && typeof tools !== 'function' && tools.some((tool) => tool.name === SUBAGENT_TOOL_NAME))
+    throw new Error('delegate_task tool name is reserved when subagents are enabled')
   const skills = 'skills' in value ? (value.skills as boolean | undefined) : undefined
   if (skills && typeof tools !== 'function' && tools.some((tool) => tool.name === 'skill'))
     throw new Error('skill tool name is reserved when skills are enabled')
@@ -102,6 +108,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     ...('reasoning' in value ? { reasoning: value.reasoning as boolean | undefined } : {}),
     compaction,
     tools,
+    subagents,
     skills,
     ...('context' in value ? { context: value.context as boolean | undefined } : {}),
     ...(systemPrompt === undefined ? {} : { systemPrompt }),
@@ -166,6 +173,14 @@ export class Agent extends Service {
   }
 
   run(input: RunAgentInput, options: ExecutionOptions = {}): AsyncIterableIterator<AGUIEvent> {
+    return this.runInternal(input, options, true)
+  }
+
+  private runInternal(
+    input: RunAgentInput,
+    options: ExecutionOptions,
+    allowSubagents: boolean
+  ): AsyncIterableIterator<AGUIEvent> {
     if (this.closed) throw new Error('agent disposed')
     const controller = new globalThis.AbortController()
     const externalSignal = options.signal
@@ -184,7 +199,7 @@ export class Agent extends Service {
       if (!controller.signal.aborted) controller.abort(new Error('agent run stopped'))
       cleanup()
     }
-    const iterator = this.execute(input, controller.signal, stop)
+    const iterator = this.execute(input, controller.signal, stop, allowSubagents)
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -204,7 +219,8 @@ export class Agent extends Service {
   private async *execute(
     input: RunAgentInput,
     signal: AbortSignal,
-    cleanup: () => void
+    cleanup: () => void,
+    allowSubagents: boolean
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     try {
       signal.throwIfAborted()
@@ -226,9 +242,17 @@ export class Agent extends Service {
       signal.throwIfAborted()
       if (this.config.skills && configuredTools.some((tool) => tool.name === 'skill'))
         throw new Error('skill tool name is reserved when skills are enabled')
+      if (this.config.subagents && configuredTools.some((tool) => tool.name === SUBAGENT_TOOL_NAME))
+        throw new Error('delegate_task tool name is reserved when subagents are enabled')
       const catalog = this.config.skills ? await this.ctx.skills.prepare(options) : undefined
       signal.throwIfAborted()
-      const tools = [...configuredTools, ...(catalog ? [skillTool(catalog)] : [])]
+      const tools = [
+        ...configuredTools,
+        ...(catalog ? [skillTool(catalog)] : []),
+        ...(this.config.subagents && allowSubagents
+          ? [subagentTool((child, execution) => this.runInternal(child, execution, false))]
+          : [])
+      ]
       const preparedInput = addTools(
         withSystemPrompt(withSkillCatalog(parseRunAgentInput(prepared.input), catalog), this.systemPrompt()),
         tools

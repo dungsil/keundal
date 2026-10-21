@@ -268,7 +268,10 @@ test('런타임에 등록한 도구를 실행하고 결과를 후속 요청에 �
     events.push(event)
   expect(executions).toEqual([{ location: 'Bordeaux' }])
   expect(requests).toHaveLength(2)
-  expect(requests[0]?.tools).toEqual([expect.objectContaining({ name: 'weather', type: 'function' })])
+  expect(requests[0]?.tools).toEqual([
+    expect.objectContaining({ name: 'weather', type: 'function' }),
+    expect.objectContaining({ name: 'delegate_task', type: 'function' })
+  ])
   expect(requests[1]?.input).toContainEqual({
     type: 'function_call_output',
     call_id: 'call_1',

@@ -38,6 +38,7 @@ export interface AgentHostOptions {
   readonly maxOutputTokens?: number
   readonly tools?: AgentConfig['tools']
   readonly plugins?: readonly AgentPluginOptions[]
+  readonly subagents?: boolean
   readonly maxToolRounds?: number
   readonly baseURL?: string
   readonly headers?: Readonly<Record<string, string>>
@@ -164,6 +165,8 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         model: selected.id,
         maxOutputTokens,
         skills: plugins.length > 0,
+        subagents: options.subagents ?? true,
+        parallelTools: true,
         maxToolRounds: options.maxToolRounds ?? 4,
         tools: async (execution) => {
           const signal = execution?.signal

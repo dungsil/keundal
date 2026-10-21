@@ -1,3 +1,4 @@
+import { TOOL_PROGRESS_EVENT } from '@keundal/agent'
 import { EventType, LLM_SOURCE_EVENT, MessageAssembly, prepareReplayMessages, type AGUIEvent, type AgentMessage, type LLMSource } from '@keundal/core'
 
 export type ChatStatus = 'ready' | 'submitted' | 'streaming' | 'error'
@@ -12,7 +13,8 @@ export type ToolInvocation<T extends { input: unknown, output: unknown } = { inp
   | { state: 'output-available', input: T['input'], output: T['output'] }
   | { state: 'output-error', input?: T['input'], output?: never, errorText: string }
 )
-export type ToolPart = ToolInvocation & { type: `tool-${string}`, providerExecuted?: boolean }
+export type SubagentProgress = { status: 'running' | 'completed' | 'failed' | 'cancelled', threadId: string, runId: string }
+export type ToolPart = ToolInvocation & { type: `tool-${string}`, providerExecuted?: boolean, subagent?: SubagentProgress }
 export type ChatPart = TextPart | FilePart | ToolPart
   | { type: 'source-url', sourceId: string, url: string, title?: string }
   | { type: 'data-keundal', data: { model: string, messages: AgentMessage[] } }
@@ -93,6 +95,18 @@ export class ChatMessageAssembly {
         break
       }
       case EventType.CUSTOM:
+        if (event.name === TOOL_PROGRESS_EVENT) {
+          const payload = event.value
+          if (payload && typeof payload === 'object' && typeof payload.toolCallId === 'string') {
+            const part = this.calls.get(payload.toolCallId)?.part
+            const progress = payload.value
+            if (part?.type === 'tool-delegate_task' && progress && typeof progress === 'object'
+              && ['running', 'completed', 'failed', 'cancelled'].includes(progress.status)
+              && typeof progress.threadId === 'string' && typeof progress.runId === 'string') {
+              part.subagent = { status: progress.status, threadId: progress.threadId, runId: progress.runId }
+            }
+          }
+        }
         if (event.name === LLM_SOURCE_EVENT) {
           const source = event.value as LLMSource
           if (!this.sources.has(source.id)) {
@@ -110,6 +124,7 @@ export class ChatMessageAssembly {
     // reasoning can be replayed to a provider on the next turn.
     for (const part of this.texts.values()) delete part.state
     for (const { part } of this.calls.values()) {
+      if (part.subagent?.status === 'running') part.subagent.status = 'cancelled'
       if (part.state !== 'output-available') Object.assign(part, { state: 'output-error', errorText: 'Tool execution interrupted' })
     }
     const messages = prepareReplayMessages(this.assembly.messages, model, model)

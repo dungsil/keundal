@@ -54,3 +54,10 @@ API 키 없이 구성할 때는 `KEUNDAL_PROVIDER`를 명시합니다. HTTP 연�
 ## Agent Plugins
 
 `createAgentHost({ plugins })`와 `createAgentRuntime(env, { plugins })`는 Agent Plugins 1.0.0 패키지를 로드합니다. 각 설정에 `root`와 설치 인스턴스별 `dataDirectory`를 지정합니다. `mcp`를 명시한 경우에만 MCP 서버를 실행합니다. 호스트가 스킬 등록과 도구 조합, 종료 시 연결 정리를 담당합니다. 지원 범위와 권한 설정은 [Agent Plugins 문서](../agent-plugins/README.md)를 참고하세요.
+
+## 서브에이전트
+
+호스트는 기본적으로 `delegate_task` 도구를 제공하고 같은 응답의 도구 호출을 병렬로 실행합니다. 모델이 작업을 위임하면 같은 모델과
+도구를 사용하는 자식이 독립된 대화에서 실행하고 최종 답변을 돌려줍니다.
+`createAgentHost({ ..., subagents: false })` 또는 `createAgentRuntime(env, { subagents: false })`로
+비활성화할 수 있습니다. 실행과 취소, 저장 방식은 [서브에이전트 문서](../agent/README.md#서브에이전트)를 참고하세요.

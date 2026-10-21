@@ -39,7 +39,7 @@ export function toMessages(messages: ChatMessage[], model: string): AgentMessage
   })
 }
 
-export async function createKeundalChat(context: Context, name: string, options: { webSearch?: boolean, reasoning?: boolean, maxOutputTokens?: number, tools?: (options: { signal?: AbortSignal }) => Promise<ExecutableTool[]> } = {}) {
+export async function createKeundalChat(context: Context, name: string, options: { subagents?: boolean, webSearch?: boolean, reasoning?: boolean, maxOutputTokens?: number, tools?: (options: { signal?: AbortSignal }) => Promise<ExecutableTool[]> } = {}) {
   const config = resolveModel(name)
   const maxOutputTokens = options.maxOutputTokens ?? 4096
   const ctx = context.isolate('agent')
@@ -49,6 +49,8 @@ export async function createKeundalChat(context: Context, name: string, options:
     webSearch: !!options.webSearch && config.provider !== 'google',
     reasoning: options.reasoning === false && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id) ? undefined : options.reasoning,
     maxToolRounds: 4,
+    subagents: options.subagents ?? true,
+    parallelTools: true,
     skills: !!context.skills,
     tools: async execution => [...createChatTools(), ...await (options.tools?.(execution) ?? [])]
   })
