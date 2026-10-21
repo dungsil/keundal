@@ -4,6 +4,7 @@ import { Client, StreamableHTTPClientTransport, type RequestOptions } from '@mod
 import type { Transport } from '@modelcontextprotocol/client'
 
 import { CatalogDiscovery } from './catalog-budget.js'
+import { parseMcpHttpUrl } from './config.js'
 import { boundedMcpPages, DEFAULT_MAX_RESULT_BYTES, McpResultBudget, resultBytes } from './result-budget.js'
 
 export interface McpPermissions {
@@ -94,6 +95,7 @@ export class McpClient {
     if (!Number.isSafeInteger(maxResultBytes) || maxResultBytes <= 0)
       throw new Error('maxResultBytes must be a positive integer')
     if (config.transport === 'stdio' && !createTransport) throw new Error('stdio requires the Node.js MCP client')
+    if (config.transport === 'streamable-http') parseMcpHttpUrl(config.url)
     const transport = createTransport
       ? createTransport(config)
       : new StreamableHTTPClientTransport(
@@ -101,7 +103,7 @@ export class McpClient {
           {
             requestInit: {
               headers: (config as Extract<McpClientConfig, { transport: 'streamable-http' }>).headers,
-              redirect: (config as Extract<McpClientConfig, { transport: 'streamable-http' }>).redirect
+              redirect: 'error'
             }
           }
         )

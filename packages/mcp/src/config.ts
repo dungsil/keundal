@@ -1,5 +1,15 @@
 import type { McpClientConfig } from './browser.js'
 
+/** Plaintext MCP is restricted to local development endpoints. */
+export function parseMcpHttpUrl(value: string): URL {
+  const url = new globalThis.URL(value)
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash)
+    throw new Error('MCP URL must use HTTP or HTTPS without embedded credentials or fragment')
+  const loopback = url.hostname === 'localhost' || url.hostname === '[::1]' || /^127\.\d+\.\d+\.\d+$/.test(url.hostname)
+  if (url.protocol === 'http:' && !loopback) throw new Error('Remote MCP URLs must use HTTPS')
+  return url
+}
+
 /** Validate persisted configuration before opening connections or starting processes. */
 export function parseMcpServers(value: unknown, allowStdio = true): McpClientConfig[] {
   if (!Array.isArray(value)) throw new Error('MCP servers must be an array')
@@ -35,9 +45,7 @@ export function parseMcpServers(value: unknown, allowStdio = true): McpClientCon
     }
     if (server.transport === 'streamable-http') {
       if (typeof server.url !== 'string') throw new Error('MCP HTTP URL is required')
-      const url = new globalThis.URL(server.url)
-      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash)
-        throw new Error('MCP URL must use HTTP or HTTPS without embedded credentials or fragment')
+      parseMcpHttpUrl(server.url)
       if (
         server.headers !== undefined &&
         (!dictionary(server.headers) ||
