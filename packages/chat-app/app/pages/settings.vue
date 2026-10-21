@@ -76,9 +76,9 @@ useHead(() => ({ title: t('settings.title') }))
                 <UColorModeSwitch :aria-label="t('settings.colorMode')" />
               </div>
             </section>
+            <ModelSettings v-show="activeSection === 'models'" />
+            <LLMSettings v-show="activeSection === 'llm'" :return-to="returnTo" />
             <ClientOnly>
-              <ModelSettings v-show="activeSection === 'models'" />
-              <LLMSettings v-show="activeSection === 'llm'" :return-to="returnTo" />
               <SkillSettings v-show="activeSection === 'skills'" />
             </ClientOnly>
           </div>
