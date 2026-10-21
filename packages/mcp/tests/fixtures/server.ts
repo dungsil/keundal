@@ -7,6 +7,9 @@ export function createFixture(
     cancelled: false,
     resourceReads: 0,
     failDiscovery: false,
+    catalog: undefined as Tool[][] | undefined,
+    catalogRequests: 0,
+    stringifyResponseIds: false,
     started: Promise.withResolvers<void>()
   }
 ) {
@@ -14,6 +17,14 @@ export function createFixture(
   if (capabilities.tools) {
     server.setRequestHandler('tools/list', (request) => {
       if (state.failDiscovery) throw new Error('discovery failed')
+      state.catalogRequests++
+      if (state.catalog) {
+        const page = Number(request.params?.cursor ?? 0)
+        return {
+          tools: state.catalog[page] ?? [],
+          ...(page + 1 < state.catalog.length ? { nextCursor: String(page + 1) } : {})
+        }
+      }
       const definitions = state.names.map<Tool>((name) => ({
         name,
         description: name,

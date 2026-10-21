@@ -57,7 +57,11 @@ async function httpFixture(t: TestContext, capabilities?: ServerCapabilities) {
       })
     )
     res.writeHead(response.status, Object.fromEntries(response.headers))
-    if (response.body) await pipeline(Readable.fromWeb(response.body), res).catch(() => {})
+    if (fixture.state.stringifyResponseIds && response.headers.get('content-type')?.includes('application/json')) {
+      const body = (await response.json()) as Record<string, unknown>
+      if (typeof body.id === 'number') body.id = String(body.id)
+      res.end(JSON.stringify(body))
+    } else if (response.body) await pipeline(Readable.fromWeb(response.body), res).catch(() => {})
     else res.end()
   })
   await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
@@ -315,4 +319,125 @@ test('서버 이름이 잘못됐거나 이미 취소했으면 연결하지 않�
   await expect(
     McpClient.connect({ ...config, serverName: 'valid' }, { signal: AbortSignal.abort(new Error('cancelled')) })
   ).rejects.toThrow('cancelled')
+})
+
+const catalogTool = (name: string, description = name, inputSchema: Record<string, unknown> = { type: 'object' }) => ({
+  name,
+  description,
+  inputSchema: { ...inputSchema, type: 'object' as const }
+})
+
+test('도구 목록의 페이지별 누적 개수를 제한하고 거부 후 기존 도구와 새 조회를 유지한다', async (t) => {
+  const { connect, state } = await httpFixture(t)
+  const client = await connect('limited', { tools: '*' })
+  const original = await client.tools()
+  state.catalog = [
+    Array.from({ length: 128 }, (_, i) => catalogTool(`a${i}`)),
+    Array.from({ length: 129 }, (_, i) => catalogTool(`b${i}`))
+  ]
+  await expect(client.tools()).rejects.toThrow('catalog exceeds')
+  expect(await execute(original, 'mcp__limited__tool__subtract', { left: 7, right: 2 })).toMatchObject({
+    structuredContent: { difference: 5 }
+  })
+  state.catalog = [[catalogTool('safe')]]
+  expect((await client.tools()).map((tool) => tool.description)).toEqual(['safe'])
+})
+
+test('허용 목록 밖의 정의도 크기 검증에서 제외하지 않는다', async (t) => {
+  const { connect, state } = await httpFixture(t)
+  const client = await connect('limited', { tools: ['safe'] })
+  state.catalog = [[catalogTool('safe'), catalogTool('denied', '가'.repeat(6000))]]
+  await expect(client.tools()).rejects.toThrow('catalog exceeds')
+})
+
+test('개별 스키마와 출력 스키마의 깊이 및 크기를 SDK 검증 전에 제한한다', async (t) => {
+  const { connect, state } = await httpFixture(t)
+  const client = await connect('limited', { tools: '*' })
+  let nested: Record<string, unknown> = { type: 'object' }
+  for (let i = 0; i < 40; i++) nested = { type: 'object', properties: { child: nested } }
+  for (const definition of [
+    catalogTool('large', 'large', { type: 'object', description: 'x'.repeat(65 * 1024) }),
+    catalogTool('deep', 'deep', nested),
+    { ...catalogTool('output'), outputSchema: { ...nested, type: 'object' as const } }
+  ]) {
+    state.catalog = [[definition]]
+    await expect(client.tools()).rejects.toThrow('catalog exceeds')
+  }
+})
+
+test('개별 정의가 작아도 여러 페이지의 전체 바이트 예산을 넘으면 다음 페이지를 요청하지 않는다', async (t) => {
+  const { connect, state } = await httpFixture(t)
+  const client = await connect('limited', { tools: '*' })
+  state.catalog = [
+    Array.from({ length: 50 }, (_, i) => catalogTool(`a${i}`, 'x'.repeat(12000))),
+    Array.from({ length: 50 }, (_, i) => catalogTool(`b${i}`, 'x'.repeat(12000))),
+    [catalogTool('not-requested')]
+  ]
+  await expect(client.tools()).rejects.toThrow('catalog exceeds')
+  expect(state.catalogRequests).toBe(2)
+})
+
+test('정상 경계 크기와 동시 조회는 서로 독립된 예산을 사용한다', async (t) => {
+  const { connect, state } = await httpFixture(t)
+  const client = await connect('limited', { tools: '*' })
+  state.catalog = [
+    Array.from({ length: 128 }, (_, i) => catalogTool(`a${i}`)),
+    Array.from({ length: 128 }, (_, i) => catalogTool(`b${i}`))
+  ]
+  const lists = await Promise.all([client.tools(), client.tools()])
+  expect(lists.map((tools) => tools.length)).toEqual([256, 256])
+  state.catalog = [[catalogTool('description', 'x'.repeat(16 * 1024))]]
+  expect((await client.tools())[0]!.description).toHaveLength(16 * 1024)
+})
+
+test('stdio에서 받은 과도한 도구 설명도 동일한 제한으로 거부한다', async (t) => {
+  const client = await McpClient.connect({
+    serverName: 'stdio',
+    transport: 'stdio',
+    command: process.execPath,
+    args: [fileURLToPath(new URL('./fixtures/stdio.ts', import.meta.url))],
+    env: { MCP_FIXTURE_LARGE_CATALOG: '1' },
+    permissions: { tools: '*' },
+    timeoutMs: 3000
+  })
+  t.onTestFinished(() => client.close())
+  await expect(client.tools()).rejects.toThrow('catalog exceeds')
+})
+
+test('캐시 없이도 도구 실행 시 출력 스키마 검증을 유지한다', async (t) => {
+  const { connect, state } = await httpFixture(t)
+  const client = await connect('limited', { tools: '*' })
+  state.catalog = [
+    [
+      {
+        ...catalogTool('subtract'),
+        outputSchema: { type: 'object', properties: { difference: { type: 'number' } }, required: ['difference'] }
+      }
+    ]
+  ]
+  const tools = await client.tools()
+  expect(await execute(tools, 'mcp__limited__tool__subtract', { left: 4, right: 1 })).toMatchObject({
+    structuredContent: { difference: 3 }
+  })
+  state.catalog = [
+    [
+      {
+        ...catalogTool('subtract'),
+        outputSchema: { type: 'object', properties: { missing: { type: 'string' } }, required: ['missing'] }
+      }
+    ]
+  ]
+  await expect(execute(await client.tools(), 'mcp__limited__tool__subtract', { left: 4, right: 1 })).rejects.toThrow(
+    'output schema'
+  )
+})
+
+test('SDK가 허용하는 문자열 응답 ID도 같은 도구 목록 제한을 적용한다', async (t) => {
+  const { connect, state } = await httpFixture(t)
+  const client = await connect('limited', { tools: '*' })
+  state.stringifyResponseIds = true
+  state.catalog = [[catalogTool('safe')]]
+  expect((await client.tools())[0]!.description).toBe('safe')
+  state.catalog = [[catalogTool('large', 'x'.repeat(17 * 1024))]]
+  await expect(client.tools()).rejects.toThrow('catalog exceeds')
 })

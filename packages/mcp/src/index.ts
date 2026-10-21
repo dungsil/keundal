@@ -4,6 +4,8 @@ import type { ExecutableTool } from '@keundal/agent'
 import { Client, StreamableHTTPClientTransport, type RequestOptions } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 
+import { CatalogDiscovery } from './catalog-budget.ts'
+
 export interface McpPermissions {
   readonly tools?: '*' | readonly string[]
   readonly resources?: '*' | readonly string[]
@@ -52,6 +54,7 @@ export class McpClient {
   private readonly lifetime = new globalThis.AbortController()
   private readonly permissions: McpPermissions
   private closing?: Promise<void>
+  private readonly catalog: CatalogDiscovery
 
   private constructor(
     private readonly client: Client,
@@ -60,6 +63,7 @@ export class McpClient {
     private readonly timeoutMs: number,
     permissions: McpPermissions
   ) {
+    this.catalog = new CatalogDiscovery(transport)
     this.permissions = {
       tools: permissions.tools === '*' ? '*' : [...(permissions.tools ?? [])],
       resources: permissions.resources === '*' ? '*' : [...(permissions.resources ?? [])]
@@ -115,7 +119,9 @@ export class McpClient {
     const request = this.requestOptions(options)
     const tools: ExecutableTool[] = []
     if (this.permissions.tools === '*' || this.permissions.tools?.length) {
-      const discovered = await this.client.listTools(undefined, { ...request, cacheMode: 'refresh' })
+      const discovered = await this.catalog.run(() =>
+        this.client.listTools(undefined, { ...request, cacheMode: 'bypass' })
+      )
       for (const definition of discovered.tools) {
         if (!allows(this.permissions.tools, definition.name)) continue
         tools.push({
