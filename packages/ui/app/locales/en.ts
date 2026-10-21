@@ -31,6 +31,7 @@ export default {
   'chat.regenerateFailed': 'Failed to regenerate.',
   'chat.voteFailed': 'Failed to save vote',
   'chat.notFound': 'Chat not found',
+  'chat.loading': 'Loading conversation...',
   'chat.thinking': 'Thinking...',
   'chat.attachment': 'Attachment',
   'chat.copy': 'Copy response',

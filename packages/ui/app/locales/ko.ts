@@ -33,6 +33,7 @@ export default {
   'chat.regenerateFailed': '응답을 다시 생성하지 못했습니다.',
   'chat.voteFailed': '평가를 저장하지 못했습니다.',
   'chat.notFound': '대화를 찾을 수 없습니다.',
+  'chat.loading': '대화를 불러오는 중...',
   'chat.thinking': '생각 중...',
   'chat.attachment': '첨부 파일',
   'chat.copy': '응답 복사',

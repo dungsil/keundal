@@ -10,7 +10,9 @@ const { webSearch, reasoning } = useChatSettings()
 const { ensureConfigured } = useLLMSettings()
 const { $chatStore } = useNuxtApp()
 
-const { data } = await useAsyncData(`chat-${route.params.id}`, () => $chatStore.get(route.params.id as string), { server: false })
+const { data, status: loadStatus } = await useAsyncData(`chat-${route.params.id}`, () => $chatStore.get(route.params.id as string), { server: false, lazy: true })
+
+const loading = computed(() => loadStatus.value === 'idle' || loadStatus.value === 'pending')
 
 const isOwner = computed(() => data.value?.isOwner ?? false)
 const visibility = ref<'public' | 'private'>(data.value?.visibility ?? 'private')
@@ -145,6 +147,7 @@ let initialized = false
 watch(data, async (chat) => {
   if (!chat || initialized) return
   initialized = true
+  visibility.value = chat.visibility
   messages.value = chat.messages
   votes.value = chat.votes
   if (!chat.started && chat.messages.length === 1) await regenerate()
@@ -156,8 +159,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <ChatSkeleton v-if="loading" />
+
   <UDashboardPanel
-    v-if="data?.id"
+    v-else-if="data?.id"
     id="chat"
     class="relative min-h-0"
     :ui="{ body: 'p-0 sm:p-0 overscroll-none' }"
