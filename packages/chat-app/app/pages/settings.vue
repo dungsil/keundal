@@ -33,7 +33,7 @@ useHead(() => ({ title: t('settings.title') }))
         />
         <ClientOnly>
           <ModelSettings />
-          <LLMSettings :return-to="returnTo" />
+          <LLMSettings />
         </ClientOnly>
       </UContainer>
     </template>
