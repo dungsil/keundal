@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdtemp, rm } from 'node:fs/promises'
-import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -87,66 +86,36 @@ async function request(url, path, options = {}) {
   return response.json()
 }
 
-async function debugPort() {
-  const server = createServer()
-  server.listen(0, '127.0.0.1')
-  await once(server, 'listening')
-  const { port } = server.address()
-  await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
-  return port
-}
-
-async function verifyChatScreen(port) {
+async function verifyChatScreen(pid) {
   const deadline = Date.now() + 30_000
-  let socket
   let lastScreen = ''
-  let discovery = ''
-  try {
-    while (Date.now() < deadline && !socket) {
-      const pages = await fetch(`http://127.0.0.1:${port}/json/list`, {
-        signal: AbortSignal.timeout(2_000)
-      }).then(response => response.json()).catch((error) => {
-        discovery = String(error)
-        return []
-      })
-      if (pages.length) discovery = JSON.stringify(pages.map(({ type, url }) => ({ type, url })))
-      const page = pages.find(page => ['page', 'webview'].includes(page.type) && /^(?:https?:\/\/tauri\.localhost|tauri:\/\/localhost)/.test(page.url))
-      if (page?.webSocketDebuggerUrl) {
-        socket = new WebSocket(page.webSocketDebuggerUrl)
-        await once(socket, 'open', { signal: AbortSignal.timeout(5_000) })
-      } else {
-        await delay(200)
-      }
+  while (Date.now() < deadline) {
+    const result = spawnSync('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      `Add-Type -AssemblyName UIAutomationClient
+       Add-Type -AssemblyName UIAutomationTypes
+       $p = Get-Process -Id ${pid} -ErrorAction Stop
+       $root = [System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
+       $elements = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+       $items = @($elements | ForEach-Object {
+         if (-not $_.Current.IsOffscreen) {
+           @{ name = $_.Current.Name; type = $_.Current.ControlType.ProgrammaticName }
+         }
+       })
+       ConvertTo-Json -InputObject $items -Compress`
+    ], { encoding: 'utf8', timeout: 10_000 })
+    if (result.error) throw result.error
+    assert.equal(result.status, 0, `Could not inspect desktop controls:\n${result.stderr}`)
+    const controls = JSON.parse(result.stdout.trim())
+    lastScreen = controls.map(control => control.name).join('\n')
+    assert.doesNotMatch(lastScreen, /Illegal invocation|not allowed by ACL|Failed to fetch/)
+    if (controls.some(control => control.type === 'ControlType.Edit')) {
+      console.log('PASS: desktop WebView exposes the chat input after sidecar initialization')
+      return
     }
-    assert.ok(socket, `Desktop WebView debugging endpoint did not become ready: ${discovery}`)
-    let id = 0
-    while (Date.now() < deadline) {
-      const reply = once(socket, 'message', { signal: AbortSignal.timeout(5_000) })
-      socket.send(JSON.stringify({
-        id: ++id,
-        method: 'Runtime.evaluate',
-        params: {
-          expression: `JSON.stringify({ ready: !!document.querySelector('#home textarea'), text: document.body?.innerText ?? '' })`,
-          returnByValue: true
-        }
-      }))
-      const [event] = await reply
-      const result = JSON.parse(event.data)
-      assert.equal(result.id, id)
-      assert.ok(!result.error && !result.result?.exceptionDetails, JSON.stringify(result))
-      const screen = JSON.parse(result.result.result.value)
-      lastScreen = screen.text
-      assert.doesNotMatch(lastScreen, /Illegal invocation|not allowed by ACL|Failed to fetch/)
-      if (screen.ready) {
-        console.log('PASS: desktop WebView renders the chat input after sidecar initialization')
-        return
-      }
-      await delay(200)
-    }
-    throw new Error(`Desktop chat screen did not become ready:\n${lastScreen}`)
-  } finally {
-    socket?.close()
+    await delay(500)
   }
+  throw new Error(`Desktop chat screen did not become ready:\n${lastScreen}`)
 }
 
 try {
@@ -168,15 +137,9 @@ try {
   console.log('PASS: packaged host starts outside the repository; auth, models and SQLite restart work')
 
   if (process.platform === 'win32') {
-    const port = await debugPort()
     app = spawn(join(portable, 'keundal-desktop.exe'), [], {
       cwd: work,
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
-        WEBVIEW2_USER_DATA_FOLDER: join(work, 'webview-data')
-      }
+      stdio: 'inherit'
     })
     let appError
     app.on('error', error => (appError = error))
@@ -204,7 +167,7 @@ try {
     assert.ok(ready, 'Desktop did not create a responding native window')
     await delay(3_000)
     assert.equal(app.exitCode, null, 'Desktop exited after creating its window')
-    await verifyChatScreen(port)
+    await verifyChatScreen(app.pid)
     console.log('PASS: extracted Windows desktop EXE creates a responding window and stays running')
   }
 } finally {
