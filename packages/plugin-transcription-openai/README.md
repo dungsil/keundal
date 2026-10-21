@@ -54,4 +54,6 @@ const text = await result.text
 
 취소 신호, 소비 순회 중단, 공급자 오류, 예상치 못한 연결 종료는 연결·오디오 reader·리스너·타이머를 정리합니다. 연결과 stop 후 최종화 제한은 각각 기본 15초이며 `timeoutMs`로 설정합니다. `text`와 이벤트 순회 모두 오류를 전달합니다. 서비스 해제는 진행 중 자격 증명 발급을 취소하지만 이미 발급한 브라우저 자격 증명을 폐기하지는 않습니다.
 
+서버 응답은 JSON 파싱 전에 프레임당 64 KiB로 제한합니다. 한 세션에서 수신하는 데이터는 4 MiB, 이벤트는 4,096개, 발화 ID와 오디오 commit은 각각 128개까지 허용합니다. 전사 문자열은 UTF-8 기준 합계 256 KiB, 발화 ID는 1,024 UTF-16 코드 단위까지 허용합니다. 부분 결과를 반복해서 전달하는 비용도 제한하기 위해 출력은 합계 8 MiB, 미소비 출력 큐는 1 MiB로 제한하며 이벤트마다 64바이트의 관리 비용을 포함합니다. 제한을 넘거나 전사 필드의 타입이 잘못되면 결과를 자르지 않고 오류로 종료하며 연결, 오디오 reader, 보관 중인 전사 상태를 정리합니다. 정상적인 짧은 응답은 `fullStream`을 소비하지 않고 `text`만 기다려도 완료됩니다.
+
 검증 기준: 설치된 OpenAI SDK 7.15.0 타입과 공식 [client secrets](https://developers.openai.com/api/reference/resources/realtime/subresources/client_secrets), [WebSocket](https://developers.openai.com/api/docs/guides/voice-websockets?api=realtime), [transcription](https://developers.openai.com/api/docs/guides/realtime-transcription) 문서. 실제 모델의 지연과 인식 품질은 로컬 프로토콜 fixture 테스트로 보장하지 않습니다. 수동 턴 경계는 발화 중간에 생길 수 있습니다.
