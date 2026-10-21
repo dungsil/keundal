@@ -32,7 +32,7 @@ export class RemoteChatStore implements ChatStoreLike {
 
   constructor(
     private connection: RemoteAgentInfo,
-    private readonly request: typeof globalThis.fetch = globalThis.fetch
+    private readonly request: typeof globalThis.fetch = (input, init) => globalThis.fetch(input, init)
   ) {}
 
   protected reconnect(connection: RemoteAgentInfo) {

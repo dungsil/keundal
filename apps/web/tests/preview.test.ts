@@ -79,7 +79,7 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
         expect(dataset.greetingTime, `${hour}시`).toBe(period)
       }
     }
-    expect(html.match(/<button\b[^>]*aria-label="Skills"/), path).not.toBeNull()
+    expect(html.match(/<button\b[^>]*aria-label="Skills"/), path).toBeNull()
     expect(html.match(/<a\b[^>]*aria-label="Settings"/), path).not.toBeNull()
   }
   const localizedRequests: { headers: Record<string, string>, language: string, label: string }[] = [
@@ -100,13 +100,15 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
       expect(heading).toContain(`data-greeting="${period}"`)
       expect(heading).toContain(translate(language === 'ko' ? 'ko' : 'en', `greeting.${period}`))
     }
-    expect(html).toContain(`aria-label="${language === 'ko' ? '스킬' : 'Skills'}"`)
+    expect(html).not.toContain(`aria-label="${language === 'ko' ? '스킬' : 'Skills'}"`)
     expect(html).toContain(`aria-label="${language === 'ko' ? '설정' : 'Settings'}"`)
     const settings = await fetch(new URL('/settings', origin), { headers })
     const settingsHtml = await settings.text()
     expect(settings.status).toBe(200)
     expect(settingsHtml).toContain(`lang="${language}"`)
     expect(settingsHtml).toContain(language === 'ko' ? '대화로 돌아가기' : 'Back to chat')
+    expect(settingsHtml).toContain('id="model-settings-title"')
+    expect(settingsHtml).toContain('id="llm-settings-title"')
   }))
   const missing = await fetch(new URL('/missing-localized-page', origin), { headers: { 'accept': 'text/html', 'accept-language': 'ko-KR' } })
   expect(missing.status).toBe(404)

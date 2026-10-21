@@ -236,6 +236,12 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
 
     let token = uuid::Uuid::new_v4().simple().to_string();
     let mut command = Command::new(&binary);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
     command
         .args(&args)
         .env("KEUNDAL_SIDECAR", "1")

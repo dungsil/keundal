@@ -72,18 +72,18 @@ PR 프리뷰는 `preview-build.yml`에서 Workers와 의존 패키지만 별도�
 저장소 전용 composite 액션을 삭제하고 공개 액션을 직접 호출한다. 아래 검토는 사용하는 코드 경로와 권한·캐시·다운로드 처리를 대상으로 한다.
 액션 전체와 번들 의존성에 취약점이 없음을 보증하는 감사는 아니다.
 
-| 액션                                                                                                                           | 선택 및 검토 근거                                                                                                                                                                                                                                                                                                                         |
-| ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [actions/checkout v7.0.1](https://github.com/actions/checkout/tree/3d3c42e5aac5ba805825da76410c181273ba90b1)                   | GitHub 공식 액션을 사용하며 `persist-credentials: false`로 후속 명령에 Git 인증 정보를 남기지 않는다.                                                                                                                                                                                                                                     |
-| [pnpm/setup v3.1.1](https://github.com/pnpm/setup/tree/a0881977cd8ea73b1ed212236c99ca10dcc80cf4)                               | pnpm 공식 액션이다. `src/install-pnpm/download.ts`에서 고정된 npm 서명 키와 다운로드 체크섬 검증 경로를 확인했다. `devEngines`에서 Node와 pnpm 버전을 읽고 `require-lockfile: true`로 고정 설치를 수행한다.                                                                                                                               |
-| [rharkor/caching-for-turbo v2.5.2](https://github.com/rharkor/caching-for-turbo/tree/760158c05c47e7a764f78e9a22ca3b5a6ed8c52e) | Node 24 액션이다. `src/lib/server/index.ts`, `providers/cache/`, `server/utils.ts`, `post.ts`의 localhost 서버, GitHub 캐시 API, 종료 경로를 확인했다. GitHub 공급자만 선택하며 저장소 쓰기 권한이나 Vercel·S3 인증 정보를 추가하지 않는다. 러너마다 임시 경로가 달라도 캐시가 적중하도록 상대 경로를 사용하고 서버 포트는 자동 배정한다. |
-| [dorny/paths-filter v4.0.3](https://github.com/dorny/paths-filter/tree/ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d)               | 변경 파일 경로를 패턴과 비교하며 PR 코드를 실행하지 않는다. `src/filter.ts`의 `dot: true`와 `every` 조건을 확인했다. 파일 조회 작업에만 `pull-requests: read`를 부여한다.                                                                                                                                                                 |
-| [re-actors/alls-green v1.3.0](https://github.com/re-actors/alls-green/tree/b5b5b37504aa4183270bd3d855c52a67f212be35)           | `action.yml`과 `src/normalize_needed_jobs_status.py`, `src/job_outcome.py`를 검토했다. Python 표준 라이브러리로 전달된 작업 결과만 집계하며 네트워크·추가 설치·checkout·토큰 권한이 필요하지 않다. 실패 허용 목록은 지정하지 않는다.                                                                                                      |
-| [dtolnay/rust-toolchain](https://github.com/dtolnay/rust-toolchain/tree/b725eda525362e7cf34af9a7243cac1e3f01a7ec)              | `action.yml`의 rustup 설치·최소 프로필·버전 선택 경로를 확인했다. 액션 코드는 SHA로 고정하고 도구 체인은 기존처럼 stable을 사용한다.                                                                                                                                                                                                      |
-| [Swatinem/rust-cache v2.9.3](https://github.com/Swatinem/rust-cache/tree/d1527c8f67ef9af357290475d4af4b0fab8f12e0)             | `src/config.ts`, `restore.ts`, `save.ts`의 Rust 버전·Cargo 입력·작업별 캐시 키와 저장 경로를 확인했다. `cache-bin: false`로 설치된 도구 바이너리를 캐시에서 제외한다.                                                                                                                                                                     |
-| [nick-fields/retry v4.0.0](https://github.com/nick-fields/retry/tree/ad984534de44a9489a53aefd81eb77f87c70dc60)                 | Node 24 액션이다. `src/index.ts`, `inputs.ts`의 셸 실행·횟수 제한·시간 초과 시 자식 프로세스 종료·최종 실패 반환을 확인했다. 고정 명령을 Bash로 실행하며 외부 입력을 명령에 보간하지 않는다. 추가 권한·인증 정보·런타임 다운로드가 필요하지 않다.                                                                                         |
-| [actions/upload-artifact v7.0.2](https://github.com/actions/upload-artifact/tree/cf430e030ddbb5b0abf93d22962f4752f3646cd9)     | GitHub 공식 업로드 액션이다. 산출물 경로를 지정하고 파일 누락 시 실패하게 한다. Workers 출력에 필요한 숨김 파일만 해당 업로드에서 포함한다.                                                                                                                                                                                               |
-| [github/codeql-action v4](https://github.com/github/codeql-action/tree/6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee)               | GitHub 공식 분석 액션이다. 기존 SHA와 분석 설정을 유지하며 분석 작업에만 `security-events: write`를 부여한다.                                                                                                                                                                                                                             |
+| 액션                                                                                                                       | 선택 및 검토 근거                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [actions/checkout v7.0.1](https://github.com/actions/checkout/tree/3d3c42e5aac5ba805825da76410c181273ba90b1)               | GitHub 공식 액션을 사용하며 `persist-credentials: false`로 후속 명령에 Git 인증 정보를 남기지 않는다.                                                                                                                                             |
+| [pnpm/setup v3.1.1](https://github.com/pnpm/setup/tree/a0881977cd8ea73b1ed212236c99ca10dcc80cf4)                           | pnpm 공식 액션이다. `src/install-pnpm/download.ts`에서 고정된 npm 서명 키와 다운로드 체크섬 검증 경로를 확인했다. `devEngines`에서 Node와 pnpm 버전을 읽고 `require-lockfile: true`로 고정 설치를 수행한다.                                       |
+| [actions/cache v5](https://github.com/actions/cache/tree/caa296126883cff596d87d8935842f9db880ef25)                         | GitHub 공식 Node 24 액션이다. `action.yml`, `src/restoreImpl.ts`, `src/saveImpl.ts`의 접두사 복원과 성공한 작업의 저장 경로를 확인했다. `.turbo/cache`만 보관하며 추가 인증 정보나 localhost 서버를 사용하지 않는다.                              |
+| [dorny/paths-filter v4.0.3](https://github.com/dorny/paths-filter/tree/ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d)           | 변경 파일 경로를 패턴과 비교하며 PR 코드를 실행하지 않는다. `src/filter.ts`의 `dot: true`와 `every` 조건을 확인했다. 파일 조회 작업에만 `pull-requests: read`를 부여한다.                                                                         |
+| [re-actors/alls-green v1.3.0](https://github.com/re-actors/alls-green/tree/b5b5b37504aa4183270bd3d855c52a67f212be35)       | `action.yml`과 `src/normalize_needed_jobs_status.py`, `src/job_outcome.py`를 검토했다. Python 표준 라이브러리로 전달된 작업 결과만 집계하며 네트워크·추가 설치·checkout·토큰 권한이 필요하지 않다. 실패 허용 목록은 지정하지 않는다.              |
+| [dtolnay/rust-toolchain](https://github.com/dtolnay/rust-toolchain/tree/b725eda525362e7cf34af9a7243cac1e3f01a7ec)          | `action.yml`의 rustup 설치·최소 프로필·버전 선택 경로를 확인했다. 액션 코드는 SHA로 고정하고 도구 체인은 기존처럼 stable을 사용한다.                                                                                                              |
+| [Swatinem/rust-cache v2.9.3](https://github.com/Swatinem/rust-cache/tree/d1527c8f67ef9af357290475d4af4b0fab8f12e0)         | `src/config.ts`, `restore.ts`, `save.ts`의 Rust 버전·Cargo 입력·작업별 캐시 키와 저장 경로를 확인했다. `cache-bin: false`로 설치된 도구 바이너리를 캐시에서 제외한다.                                                                             |
+| [nick-fields/retry v4.0.0](https://github.com/nick-fields/retry/tree/ad984534de44a9489a53aefd81eb77f87c70dc60)             | Node 24 액션이다. `src/index.ts`, `inputs.ts`의 셸 실행·횟수 제한·시간 초과 시 자식 프로세스 종료·최종 실패 반환을 확인했다. 고정 명령을 Bash로 실행하며 외부 입력을 명령에 보간하지 않는다. 추가 권한·인증 정보·런타임 다운로드가 필요하지 않다. |
+| [actions/upload-artifact v7.0.2](https://github.com/actions/upload-artifact/tree/cf430e030ddbb5b0abf93d22962f4752f3646cd9) | GitHub 공식 업로드 액션이다. 산출물 경로를 지정하고 파일 누락 시 실패하게 한다. Workers 출력에 필요한 숨김 파일만 해당 업로드에서 포함한다.                                                                                                       |
+| [github/codeql-action v4](https://github.com/github/codeql-action/tree/6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee)           | GitHub 공식 분석 액션이다. 기존 SHA와 분석 설정을 유지하며 분석 작업에만 `security-events: write`를 부여한다.                                                                                                                                     |
 
 pnpm/setup의 `src/lockfile-verification-cache/index.ts`는 설치 직후 검증 기록을 저장하고,
 이전 기록 변경이나 예상보다 많은 추가 기록이 있으면 저장하지 않는다. 검증 결과는 정확한 잠금 파일 해시로만 복원한다.
@@ -92,14 +92,18 @@ pnpm/setup의 `src/lockfile-verification-cache/index.ts`는 설치 직후 검증
 
 ## Turbo 캐시 재사용
 
-`rharkor/caching-for-turbo`가 작업 결과를 Turbo 해시별로 GitHub 캐시에 바로 저장한다. 같은 OS·아키텍처의
-다른 작업도 저장이 끝난 결과를 조회할 수 있으며, 작업 종료 시 전체 캐시 묶음을 저장하는 방식의 누락과 중복 전송을 줄인다.
-동시에 같은 해시를 빌드할 수는 있지만, 완료된 결과는 이후 작업과 실행에서 재사용한다. 캐시는 GitHub의 저장소·브랜치 접근 범위를 따른다.
+`actions/cache`가 Turbo의 로컬 캐시 디렉터리인 `.turbo/cache`를 복원하고 작업이 성공하면 저장한다.
+저장 키는 `turbo-v4-<OS>-<아키텍처>-<작업>-<실행 ID>-<재실행 번호>`로 구성한다. 병렬 작업과 재실행이
+같은 불변 키를 저장하지 않으므로 캐시 예약 충돌과 불필요한 재시도를 피한다.
 
-캐시 키에 작업 이름·커밋 SHA·전체 잠금 파일 해시를 별도 장벽으로 넣지 않는다. 입력 파일·의존 패키지·환경 변수의
-변경 여부는 Turbo가 작업별로 판단한다. OS·아키텍처는 캐시 접두사와 `globalEnv`에서 모두 구분한다.
-루트 `package.json`도 전역 입력에 넣어 Node·pnpm 버전과 공통 설정 변경을 반영한다.
-로컬 캐시 서버의 주소·토큰·팀 값은 중첩 Turbo 호출에 전달하되 작업 해시에는 넣지 않는다.
+복원할 때는 같은 작업의 최신 캐시를 먼저 찾고, 없으면 같은 OS·아키텍처의 다른 작업이 저장한 최신 캐시를 찾는다.
+서로 다른 캐시 묶음을 합치지는 않는다. 캐시 안의 결과가 현재 입력에 맞는지는 Turbo가 작업 해시로 다시 판단한다.
+입력 파일·의존 패키지·환경 변수와 루트 `package.json` 변경은 기존 Turbo 설정에 따라 반영된다.
+캐시는 GitHub의 저장소·브랜치 접근 범위를 따르며 OS·아키텍처는 캐시 접두사와 `globalEnv`에서 모두 구분한다.
+
+기존 방식처럼 작업 결과가 나올 때마다 다른 러너에 즉시 공유하지는 않는다. 성공한 작업이 종료된 뒤 저장한
+묶음을 이후 작업과 실행에서 재사용한다. 묶음에는 과거 결과도 남을 수 있고 실행마다 새 항목이 저장되므로
+전송량과 저장 공간 사용량은 늘어날 수 있다. 기존 `turbo-v3` 원격 캐시와 형식이 달라 첫 실행은 새 캐시를 만든다.
 
 - 패키지 빌드는 테스트·README·테스트 전용 TypeScript 설정 변경으로 무효화하지 않는다. 테스트 자체는 변경 시 다시 실행한다.
 - 데스크톱의 `build:ui`는 공용 채팅 레이어로 생성한 UI와 Nuxt 준비 산출물을 캐시한다. 출력은 `apps/desktop`의 `.nuxt`, `.output`, `dist`에 둔다.
@@ -199,3 +203,12 @@ CI는 `LIGHTHOUSE_RUN=1`, `2`, `3`으로 위 명령을 각각 실행하여 원�
 ```sh
 LIGHTHOUSE_BASE_URL=https://배포된-프리뷰-주소 LIGHTHOUSE_REPORT_DIR=.unlighthouse node tools/lighthouse/summary.mjs
 ```
+
+## 린터의 실행 환경
+
+Oxlint의 Node 환경은 `packages/agent-host/src/**`에도 적용한다. Node가 제공하는 `AbortController`를
+미정의 변수로 처리하지 않으며, 다른 패키지에 Node 전역을 일괄 허용하지 않는다.
+
+`packages/ui/nuxt.config.ts`에는 `defineNuxtConfig`를, UI 앱 파일에는 사용하는 Nuxt·Vue 자동 import를
+읽기 전용 전역으로 등록한다. 브라우저 환경은 UI 앱 파일에만 적용하고 `defineProps`, `defineEmits`는
+Vue 파일에만 허용한다. UI 파일을 린트 대상에서 제외하거나 미정의 변수 검사를 끄지는 않는다.

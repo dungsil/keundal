@@ -24,6 +24,12 @@
       "csp": null,
       "capabilities": [
         {
+          "identifier": "sidecar-info",
+          "description": "Allow the local main window to obtain the sidecar connection information",
+          "windows": ["main"],
+          "permissions": ["allow-sidecar-info"]
+        },
+        {
           "identifier": "llm-settings",
           "description": "Allow the local main window to store LLM settings in the OS secret store",
           "windows": ["main"],

@@ -1,8 +1,9 @@
 @import "tailwindcss" theme(static);
 @import "@nuxt/ui";
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 
 @theme static {
-  --font-sans: 'Pretendard', sans-serif;
+  --font-sans: 'Pretendard Variable', sans-serif;
 }
 
 @layer base {
@@ -12,7 +13,12 @@
 }
 
 :root {
+  --ui-primary: var(--ui-color-primary-600);
   --ui-container: var(--container-3xl);
+}
+
+.dark {
+  --ui-primary: var(--ui-color-primary-400);
 }
 
 html.dark .shiki span {
