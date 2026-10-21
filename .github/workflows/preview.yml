@@ -43,6 +43,24 @@ jobs:
               core.info('최신 커밋이 일치하는 열린 PR이 없어 프리뷰를 생략합니다.');
               return;
             }
+            // 일반 CI 성공도 이 워크플로를 실행하므로 아티팩트 유무와 별도로 검사한다.
+            // preview-build.yml의 paths-ignore와 같은 제외 경로를 유지한다.
+            const isPreviewInput = path => !(
+              /^(\.github|ci|docs|examples|tools\/store-conformance)\//.test(path) ||
+              /^[^/]+\.md$/.test(path) ||
+              /^(apps|packages|tools)\/[^/]+\/README\.md$/.test(path)
+            );
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              ...context.repo, pull_number: pr.number, per_page: 100
+            });
+            // API가 반환하는 최대 3,000개를 넘으면 누락된 배포 입력이 있을 수 있다.
+            if (pr.changed_files <= files.length && !files.some(file =>
+              isPreviewInput(file.filename) ||
+              (file.previous_filename && isPreviewInput(file.previous_filename))
+            )) {
+              core.info('배포에 영향을 주는 변경이 없어 프리뷰를 생략합니다.');
+              return;
+            }
             const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
               ...context.repo, run_id: run.id, per_page: 100
             });

@@ -34,20 +34,27 @@ jobs:
     outputs:
       source: ${{ github.event_name != 'pull_request' || steps.filter.outputs.source == 'true' }}
     steps:
-      # PR은 경로 확인을 항상 실행하여 문서 변경도 필수 검사 결과를 남긴다.
+      # PR은 경로 확인을 항상 실행하여 배포와 무관한 변경도 필수 검사 결과를 남긴다.
       - name: 변경 경로 확인
         if: github.event_name == 'pull_request'
         id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
-          # 새 설정 파일도 검사 대상에 포함한다. 문서는 린트 작업에서 검사한다.
+          # 프리뷰와 같은 제외 경로를 사용한다. 린트와 CodeQL은 항상 실행한다.
+          # tools/tsdown과 tools/tsconfig 및 새 설정 파일은 검사 대상에 포함한다.
           predicate-quantifier: every
           filters: |
             source:
               - '**'
-              - '!{README,CONTRIBUTING,CODE_OF_CONDUCT,AGENTS}.md'
-              - '!docs/**/*.md'
-              - '!{apps,examples,packages,tools}/*/README.md'
+              - '!.github/**'
+              - '!ci/**'
+              - '!docs/**'
+              - '!examples/**'
+              - '!tools/store-conformance/**'
+              - '!*.md'
+              - '!apps/*/README.md'
+              - '!packages/*/README.md'
+              - '!tools/*/README.md'
 
   build:
     name: 빌드
