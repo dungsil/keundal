@@ -1,23 +1,16 @@
 <script setup lang="ts">
 const { t } = useLocale()
-const { reasoning } = useChatSettings()
-
-const selected = computed({
-  get: () => reasoning.value ? 'on' : 'off',
-  set: (value: string) => { reasoning.value = value === 'on' }
-})
-
-const items = computed(() => [
-  { label: t('prompt.reasoningOn'), value: 'on' },
-  { label: t('prompt.reasoningOff'), value: 'off' }
-])
+const { reasoning, reasoningLevels } = useChatSettings()
+const items = computed(() => reasoningLevels.value.map(value => ({ label: value, value })))
 </script>
 
 <template>
   <USelect
-    v-model="selected"
+    v-model="reasoning"
     :items="items"
-    :aria-label="t('prompt.reasoning')"
+    :aria-label="t('prompt.reasoningLevel')"
+    :disabled="!reasoningLevels.length"
+    :title="reasoningLevels.length ? t('prompt.reasoningLevel') : t('prompt.unsupported')"
     icon="i-lucide-brain"
     size="sm"
     color="neutral"

@@ -1,5 +1,5 @@
+import type { Reasoning, AGUIEvent, SessionSnapshot } from '@keundal/core'
 import type { Context } from 'cordis'
-import type { AGUIEvent, SessionSnapshot } from '@keundal/core'
 import type { ChatMessage } from './chat-message'
 import { createKeundalChat, toMessages } from './keundal'
 
@@ -15,7 +15,7 @@ export interface ChatStoreLike {
     messages: ChatMessage[]
     model: string
     titleModel?: string
-    reasoning?: boolean
+    reasoning?: Reasoning
     webSearch?: boolean
     onMessage?: (message: ChatMessage) => void
     onTitle?: (title: string) => void
@@ -146,7 +146,7 @@ export class ChatStore implements ChatStoreLike {
     messages: ChatMessage[]
     model: string
     titleModel?: string
-    reasoning?: boolean
+    reasoning?: Reasoning
     webSearch?: boolean
     onMessage?: (message: ChatMessage) => void
     onTitle?: (title: string) => void

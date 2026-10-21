@@ -306,3 +306,54 @@ test('Agent Plugin 스킬을 호스트에 등록하고 종료하면 사용할 �
   await host.dispose()
   await expect(catalog.load('hello')).rejects.toThrow()
 })
+
+test('같은 모델의 추론 수준을 바꾸면 캐시된 에이전트에도 새 수준을 적용한다', async (t) => {
+  const { createServer } = await import('node:http')
+  const received: unknown[] = []
+  const server = createServer(async (request, response) => {
+    let body = ''
+    for await (const chunk of request) body += chunk
+    if (request.url?.endsWith('/input_tokens')) {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ input_tokens: 10 }))
+      return
+    }
+    received.push(JSON.parse(body).reasoning)
+    response.writeHead(200, { 'content-type': 'text/event-stream' })
+    response.end(`data: ${JSON.stringify({ type: 'response.completed', response: { status: 'completed' } })}\n\n`)
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.onTestFinished(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        server.closeAllConnections()
+        server.close((error) => (error ? reject(error) : resolve()))
+      })
+  )
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('server did not bind a port')
+  const host = await createAgentHost({
+    provider: 'openai',
+    apiKey: 'test-key',
+    model: 'gpt-5',
+    baseURL: `http://127.0.0.1:${address.port}/v1`,
+    sqlitePath: sqlitePath()
+  })
+  hosts.push(host)
+  for (const [index, reasoning] of (['low', 'high', 'medium', 'low'] as const).entries()) {
+    const events = []
+    for await (const event of host.services.run(
+      {
+        threadId: `levels-${index}`,
+        runId: `levels-${index}`,
+        state: {},
+        tools: [],
+        context: [],
+        messages: [{ id: 'user', role: 'user', content: 'hello' }]
+      },
+      { reasoning }
+    ))
+      events.push(event)
+    expect(events.at(-1)?.type).toBe('RUN_FINISHED')
+  }
+  expect(received).toEqual(['low', 'high', 'medium', 'low'].map((effort) => ({ effort, summary: 'auto' })))
+})

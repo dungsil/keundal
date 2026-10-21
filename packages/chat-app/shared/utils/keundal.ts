@@ -1,5 +1,5 @@
+import { type Reasoning, EventType, parseRunAgentInput, prepareReplayMessages, type AgentMessage, type AGUIEvent } from '@keundal/core'
 import { ChatMessagePublisher } from './chat-message-publisher'
-import { EventType, parseRunAgentInput, prepareReplayMessages, type AgentMessage, type AGUIEvent } from '@keundal/core'
 import agentPlugin, { type ExecutableTool } from '@keundal/agent'
 import type { Context } from 'cordis'
 import { ChatMessageAssembly, type ChatMessage } from './chat-message'
@@ -39,7 +39,7 @@ export function toMessages(messages: ChatMessage[], model: string): AgentMessage
   })
 }
 
-export async function createKeundalChat(context: Context, name: string, options: { webSearch?: boolean, reasoning?: boolean, maxOutputTokens?: number, tools?: (options: { signal?: AbortSignal }) => Promise<ExecutableTool[]> } = {}) {
+export async function createKeundalChat(context: Context, name: string, options: { webSearch?: boolean, reasoning?: Reasoning, maxOutputTokens?: number, tools?: (options: { signal?: AbortSignal }) => Promise<ExecutableTool[]> } = {}) {
   const config = resolveModel(name)
   const maxOutputTokens = options.maxOutputTokens ?? 4096
   const ctx = context.isolate('agent')
@@ -47,7 +47,7 @@ export async function createKeundalChat(context: Context, name: string, options:
     model: config.value,
     maxOutputTokens,
     webSearch: !!options.webSearch && config.provider !== 'google',
-    reasoning: options.reasoning === false && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id) ? undefined : options.reasoning,
+    reasoning: options.reasoning !== undefined && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id) ? undefined : options.reasoning,
     maxToolRounds: 4,
     skills: !!context.skills,
     tools: async execution => [...createChatTools(), ...await (options.tools?.(execution) ?? [])]

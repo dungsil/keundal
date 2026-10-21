@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { createServer, type ServerResponse, type IncomingMessage } from 'node:http'
-import { EventType, LLM_SOURCE_EVENT, type AGUIEvent } from '@keundal/core'
+import { EventType, LLM_SOURCE_EVENT, type AGUIEvent, type Reasoning } from '@keundal/core'
 import type { ChatMessage } from '../shared/utils/chat-message'
 import { expect, test, onTestFinished, vi } from 'vitest'
 import { Context } from 'cordis'
@@ -32,7 +32,7 @@ test('공급자 모듈을 불러오는 동안 서비스를 해제하면 공급�
   await rejected
 })
 
-async function createKeundalChat(name: string, options: { webSearch?: boolean, reasoning?: boolean }, env: Record<string, string>) {
+async function createKeundalChat(name: string, options: { webSearch?: boolean, reasoning?: Reasoning }, env: Record<string, string>) {
   const ctx = new Context()
   const llm = ctx.plugin(browserLLMPlugin, { getSettings: () => ({
     openai: { apiKey: env.OPENAI_API_KEY ?? '', baseURL: env.OPENAI_BASE_URL ?? '' },
@@ -509,4 +509,26 @@ test('같은 종류의 공급자를 전환하면 제목과 생성 요청을 선�
   expect(requests).toContain('home:Bearer home-key')
   delete settings['openai@work']
   await expect(ctx.llm.getModel('openai@work/shared')).rejects.toThrow('configuration')
+})
+
+test.each(['low', 'medium', 'high'] as const)('%s 추론 수준을 각 공급자의 생성 요청에 전달한다', async (reasoning) => {
+  for (const provider of [
+    { name: 'openai/gpt-5-nano', key: 'OPENAI_API_KEY', url: 'OPENAI_BASE_URL', frames: openaiText('답변') },
+    { name: 'google/gemini-3-flash', key: 'GEMINI_API_KEY', url: 'GEMINI_BASE_URL', frames: [{ candidates: [{ content: { parts: [{ text: '답변' }] }, finishReason: 'STOP' }] }] },
+    { name: 'anthropic/claude-haiku-4.5', key: 'ANTHROPIC_API_KEY', url: 'ANTHROPIC_BASE_URL', frames: anthropicText('답변') }
+  ]) {
+    const requests: Record<string, unknown>[] = []
+    const baseURL = await setup((body, response) => {
+      requests.push(body)
+      send(response, provider.frames)
+    })
+    const chat = await createKeundalChat(provider.name, { reasoning }, { [provider.key]: 'test-key', [provider.url]: baseURL })
+    onTestFinished(chat.dispose)
+    const events = await collect(chat.respond({ threadId: 'levels', messages: [user], instructions: '도움말' }))
+    expect(events.at(-1)).toMatchObject({ type: EventType.RUN_FINISHED })
+    expect(requests).toHaveLength(1)
+    if (provider.key === 'OPENAI_API_KEY') expect(requests[0]!.reasoning).toEqual({ effort: reasoning, summary: 'auto' })
+    if (provider.key === 'GEMINI_API_KEY') expect(requests[0]!.generationConfig).toMatchObject({ thinkingConfig: { thinkingLevel: reasoning.toUpperCase(), includeThoughts: true } })
+    if (provider.key === 'ANTHROPIC_API_KEY') expect(requests[0]!.thinking).toEqual({ type: 'enabled', budget_tokens: { low: 1024, medium: 2048, high: 3072 }[reasoning] })
+  }
 })

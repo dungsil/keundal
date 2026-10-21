@@ -617,3 +617,23 @@ test('큰 SSE 이벤트는 직렬화 전에 거부하고 오류 이벤트만 전
   expect(events).toEqual([{ type: EventType.RUN_ERROR, message: 'stream byte limit exceeded' }])
   expect(closed).toBe(true)
 })
+
+test.for(['low', 'medium', 'high'])('%s 추론 수준 헤더를 실행 옵션으로 전달한다', async (reasoning, t) => {
+  const { services, requestText } = await setup(t)
+  const run = services.run
+  let received: unknown
+  services.run = (input, options) => {
+    received = options
+    return run(input, options)
+  }
+  const response = await requestText('POST', '/runs', input, { 'x-keundal-reasoning': reasoning })
+  expect(response.status).toBe(200)
+  expect(received).toMatchObject({ reasoning })
+})
+
+test('잘못된 추론 수준을 실행 전에 400으로 거부한다', async (t) => {
+  const fixture = await setup(t)
+  const response = await fixture.requestJson('POST', '/runs', input, { 'x-keundal-reasoning': 'invalid' })
+  expect(response.status).toBe(400)
+  expect(fixture.agentCalls).toBe(0)
+})

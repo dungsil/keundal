@@ -1,5 +1,5 @@
 import type { Content, FunctionDeclaration, FunctionResponsePart, Part, Tool } from '@google/genai'
-import { parseRunAgentInput, type AgentMessage, type AgentTool, type LLMRequest } from '@keundal/core'
+import { parseReasoning, parseRunAgentInput, type AgentMessage, type AgentTool, type LLMRequest } from '@keundal/core'
 
 type AssistantMessage = Extract<AgentMessage, { role: 'assistant' }>
 type ToolMessage = Extract<AgentMessage, { role: 'tool' }>
@@ -149,7 +149,10 @@ interface ConvertedConversation {
 }
 
 function convertConversation(request: LLMRequest): ConvertedConversation {
-  for (const key of ['webSearch', 'reasoning'] as const) {
+  parseReasoning(request.reasoning)
+  if (request.reasoning === 'medium' && request.model.startsWith('gemini-3') && !request.model.includes('flash'))
+    throw new Error('This Gemini model supports low and high reasoning levels')
+  for (const key of ['webSearch'] as const) {
     if (request[key] !== undefined && typeof request[key] !== 'boolean') throw new Error(`${key} must be a boolean`)
   }
   if (request.reasoning && request.maxOutputTokens < 2)

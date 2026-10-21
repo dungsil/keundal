@@ -125,18 +125,35 @@ export class GeminiLLMService extends LLMService {
           ...(tools ? { tools } : {}),
           maxOutputTokens: request.maxOutputTokens,
           thinkingConfig: {
-            includeThoughts: request.reasoning ?? true,
+            includeThoughts: request.reasoning !== false,
             ...(request.reasoning === undefined
               ? {}
               : request.model.startsWith('gemini-3')
                 ? {
                     thinkingLevel: request.reasoning
-                      ? ThinkingLevel.HIGH
+                      ? request.reasoning === 'low'
+                        ? ThinkingLevel.LOW
+                        : request.reasoning === 'medium'
+                          ? ThinkingLevel.MEDIUM
+                          : ThinkingLevel.HIGH
                       : request.model.includes('flash')
                         ? ThinkingLevel.MINIMAL
                         : ThinkingLevel.LOW
                   }
-                : { thinkingBudget: request.reasoning ? Math.min(24576, Math.floor(request.maxOutputTokens / 2)) : 0 })
+                : {
+                    thinkingBudget: request.reasoning
+                      ? Math.min(
+                          24576,
+                          Math.max(
+                            1,
+                            Math.floor(
+                              request.maxOutputTokens *
+                                (request.reasoning === 'low' ? 0.25 : request.reasoning === 'high' ? 0.75 : 0.5)
+                            )
+                          )
+                        )
+                      : 0
+                  })
           },
           abortSignal: signal
         }

@@ -2,6 +2,7 @@ import agentPlugin, { type AgentConfig } from '@keundal/agent'
 import { loadAgentPlugin, type AgentPluginOptions, type LoadedAgentPlugin } from '@keundal/agent-plugins'
 import {
   EventType,
+  parseReasoning,
   type AGUIEvent,
   type AgentMessage,
   type ExecutionOptions,
@@ -44,6 +45,7 @@ export interface AgentHostOptions {
 }
 
 export interface AgentHostRunOptions extends ExecutionOptions {
+  readonly reasoning?: AgentConfig['reasoning']
   readonly model?: string
 }
 
@@ -146,8 +148,9 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
     return value
   }
 
-  const agent = async (id: string): Promise<Fiber> => {
-    const existing = agents.get(id)
+  const agent = async (id: string, reasoning?: AgentConfig['reasoning']): Promise<Fiber> => {
+    const key = JSON.stringify([id, reasoning])
+    const existing = agents.get(key)
     if (existing) return existing
     const created = (async () => {
       const selected = model(id)
@@ -162,6 +165,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
       const isolated = ctx.isolate('agent')
       return isolated.plugin(agentPlugin, {
         model: selected.id,
+        reasoning,
         maxOutputTokens,
         skills: plugins.length > 0,
         maxToolRounds: options.maxToolRounds ?? 4,
@@ -196,8 +200,8 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         }
       })
     })()
-    agents.set(id, created)
-    created.catch(() => agents.delete(id))
+    agents.set(key, created)
+    created.catch(() => agents.delete(key))
     return created
   }
 
@@ -226,9 +230,13 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
     const services: AgentHostServices = {
       run(input, runOptions = {}) {
         const selected = model(runOptions.model)
-        const { model: _model, ...execution } = runOptions
+        const { model: _model, reasoning: rawReasoning, ...execution } = runOptions
+        const reasoning = parseReasoning(rawReasoning)
         const iterator = (async function* () {
-          const fiber = await agent(selected.id)
+          const fiber = await agent(
+            selected.id,
+            options.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(selected.id) ? undefined : reasoning
+          )
           yield* fiber.ctx.agent.run(input, execution)
         })()
         return iterator

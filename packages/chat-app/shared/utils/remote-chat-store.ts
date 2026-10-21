@@ -1,5 +1,5 @@
+import { type Reasoning, EventType, type AGUIEvent, type GenerationSnapshot, type SessionSnapshot } from '@keundal/core'
 import { ChatMessagePublisher } from './chat-message-publisher'
-import { EventType, type AGUIEvent, type GenerationSnapshot, type SessionSnapshot } from '@keundal/core'
 import { ChatMessageAssembly } from './chat-message'
 import type { ChatMessage } from './chat-message'
 import type { ChatStoreLike, LocalChat } from './chat-store'
@@ -207,7 +207,7 @@ export class RemoteChatStore implements ChatStoreLike {
     messages: ChatMessage[]
     model: string
     titleModel?: string
-    reasoning?: boolean
+    reasoning?: Reasoning
     webSearch?: boolean
     onMessage?: (message: ChatMessage) => void
     onTitle?: (title: string) => void
@@ -244,7 +244,7 @@ export class RemoteChatStore implements ChatStoreLike {
       try {
         const response = await this.call('/runs', {
           method: 'POST',
-          headers: { 'x-keundal-model': selected.id },
+          headers: { 'x-keundal-model': selected.id, ...(request.reasoning === undefined ? {} : { 'x-keundal-reasoning': String(request.reasoning) }) },
           signal: combined,
           body: JSON.stringify({
             threadId: id,
