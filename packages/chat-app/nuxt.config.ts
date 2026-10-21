@@ -14,5 +14,20 @@ export default defineNuxtConfig({
   },
   compatibilityDate: '2026-06-30',
   vite: { optimizeDeps: { include: ['striptags'] } },
-  eslint: { config: { stylistic: { commaDangle: 'never', braceStyle: '1tbs' } } }
+  eslint: { config: { stylistic: { commaDangle: 'never', braceStyle: '1tbs' } } },
+  icon: {
+    provider: 'none',
+    clientBundle: {
+      scan: { globInclude: ['**/*.{vue,ts}'] },
+      icons: [
+        'lucide:cloud',
+        'lucide:cloud-fog',
+        'lucide:cloud-rain',
+        'lucide:image',
+        'simple-icons:anthropic',
+        'simple-icons:google',
+        'simple-icons:openai'
+      ]
+    }
+  }
 })

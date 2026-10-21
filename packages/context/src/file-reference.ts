@@ -1,8 +1,6 @@
 import { Service } from 'cordis'
 import type { Context } from 'cordis'
 
-import { appendContext, type ContextProvider } from './types.js'
-
 /** One path-only file or directory completion candidate. */
 export interface FileReferenceCandidate {
   readonly path: string
@@ -51,19 +49,5 @@ export abstract class FileReferenceService extends Service {
 declare module 'cordis' {
   interface Context {
     readonly fileReferences: FileReferenceService
-  }
-}
-
-/** Stable model guidance for interpreting ordinary @file prompt text. */
-export const FILE_REFERENCE_PROMPT =
-  'Tokens prefixed with @ are paths the user explicitly referenced. Relative paths resolve from the workspace root; absolute paths identify files or directories on the host. A trailing slash marks a directory: list it when its contents matter. Anything else is a file: use the read tool when its contents are needed, and do not claim to have inspected it before reading. @"..." quotes a path containing spaces.'
-
-/** Add file-reference guidance only when the current request exposes a read tool. */
-export function createFileReferenceContext(references?: { invalidate(): void }): ContextProvider {
-  return (input, options) => {
-    options.signal?.throwIfAborted()
-    if (options.step > 1) references?.invalidate()
-    if (!input.tools.some((tool) => tool.name === 'read' || tool.name === 'read_file')) return input
-    return appendContext(input, 'file-reference:guidance', FILE_REFERENCE_PROMPT)
   }
 }

@@ -8,8 +8,11 @@
 | `@keundal/chat-app`                    | web과 desktop이 공유하는 채팅 화면과 실행 코드를 Nuxt 레이어로 제공합니다. |
 | `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.     |
 | `@keundal/agent-host`                  | 주입받은 LLM·저장소·에이전트로 호스트와 HTTP 계층에 서비스를 제공합니다.   |
-| `@keundal/agent`                       | 에이전트 계약의 기본 실행 루프를 구현합니다.                               |
-| `@keundal/coding-agent`                | 에이전트 구현 계약을 확장한 코딩 작업용 에이전트입니다.                    |
+| `@keundal/agent`                       | 교체 가능한 에이전트 서비스 계약을 제공합니다.                             |
+| `@keundal/agent-loop`                  | 공통 실행 루프와 축약·도구 반복 설정을 제공합니다.                         |
+| `@keundal/plugin-agent-chat`           | 공통 루프로 대화 에이전트를 등록합니다.                                    |
+| `@keundal/plugin-agent-coding`         | 공통 루프에 코딩 지침을 적용하여 에이전트를 등록합니다.                    |
+| `@keundal/tools`                       | 에이전트와 도구 공급자가 공유하는 실행 계약을 제공합니다.                  |
 | `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                                 |
 | `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                           |
 | `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                               |
@@ -26,7 +29,7 @@
 `ShellService`는 `@keundal/shell`에, `TranscriptionService`는 `@keundal/transcription`에 둡니다.
 교체 가능한 서비스의 계약은 구현과 분리합니다. 소비자는 계약에 의존하고 앱에서 구현을 조립합니다.
 
-플러그인 설정과 사용법은 [에이전트 문서](packages/agent/README.md), [코딩 에이전트 문서](packages/coding-agent/README.md), [OpenAI 문서](packages/plugin-llm-openai/README.md), [Gemini 문서](packages/plugin-llm-gemini/README.md), [Anthropic 문서](packages/plugin-llm-anthropic/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [축약 문서](packages/compaction/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
+플러그인 설정과 사용법은 [공통 루프 문서](packages/agent-loop/README.md), [대화 에이전트 문서](packages/plugin-agent-chat/README.md), [코딩 에이전트 문서](packages/plugin-agent-coding/README.md), [OpenAI 문서](packages/plugin-llm-openai/README.md), [Gemini 문서](packages/plugin-llm-gemini/README.md), [Anthropic 문서](packages/plugin-llm-anthropic/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [축약 문서](packages/compaction/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
 
 ## 앱 의존성 경계
 
@@ -47,7 +50,7 @@
 
 ## 에이전트 조합
 
-`@keundal/agent`는 `@keundal/agent-contract`의 계약을 구현하는 기본 실행 루프를 제공합니다. `agentPlugin`은 `llm`, `session`, `generation`을 주입받고 `@keundal/compaction`의 축약 함수를 직접 호출합니다. 축약 설정은 에이전트의 `compaction` 옵션으로 전달합니다. `ctx.agent.run(input, { signal })`은 AG-UI `RunAgentInput`을 받아 `AsyncIterable<AGUIEvent>`를 반환합니다.
+`@keundal/agent`는 `AgentService`와 `ctx.agent`의 계약만 제공합니다. `@keundal/agent-loop`는 공통 루프와 `AgentConfig`를 소유하며 `@keundal/compaction`을 직접 호출합니다. `@keundal/plugin-agent-chat`은 `llm`, `session`, `generation`을 주입받아 이 루프를 등록합니다. 축약 설정은 `compaction` 옵션으로 전달합니다. `ctx.agent.run(input, { signal })`은 AG-UI `RunAgentInput`을 받아 `AsyncIterable<AGUIEvent>`를 반환합니다.
 
 세션 입력을 준비한 뒤 컨텍스트 한도에서 출력 예산과 `reserveTokens`를 뺀 크기와 입력 크기를 비교합니다. `threshold`에 도달하면 백그라운드에서 축약을 준비하고, 예산을 넘으면 준비 결과를 기다리거나 동기 축약합니다. 준비 결과는 원본 메시지와 메타데이터가 일치할 때만 적용하고 추가 메시지를 보존하며 최신 토큰 수를 검사합니다. `compaction.models`로 모델별 정책을 재정의하고 `keepRecentTokens`로 최근 대화의 최소 보존 토큰 수를 지정합니다. 공급자의 컨텍스트 초과 오류는 해당 모델 요청의 첫 응답 이벤트 전에만 축약 후 한 번 재시도하며, 부분 응답과 완료된 도구는 다시 실행하지 않습니다. 축약 후에도 예산을 넘으면 생성을 시작하지 않습니다. 준비된 입력·revision·축약 결과는 `generation.run()`에 전달하고, 반환된 이벤트를 그대로 전달합니다. 준비 오류는 순회 중 예외로 전달합니다.
 
@@ -55,7 +58,7 @@
 
 플러그인 해제와 순회 중단은 준비·생성 작업을 취소합니다. 주입된 서비스를 교체하면 Cordis가 조합 플러그인의 수명을 갱신하며, 서비스별 격리는 `ctx.isolate('llm')`을 사용합니다.
 
-다른 에이전트 구현은 `Agent`를 상속하고 `registerAgent()`에 구현 클래스를 넘깁니다. `@keundal/coding-agent`는 `Agent`를 상속해 코딩 작업용 시스템 지침을 넣고, `registerAgent()`로 같은 `ctx.agent` 서비스를 구성합니다. 도구 등록은 앱이 담당하며 이 패키지는 도구를 직접 등록하지 않습니다.
+공통 루프를 재사용하는 구현은 `@keundal/agent-loop`의 `Agent`를 상속하고 `registerAgent()`에 구현 클래스를 넘깁니다. `@keundal/plugin-agent-coding`도 이 방식으로 같은 `ctx.agent`를 구성하며 대화 플러그인에는 의존하지 않습니다. 독립적인 구현은 `@keundal/agent`의 `AgentService`를 직접 구현합니다. 도구 계약은 `@keundal/tools`에 두고, 앱이 도구 공급자를 선택합니다.
 
 ## 앱의 호스트 실행
 

@@ -141,7 +141,14 @@ async function setup(
     for (const fiber of fibers.toReversed()) await fiber.dispose()
     store.close()
   })
-  return { ctx, fibers, store, calls: () => calls, methodCalls }
+  return {
+    ctx,
+    fibers,
+    store,
+    calls: () => calls,
+    methodCalls,
+    replaceLLM: async () => fibers.push(await ctx.plugin(LLM))
+  }
 }
 
 async function eventually<T>(value: () => Promise<T | undefined>): Promise<T> {
@@ -152,6 +159,73 @@ async function eventually<T>(value: () => Promise<T | undefined>): Promise<T> {
   }
   throw new Error('condition was not reached')
 }
+
+test('LLM 교체 중에도 기존 세션을 사용하고 교체 뒤 완료 기록과 revision을 이어간다', async (t) => {
+  const { ctx, fibers, replaceLLM } = await setup(t, [
+    { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' },
+    { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'reply', delta: 'hello' },
+    { type: EventType.TEXT_MESSAGE_END, messageId: 'reply' }
+  ])
+  const events = await Array.fromAsync(ctx.generation.run(request('first')))
+  const session = ctx.session
+  const saved = await session.get('thread')
+  const run = await ctx.generation.get('first')
+
+  await fibers[0]!.dispose()
+  expect(await session.get('thread')).toEqual(saved)
+  expect(await ctx.session.get('thread')).toEqual(saved)
+  expect(ctx.generation).toBeUndefined()
+  await replaceLLM()
+
+  expect(await ctx.generation.get('first')).toEqual(run)
+  expect(run?.journal.map((entry) => entry.event)).toEqual(events)
+  await Array.fromAsync(
+    ctx.generation.run(request('second', 1), {
+      stream: async function* () {
+        yield { type: EventType.TEXT_MESSAGE_START, messageId: 'next', role: 'assistant' }
+        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'next', delta: 'continued' }
+        yield { type: EventType.TEXT_MESSAGE_END, messageId: 'next' }
+      }
+    })
+  )
+  expect(await session.get('thread')).toMatchObject({
+    revision: 2,
+    messages: [
+      { id: 'reply', content: 'hello' },
+      { id: 'next', content: 'continued' }
+    ]
+  })
+})
+
+test('플러그인이 소유한 저장소도 해제 전에 부분 journal을 확정한다', async (t) => {
+  const { ctx, fibers } = await setup(t)
+  await fibers.pop()!.dispose()
+  const options = {
+    databaseName: `owned-${globalThis.crypto.randomUUID()}`,
+    indexedDB: new IDBFactory(),
+    locks: new Locks()
+  }
+  const plugin = await ctx.plugin(indexedDBStorePlugin, options)
+  fibers.push(plugin)
+  const iterator = ctx.generation
+    .run(request(), {
+      stream: async function* () {
+        yield { type: EventType.TEXT_MESSAGE_START, messageId: 'partial', role: 'assistant' }
+        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'partial', delta: 'preserved' }
+      }
+    })
+    [Symbol.asyncIterator]()
+  const delivered: AGUIEvent[] = []
+  for (let index = 0; index < 3; index++) delivered.push((await iterator.next()).value!)
+  await plugin.dispose()
+
+  const reopened = await setup(t, [], new IndexedDBStore(options))
+  const [recovered] = await reopened.ctx.generation.recover()
+  expect(recovered?.status).toBe('interrupted')
+  expect(recovered?.messages).toEqual([{ id: 'partial', role: 'assistant', content: 'preserved' }])
+  expect(recovered?.journal.map(({ event }) => event)).toEqual(delivered)
+  expect(reopened.calls()).toBe(0)
+})
 
 test('이벤트를 journal에 접두사로 저장하고 완료 커밋 뒤 RUN_FINISHED를 전달한다', async (t) => {
   const { ctx } = await setup(t, [

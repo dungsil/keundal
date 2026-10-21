@@ -1,6 +1,6 @@
-import { providerCredentials, providerError, type LLMSettings } from '@keundal/chat/llm-settings'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
 import { LLMService, type LLMRequest, type ExecutionOptions, type LLMEvent } from '@keundal/core'
+import { providerCredentials, providerError, type LLMSettings } from '@keundal/llm-settings'
 import { Context, type Fiber } from 'cordis'
 
 const plugins = {

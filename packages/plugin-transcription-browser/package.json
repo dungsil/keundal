@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@keundal/chat": "workspace:*",
+    "@keundal/llm-settings": "workspace:*",
     "@keundal/plugin-transcription-openai": "workspace:*",
     "cordis": "catalog:"
   },

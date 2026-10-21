@@ -1,5 +1,5 @@
-import { providerCredentials, providerError } from '@keundal/chat/llm-settings'
 import type { ChatPlatform } from '@keundal/chat/platform'
+import { providerCredentials, providerError } from '@keundal/llm-settings'
 import { encodeRealtimeAudio, streamTranscription } from '@keundal/plugin-transcription-openai/client'
 import { Context } from 'cordis'
 

@@ -12,7 +12,7 @@ import type { ChatMessage } from '@keundal/chat/chat-message'
 import { expect, onTestFinished, test } from 'vitest'
 import { ChatStore } from '@keundal/plugin-chat-local'
 import { browserLLMPlugin } from '@keundal/plugin-llm-browser'
-import { defaultLLMSettings } from '@keundal/chat/llm-settings'
+import { defaultLLMSettings } from '@keundal/llm-settings'
 import { useKeundalChat } from '../app/composables/useKeundalChat'
 
 const model = 'openai/gpt-5-nano'

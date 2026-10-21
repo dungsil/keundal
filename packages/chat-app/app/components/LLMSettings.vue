@@ -7,7 +7,7 @@ import {
   registeredProviders,
   providerSettingsSchema,
   type LLMProvider
-} from '@keundal/chat/llm-settings'
+} from '@keundal/llm-settings'
 
 const { t } = useLocale()
 

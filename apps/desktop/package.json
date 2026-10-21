@@ -25,6 +25,8 @@
     "nuxt": "^4.6.2",
     "@keundal/agent-runtime-node": "workspace:*",
     "@keundal/chat": "workspace:*",
+    "@keundal/plugin-tool-chat": "workspace:*",
+    "@keundal/llm-settings": "workspace:*",
     "@keundal/plugin-chat-desktop": "workspace:*",
     "@keundal/plugin-llm-browser": "workspace:*",
     "@tauri-apps/api": "2.12.4",

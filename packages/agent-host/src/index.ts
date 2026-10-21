@@ -1,4 +1,4 @@
-import { EventType, type AgentMessage, type RunAgentInput } from '@keundal/core'
+import { parseReasoning, type Reasoning, EventType, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import { Context, type Fiber } from 'cordis'
 
 import type { AgentHostOptions, AgentHost, AgentHostModel, AgentHostServices } from './contracts.js'
@@ -54,9 +54,10 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
     return value
   }
 
-  const agent = async (id: string): Promise<MountedAgent> => {
+  const agent = async (id: string, reasoning?: Reasoning): Promise<MountedAgent> => {
     if (closed) throw new Error('agent host disposed')
-    const existing = agents.get(id)
+    const key = JSON.stringify([id, reasoning])
+    const existing = agents.get(key)
     if (existing) return existing
     const created = (async () => {
       const selected = model(id)
@@ -72,9 +73,8 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
       const owned = isolated.plugin(async (child: Context) => {
         await options.mountAgent(child, {
           model: selected.id,
-          maxOutputTokens,
-          tools: options.tools,
-          maxToolRounds: options.maxToolRounds ?? 4
+          reasoning,
+          maxOutputTokens
         })
       })
       try {
@@ -85,8 +85,8 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         throw error
       }
     })()
-    agents.set(id, created)
-    created.catch(() => agents.delete(id))
+    agents.set(key, created)
+    created.catch(() => agents.delete(key))
     return created
   }
 
@@ -103,9 +103,10 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
     const services: AgentHostServices = {
       run(input, runOptions = {}) {
         const selected = model(runOptions.model)
-        const { model: _model, ...execution } = runOptions
+        const { model: _model, reasoning: rawReasoning, ...execution } = runOptions
+        const reasoning = parseReasoning(rawReasoning)
         const iterator = (async function* () {
-          const fiber = await agent(selected.id)
+          const fiber = await agent(selected.id, reasoning)
           yield* fiber.ctx.agent.run(input, execution)
         })()
         return iterator

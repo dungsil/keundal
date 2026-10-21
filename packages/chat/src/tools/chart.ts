@@ -4,10 +4,10 @@ import type { ToolInvocation } from '../chat-message'
 
 export type ChartUIToolInvocation = ToolInvocation<{
   input: z.infer<typeof chartSchema>
-  output: Awaited<ReturnType<typeof chartTool.execute>>
+  output: z.infer<typeof chartSchema>
 }>
 
-const chartSchema = z.object({
+export const chartSchema = z.object({
   title: z.string().optional().describe('Title of the chart'),
   data: z
     .array(z.record(z.string(), z.union([z.string(), z.number()])))
@@ -30,21 +30,4 @@ const chartSchema = z.object({
   yLabel: z.string().optional().describe('Optional label for y-axis')
 })
 
-export const chartTool = {
-  description:
-    'Create a line chart visualization with one or multiple data series. Use this tool to display time-series data, trends, or comparisons between different metrics over time.',
-  inputSchema: chartSchema,
-  execute: async ({ title, data, xKey, series, xLabel, yLabel }: z.infer<typeof chartSchema>) => {
-    // Create a delay to simulate the input-available state
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    return {
-      title,
-      data,
-      xKey,
-      series,
-      xLabel,
-      yLabel
-    }
-  }
-}
+export const chartOutputSchema = chartSchema

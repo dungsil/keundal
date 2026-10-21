@@ -1,15 +1,17 @@
-import type { AgentConfig } from '@keundal/agent-contract'
+import type { AgentConfig } from '@keundal/agent-loop'
+import '@keundal/agent'
 import { ChatMessageAssembly, type ChatMessage } from '@keundal/chat/chat-message'
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
 import { validateChatTitle } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
-import { EventType, type AGUIEvent, type AgentMessage } from '@keundal/core'
+import { type Reasoning, EventType, type AGUIEvent, type AgentMessage } from '@keundal/core'
 import type { Fiber } from 'cordis'
 import type { Context } from 'cordis'
 export { toMessages } from '@keundal/chat/messages'
 import { resolveModel } from '@keundal/chat/models'
 
 const randomUUID = () => globalThis.crypto.randomUUID()
+export type MountAgent = (ctx: Context, config: AgentConfig) => Promise<Fiber>
 const input = (
   messages: AgentMessage[],
   threadId: string = randomUUID(),
@@ -20,8 +22,8 @@ const input = (
 export async function createKeundalChat(
   context: Context,
   name: string,
-  options: { webSearch?: boolean; reasoning?: boolean; maxOutputTokens?: number },
-  mountAgent: (ctx: Context, config: AgentConfig) => Promise<Fiber>
+  options: { webSearch?: boolean; reasoning?: Reasoning; maxOutputTokens?: number },
+  mountAgent: MountAgent
 ) {
   const config = resolveModel(name)
   const maxOutputTokens = options.maxOutputTokens ?? 4096
@@ -32,7 +34,7 @@ export async function createKeundalChat(
       maxOutputTokens,
       webSearch: !!options.webSearch && config.provider !== 'google',
       reasoning:
-        options.reasoning === false && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id)
+        options.reasoning !== undefined && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id)
           ? undefined
           : options.reasoning,
       maxToolRounds: 4,

@@ -4,7 +4,7 @@ import { listGeminiModels } from '@keundal/plugin-llm-gemini'
 import { listOpenAIModels } from '@keundal/plugin-llm-openai'
 import { expect, test, onTestFinished, vi } from 'vitest'
 import { loadModels, MODEL_CACHE_TTL } from '@keundal/plugin-llm-browser/models'
-import { defaultLLMSettings } from '@keundal/chat/llm-settings'
+import { defaultLLMSettings } from '@keundal/llm-settings'
 
 async function fixture(handler: (req: IncomingMessage, res: ServerResponse) => void) {
   const requests: IncomingMessage[] = []

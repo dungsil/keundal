@@ -1,4 +1,4 @@
-import { defaultLLMSettings, configuredProviders, providerCredentials } from '@keundal/chat/llm-settings'
+import { defaultLLMSettings, configuredProviders, providerCredentials } from '@keundal/llm-settings'
 
 export function useLLMSettings() {
   // The client plugin owns one shared ref; SSR only receives empty defaults.

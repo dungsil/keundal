@@ -1,5 +1,5 @@
-import type { ExecutableTool } from '@keundal/agent-contract'
 import type { ShellRequest } from '@keundal/shell'
+import type { ExecutableTool } from '@keundal/tools'
 import { Service, type Context } from 'cordis'
 
 declare module 'cordis' {

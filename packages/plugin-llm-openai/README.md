@@ -77,6 +77,7 @@ try {
 
 - `LLMRequest.webSearch: true`는 함수 도구와 함께 네이티브 `{ type: 'web_search' }` 도구를 등록합니다. false/생략은 등록하지 않습니다. 검색 호출은 로컬 실행용 `TOOL_CALL_*`로 내보내지 않습니다.
 - `reasoning: true`는 `{ effort: 'medium', summary: 'auto' }`를 전송합니다. false는 GPT-5/mini/nano(날짜 snapshot 포함)에 `minimal`(검색 시 `low`), 그 외 모델에는 `none`을 전송하고 요약을 요청하지 않습니다. 초기 GPT-5 계열은 추론을 완전히 끌 수 없습니다. 생략하면 공급자 기본값을 유지합니다. 추론 토큰도 기존 `max_output_tokens` 예산 안에서 사용하며, 모델이 해당 옵션과 검색을 지원해야 합니다. 지원하지 않는 모델의 API 오류는 그대로 전달합니다. 토큰 계산에도 같은 도구·추론 설정을 사용합니다.
+- `reasoning`에 `low`, `medium`, `high`를 지정하면 해당 값을 `effort`로 전달하고 `summary: 'auto'`를 요청합니다.
 - URL 인용은 `{ type: 'CUSTOM', name: 'keundal.source', value: { id, url, title? } }`로 전달하며 `id`는 URL입니다. 같은 URL이 여러 번 인용되면 이벤트도 반복될 수 있습니다.
 - 네이티브 문맥은 `TEXT_MESSAGE_END.metadata['openai.outputItems']`에 **SDK의 완료된 출력 항목 배열**로 보존합니다. 각 검색 전용 어시스턴트 호스트에는 `[ResponseFunctionWebSearch]`(원래 `id`, `status`, `action` 포함), 인용 텍스트 호스트에는 `[ResponseOutputMessage]`(원래 `phase`, `content[].annotations` 포함)를 담습니다. 후속 변환은 이 배열을 텍스트 대신 재생하고 로컬 함수 호출을 뒤에 추가합니다. 메시지 순서와 메타데이터를 수정하지 말고 보존해야 검색·텍스트·추론·함수 호출 순서가 유지됩니다. 추론 암호화 값은 기존 `reasoning.encryptedValue`에 따로 유지합니다.
 - 시스템·개발자·사용자·어시스턴트 메시지, 함수 호출과 결과, 추론 메시지를 변환합니다. 사용자 입력은 텍스트와 이미지 URL·base64·파일 ID를 지원합니다. 문서·음성·동영상 입력과 `activity` 메시지는 오류로 알립니다.
@@ -85,7 +86,7 @@ try {
 - 추론 항목의 최종 암호화 값은 `REASONING_ENCRYPTED_VALUE`로 전달합니다. 후속 요청을 구성하는 쪽에서 해당 `reasoning` 메시지의 `id`, `content`, `encryptedValue`를 보존해야 합니다.
 - 어시스턴트 메시지의 `phase`는 시작·종료 이벤트의 `metadata['openai.phase']`로 전달합니다. 저장된 메시지에도 이 메타데이터를 유지하면 후속 요청에서 복원합니다.
 
-요청에는 `store: false`와 `truncation: 'disabled'`를 지정합니다. 대화와 문맥 축약은 Keundal 측에서 관리합니다. `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`는 생성하지 않으며, journal·커밋·복구도 수행하지 않습니다. 전체 에이전트를 실행하려면 저장소 플러그인과 `@keundal/agent`을 함께 등록합니다.
+요청에는 `store: false`와 `truncation: 'disabled'`를 지정합니다. 대화와 문맥 축약은 Keundal 측에서 관리합니다. `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`는 생성하지 않으며, journal·커밋·복구도 수행하지 않습니다. 전체 에이전트를 실행하려면 저장소 플러그인과 `@keundal/plugin-agent-chat`을 함께 등록합니다.
 
 모델 목록 조회는 응답 한 페이지를 1 MiB, 전체 응답을 8 MiB와 32페이지로 제한합니다.
 중복되거나 필터에서 제외되는 항목을 포함하여 최대 4,096개를 처리하며, 모델 식별자와 표시 이름은

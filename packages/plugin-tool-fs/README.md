@@ -4,7 +4,7 @@
 파일 접근과 권한 검사는 각각 공급자와 정책에 맡깁니다. 이 패키지는 Node.js 파일 API를 가져오지 않습니다.
 
 ```ts
-import agent from '@keundal/agent'
+import agent from '@keundal/plugin-agent-chat'
 import localFileSystemPlugin from '@keundal/plugin-fs-local'
 import fileSystemPolicyPlugin from '@keundal/plugin-fs-policy'
 import fileSystemToolsPlugin from '@keundal/plugin-tool-fs'

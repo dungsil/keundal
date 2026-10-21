@@ -1,0 +1,34 @@
+{
+  "name": "@keundal/agent-loop",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@keundal/agent": "workspace:*",
+    "@keundal/compaction": "workspace:*",
+    "@keundal/context": "workspace:*",
+    "@keundal/core": "workspace:*",
+    "@keundal/tools": "workspace:*",
+    "@standard-schema/spec": "catalog:",
+    "cordis": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/tsconfig": "workspace:*",
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  }
+}

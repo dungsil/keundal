@@ -13,21 +13,13 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
-    "test": "vitest run"
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@keundal/agent-contract": "workspace:*",
-    "@keundal/compaction": "workspace:*",
-    "@keundal/context": "workspace:*",
     "@keundal/core": "workspace:*",
-    "@standard-schema/spec": "catalog:",
     "cordis": "catalog:"
   },
   "devDependencies": {
-    "@keundal/plugin-skill": "workspace:*",
-    "@keundal/plugin-skill-filesystem": "workspace:*",
-    "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",

@@ -6,7 +6,7 @@ import type {
   TextBlockParam,
   ToolUnion
 } from '@anthropic-ai/sdk/resources/messages'
-import { parseRunAgentInput, type AgentMessage, type LLMRequest } from '@keundal/core'
+import { parseReasoning, parseRunAgentInput, type AgentMessage, type LLMRequest } from '@keundal/core'
 
 type UserContent = Exclude<Extract<AgentMessage, { role: 'user' }>['content'], string>[number]
 type ConvertedMessage = { role: 'user' | 'assistant'; content: ContentBlockParam[] }
@@ -104,7 +104,8 @@ function validateToolResults(messages: ConvertedMessage[]): void {
 export function createInput(
   request: LLMRequest
 ): Pick<MessageCountTokensParams, 'model' | 'messages' | 'system' | 'tools' | 'thinking'> {
-  for (const key of ['webSearch', 'reasoning'] as const) {
+  parseReasoning(request.reasoning)
+  for (const key of ['webSearch'] as const) {
     if (request[key] !== undefined && typeof request[key] !== 'boolean') throw new Error(`${key} must be a boolean`)
   }
   if (request.reasoning && request.maxOutputTokens <= 1024)
@@ -200,7 +201,16 @@ export function createInput(
           thinking: request.reasoning
             ? {
                 type: 'enabled' as const,
-                budget_tokens: Math.min(10000, Math.max(1024, Math.floor(request.maxOutputTokens / 2)))
+                budget_tokens: Math.min(
+                  10000,
+                  Math.max(
+                    1024,
+                    Math.floor(
+                      request.maxOutputTokens *
+                        (request.reasoning === 'low' ? 0.25 : request.reasoning === 'high' ? 0.75 : 0.5)
+                    )
+                  )
+                )
               }
             : { type: 'disabled' as const }
         }),
