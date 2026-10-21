@@ -1,14 +1,11 @@
-import type { AgentConfig } from '@keundal/agent-contract'
 import type { SkillProvider } from '@keundal/core'
-import type { Context, Fiber } from 'cordis'
+import type { LLMSettings } from '@keundal/llm-settings'
 
 import type { ChatStoreLike } from './chat-store'
-import type { LLMSettings } from './llm-settings'
 import type { ModelOption } from './models'
-import type { SkillFileSource } from './skills'
+import type { SkillManager } from './skills'
 
 export type NativeInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>
-export type MountAgent = (ctx: Context, config: AgentConfig) => Promise<Fiber>
 export const LLM_SETTINGS_KEY = 'keundal:llm-settings'
 export interface SettingsStorage {
   load(): Promise<LLMSettings>
@@ -46,13 +43,13 @@ export interface TranscriptionStream {
 }
 export interface ChatPlatform {
   mcp: {
-    readonly configuration: import('@keundal/mcp/browser').McpClientConfig[]
+    readonly configuration: import('@keundal/mcp').McpClientConfig[]
     load(): Promise<void>
     save(value: unknown, restart: () => Promise<void>): Promise<void>
     close(): Promise<void>
   }
   settings: SettingsStorage
-  skillFiles?: SkillFileSource
+  skills: SkillManager
   loadModels: ModelLoader
   connect(options: ChatConnectionOptions): Promise<ChatConnection>
   transcription: {

@@ -3,7 +3,6 @@ import { resolveModel } from './models'
 export const MODEL_KEY = 'keundal:model'
 export const TITLE_MODEL_KEY = 'keundal:title-model'
 export const DEFAULT_MODEL_KEY = 'keundal:default-model'
-export const FALLBACK_MODEL = 'anthropic/claude-haiku-4-5'
 
 export function readModelPreference(storage: Pick<Storage, 'getItem'>, key: string) {
   try {

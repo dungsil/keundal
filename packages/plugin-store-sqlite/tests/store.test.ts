@@ -161,7 +161,7 @@ async function setup(t: TestContext, script: Script, path = databasePath(t)) {
     for (const fiber of fibers.toReversed()) await fiber.dispose()
   })
   fibers.push(await ctx.plugin(LLM), await ctx.plugin(sqliteStorePlugin, { path }))
-  return { ctx, path, calls, held: held.promise, fibers }
+  return { ctx, path, calls, held: held.promise, fibers, replaceLLM: async () => fibers.push(await ctx.plugin(LLM)) }
 }
 
 const request = (runId: string, sessionRevision = 0): GenerationRequest => ({
@@ -169,6 +169,39 @@ const request = (runId: string, sessionRevision = 0): GenerationRequest => ({
   model: 'test-model',
   maxOutputTokens: 20,
   sessionRevision
+})
+
+test('LLM 교체 중에도 기존 세션을 사용하고 교체 뒤 완료 기록과 revision을 이어간다', async (t) => {
+  const { ctx, fibers, replaceLLM } = await setup(t, { events: reply })
+  const events = await collect(ctx.generation.run(request('first')))
+  const session = ctx.session
+  const saved = await session.get('thread')
+  const run = await ctx.generation.get('first')
+
+  await fibers[0]!.dispose()
+  expect(await session.get('thread')).toEqual(saved)
+  expect(await ctx.session.get('thread')).toEqual(saved)
+  expect(ctx.generation).toBeUndefined()
+  await replaceLLM()
+
+  expect(await ctx.generation.get('first')).toEqual(run)
+  expect(run?.journal.map((entry) => entry.event)).toEqual(events)
+  await collect(
+    ctx.generation.run(request('second', 1), {
+      stream: async function* () {
+        yield { type: EventType.TEXT_MESSAGE_START, messageId: 'next', role: 'assistant' }
+        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'next', delta: 'continued' }
+        yield { type: EventType.TEXT_MESSAGE_END, messageId: 'next' }
+      }
+    })
+  )
+  expect(await session.get('thread')).toMatchObject({
+    revision: 2,
+    messages: [
+      { id: 'reply', content: 'hello' },
+      { id: 'next', content: 'continued' }
+    ]
+  })
 })
 
 test('성공한 실행은 커밋 이후에 RUN_FINISHED를 전달하고 실행을 completed로 확정한다', async (t) => {

@@ -3,8 +3,8 @@
 주입받은 `llm`, `session`, `generation`, `agent` 서비스로 실행·제목·대화 API를 제공합니다. LLM SDK, 저장소 공급자, 기본 에이전트 구현에는 의존하지 않습니다.
 
 ```ts
-import agentPlugin from '@keundal/agent'
 import { createAgentHost } from '@keundal/agent-host'
+import agentPlugin from '@keundal/plugin-agent-chat'
 import openaiPlugin from '@keundal/plugin-llm-openai'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 
@@ -21,6 +21,8 @@ const host = await createAgentHost({
 ```
 
 `setup`과 `mountAgent`는 전달받은 컨텍스트에 플러그인을 등록합니다. 초기화 실패, 에이전트 등록 실패, 호스트 종료 시 해당 범위를 정리합니다. `host.services`는 `run`, `session`, `generation`, `models`, `title`을 제공합니다. 모델은 `models`에 등록한 ID만 사용할 수 있습니다.
+
+`mountAgent`는 모델 ID와 출력 예산만 받습니다. 도구와 반복 횟수 같은 구현별 정책은 앱의 조립 함수에서 추가합니다. 호스트는 `AgentConfig`나 공통 루프에 의존하지 않습니다.
 
 `@keundal/agent-host/contracts`는 호스트 계약만 내보냅니다. `@keundal/agent-host/http`의 `createAgentApp(services, { token })`은 인증, 본문 크기 제한, AG-UI SSE를 제공하는 Node.js 요청 리스너입니다.
 

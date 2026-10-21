@@ -17,13 +17,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@keundal/agent-contract": "workspace:*",
     "@keundal/fs": "workspace:*",
+    "@keundal/tools": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {
-    "@keundal/agent": "workspace:*",
     "@keundal/core": "workspace:*",
+    "@keundal/plugin-agent-chat": "workspace:*",
     "@keundal/plugin-fs-local": "workspace:*",
     "@keundal/plugin-fs-policy": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",

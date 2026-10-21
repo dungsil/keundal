@@ -1,6 +1,6 @@
 import { onScopeDispose, ref, watch, type Ref } from 'vue'
 
-import { configuredProviders, type LLMSettings } from '@keundal/chat/llm-settings'
+import { configuredProviders, type LLMSettings } from '@keundal/llm-settings'
 import type { ModelOption } from '@keundal/chat/models'
 import type { ModelLoader } from '@keundal/chat/platform'
 

@@ -39,4 +39,4 @@ const runtime = await createAgentRuntime(process.env, { compose: createNodeCompo
 `createNodeAgentHost({ ...options, subagents: false }, createNodeComposition)`으로 위임을 끌 수 있습니다.
 `maxActiveSubagents`의 기본값은 8이며 부모 실행별 동시 자식 수를 제한합니다.
 `createAgentRuntime(env, { compose: createNodeComposition, subagents: false })`에도 같은 설정을 전달할 수 있습니다.
-자세한 결과 형식과 취소 동작은 [에이전트 문서](../agent/README.md#서브에이전트)를 참고하세요.
+자세한 결과 형식과 취소 동작은 [에이전트 문서](../agent-loop/README.md#서브에이전트)를 참고하세요.

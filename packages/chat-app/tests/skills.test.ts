@@ -6,7 +6,8 @@ import { EventType, LLMService, type LLMEvent, type LLMRequest } from '@keundal/
 import skillPlugin from '@keundal/plugin-skill'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { expect, test, type TestContext } from 'vitest'
-import { SkillManager, SKILL_SETTINGS_KEY } from '@keundal/chat/skills'
+import { SKILL_SETTINGS_KEY } from '@keundal/chat/skills'
+import { SkillManager } from '@keundal/plugin-chat-browser/skills'
 import { createKeundalChat } from '@keundal/plugin-chat-local/keundal'
 
 const review = { name: 'review', description: 'Review code', content: 'Check public behavior.', enabled: true }

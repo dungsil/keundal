@@ -16,7 +16,12 @@ const implementationIndependent = new Set([
   '@keundal/chat-app',
   '@keundal/chat',
   '@keundal/core',
-  '@keundal/agent-contract',
+  '@keundal/agent',
+  '@keundal/agent-loop',
+  '@keundal/tools',
+  '@keundal/context',
+  '@keundal/mcp',
+  '@keundal/llm-settings',
   '@keundal/agent-host',
   '@keundal/fs',
   '@keundal/shell',
@@ -24,7 +29,7 @@ const implementationIndependent = new Set([
 ])
 const isImplementation = (name) =>
   name.startsWith('@keundal/plugin-') ||
-  name === '@keundal/agent' ||
+  name === '@keundal/agent-loop' ||
   name === '@keundal/agent-runtime-node' ||
   name.startsWith('@tauri-apps/')
 
@@ -100,6 +105,7 @@ export async function checkWorkspaceBoundaries(root) {
           const target = value.startsWith('.') ? resolve(dirname(file), value) : null
           const implementation = workspaces.find(
             (candidate) =>
+              candidate.directory !== workspace.directory &&
               isImplementation(candidate.manifest.name) &&
               (value === candidate.manifest.name ||
                 value.startsWith(`${candidate.manifest.name}/`) ||

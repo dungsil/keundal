@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { McpClientConfig } from '@keundal/mcp/browser'
+import type { McpClientConfig } from '@keundal/mcp'
 
 const { t } = useLocale()
 const { $mcpManager, $saveMcpSettings, $remoteAgent } = useNuxtApp()

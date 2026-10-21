@@ -1,9 +1,8 @@
 import { useLocalStorage } from '@vueuse/core'
 import type { ChatPlatform, ChatConnection } from '@keundal/chat/platform'
 import { resolveModel } from '@keundal/chat/models'
-import type { LLMSettings } from '@keundal/chat/llm-settings'
-import { SkillManager } from '@keundal/chat/skills'
-import { FALLBACK_MODEL, MODEL_KEY, DEFAULT_MODEL_KEY, TITLE_MODEL_KEY, readModelPreference, loadModelPreferences } from '@keundal/chat/model-preferences'
+import { FALLBACK_MODEL, type LLMSettings } from '@keundal/llm-settings'
+import { MODEL_KEY, DEFAULT_MODEL_KEY, TITLE_MODEL_KEY, readModelPreference, loadModelPreferences } from '@keundal/chat/model-preferences'
 
 declare module '#app' {
   interface NuxtApp { $chatPlatform: ChatPlatform }
@@ -38,7 +37,7 @@ export default defineNuxtPlugin({
     }
     const settings = ref(loaded)
     const modelCatalog = useModelCatalog(settings, platform.loadModels, () => t('model.loadFailed'))
-    const skillManager = new SkillManager(localStorage, platform.skillFiles)
+    const skillManager = platform.skills
     const connection: ChatConnection = await platform.connect({
       getSettings: () => settings.value,
       getModels: () => modelCatalog.models.value,

@@ -7,7 +7,7 @@ import {
   providerError,
   providerType,
   type LLMSettings
-} from '@keundal/chat/llm-settings'
+} from '@keundal/llm-settings'
 import { z } from 'zod'
 
 export const MODEL_CACHE_TTL = 60 * 60 * 1000

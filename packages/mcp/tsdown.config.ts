@@ -1,4 +1,2 @@
 import config from '@keundal/tsdown'
-import { defineConfig } from 'tsdown'
-
-export default defineConfig({ ...config, entry: ['src/index.ts', 'src/browser.ts'] })
+export default { ...config, platform: 'browser', target: 'es2022' }

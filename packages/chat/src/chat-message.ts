@@ -1,4 +1,3 @@
-import { TOOL_PROGRESS_EVENT } from '@keundal/agent-contract'
 import {
   EventType,
   LLM_SOURCE_EVENT,
@@ -8,6 +7,7 @@ import {
   type AgentMessage,
   type LLMSource
 } from '@keundal/core'
+import { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 
 export type ChatStatus = 'ready' | 'submitted' | 'streaming' | 'error'
 export type TextPart =
