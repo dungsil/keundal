@@ -44,8 +44,7 @@ export class IndexedDBGenerationService extends GenerationService {
 
   constructor(
     ctx: Context,
-    private readonly store: IndexedDBStore,
-    private readonly closeStore = false
+    private readonly store: IndexedDBStore
   ) {
     super(ctx)
     ctx.fiber.effect(() => () => this.dispose())
@@ -308,7 +307,6 @@ export class IndexedDBGenerationService extends GenerationService {
       })
     )
     this.active.clear()
-    if (this.closeStore) this.store.close()
   }
 
   private isCurrent(runId: string, token: symbol): boolean {

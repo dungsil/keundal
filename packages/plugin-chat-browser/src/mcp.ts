@@ -1,7 +1,21 @@
-import type { NativeInvoke } from '@keundal/chat/platform'
-import { McpClient, parseMcpServers, type McpClientConfig, type McpRequestOptions } from '@keundal/mcp/browser'
+import { parseMcpServers, type McpClientConfig, type McpRequestOptions, type McpSettingsStorage } from '@keundal/mcp'
+import { McpClient } from '@keundal/plugin-mcp-client/browser'
 
 const storageKey = 'keundal:mcp-servers'
+
+export function createBrowserMcpSettingsStorage(
+  storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
+): McpSettingsStorage {
+  return {
+    async load() {
+      return storage.getItem(storageKey)
+    },
+    async save(settings) {
+      if (settings === null) storage.removeItem(storageKey)
+      else storage.setItem(storageKey, settings)
+    }
+  }
+}
 
 export class McpManager {
   private servers: McpClientConfig[] = []
@@ -9,8 +23,8 @@ export class McpManager {
   private lifetime = new AbortController()
 
   constructor(
-    private readonly storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>,
-    private readonly invokeNative?: NativeInvoke
+    private readonly storage: McpSettingsStorage,
+    private readonly options: { allowStdio?: boolean } = {}
   ) {}
 
   get configuration(): McpClientConfig[] {
@@ -18,14 +32,12 @@ export class McpManager {
   }
 
   async load() {
-    const saved = this.invokeNative
-      ? await this.invokeNative<string | null>('load_mcp_settings')
-      : this.storage.getItem(storageKey)
-    this.servers = parseMcpServers(saved ? JSON.parse(saved) : [], !!this.invokeNative)
+    const saved = await this.storage.load()
+    this.servers = parseMcpServers(saved ? JSON.parse(saved) : [], this.options.allowStdio ?? false)
   }
 
   async save(value: unknown, restart: () => Promise<void>) {
-    const next = parseMcpServers(value, !!this.invokeNative)
+    const next = parseMcpServers(value, this.options.allowStdio ?? false)
     const previous = this.configuration
     await this.persist(next)
     try {
@@ -39,10 +51,7 @@ export class McpManager {
   }
 
   private async persist(servers: McpClientConfig[]) {
-    if (this.invokeNative)
-      await this.invokeNative('save_mcp_settings', { settings: servers.length ? JSON.stringify(servers) : null })
-    else if (servers.length) this.storage.setItem(storageKey, JSON.stringify(servers))
-    else this.storage.removeItem(storageKey)
+    await this.storage.save(servers.length ? JSON.stringify(servers) : null)
   }
 
   async tools(options: McpRequestOptions = {}) {

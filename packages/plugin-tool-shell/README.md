@@ -5,7 +5,7 @@
 에이전트 도구 타입만 참조하고 실행할 때 에이전트 패키지를 가져오지 않습니다.
 
 ```ts
-import agent from '@keundal/agent'
+import agent from '@keundal/plugin-agent-chat'
 import localShellPlugin from '@keundal/plugin-shell-local'
 import shellToolsPlugin from '@keundal/plugin-tool-shell'
 import { Context } from 'cordis'

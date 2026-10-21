@@ -69,6 +69,7 @@ export default {
   'prompt.search': '웹 검색',
   'prompt.unsupported': '이 모델에서는 지원하지 않습니다.',
   'prompt.reasoning': '심층 사고',
+  'prompt.reasoningLevel': '추론 수준',
   'prompt.menu': '입력 옵션 열기',
   'prompt.commands': '스킬 및 MCP 도구',
   'prompt.commandsLoading': '스킬과 도구를 불러오는 중…',

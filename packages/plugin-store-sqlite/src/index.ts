@@ -20,9 +20,11 @@ export const sqliteStorePlugin = Object.assign(
     const store = new SqliteStore(config.path)
     ctx.fiber.effect(() => () => store.release())
     new SqliteSessionService(ctx, store)
-    new SqliteGenerationService(ctx, store)
+    ctx.inject(['llm', 'session'], (injected) => {
+      new SqliteGenerationService(injected, store)
+    })
   },
-  { inject: ['llm'], Config: sqliteStoreConfigSchema }
+  { Config: sqliteStoreConfigSchema }
 )
 
 export default sqliteStorePlugin

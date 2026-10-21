@@ -17,16 +17,17 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@keundal/agent": "workspace:*",
-    "@keundal/agent-contract": "workspace:*",
     "@keundal/agent-host": "workspace:*",
     "@keundal/agent-plugins": "workspace:*",
     "@keundal/mcp": "workspace:*",
+    "@keundal/plugin-agent-chat": "workspace:*",
     "@keundal/plugin-llm-anthropic": "workspace:*",
     "@keundal/plugin-llm-gemini": "workspace:*",
     "@keundal/plugin-llm-openai": "workspace:*",
+    "@keundal/plugin-mcp-client": "workspace:*",
     "@keundal/plugin-skill": "workspace:*",
     "@keundal/plugin-store-sqlite": "workspace:*",
+    "@keundal/tools": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {

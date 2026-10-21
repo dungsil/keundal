@@ -9,32 +9,17 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./browser": {
-      "types": "./dist/browser.d.ts",
-      "import": "./dist/browser.js"
     }
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "@keundal/agent-contract": "workspace:*",
-    "@modelcontextprotocol/client": "2.3.1"
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
-    "@keundal/agent": "workspace:*",
-    "@keundal/core": "workspace:*",
-    "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
-    "@modelcontextprotocol/server": "2.3.1",
     "@types/node": "catalog:",
-    "cordis": "catalog:",
     "tsdown": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }

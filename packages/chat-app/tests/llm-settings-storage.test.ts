@@ -1,6 +1,6 @@
 import type { invoke } from '@tauri-apps/api/core'
 import { expect, test } from 'vitest'
-import { defaultLLMSettings } from '@keundal/chat/llm-settings'
+import { defaultLLMSettings } from '@keundal/llm-settings'
 import { LLM_SETTINGS_KEY } from '@keundal/chat/platform'
 import { createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
 import { createNativeSettingsStorage } from '@keundal/plugin-chat-desktop/settings'

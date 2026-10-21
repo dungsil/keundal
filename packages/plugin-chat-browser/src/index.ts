@@ -1,5 +1,5 @@
-import { defaultLLMSettings, llmSettingsSchema } from '@keundal/chat/llm-settings'
 import { LLM_SETTINGS_KEY, type SettingsStorage } from '@keundal/chat/platform'
+import { defaultLLMSettings, llmSettingsSchema } from '@keundal/llm-settings'
 
 export function createBrowserSettingsStorage(storage: Pick<Storage, 'getItem' | 'setItem'>): SettingsStorage {
   const load = () => {

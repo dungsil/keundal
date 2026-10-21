@@ -1,6 +1,7 @@
-import { McpManager } from '@keundal/plugin-chat-browser/mcp'
+import { McpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-chat-browser/mcp'
+import { SkillManager } from '@keundal/plugin-chat-browser/skills'
 import { Context } from 'cordis'
-import agentPlugin from '@keundal/agent'
+import agentPlugin from '@keundal/plugin-agent-chat'
 import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
 import skillPlugin from '@keundal/plugin-skill'
 import { ChatStore } from '@keundal/plugin-chat-local'
@@ -9,14 +10,15 @@ import { browserLLMPlugin } from '@keundal/plugin-llm-browser'
 import { loadModels } from '@keundal/plugin-llm-browser/models'
 import { openaiTranscription } from '@keundal/plugin-transcription-browser'
 import { createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
-import { createChatTools } from '@keundal/chat/tools/agent'
+import { createChatTools } from '@keundal/plugin-tool-chat'
 import type { ChatPlatform } from '@keundal/chat/platform'
 
 export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: string, agentToken?: string } = {}): ChatPlatform {
-  const mcp = new McpManager(storage)
+  const mcp = new McpManager(createBrowserMcpSettingsStorage(storage))
   const platform: ChatPlatform = {
     mcp,
     settings: createBrowserSettingsStorage(storage),
+    skills: new SkillManager(storage),
     loadModels,
     transcription: openaiTranscription,
     async connect(options) {

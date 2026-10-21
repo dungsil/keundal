@@ -1,6 +1,5 @@
+import { providerType } from '@keundal/llm-settings'
 import { z } from 'zod'
-
-import { providerType } from './llm-settings'
 export const modelSchema = z.object({
   value: z.string().min(1),
   label: z.string().min(1),

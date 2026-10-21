@@ -73,6 +73,7 @@ try {
 
 - `LLMRequest.webSearch: true`는 함수 도구와 함께 `{ type: 'web_search_20250305', name: 'web_search' }`를 등록합니다. false/생략은 등록하지 않습니다. 서버의 검색 호출·결과는 로컬 실행용 `TOOL_CALL_*`로 변환하지 않습니다.
 - `reasoning: true`는 출력 예산의 절반을 thinking 예산으로 지정합니다(최소 1024, 최대 10000). false는 `{ type: 'disabled' }`을 지정합니다. 생략하면 기존 공급자 기본값을 유지합니다. true는 Anthropic 최소 예산에 따라 `maxOutputTokens > 1024`가 필요합니다. 추론도 기존 `max_tokens` 안에 포함됩니다. 모델은 선택한 검색·thinking 옵션을 지원해야 하며 API 오류는 그대로 전달합니다. 토큰 계산에도 같은 도구·thinking 설정을 사용합니다.
+- `reasoning`의 `low`, `medium`, `high`는 출력 예산의 25%, 50%, 75%를 사고 토큰 예산으로 사용합니다. 최소 1024, 최대 10000 토큰으로 제한하며 출력 예산을 늘리지 않습니다.
 - 웹 검색 인용은 `{ type: 'CUSTOM', name: 'keundal.source', value: { id, url, title? } }`로 전달합니다. `id`는 URL이며 반복 인용은 반복 이벤트가 될 수 있습니다.
 - `TEXT_MESSAGE_END.metadata['anthropic.contentBlocks']`는 **SDK 콘텐츠 블록 배열**입니다. 검색 전용 어시스턴트 호스트는 `[ServerToolUseBlock]` 또는 `[WebSearchToolResultBlock]`을, 인용 텍스트 호스트는 `[TextBlock]`을 보존합니다. `input`, `tool_use_id`, 결과의 `encrypted_content`, 인용의 `encrypted_index` 등 원본 필드를 유지합니다. 후속 변환은 이 배열을 텍스트 대신 재생하고 함수 호출을 뒤에 추가하며, 인접 어시스턴트 블록을 합칩니다. 메시지 순서·메타데이터와 기존 추론 `encryptedValue`를 함께 유지해야 서명과 검색 문맥을 복원할 수 있습니다. `pause_turn` 자동 재개는 하지 않고 기존처럼 오류로 전달합니다.
 - 시스템·개발자 메시지는 최상위 `system` 텍스트 블록으로 전달합니다. 사용자 입력은 텍스트와 이미지 URL·base64를 지원합니다. 문서·음성·동영상, 이미지 파일 ID, `activity` 메시지는 오류로 알립니다.
@@ -82,7 +83,7 @@ try {
 - 추론 서명과 `redacted_thinking` 데이터는 `REASONING_ENCRYPTED_VALUE`로 전달합니다. 후속 요청을 구성하는 쪽에서 `reasoning` 메시지의 `content`와 `encryptedValue`, 메시지 순서를 보존해야 합니다. `encryptedValue`는 공급자와 블록 종류를 구분하는 JSON 문자열이므로 수정하지 않고 재사용합니다.
 - `end_turn`, `tool_use`, `stop_sequence` 종료 사유와 `message_stop`을 모두 확인해야 성공으로 처리합니다. `max_tokens`, `refusal`, `pause_turn` 등 다른 종료 사유, 완료 이벤트 없는 스트림 종료, 미완료 블록은 예외로 전달합니다.
 
-생성 요청에는 출력 예산을 `max_tokens`로 지정합니다. 대화와 문맥 축약은 Keundal 측에서 관리합니다. `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`는 생성하지 않으며, journal·커밋·복구도 수행하지 않습니다. 전체 에이전트를 실행하려면 저장소 플러그인과 `@keundal/agent`을 함께 등록합니다.
+생성 요청에는 출력 예산을 `max_tokens`로 지정합니다. 대화와 문맥 축약은 Keundal 측에서 관리합니다. `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`는 생성하지 않으며, journal·커밋·복구도 수행하지 않습니다. 전체 에이전트를 실행하려면 저장소 플러그인과 `@keundal/plugin-agent-chat`을 함께 등록합니다.
 
 ## 검증
 

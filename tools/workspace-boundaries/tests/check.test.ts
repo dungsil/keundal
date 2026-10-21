@@ -137,16 +137,23 @@ test('baseUrl과 상속한 paths 별칭으로 앱 경계를 우회할 수 없다
 })
 
 test('계약과 공통 UI는 구현 패키지를 실행 의존성으로 가져올 수 없다', async (t) => {
-  const root = await fixture(t, {
-    'packages/shared/package.json': {
-      name: '@keundal/chat-app',
-      dependencies: { '@keundal/plugin-chat-local': 'workspace:*' }
-    },
-    'packages/provider/package.json': { name: '@keundal/plugin-chat-local' },
-    'packages/shared/app/plugin.ts': "import { ChatStore } from '@keundal/plugin-chat-local'",
-    'packages/shared/src/escape.ts': "export * from '../../provider/src/index'"
-  })
-  assert.equal((await checkWorkspaceBoundaries(root)).length, 3)
+  for (const [contract, provider] of [
+    ['@keundal/chat-app', '@keundal/plugin-chat-local'],
+    ['@keundal/agent', '@keundal/agent-loop'],
+    ['@keundal/tools', '@keundal/plugin-tool-fs'],
+    ['@keundal/context', '@keundal/plugin-context-node'],
+    ['@keundal/mcp', '@keundal/plugin-mcp-client'],
+    ['@keundal/llm-settings', '@keundal/plugin-llm-openai'],
+    ['@keundal/agent-loop', '@keundal/plugin-agent-chat']
+  ]) {
+    const root = await fixture(t, {
+      'packages/shared/package.json': { name: contract, dependencies: { [provider!]: 'workspace:*' } },
+      'packages/provider/package.json': { name: provider },
+      'packages/shared/app/plugin.ts': `import '${provider}'`,
+      'packages/shared/src/escape.ts': "export * from '../../provider/src/index'"
+    })
+    assert.equal((await checkWorkspaceBoundaries(root)).length, 3, contract)
+  }
 })
 
 test('계약의 통합 테스트와 앱 조립 지점은 구현 패키지를 사용할 수 있다', async (t) => {
@@ -156,6 +163,8 @@ test('계약의 통합 테스트와 앱 조립 지점은 구현 패키지를 사
       devDependencies: { '@keundal/plugin-store-memory': 'workspace:*' }
     },
     'packages/shared/tests/integration.test.ts': "import store from '@keundal/plugin-store-memory'",
+    'packages/loop/package.json': { name: '@keundal/agent-loop' },
+    'packages/loop/src/index.ts': "export * from './config.js'",
     'apps/alpha/app/platform.ts': "import store from '@keundal/plugin-store-memory'"
   })
   assert.deepEqual(await checkWorkspaceBoundaries(root), [])

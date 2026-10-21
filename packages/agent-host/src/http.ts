@@ -9,6 +9,7 @@ import {
   StreamBudget,
   parseAGUIEvent,
   parseRunAgentInput,
+  parseReasoning,
   type AGUIEvent,
   type AgentMessage,
   type RunAgentInput,
@@ -131,7 +132,10 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
       if (allowedOrigin) {
         response.setHeader('access-control-allow-origin', allowedOrigin)
         response.setHeader('access-control-allow-methods', 'GET,POST,PUT,DELETE,OPTIONS')
-        response.setHeader('access-control-allow-headers', 'authorization,content-type,x-keundal-model')
+        response.setHeader(
+          'access-control-allow-headers',
+          'authorization,content-type,x-keundal-model,x-keundal-reasoning'
+        )
         response.setHeader('access-control-max-age', '600')
         response.setHeader('vary', 'origin')
       }
@@ -176,6 +180,10 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
         if (requested !== undefined && !models().some((model) => model.id === requested)) {
           return sendJson(response, 400, { error: `unknown model: ${requested}` })
         }
+        const rawReasoning = modelId(request.headers['x-keundal-reasoning'])
+        const reasoning = parseReasoning(
+          rawReasoning === 'true' ? true : rawReasoning === 'false' ? false : rawReasoning
+        )
         const input = parseRunAgentInput(JSON.parse(await readBody(request, maxRequestBodyBytes)))
         const abort = new AbortController()
         const disconnect = () => abort.abort()
@@ -187,7 +195,7 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
           if (!response.write(sseEvent(event))) await once(response, 'drain', { signal: abort.signal })
         }
         try {
-          for await (const raw of services.run(input, { model: requested, signal: abort.signal })) {
+          for await (const raw of services.run(input, { model: requested, reasoning, signal: abort.signal })) {
             budget.accept(raw)
             const event = parseAGUIEvent(raw)
             await write(event)
