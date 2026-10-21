@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { DEFAULT_MODEL_KEY, MODEL_KEY, loadModelPreferences, saveDefaultModel } from '../shared/utils/model-preferences'
+import { DEFAULT_MODEL_KEY, MODEL_KEY, TITLE_MODEL_KEY, readModelPreference, saveTitleModel, loadModelPreferences, saveDefaultModel } from '../shared/utils/model-preferences'
 
 function storage() {
   const values = new Map<string, string>()
@@ -38,4 +38,17 @@ test('잘못된 기본 모델은 기존 선택을 덮어쓰지 않는다', () =>
   saveDefaultModel(saved, 'openai/custom/model')
   expect(() => saveDefaultModel(saved, 'openai/')).toThrow()
   expect(loadModelPreferences(saved).defaultModel).toBe('openai/custom/model')
+})
+
+test('제목 모델은 채팅 기본 모델과 독립적으로 저장하고 해제한다', () => {
+  const saved = storage()
+  saveDefaultModel(saved, 'openai/chat')
+  saveTitleModel(saved, 'anthropic/claude-haiku-4.5')
+  expect(readModelPreference(saved, TITLE_MODEL_KEY)).toBe('anthropic/claude-haiku-4-5')
+  expect(loadModelPreferences(saved).defaultModel).toBe('openai/chat')
+  expect(() => saveTitleModel(saved, 'unknown/title')).toThrow()
+  expect(readModelPreference(saved, TITLE_MODEL_KEY)).toBe('anthropic/claude-haiku-4-5')
+  saveTitleModel(saved, '')
+  expect(readModelPreference(saved, TITLE_MODEL_KEY)).toBeUndefined()
+  expect(loadModelPreferences(saved).defaultModel).toBe('openai/chat')
 })

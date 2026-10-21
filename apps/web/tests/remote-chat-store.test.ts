@@ -32,6 +32,8 @@ async function collect(events: AsyncIterable<AGUIEvent>) {
 
 test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제목·투표·편집·삭제를 수행한다 (desktop=%s)', async (desktop) => {
   const ctx = new Context()
+  const titleModels: string[] = []
+  const selections: unknown[] = []
   class ScriptedLLM extends LLMService {
     async getModel() { return { contextWindow: 128_000, maxOutputTokens: 4096 } }
     async countTokens() { return 40 }
@@ -59,8 +61,14 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
       list: options => ctx.generation.list(options),
       recover: options => ctx.generation.recover(options)
     },
-    models: () => [{ id: 'gpt-5-nano', provider: 'openai', contextWindow: 128_000, maxOutputTokens: 4096 }],
-    title: async () => '원격 제목'
+    models: () => [
+      { id: 'gpt-5-nano', provider: 'openai', contextWindow: 128_000, maxOutputTokens: 4096 },
+      { id: 'title', provider: 'anthropic', contextWindow: 128_000, maxOutputTokens: 4096 }
+    ],
+    title: async (request) => {
+      titleModels.push(request.model)
+      return '원격 제목'
+    }
   }
   const app = createApp()
   app.use('/api/agent', createAgentHandler(async () => createAgentApp(services, { token })))
@@ -78,13 +86,22 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
   const endpoint = `http://127.0.0.1:${address.port}/api/agent`
   expect((await fetch(`${endpoint}/models`)).status).toBe(401)
   const chats = desktop
-    ? await createDesktopChatStore(async <T>() => ({ endpoint, token }) as T, () => [], model)
+    ? await createDesktopChatStore(async <T>(_command: string, args: unknown) => {
+        selections.push(args)
+        return { endpoint, token } as T
+      }, () => [], model)
     : new RemoteChatStore({ endpoint, token })
   await chats.create('chat', user, model)
-  const events = await collect(chats.respond('chat', { model, messages: [user] }))
+  const events = await collect(chats.respond('chat', { model, titleModel: 'anthropic/title', messages: [user] }))
   expect(events.some(event => event.type === EventType.RUN_FINISHED)).toBe(true)
 
   const saved = (await chats.get('chat'))!
+  expect(titleModels).toEqual(['title'])
+  if (desktop) expect(selections).toMatchObject([
+    { selection: { provider: 'openai', model: 'gpt-5-nano' } },
+    { selection: { provider: 'anthropic', model: 'title' } },
+    { selection: { provider: 'openai', model: 'gpt-5-nano' } }
+  ])
   expect(saved.title).toBe('원격 제목')
   expect(saved.messages).toHaveLength(2)
   expect(saved.messages[1]!.parts).toContainEqual({ type: 'text', text: '원격 응답' })

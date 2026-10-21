@@ -10,13 +10,14 @@ import { browserLLMPlugin } from '../../shared/utils/browser-llm'
 import { defaultLLMSettings, type LLMSettings } from '../../shared/utils/llm-settings'
 import { createLLMSettingsStorage, LLM_SETTINGS_KEY } from '../../shared/utils/llm-settings-storage'
 import { SkillManager } from '../../shared/utils/skills'
-import { FALLBACK_MODEL, MODEL_KEY, loadModelPreferences } from '../../shared/utils/model-preferences'
+import { FALLBACK_MODEL, MODEL_KEY, TITLE_MODEL_KEY, readModelPreference, loadModelPreferences } from '../../shared/utils/model-preferences'
 
 export default defineNuxtPlugin(async () => {
   const { t } = useLocale()
   const preferences = loadModelPreferences(localStorage)
   const defaultModel = useState('default-model', () => '')
   defaultModel.value = preferences.defaultModel
+  useState('title-model', () => '').value = readModelPreference(localStorage, TITLE_MODEL_KEY) ?? ''
   const initialModel = preferences.model
   const model = useState('chat-model', () => FALLBACK_MODEL)
   useLocalStorage(MODEL_KEY, model, { writeDefaults: false })

@@ -188,7 +188,8 @@ export class RemoteChatStore implements ChatStoreLike {
     return found
   }
 
-  private async title(model: RemoteModel, message: ChatMessage, signal?: AbortSignal): Promise<string> {
+  protected async generateTitle(value: string, message: ChatMessage, signal?: AbortSignal): Promise<string> {
+    const model = await this.model(value)
     const provider = model.provider === 'gemini' ? 'google' : model.provider
     const first = toMessages([message], `${provider}/${model.id}`)[0]
     if (!first) return ''
@@ -204,6 +205,7 @@ export class RemoteChatStore implements ChatStoreLike {
   async* respond(id: string, request: {
     messages: ChatMessage[]
     model: string
+    titleModel?: string
     reasoning?: boolean
     webSearch?: boolean
     onMessage?: (message: ChatMessage) => void
@@ -217,7 +219,6 @@ export class RemoteChatStore implements ChatStoreLike {
     this.active.set(id, { abort, done })
     try {
       combined.throwIfAborted()
-      const selected = await this.model(request.model)
       const snapshot = this.snapshot(await (await this.call(`/threads/${encodeURIComponent(id)}`)).json())
       const current = this.chat(snapshot)
       if (!current) throw new Error('Chat not found')
@@ -226,7 +227,7 @@ export class RemoteChatStore implements ChatStoreLike {
       const saved = await this.save(snapshot, chat)
       if (!chat.title && chat.messages[0]) {
         try {
-          chat = { ...chat, title: await this.title(selected, chat.messages[0], combined) }
+          chat = { ...chat, title: await this.generateTitle(request.titleModel || request.model, chat.messages[0], combined) }
           await this.save(saved, chat)
           request.onTitle?.(chat.title!)
         } catch {
@@ -234,6 +235,7 @@ export class RemoteChatStore implements ChatStoreLike {
         }
       }
       combined.throwIfAborted()
+      const selected = await this.model(request.model)
       const projection = new ChatMessageAssembly(runId)
       let finished: Extract<AGUIEvent, { type: 'RUN_FINISHED' }> | undefined
       let failed = false
