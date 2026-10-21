@@ -18,7 +18,17 @@ let app
 async function stop(child) {
   if (!child || child.exitCode !== null || child.signalCode !== null) return
   const exited = once(child, 'exit')
-  child.kill()
+  if (process.platform === 'win32') {
+    // Terminate the sidecar and WebView processes before removing their working directory.
+    const result = spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
+      encoding: 'utf8',
+      timeout: 10_000
+    })
+    if (result.error) throw result.error
+    assert.equal(result.status, 0, `Failed to stop process tree:\n${result.stdout}\n${result.stderr}`)
+  } else {
+    child.kill()
+  }
   await exited
 }
 
@@ -127,5 +137,5 @@ try {
 } finally {
   await stop(app)
   await stop(host)
-  await rm(work, { recursive: true, force: true })
+  await rm(work, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 }
