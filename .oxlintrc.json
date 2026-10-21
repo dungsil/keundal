@@ -1,7 +1,9 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "ignorePatterns": ["apps/web/**", "packages/chat-app/**", "apps/desktop/**"],
-  "env": { "builtin": true },
+  "env": {
+    "builtin": true
+  },
   "plugins": ["typescript", "unicorn", "oxc"],
   "categories": {
     "correctness": "error",
@@ -10,8 +12,45 @@
   "rules": {},
   "overrides": [
     {
-      "files": [".pnpmfile.cjs", "apps/**", "examples/**", "packages/*/tests/**", "tools/lighthouse/**"],
-      "env": { "node": true }
+      "files": [
+        ".pnpmfile.cjs",
+        "apps/**",
+        "examples/**",
+        "packages/*/tests/**",
+        "packages/agent-host/src/**",
+        "tools/lighthouse/**"
+      ],
+      "env": {
+        "node": true
+      }
+    },
+    {
+      "files": ["packages/ui/nuxt.config.ts"],
+      "globals": {
+        "defineNuxtConfig": "readonly"
+      }
+    },
+    {
+      "files": ["packages/ui/app/**"],
+      "env": {
+        "browser": true
+      },
+      "globals": {
+        "computed": "readonly",
+        "readonly": "readonly",
+        "ref": "readonly",
+        "useCookie": "readonly",
+        "useLocale": "readonly",
+        "useRequestHeaders": "readonly",
+        "useState": "readonly"
+      }
+    },
+    {
+      "files": ["packages/ui/app/**/*.vue"],
+      "globals": {
+        "defineProps": "readonly",
+        "defineEmits": "readonly"
+      }
     }
   ]
 }

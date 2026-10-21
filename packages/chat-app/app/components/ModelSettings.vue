@@ -36,7 +36,7 @@ function save() {
 </script>
 
 <template>
-  <section class="mb-8 space-y-4" aria-labelledby="model-settings-title">
+  <section class="space-y-4" aria-labelledby="model-settings-title">
     <h2 id="model-settings-title" class="text-lg font-semibold text-highlighted">
       {{ t('model.defaultTitle') }}
     </h2>

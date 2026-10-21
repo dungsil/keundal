@@ -18,7 +18,17 @@ let app
 async function stop(child) {
   if (!child || child.exitCode !== null || child.signalCode !== null) return
   const exited = once(child, 'exit')
-  child.kill()
+  if (process.platform === 'win32') {
+    // Terminate the sidecar and WebView processes before removing their working directory.
+    const result = spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
+      encoding: 'utf8',
+      timeout: 10_000
+    })
+    if (result.error) throw result.error
+    assert.equal(result.status, 0, `Failed to stop process tree:\n${result.stdout}\n${result.stderr}`)
+  } else {
+    child.kill()
+  }
   await exited
 }
 
@@ -76,6 +86,29 @@ async function request(url, path, options = {}) {
   return response.json()
 }
 
+async function verifyChatScreen(pid) {
+  const result = spawnSync('powershell.exe', [
+    '-NoProfile', '-NonInteractive', '-Mta', '-Command',
+    `Add-Type -AssemblyName UIAutomationClient
+     Add-Type -AssemblyName UIAutomationTypes
+     $p = Get-Process -Id ${pid} -ErrorAction Stop
+     $root = [System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
+     $condition = New-Object System.Windows.Automation.PropertyCondition(
+       [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+       [System.Windows.Automation.ControlType]::Edit)
+     $deadline = (Get-Date).AddSeconds(30)
+     do {
+       $inputControl = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+       if ($null -ne $inputControl -and -not $inputControl.Current.IsOffscreen) { exit 0 }
+       Start-Sleep -Milliseconds 500
+     } while ((Get-Date) -lt $deadline)
+     throw 'Desktop chat input did not become visible'`
+  ], { encoding: 'utf8', timeout: 45_000 })
+  if (result.error) throw result.error
+  assert.equal(result.status, 0, `Desktop chat screen did not become ready:\n${result.stderr}`)
+  console.log('PASS: desktop WebView exposes the chat input after sidecar initialization')
+}
+
 try {
   const url = await startHost()
   const denied = await fetch(`${url}/threads`, { signal: AbortSignal.timeout(5_000) })
@@ -95,7 +128,10 @@ try {
   console.log('PASS: packaged host starts outside the repository; auth, models and SQLite restart work')
 
   if (process.platform === 'win32') {
-    app = spawn(join(portable, 'keundal-desktop.exe'), [], { cwd: work, stdio: 'inherit' })
+    app = spawn(join(portable, 'keundal-desktop.exe'), [], {
+      cwd: work,
+      stdio: 'inherit'
+    })
     let appError
     app.on('error', error => (appError = error))
     let ready = false
@@ -122,10 +158,11 @@ try {
     assert.ok(ready, 'Desktop did not create a responding native window')
     await delay(3_000)
     assert.equal(app.exitCode, null, 'Desktop exited after creating its window')
+    await verifyChatScreen(app.pid)
     console.log('PASS: extracted Windows desktop EXE creates a responding window and stays running')
   }
 } finally {
   await stop(app)
   await stop(host)
-  await rm(work, { recursive: true, force: true })
+  await rm(work, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 }
