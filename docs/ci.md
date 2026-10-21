@@ -176,7 +176,11 @@ macOS의 DMG 생성은 [실행 39454203709](https://github.com/dungsil/keundal/a
 
 ## Lighthouse 검사
 
-`PR Lighthouse`는 `pull_request` 이벤트로 실행하므로 워크플로우를 추가한 PR에서도 병합 전에 작동한다.
+`PR Lighthouse`는 `main`을 대상으로 하는 `pull_request` 이벤트에서 UI 관련 변경이 있는 경우에만 실행한다.
+대상은 `apps/web`, `packages/chat-app`, `packages/ui`의 `app/`, `public/`, `shared/` 경로와
+각 패키지의 `nuxt.config.ts`, `package.json`이다. PR 전체 변경 파일을 기준으로 판단한다.
+문서, 서버, 데스크톱 전용 코드, 검사 설정 또는 루트 잠금 파일만 바뀐 PR에서는 실행하지 않는다.
+따라서 UI 변경이 없는 PR에서는 프리뷰 배포 대기와 Lighthouse 결과 댓글 갱신도 생략한다.
 기존 프리뷰 배포가 남긴 봇 댓글에서 현재 PR 커밋과 일치하는 배포 URL을 최대 20분간 기다린 뒤,
 그 URL의 홈(`/`)과 설정(`/settings`)을 Unlighthouse 0.19.1로 검사한다. 이전 커밋이나 일반 사용자의
 댓글에 있는 주소는 사용하지 않는다.
