@@ -1,6 +1,6 @@
 import { computed, type Ref } from 'vue'
-import { resolveModel } from './models'
-import { saveDefaultModel } from './model-preferences'
+import { resolveModel } from '@keundal/chat/models'
+import { saveDefaultModel } from '@keundal/chat/model-preferences'
 
 export function createModelSelection(options: {
   model: Ref<string>

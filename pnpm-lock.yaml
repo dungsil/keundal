@@ -207,15 +207,12 @@ importers:
 
   .:
     devDependencies:
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:tools/tsconfig
       lint-staged:
         specifier: 17.6.0
         version: 17.6.0
-      node:
-        specifier: runtime:24.21.0
-        version: runtime:24.21.0
       oxfmt:
         specifier: 0.73.0
         version: 0.73.0
@@ -232,8 +229,11 @@ importers:
         specifier: 2.10.13
         version: 2.10.13
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
+      node:
+        specifier: runtime:24.21.0
+        version: runtime:24.21.0
 
   apps/desktop:
     dependencies:
@@ -243,6 +243,27 @@ importers:
       nuxt:
         specifier: ^4.6.2
         version: 4.6.2(f10f8451716ca2c6ce655b791cd5799d)
+      "@keundal/agent-runtime-node":
+        specifier: workspace:*
+        version: link:../../packages/agent-runtime-node
+      "@keundal/chat":
+        specifier: workspace:*
+        version: link:../../packages/chat
+      "@keundal/plugin-chat-desktop":
+        specifier: workspace:*
+        version: link:../../packages/plugin-chat-desktop
+      "@keundal/plugin-llm-browser":
+        specifier: workspace:*
+        version: link:../../packages/plugin-llm-browser
+      "@tauri-apps/api":
+        specifier: 2.12.4
+        version: 2.12.4
+      "@keundal/plugin-transcription-browser":
+        specifier: workspace:*
+        version: link:../../packages/plugin-transcription-browser
+      "@keundal/plugin-chat-browser":
+        specifier: workspace:*
+        version: link:../../packages/plugin-chat-browser
     devDependencies:
       "@keundal/agent-host":
         specifier: workspace:*
@@ -286,6 +307,39 @@ importers:
       h3:
         specifier: 1.15.11
         version: 1.15.11
+      "@keundal/agent-runtime-node":
+        specifier: workspace:*
+        version: link:../../packages/agent-runtime-node
+      "@keundal/chat":
+        specifier: workspace:*
+        version: link:../../packages/chat
+      "@keundal/agent":
+        specifier: workspace:*
+        version: link:../../packages/agent
+      "@keundal/plugin-store-indexeddb":
+        specifier: workspace:*
+        version: link:../../packages/plugin-store-indexeddb
+      "@keundal/plugin-skill":
+        specifier: workspace:*
+        version: link:../../packages/plugin-skill
+      "@keundal/plugin-chat-local":
+        specifier: workspace:*
+        version: link:../../packages/plugin-chat-local
+      "@keundal/plugin-chat-remote":
+        specifier: workspace:*
+        version: link:../../packages/plugin-chat-remote
+      "@keundal/plugin-chat-browser":
+        specifier: workspace:*
+        version: link:../../packages/plugin-chat-browser
+      "@keundal/plugin-llm-browser":
+        specifier: workspace:*
+        version: link:../../packages/plugin-llm-browser
+      cordis:
+        specifier: "catalog:"
+        version: 4.0.0-rc.11
+      "@keundal/plugin-transcription-browser":
+        specifier: workspace:*
+        version: link:../../packages/plugin-transcription-browser
     devDependencies:
       "@nuxt/eslint":
         specifier: ^1.17.0
@@ -314,884 +368,887 @@ importers:
       "@keundal/core":
         specifier: workspace:*
         version: link:../../packages/core
-      "@keundal/agent":
-        specifier: workspace:*
-        version: link:../../packages/agent
       "@keundal/plugin-store-memory":
         specifier: workspace:*
         version: link:../../packages/plugin-store-memory
-      cordis:
-        specifier: "catalog:"
-        version: 4.0.0-rc.11
+      fake-indexeddb:
+        specifier: 6.2.6
+        version: 6.2.6
+      "@keundal/plugin-chat-desktop":
+        specifier: workspace:*
+        version: link:../../packages/plugin-chat-desktop
 
   examples/basic:
     dependencies:
-      '@keundal/agent':
+      "@keundal/agent":
         specifier: workspace:*
         version: link:../../packages/agent
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../../packages/core
-      '@keundal/plugin-llm-openai':
+      "@keundal/plugin-llm-openai":
         specifier: workspace:*
         version: link:../../packages/plugin-llm-openai
-      '@keundal/plugin-store-sqlite':
+      "@keundal/plugin-store-sqlite":
         specifier: workspace:*
         version: link:../../packages/plugin-store-sqlite
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
 
   packages/agent:
     dependencies:
-      '@keundal/compaction':
+      "@keundal/agent-contract":
+        specifier: workspace:*
+        version: link:../agent-contract
+      "@keundal/compaction":
         specifier: workspace:*
         version: link:../compaction
-      '@keundal/context':
+      "@keundal/context":
         specifier: workspace:*
         version: link:../context
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@standard-schema/spec':
-        specifier: 'catalog:'
+      "@standard-schema/spec":
+        specifier: "catalog:"
         version: 1.1.0
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/plugin-skill':
+      "@keundal/plugin-skill":
         specifier: workspace:*
         version: link:../plugin-skill
-      '@keundal/plugin-skill-filesystem':
+      "@keundal/plugin-skill-filesystem":
         specifier: workspace:*
         version: link:../plugin-skill-filesystem
-      '@keundal/plugin-store-memory':
+      "@keundal/plugin-store-memory":
         specifier: workspace:*
         version: link:../plugin-store-memory
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/agent-host:
     dependencies:
-      '@keundal/mcp':
+      "@keundal/agent-contract":
         specifier: workspace:*
-        version: link:../mcp
-      '@keundal/agent':
-        specifier: workspace:*
-        version: link:../agent
-      '@keundal/agent-plugins':
-        specifier: workspace:*
-        version: link:../agent-plugins
-      '@keundal/core':
+        version: link:../agent-contract
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@keundal/plugin-llm-anthropic':
-        specifier: workspace:*
-        version: link:../plugin-llm-anthropic
-      '@keundal/plugin-llm-gemini':
-        specifier: workspace:*
-        version: link:../plugin-llm-gemini
-      '@keundal/plugin-llm-openai':
-        specifier: workspace:*
-        version: link:../plugin-llm-openai
-      '@keundal/plugin-skill':
-        specifier: workspace:*
-        version: link:../plugin-skill
-      '@keundal/plugin-store-sqlite':
-        specifier: workspace:*
-        version: link:../plugin-store-sqlite
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/plugin-store-memory':
+      "@keundal/agent":
+        specifier: workspace:*
+        version: link:../agent
+      "@keundal/plugin-store-memory":
         specifier: workspace:*
         version: link:../plugin-store-memory
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/agent-plugins:
     dependencies:
-      '@keundal/agent':
-        specifier: workspace:*
-        version: link:../agent
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@keundal/mcp':
+      "@keundal/mcp":
         specifier: workspace:*
         version: link:../mcp
       yaml:
         specifier: 2.9.1
         version: 2.9.1
+      "@keundal/agent-contract":
+        specifier: workspace:*
+        version: link:../agent-contract
     devDependencies:
-      '@keundal/plugin-skill':
+      "@keundal/plugin-skill":
         specifier: workspace:*
         version: link:../plugin-skill
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@modelcontextprotocol/server':
+      "@modelcontextprotocol/server":
         specifier: 2.3.1
         version: 2.3.1
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/coding-agent:
     dependencies:
-      '@keundal/agent':
+      "@keundal/agent":
         specifier: workspace:*
         version: link:../agent
-      '@keundal/compaction':
+      "@keundal/compaction":
         specifier: workspace:*
         version: link:../compaction
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@standard-schema/spec':
-        specifier: 'catalog:'
+      "@standard-schema/spec":
+        specifier: "catalog:"
         version: 1.1.0
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/plugin-store-memory':
+      "@keundal/plugin-store-memory":
         specifier: workspace:*
         version: link:../plugin-store-memory
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/compaction:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@standard-schema/spec':
-        specifier: 'catalog:'
+      "@standard-schema/spec":
+        specifier: "catalog:"
         version: 1.1.0
     devDependencies:
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/context:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@keundal/fs':
+      "@keundal/fs":
         specifier: workspace:*
         version: link:../fs
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/plugin-fs-local':
+      "@keundal/plugin-fs-local":
         specifier: workspace:*
         version: link:../plugin-fs-local
-      '@keundal/plugin-store-memory':
+      "@keundal/plugin-store-memory":
         specifier: workspace:*
         version: link:../plugin-store-memory
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/core:
     dependencies:
-      '@ag-ui/core':
-        specifier: 'catalog:'
+      "@ag-ui/core":
+        specifier: "catalog:"
         version: 1.0.2(zod@4.6.7)
-      '@standard-schema/spec':
-        specifier: 'catalog:'
+      "@standard-schema/spec":
+        specifier: "catalog:"
         version: 1.1.0
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
       zod:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.6.7
     devDependencies:
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/fs:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
 
   packages/mcp:
     dependencies:
-      '@keundal/agent':
+      "@keundal/agent-contract":
         specifier: workspace:*
-        version: link:../agent
-      '@modelcontextprotocol/client':
+        version: link:../agent-contract
+      "@modelcontextprotocol/client":
         specifier: 2.3.1
         version: 2.3.1
     devDependencies:
-      '@keundal/core':
+      "@keundal/agent":
+        specifier: workspace:*
+        version: link:../agent
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@keundal/plugin-store-memory':
+      "@keundal/plugin-store-memory":
         specifier: workspace:*
         version: link:../plugin-store-memory
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@modelcontextprotocol/server':
+      "@modelcontextprotocol/server":
         specifier: 2.3.1
         version: 2.3.1
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-fs-local:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@keundal/fs':
+      "@keundal/fs":
         specifier: workspace:*
         version: link:../fs
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-fs-policy:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@keundal/fs':
+      "@keundal/fs":
         specifier: workspace:*
         version: link:../fs
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/plugin-fs-local':
+      "@keundal/plugin-fs-local":
         specifier: workspace:*
         version: link:../plugin-fs-local
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-llm-anthropic:
     dependencies:
-      '@anthropic-ai/sdk':
-        specifier: 'catalog:'
+      "@anthropic-ai/sdk":
+        specifier: "catalog:"
         version: 0.134.0(zod@4.6.7)
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@standard-schema/spec':
-        specifier: 'catalog:'
+      "@standard-schema/spec":
+        specifier: "catalog:"
         version: 1.1.0
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
       zod:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.6.7
     devDependencies:
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-llm-gemini:
     dependencies:
-      '@google/genai':
-        specifier: 'catalog:'
+      "@google/genai":
+        specifier: "catalog:"
         version: 2.28.0(supports-color@10.2.2)
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@standard-schema/spec':
-        specifier: 'catalog:'
+      "@standard-schema/spec":
+        specifier: "catalog:"
         version: 1.1.0
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
       zod:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.6.7
     devDependencies:
-      '@keundal/plugin-store-indexeddb':
+      "@keundal/plugin-store-indexeddb":
         specifier: workspace:*
         version: link:../plugin-store-indexeddb
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       fake-indexeddb:
         specifier: 6.2.6
         version: 6.2.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-llm-openai:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@standard-schema/spec':
-        specifier: 'catalog:'
+      "@standard-schema/spec":
+        specifier: "catalog:"
         version: 1.1.0
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
       openai:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 7.15.0(undici@8.12.1)(ws@8.21.3)(zod@4.6.7)
       zod:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.6.7
     devDependencies:
-      '@keundal/plugin-store-indexeddb':
+      "@keundal/plugin-store-indexeddb":
         specifier: workspace:*
         version: link:../plugin-store-indexeddb
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       fake-indexeddb:
         specifier: 6.2.6
         version: 6.2.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-shell-local:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
+      "@keundal/shell":
+        specifier: workspace:*
+        version: link:../shell
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-skill:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-skill-filesystem:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
+      "@keundal/skill-markdown":
+        specifier: workspace:*
+        version: link:../skill-markdown
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
-      yaml:
-        specifier: 2.9.1
-        version: 2.9.1
     devDependencies:
-      '@keundal/plugin-skill':
+      "@keundal/plugin-skill":
         specifier: workspace:*
         version: link:../plugin-skill
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-store-indexeddb:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@standard-schema/spec':
-        specifier: 'catalog:'
+      "@standard-schema/spec":
+        specifier: "catalog:"
         version: 1.1.0
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/store-conformance':
+      "@keundal/store-conformance":
         specifier: workspace:*
         version: link:../../tools/store-conformance
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
       fake-indexeddb:
         specifier: 6.2.6
         version: 6.2.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.4)(vite@8.3.4(@types/node@24.13.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-store-memory:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@standard-schema/spec':
-        specifier: 'catalog:'
+      "@standard-schema/spec":
+        specifier: "catalog:"
         version: 1.1.0
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/store-conformance':
+      "@keundal/store-conformance":
         specifier: workspace:*
         version: link:../../tools/store-conformance
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-store-sqlite:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@standard-schema/spec':
-        specifier: 'catalog:'
+      "@standard-schema/spec":
+        specifier: "catalog:"
         version: 1.1.0
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/store-conformance':
+      "@keundal/store-conformance":
         specifier: workspace:*
         version: link:../../tools/store-conformance
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-tool-fs:
     dependencies:
-      '@keundal/fs':
+      "@keundal/agent-contract":
+        specifier: workspace:*
+        version: link:../agent-contract
+      "@keundal/fs":
         specifier: workspace:*
         version: link:../fs
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/agent':
+      "@keundal/agent":
         specifier: workspace:*
         version: link:../agent
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@keundal/plugin-fs-local':
+      "@keundal/plugin-fs-local":
         specifier: workspace:*
         version: link:../plugin-fs-local
-      '@keundal/plugin-fs-policy':
+      "@keundal/plugin-fs-policy":
         specifier: workspace:*
         version: link:../plugin-fs-policy
-      '@keundal/plugin-store-memory':
+      "@keundal/plugin-store-memory":
         specifier: workspace:*
         version: link:../plugin-store-memory
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-tool-shell:
     dependencies:
-      '@keundal/plugin-shell-local':
+      "@keundal/agent-contract":
         specifier: workspace:*
-        version: link:../plugin-shell-local
+        version: link:../agent-contract
+      "@keundal/shell":
+        specifier: workspace:*
+        version: link:../shell
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/agent':
+      "@keundal/agent":
         specifier: workspace:*
         version: link:../agent
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
-      '@keundal/tsconfig':
+      "@keundal/plugin-shell-local":
+        specifier: workspace:*
+        version: link:../plugin-shell-local
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-transcription-openai:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../core
+      "@keundal/transcription":
+        specifier: workspace:*
+        version: link:../transcription
       cordis:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 4.0.0-rc.11
       openai:
-        specifier: 'catalog:'
-        version: 7.15.0(undici@8.12.1)(ws@8.22.0)(zod@4.6.7)
+        specifier: "catalog:"
+        version: 7.15.0(undici@8.12.1)(ws@8.21.3)(zod@4.6.7)
     devDependencies:
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../../tools/tsconfig
-      '@keundal/tsdown':
+      "@keundal/tsdown":
         specifier: workspace:*
         version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
-      '@types/ws':
+      "@types/ws":
         specifier: 8.18.2
         version: 8.18.2
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
       vitest:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
       ws:
         specifier: 8.22.0
@@ -1199,16 +1256,16 @@ importers:
 
   packages/ui:
     dependencies:
-      '@comark/nuxt':
+      "@comark/nuxt":
         specifier: ^0.7.0
         version: 0.7.0(magicast@0.5.5)(nuxt@4.6.2(f10f8451716ca2c6ce655b791cd5799d))(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
-      '@nuxt/ui':
+      "@nuxt/ui":
         specifier: ^4.11.3
         version: 4.11.3(3d9f6d5515484cabff85320d640f6c3d)
-      '@shikijs/langs':
+      "@shikijs/langs":
         specifier: ^4.5.0
         version: 4.5.0
-      '@vueuse/core':
+      "@vueuse/core":
         specifier: ^14.4.0
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
       motion-v:
@@ -1230,7 +1287,7 @@ importers:
         specifier: 3.5.44
         version: 3.5.44(typescript@6.0.3)
     devDependencies:
-      '@types/node':
+      "@types/node":
         specifier: ^24.19.2
         version: 24.19.2
       typescript:
@@ -1239,37 +1296,34 @@ importers:
 
   tools/store-conformance:
     dependencies:
-      '@keundal/core':
+      "@keundal/core":
         specifier: workspace:*
         version: link:../../packages/core
     devDependencies:
-      '@keundal/tsconfig':
+      "@keundal/tsconfig":
         specifier: workspace:*
         version: link:../tsconfig
-      '@types/node':
-        specifier: 'catalog:'
+      "@types/node":
+        specifier: "catalog:"
         version: 24.13.6
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
 
   tools/tsconfig:
     devDependencies:
       typescript:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 6.0.3
 
   tools/tsdown:
     devDependencies:
       tsdown:
-        specifier: 'catalog:'
+        specifier: "catalog:"
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
 
   packages/chat-app:
     dependencies:
-      '@keundal/mcp':
-        specifier: workspace:*
-        version: link:../mcp
       "@comark/nuxt":
         specifier: ^0.7.0
         version: 0.7.0(magicast@0.5.5)(nuxt@4.6.2(f10f8451716ca2c6ce655b791cd5799d))(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
@@ -1285,48 +1339,21 @@ importers:
       "@keundal/core":
         specifier: workspace:*
         version: link:../core
+      "@keundal/mcp":
+        specifier: workspace:*
+        version: link:../mcp
       "@keundal/ui":
         specifier: workspace:*
         version: link:../ui
-      "@keundal/agent":
-        specifier: workspace:*
-        version: link:../agent
-      "@keundal/plugin-llm-anthropic":
-        specifier: workspace:*
-        version: link:../plugin-llm-anthropic
-      "@keundal/plugin-llm-gemini":
-        specifier: workspace:*
-        version: link:../plugin-llm-gemini
-      "@keundal/plugin-llm-openai":
-        specifier: workspace:*
-        version: link:../plugin-llm-openai
-      "@keundal/plugin-skill":
-        specifier: workspace:*
-        version: link:../plugin-skill
-      "@keundal/plugin-skill-filesystem":
-        specifier: workspace:*
-        version: link:../plugin-skill-filesystem
-      "@keundal/plugin-store-indexeddb":
-        specifier: workspace:*
-        version: link:../plugin-store-indexeddb
-      "@keundal/plugin-transcription-openai":
-        specifier: workspace:*
-        version: link:../plugin-transcription-openai
       "@nuxt/ui":
         specifier: ^4.11.3
         version: 4.11.3(3d9f6d5515484cabff85320d640f6c3d)
       "@shikijs/langs":
         specifier: ^4.5.0
         version: 4.5.0
-      "@tauri-apps/api":
-        specifier: 2.12.4
-        version: 2.12.4
       "@vueuse/core":
         specifier: ^14.4.0
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
-      cordis:
-        specifier: "catalog:"
-        version: 4.0.0-rc.11
       date-fns:
         specifier: ^4.4.0
         version: 4.4.0
@@ -1360,6 +1387,12 @@ importers:
       zod:
         specifier: ^4.6.5
         version: 4.6.7
+      "@keundal/chat":
+        specifier: workspace:*
+        version: link:../chat
+      "@keundal/skill-markdown":
+        specifier: workspace:*
+        version: link:../skill-markdown
     devDependencies:
       "@keundal/plugin-store-memory":
         specifier: workspace:*
@@ -1391,6 +1424,54 @@ importers:
       vue-tsc:
         specifier: ^3.3.13
         version: 3.3.13(typescript@6.0.3)
+      "@keundal/agent":
+        specifier: workspace:*
+        version: link:../agent
+      "@keundal/plugin-llm-anthropic":
+        specifier: workspace:*
+        version: link:../plugin-llm-anthropic
+      "@keundal/plugin-llm-gemini":
+        specifier: workspace:*
+        version: link:../plugin-llm-gemini
+      "@keundal/plugin-llm-openai":
+        specifier: workspace:*
+        version: link:../plugin-llm-openai
+      "@keundal/plugin-skill":
+        specifier: workspace:*
+        version: link:../plugin-skill
+      "@keundal/plugin-skill-filesystem":
+        specifier: workspace:*
+        version: link:../plugin-skill-filesystem
+      "@keundal/plugin-store-indexeddb":
+        specifier: workspace:*
+        version: link:../plugin-store-indexeddb
+      "@keundal/plugin-transcription-openai":
+        specifier: workspace:*
+        version: link:../plugin-transcription-openai
+      "@tauri-apps/api":
+        specifier: 2.12.4
+        version: 2.12.4
+      cordis:
+        specifier: "catalog:"
+        version: 4.0.0-rc.11
+      "@keundal/plugin-chat-local":
+        specifier: workspace:*
+        version: link:../plugin-chat-local
+      "@keundal/plugin-chat-remote":
+        specifier: workspace:*
+        version: link:../plugin-chat-remote
+      "@keundal/plugin-chat-desktop":
+        specifier: workspace:*
+        version: link:../plugin-chat-desktop
+      "@keundal/plugin-chat-browser":
+        specifier: workspace:*
+        version: link:../plugin-chat-browser
+      "@keundal/plugin-llm-browser":
+        specifier: workspace:*
+        version: link:../plugin-llm-browser
+      "@keundal/agent-contract":
+        specifier: workspace:*
+        version: link:../agent-contract
 
   tools/workspace-boundaries:
     dependencies:
@@ -1404,6 +1485,393 @@ importers:
       "@types/node":
         specifier: "catalog:"
         version: 24.13.6
+  packages/agent-contract:
+    dependencies:
+      "@keundal/core":
+        specifier: workspace:*
+        version: link:../core
+      cordis:
+        specifier: "catalog:"
+        version: 4.0.0-rc.11
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      "@keundal/tsdown":
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+  packages/agent-runtime-node:
+    dependencies:
+      "@keundal/agent":
+        specifier: workspace:*
+        version: link:../agent
+      "@keundal/agent-contract":
+        specifier: workspace:*
+        version: link:../agent-contract
+      "@keundal/agent-host":
+        specifier: workspace:*
+        version: link:../agent-host
+      "@keundal/plugin-llm-anthropic":
+        specifier: workspace:*
+        version: link:../plugin-llm-anthropic
+      "@keundal/plugin-llm-gemini":
+        specifier: workspace:*
+        version: link:../plugin-llm-gemini
+      "@keundal/plugin-llm-openai":
+        specifier: workspace:*
+        version: link:../plugin-llm-openai
+      "@keundal/plugin-store-sqlite":
+        specifier: workspace:*
+        version: link:../plugin-store-sqlite
+      cordis:
+        specifier: "catalog:"
+        version: 4.0.0-rc.11
+      "@keundal/agent-plugins":
+        specifier: workspace:*
+        version: link:../agent-plugins
+      "@keundal/mcp":
+        specifier: workspace:*
+        version: link:../mcp
+      "@keundal/plugin-skill":
+        specifier: workspace:*
+        version: link:../plugin-skill
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      "@keundal/tsdown":
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+  packages/chat:
+    dependencies:
+      "@keundal/agent-contract":
+        specifier: workspace:*
+        version: link:../agent-contract
+      "@keundal/core":
+        specifier: workspace:*
+        version: link:../core
+      "@keundal/skill-markdown":
+        specifier: workspace:*
+        version: link:../skill-markdown
+      cordis:
+        specifier: "catalog:"
+        version: 4.0.0-rc.11
+      zod:
+        specifier: "catalog:"
+        version: 4.6.7
+      "@keundal/mcp":
+        specifier: workspace:*
+        version: link:../mcp
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      "@keundal/tsdown":
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+  packages/plugin-chat-browser:
+    dependencies:
+      "@keundal/chat":
+        specifier: workspace:*
+        version: link:../chat
+      "@keundal/mcp":
+        specifier: workspace:*
+        version: link:../mcp
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      "@keundal/tsdown":
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+  packages/plugin-chat-desktop:
+    dependencies:
+      "@keundal/chat":
+        specifier: workspace:*
+        version: link:../chat
+      "@keundal/plugin-chat-remote":
+        specifier: workspace:*
+        version: link:../plugin-chat-remote
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      "@keundal/tsdown":
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+  packages/plugin-chat-local:
+    dependencies:
+      "@keundal/agent-contract":
+        specifier: workspace:*
+        version: link:../agent-contract
+      "@keundal/chat":
+        specifier: workspace:*
+        version: link:../chat
+      "@keundal/core":
+        specifier: workspace:*
+        version: link:../core
+      cordis:
+        specifier: "catalog:"
+        version: 4.0.0-rc.11
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      "@keundal/tsdown":
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+  packages/plugin-chat-remote:
+    dependencies:
+      "@keundal/chat":
+        specifier: workspace:*
+        version: link:../chat
+      "@keundal/core":
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      "@keundal/tsdown":
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+  packages/plugin-llm-browser:
+    dependencies:
+      "@keundal/chat":
+        specifier: workspace:*
+        version: link:../chat
+      "@keundal/core":
+        specifier: workspace:*
+        version: link:../core
+      "@keundal/plugin-llm-anthropic":
+        specifier: workspace:*
+        version: link:../plugin-llm-anthropic
+      "@keundal/plugin-llm-gemini":
+        specifier: workspace:*
+        version: link:../plugin-llm-gemini
+      "@keundal/plugin-llm-openai":
+        specifier: workspace:*
+        version: link:../plugin-llm-openai
+      cordis:
+        specifier: "catalog:"
+        version: 4.0.0-rc.11
+      zod:
+        specifier: "catalog:"
+        version: 4.6.7
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      "@keundal/tsdown":
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+  packages/plugin-transcription-browser:
+    dependencies:
+      "@keundal/chat":
+        specifier: workspace:*
+        version: link:../chat
+      "@keundal/plugin-transcription-openai":
+        specifier: workspace:*
+        version: link:../plugin-transcription-openai
+      cordis:
+        specifier: "catalog:"
+        version: 4.0.0-rc.11
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      "@keundal/tsdown":
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+  packages/shell:
+    dependencies:
+      "@keundal/core":
+        specifier: workspace:*
+        version: link:../core
+      cordis:
+        specifier: "catalog:"
+        version: 4.0.0-rc.11
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      "@keundal/tsdown":
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+  packages/skill-markdown:
+    dependencies:
+      "@keundal/core":
+        specifier: workspace:*
+        version: link:../core
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      "@keundal/tsdown":
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+  packages/transcription:
+    dependencies:
+      "@keundal/core":
+        specifier: workspace:*
+        version: link:../core
+      cordis:
+        specifier: "catalog:"
+        version: 4.0.0-rc.11
+    devDependencies:
+      "@keundal/tsconfig":
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      "@keundal/tsdown":
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      "@types/node":
+        specifier: "catalog:"
+        version: 24.13.6
+      tsdown:
+        specifier: "catalog:"
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: "catalog:"
+        version: 6.0.3
+      vitest:
+        specifier: "catalog:"
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
 packages:
 

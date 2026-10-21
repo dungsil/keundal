@@ -1,15 +1,15 @@
 import { EventType } from '@keundal/core'
 import { shallowRef } from 'vue'
 
-import type { ChatMessage, ChatStatus, FilePart } from '../../shared/utils/chat-message'
-import type { ChatStore } from '../../shared/utils/chat-store'
+import type { ChatMessage, ChatStatus, FilePart } from '@keundal/chat/chat-message'
+import type { ChatStoreLike } from '@keundal/chat/chat-store'
 
 export function useKeundalChat(options: {
   respond: (
     messages: ChatMessage[],
     onMessage: (message: ChatMessage) => void,
     signal: AbortSignal
-  ) => ReturnType<ChatStore['respond']>
+  ) => ReturnType<ChatStoreLike['respond']>
   onFinish?: () => Promise<void>
   onError?: (error: Error) => void
 }) {

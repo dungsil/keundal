@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
-import { resolveModel } from '../../../shared/utils/models'
+import { resolveModel } from '@keundal/chat/models'
 
 const { t } = useLocale()
 

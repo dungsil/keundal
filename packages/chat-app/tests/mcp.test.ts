@@ -1,10 +1,12 @@
 import { Context } from 'cordis'
 import { EventType, LLMService, type LLMRequest, type LLMEvent } from '@keundal/core'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
-import { createKeundalChat } from '../shared/utils/keundal'
+import { createKeundalChat } from '@keundal/plugin-chat-local/keundal'
+import agentPlugin from '@keundal/agent'
+import { createChatTools } from '@keundal/chat/tools/agent'
 import type { invoke } from '@tauri-apps/api/core'
 import { expect, test, vi } from 'vitest'
-import { McpManager } from '../shared/utils/mcp'
+import { McpManager } from '@keundal/plugin-chat-browser/mcp'
 
 function storage() {
   const values = new Map<string, string>()
@@ -107,7 +109,7 @@ test('웹 대화의 에이전트는 MCP 도구를 실행하고 결과를 모델�
     await llm.dispose()
   })
   const tools = vi.fn(async () => [{ name: 'mcp__docs__tool__search', description: 'Search', parameters: { type: 'object' }, execute: async () => JSON.stringify({ content: [{ type: 'text', text: 'MCP search result' }] }) }])
-  const runtime = await createKeundalChat(ctx, 'openai/gpt-5-nano', { tools })
+  const runtime = await createKeundalChat(ctx, 'openai/gpt-5-nano', {}, async (ctx, config) => ctx.plugin(agentPlugin, { ...config, tools: async () => [...createChatTools(), ...await tools()] }))
   t.onTestFinished(() => runtime.dispose())
   const events = []
   for await (const event of runtime.respond({ threadId: 'chat', instructions: 'Be helpful.', messages: [{ id: 'question', role: 'user', parts: [{ type: 'text', text: 'Review my code.' }] }] })) events.push(event)

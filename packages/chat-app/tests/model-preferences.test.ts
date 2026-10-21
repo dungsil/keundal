@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { DEFAULT_MODEL_KEY, MODEL_KEY, TITLE_MODEL_KEY, readModelPreference, saveTitleModel, loadModelPreferences, saveDefaultModel } from '../shared/utils/model-preferences'
+import { DEFAULT_MODEL_KEY, MODEL_KEY, TITLE_MODEL_KEY, readModelPreference, saveTitleModel, loadModelPreferences, saveDefaultModel } from '@keundal/chat/model-preferences'
 
 function storage() {
   const values = new Map<string, string>()

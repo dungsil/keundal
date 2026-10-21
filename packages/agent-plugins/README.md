@@ -5,28 +5,31 @@
 ## 호스트에 연결
 
 ```ts
-import { createAgentHost } from '@keundal/agent-host'
+import { createNodeAgentHost, createNodeComposition } from '@keundal/agent-runtime-node'
 
-const host = await createAgentHost({
-  provider: 'openai',
-  apiKey: process.env.OPENAI_API_KEY!,
-  model: 'your-model',
-  sqlitePath: '.data/keundal.sqlite',
-  plugins: [
-    {
-      root: '/installed/plugins/reports',
-      dataDirectory: '/data/plugins/reports-instance',
-      mcp: { permissions: { reports: { tools: ['search'] } } }
-    }
-  ]
-})
+const host = await createNodeAgentHost(
+  {
+    provider: 'openai',
+    apiKey: process.env.OPENAI_API_KEY!,
+    model: 'your-model',
+    sqlitePath: '.data/keundal.sqlite',
+    plugins: [
+      {
+        root: '/installed/plugins/reports',
+        dataDirectory: '/data/plugins/reports-instance',
+        mcp: { permissions: { reports: { tools: ['search'] } } }
+      }
+    ]
+  },
+  createNodeComposition
+)
 
 // 스킬은 skill 도구로 읽고 MCP 도구는 기존 에이전트 실행 루프에서 호출합니다.
 console.log(host.plugins.flatMap((plugin) => plugin.diagnostics))
 await host.dispose()
 ```
 
-`createAgentRuntime(env, { plugins })`에서도 같은 설정을 전달할 수 있습니다. 기존 `tools`와 플러그인의 도구를 함께 사용합니다. 플러그인 설정이 없으면 기존 호스트 동작을 유지합니다.
+`createAgentRuntime(env, { plugins, compose: createNodeComposition })`에서도 같은 설정을 전달할 수 있습니다. 기존 `tools`와 플러그인의 도구를 함께 사용합니다. 플러그인 설정이 없으면 기존 호스트 동작을 유지합니다.
 
 ## 직접 조합
 

@@ -80,7 +80,7 @@ Windows 포터블 배포는 이 프로젝트에서 구성한 방식이며, Tauri
 
 ## 로컬 호스트
 
-데스크톱은 Tauri 창과 함께 Node.js 호스트를 sidecar 프로세스로 실행합니다. 호스트 진입점인 `sidecar/main.ts`는 `@keundal/agent-host/runtime`을 직접 사용하며 SQLite 파일을 앱 데이터 디렉터리에 저장합니다. 웹 서버를 실행하거나 웹 서버 번들을 복사하지 않습니다.
+데스크톱은 Tauri 창과 함께 Node.js 호스트를 sidecar 프로세스로 실행합니다. 호스트 진입점인 `sidecar/main.ts`는 `@keundal/agent-runtime-node`을 직접 사용하며 SQLite 파일을 앱 데이터 디렉터리에 저장합니다. 웹 서버를 실행하거나 웹 서버 번들을 복사하지 않습니다.
 
 - 채팅 입력창의 모델 선택기에서 공급자와 모델을 바꿉니다. 저장한 선택이 없으면 OS 보안 저장소에 설정한 첫 공급자를 고르며, 공급자 순서는 OpenAI, Anthropic, Google Gemini입니다. API 키 없이 주소나 헤더만 설정한 공급자도 사용할 수 있습니다.
 - 저장한 모델 선택이 없으면 `KEUNDAL_MODEL` 환경 변수를 사용하며, 환경 변수도 없으면 공급자별 기본 모델을 사용합니다. 설정한 공급자가 하나도 없으면 OpenAI를 기본값으로 사용합니다.
@@ -113,6 +113,8 @@ rustc --edition=2021 --test apps/desktop/src-tauri/src/skill_files.rs -o /tmp/ke
 ```
 
 아이콘은 `packages/chat-app/public/favicon.ico`에서 Tauri CLI의 `icon` 명령으로 생성했습니다.
+
+앱별 플러그인은 `app/platform.ts`에서 조립합니다. [계약과 구현의 경계](../../docs/plugin-composition.md)를 참고합니다.
 
 ## MCP
 

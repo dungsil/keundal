@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { ChartUIToolInvocation } from '@keundal/chat/tools/chart'
+
 const { t, intlLocale } = useLocale()
 
 const props = defineProps<{

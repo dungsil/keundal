@@ -1,14 +1,7 @@
-import { SummaryCompactionConfigSchema, type SummaryCompactionConfig } from '@keundal/compaction'
+import type { CompactionPolicy, AgentCompactionConfig } from '@keundal/agent-contract'
+import { SummaryCompactionConfigSchema } from '@keundal/compaction'
 import type { CompactionResult, RunAgentInput } from '@keundal/core'
-
-export interface CompactionPolicy extends SummaryCompactionConfig {
-  readonly threshold?: number
-  readonly reserveTokens?: number
-}
-
-export interface AgentCompactionConfig extends CompactionPolicy {
-  readonly models?: Readonly<Record<string, CompactionPolicy>>
-}
+export type { CompactionPolicy, AgentCompactionConfig } from '@keundal/agent-contract'
 
 function policy(value: unknown): CompactionPolicy {
   if (value === undefined) value = {}

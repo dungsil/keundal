@@ -1,4 +1,4 @@
-import type { ExecutableTool } from '@keundal/agent'
+import type { ExecutableTool } from '@keundal/agent-contract'
 import type { FileSystemOptions } from '@keundal/fs'
 import { Service, type Context } from 'cordis'
 

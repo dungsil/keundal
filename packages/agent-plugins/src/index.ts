@@ -3,7 +3,7 @@ import { constants } from 'node:fs'
 import { access, mkdir, readFile, realpath } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-import type { ExecutableTool } from '@keundal/agent'
+import type { ExecutableTool } from '@keundal/agent-contract'
 import type { ExecutionOptions, SkillProvider } from '@keundal/core'
 import { McpClient, type McpClientConfig, type McpPermissions } from '@keundal/mcp'
 

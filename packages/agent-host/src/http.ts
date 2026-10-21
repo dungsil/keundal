@@ -15,7 +15,7 @@ import {
   type SessionCommit
 } from '@keundal/core'
 
-import type { AgentHostModel, AgentHostRunOptions, AgentHostServices } from './index.js'
+import type { AgentHostModel, AgentHostRunOptions, AgentHostServices } from './contracts.js'
 
 /** HTTP 계층이 접근하는 에이전트 표면입니다. `@keundal/agent-host`가 이 모양을 만듭니다. */
 export interface AgentAppServices extends Omit<AgentHostServices, 'run'> {

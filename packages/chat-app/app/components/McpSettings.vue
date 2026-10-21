@@ -3,7 +3,7 @@ import type { McpClientConfig } from '@keundal/mcp/browser'
 
 const { t } = useLocale()
 const { $mcpManager, $saveMcpSettings, $remoteAgent } = useNuxtApp()
-const desktop = useRuntimeConfig().public.desktop
+const desktop = useRuntimeConfig().public.chatCapabilities.secureSettings
 const hosted = $remoteAgent && !desktop
 const servers = ref($mcpManager.configuration)
 const editing = ref<number | null>(null)

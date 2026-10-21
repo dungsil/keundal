@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],
   ui: { fonts: false },
   spaLoadingTemplate: fileURLToPath(new URL('./app/spa-loading-template.html', import.meta.url)),
-  runtimeConfig: { public: { desktop: false, agentEndpoint: '', agentToken: '' } },
+  runtimeConfig: { public: { chatCapabilities: { secureSettings: false, localSkills: false }, agentEndpoint: '', agentToken: '' } },
   experimental: {
     viewTransition: true,
     defaults: { nuxtLink: { prefetchOn: { visibility: false, interaction: true } } }

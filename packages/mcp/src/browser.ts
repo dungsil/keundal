@@ -1,5 +1,5 @@
 export { parseMcpServers } from './config.js'
-import type { ExecutableTool } from '@keundal/agent'
+import type { ExecutableTool } from '@keundal/agent-contract'
 import { Client, StreamableHTTPClientTransport, type RequestOptions } from '@modelcontextprotocol/client'
 import type { Transport } from '@modelcontextprotocol/client'
 

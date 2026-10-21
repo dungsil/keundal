@@ -1,0 +1,39 @@
+{
+  "name": "@keundal/plugin-llm-browser",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./models": {
+      "types": "./dist/models.d.ts",
+      "import": "./dist/models.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@keundal/chat": "workspace:*",
+    "@keundal/core": "workspace:*",
+    "@keundal/plugin-llm-anthropic": "workspace:*",
+    "@keundal/plugin-llm-gemini": "workspace:*",
+    "@keundal/plugin-llm-openai": "workspace:*",
+    "cordis": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/tsconfig": "workspace:*",
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

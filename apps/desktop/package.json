@@ -22,7 +22,14 @@
   },
   "dependencies": {
     "@keundal/chat-app": "workspace:*",
-    "nuxt": "^4.6.2"
+    "nuxt": "^4.6.2",
+    "@keundal/agent-runtime-node": "workspace:*",
+    "@keundal/chat": "workspace:*",
+    "@keundal/plugin-chat-desktop": "workspace:*",
+    "@keundal/plugin-llm-browser": "workspace:*",
+    "@tauri-apps/api": "2.12.4",
+    "@keundal/plugin-transcription-browser": "workspace:*",
+    "@keundal/plugin-chat-browser": "workspace:*"
   },
   "devDependencies": {
     "@keundal/agent-host": "workspace:*",

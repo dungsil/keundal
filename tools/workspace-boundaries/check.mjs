@@ -12,6 +12,22 @@ function isWithin(path, directory) {
 }
 
 const groups = ['apps', 'packages', 'tools', 'examples']
+const implementationIndependent = new Set([
+  '@keundal/chat-app',
+  '@keundal/chat',
+  '@keundal/core',
+  '@keundal/agent-contract',
+  '@keundal/agent-host',
+  '@keundal/fs',
+  '@keundal/shell',
+  '@keundal/transcription'
+])
+const isImplementation = (name) =>
+  name.startsWith('@keundal/plugin-') ||
+  name === '@keundal/agent' ||
+  name === '@keundal/agent-runtime-node' ||
+  name.startsWith('@tauri-apps/')
+
 const ignored = new Set(['node_modules', 'dist', 'target', 'coverage'])
 
 async function* sources(directory) {
@@ -79,6 +95,21 @@ export async function checkWorkspaceBoundaries(root) {
     for await (const file of sources(workspace.directory)) {
       const source = await readFile(file, 'utf8')
       for (const value of strings(source, file)) {
+        const local = relative(workspace.directory, file)
+        if (implementationIndependent.has(workspace.manifest.name) && /^(src|app|shared)[/\\]/.test(local)) {
+          const target = value.startsWith('.') ? resolve(dirname(file), value) : null
+          const implementation = workspaces.find(
+            (candidate) =>
+              isImplementation(candidate.manifest.name) &&
+              (value === candidate.manifest.name ||
+                value.startsWith(`${candidate.manifest.name}/`) ||
+                (target && isWithin(target, candidate.directory)))
+          )
+          if (implementation || value.startsWith('@tauri-apps/')) {
+            errors.push(`${relative(root, file)}: ${value} couples a contract/UI package to an implementation`)
+          }
+        }
+
         for (const app of apps) {
           if (app.directory === workspace.directory) continue
           const name = app.manifest.name
@@ -105,6 +136,15 @@ export async function checkWorkspaceBoundaries(root) {
       if (file === resolve(workspace.directory, 'package.json')) {
         for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
           for (const name of Object.keys(workspace.manifest[field] ?? {})) {
+            if (
+              field !== 'devDependencies' &&
+              implementationIndependent.has(workspace.manifest.name) &&
+              isImplementation(name)
+            ) {
+              errors.push(
+                `${relative(root, file)}: ${field}.${name} couples a contract/UI package to an implementation`
+              )
+            }
             const app = apps.find((candidate) => candidate.manifest.name === name)
             if (app && app.directory !== workspace.directory) {
               errors.push(`${relative(root, file)}: ${field}.${name} references app ${name}`)
