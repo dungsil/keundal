@@ -52,12 +52,13 @@ jobs:
           require-lockfile: true
 
       - name: Turbo 공유 캐시 설정
-        uses: rharkor/caching-for-turbo@760158c05c47e7a764f78e9a22ca3b5a6ed8c52e # v2.5.2
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
-          provider: github
-          cache-prefix: turbo-v3-${{ runner.os }}-${{ runner.arch }}-
-          use-relative-cache-path: true
-          server-port: 0
+          path: .turbo/cache
+          key: turbo-v4-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            turbo-v4-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
+            turbo-v4-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Workers 빌드
         run: pnpm exec turbo run build:cloudflare --filter=@keundal/web
