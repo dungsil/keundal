@@ -123,15 +123,18 @@ test('reasoning을 켠 한 토큰 예산을 비활성화로 바꾸지 않고 거
   expect(requests).toHaveLength(0)
 })
 
-test.for(['webSearch', 'reasoning'] as const)('%s가 boolean이 아니면 공급자 호출 전에 거부한다', async (key, t) => {
-  const { ctx, requests } = await setup(t, () => {
-    throw new Error('unexpected HTTP call')
-  })
-  const invalid = { ...request, [key]: 'true' } as LLMRequest
-  await expect(ctx.llm.countTokens(invalid)).rejects.toThrow('must be a boolean')
-  await expect(collect(ctx.llm.stream(invalid))).rejects.toThrow('must be a boolean')
-  expect(requests).toHaveLength(0)
-})
+test.for(['webSearch', 'reasoning'] as const)(
+  '%s에 지원하지 않는 값을 넣으면 공급자 호출 전에 거부한다',
+  async (key, t) => {
+    const { ctx, requests } = await setup(t, () => {
+      throw new Error('unexpected HTTP call')
+    })
+    const invalid = { ...request, [key]: 'true' } as LLMRequest
+    await expect(ctx.llm.countTokens(invalid)).rejects.toThrow('must be a boolean')
+    await expect(collect(ctx.llm.stream(invalid))).rejects.toThrow('must be a boolean')
+    expect(requests).toHaveLength(0)
+  }
+)
 
 test('streamGenerateContent 요청을 보내고 분할된 UTF-8 SSE를 실행 수명 이벤트 없이 변환한다', async (t) => {
   const { ctx, requests } = await setup(t, async (_request, response) => {
@@ -825,3 +828,14 @@ test('큰 중첩 공급자 payload를 변환하거나 반환하기 전에 거부
   expect(accepted).toHaveLength(0)
   await closed.promise
 })
+
+test.for(['low', 'medium', 'high'] as const)(
+  '%s 추론 수준을 이전 Gemini 모델의 사고 예산으로 변환한다',
+  async (reasoning, t) => {
+    const { ctx, requests } = await setup(t, (_received, response) => send(response, textChunks))
+    await collect(ctx.llm.stream({ ...request, reasoning }))
+    expect(requests[0]!.body.generationConfig).toMatchObject({
+      thinkingConfig: { includeThoughts: true, thinkingBudget: { low: 8, medium: 16, high: 24 }[reasoning] }
+    })
+  }
+)

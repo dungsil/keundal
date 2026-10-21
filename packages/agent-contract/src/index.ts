@@ -1,4 +1,4 @@
-import type { AGUIEvent, AgentTool, ExecutionOptions, RunAgentInput } from '@keundal/core'
+import type { Reasoning, AGUIEvent, AgentTool, ExecutionOptions, RunAgentInput } from '@keundal/core'
 import { Service, type Context } from 'cordis'
 
 export const TOOL_PROGRESS_EVENT = 'keundal.tool.progress'
@@ -34,7 +34,7 @@ export interface AgentConfig {
   readonly model: string
   readonly maxOutputTokens: number
   readonly webSearch?: boolean
-  readonly reasoning?: boolean
+  readonly reasoning?: Reasoning
   readonly compaction?: AgentCompactionConfig
   readonly tools?: readonly ExecutableTool[] | ToolProvider
   readonly subagents?: boolean

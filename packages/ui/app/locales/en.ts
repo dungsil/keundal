@@ -67,6 +67,7 @@ export default {
   'prompt.search': 'Web search',
   'prompt.unsupported': 'Not available with this model',
   'prompt.reasoning': 'Extended thinking',
+  'prompt.reasoningLevel': 'Reasoning level',
   'prompt.menu': 'Open prompt menu',
   'dictation.listening': 'Listening...',
   'dictation.transcribing': 'Transcribing...',

@@ -204,15 +204,18 @@ test('네이티브 검색과 인용 뒤의 함수 호출을 로컬 호출과 구
   expect(requests[3]!.body.reasoning).toEqual({ effort: 'none' })
 })
 
-test.for(['webSearch', 'reasoning'] as const)('%s가 boolean이 아니면 공급자 호출 전에 거부한다', async (key, t) => {
-  const { ctx, requests } = await setup(t, () => {
-    throw new Error('unexpected HTTP call')
-  })
-  const invalid = { ...request, [key]: 'true' } as LLMRequest
-  await expect(ctx.llm.countTokens(invalid)).rejects.toThrow('must be a boolean')
-  await expect(collect(ctx.llm.stream(invalid))).rejects.toThrow('must be a boolean')
-  expect(requests).toHaveLength(0)
-})
+test.for(['webSearch', 'reasoning'] as const)(
+  '%s에 지원하지 않는 값을 넣으면 공급자 호출 전에 거부한다',
+  async (key, t) => {
+    const { ctx, requests } = await setup(t, () => {
+      throw new Error('unexpected HTTP call')
+    })
+    const invalid = { ...request, [key]: 'true' } as LLMRequest
+    await expect(ctx.llm.countTokens(invalid)).rejects.toThrow('must be a boolean')
+    await expect(collect(ctx.llm.stream(invalid))).rejects.toThrow('must be a boolean')
+    expect(requests).toHaveLength(0)
+  }
+)
 
 test('Responses 요청을 보내고 분할된 UTF-8 SSE를 실행 수명 이벤트 없이 변환한다', async (t) => {
   const { ctx, requests } = await setup(t, async (_request, response) => {

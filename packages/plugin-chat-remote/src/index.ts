@@ -5,7 +5,7 @@ import { validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
-import { EventType, type AGUIEvent, type GenerationSnapshot, type SessionSnapshot } from '@keundal/core'
+import { type Reasoning, EventType, type AGUIEvent, type GenerationSnapshot, type SessionSnapshot } from '@keundal/core'
 
 type ChatState = { web: LocalChat }
 
@@ -229,7 +229,7 @@ export class RemoteChatStore implements ChatStoreLike {
       messages: ChatMessage[]
       model: string
       titleModel?: string
-      reasoning?: boolean
+      reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void
       onTitle?: (title: string) => void
@@ -273,7 +273,10 @@ export class RemoteChatStore implements ChatStoreLike {
       try {
         const response = await this.call('/runs', {
           method: 'POST',
-          headers: { 'x-keundal-model': selected.id },
+          headers: {
+            'x-keundal-model': selected.id,
+            ...(request.reasoning === undefined ? {} : { 'x-keundal-reasoning': String(request.reasoning) })
+          },
           signal: combined,
           body: JSON.stringify({
             threadId: id,

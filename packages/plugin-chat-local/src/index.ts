@@ -1,7 +1,7 @@
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import { validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
-import type { AGUIEvent, SessionSnapshot } from '@keundal/core'
+import type { Reasoning, AGUIEvent, SessionSnapshot } from '@keundal/core'
 import type { Context } from 'cordis'
 
 import { createKeundalChat, toMessages } from './keundal'
@@ -135,7 +135,7 @@ export class ChatStore implements ChatStoreLike {
       messages: ChatMessage[]
       model: string
       titleModel?: string
-      reasoning?: boolean
+      reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void
       onTitle?: (title: string) => void
