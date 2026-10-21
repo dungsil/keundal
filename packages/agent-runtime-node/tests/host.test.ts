@@ -23,6 +23,228 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
+test('외부 매니페스트가 파일과 import 전용 패키지를 불러오고 사용자 공급자를 유지한다', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-runtime-plugins-'))
+  directories.push(directory)
+  const pluginDirectory = join(directory, 'plugins')
+  const packageDirectory = join(directory, 'node_modules', 'runtime-fixture')
+  mkdirSync(pluginDirectory, { recursive: true })
+  mkdirSync(packageDirectory, { recursive: true })
+  writeFileSync(
+    join(pluginDirectory, 'llm.mjs'),
+    `export default Object.assign(ctx => {
+    ctx.provide('llm', {
+      async getModel() { return { contextWindow: 128000, maxOutputTokens: 4096 } },
+      async countTokens() { return 10 },
+      async *stream(request) {
+        const result = request.input.messages.find(message => message.role === 'tool')
+        if (!result) {
+          yield { type: 'TOOL_CALL_START', toolCallId: 'manifest-call', toolCallName: 'manifest_tool' }
+          yield { type: 'TOOL_CALL_ARGS', toolCallId: 'manifest-call', delta: '{}' }
+          yield { type: 'TOOL_CALL_END', toolCallId: 'manifest-call' }
+          return
+        }
+        yield { type: 'TEXT_MESSAGE_START', messageId: 'external-answer', role: 'assistant' }
+        yield { type: 'TEXT_MESSAGE_CONTENT', messageId: 'external-answer', delta: ctx.runtimeFixture.prefix + result.content }
+        yield { type: 'TEXT_MESSAGE_END', messageId: 'external-answer' }
+      }
+    })
+  }, { inject: ['runtimeFixture'] })`
+  )
+  writeFileSync(
+    join(packageDirectory, 'package.json'),
+    JSON.stringify({ name: 'runtime-fixture', type: 'module', exports: { import: './index.mjs' } })
+  )
+  writeFileSync(
+    join(packageDirectory, 'index.mjs'),
+    "export default (ctx, config) => { ctx.provide('runtimeFixture', { prefix: config.prefix }) }"
+  )
+  writeFileSync(
+    join(pluginDirectory, 'tools.mjs'),
+    "export function createTools(config) { return [{ name: 'manifest_tool', description: config.description, parameters: { type: 'object' }, execute: async () => 'runtime-tool-result' }] }"
+  )
+  const manifestPath = join(directory, 'keundal.plugins.json')
+  writeFileSync(
+    manifestPath,
+    JSON.stringify({
+      plugins: [
+        { module: 'runtime-fixture', config: { prefix: 'external-package: ' } },
+        { module: './plugins/llm.mjs' },
+        { module: 'builtin:store', config: { path: join(directory, 'store.sqlite') } }
+      ],
+      agent: { module: 'builtin:agent', config: { subagents: false } },
+      tools: [{ module: './plugins/tools.mjs', export: 'createTools', config: { description: 'Manifest tool' } }]
+    })
+  )
+  const runtime = await createAgentRuntime(
+    {
+      KEUNDAL_PROVIDER: 'external-provider',
+      KEUNDAL_MODEL: 'custom-model',
+      KEUNDAL_API_TOKEN: 'runtime-test-token',
+      KEUNDAL_PLUGIN_CONFIG: manifestPath
+    },
+    {
+      compose: createNodeComposition,
+      defaultTools: [
+        { name: 'default-tool', description: 'Default', parameters: { type: 'object' }, execute: async () => '' }
+      ],
+      tools: [{ name: 'option-tool', description: 'Option', parameters: { type: 'object' }, execute: async () => '' }]
+    }
+  )
+  hosts.push(runtime)
+  expect(runtime.services.models()).toEqual([
+    { id: 'custom-model', provider: 'external-provider', contextWindow: 128000, maxOutputTokens: 4096 }
+  ])
+  expect((await runtime.services.catalog?.())?.tools.map(({ name }) => name)).toEqual(['manifest_tool', 'option-tool'])
+  const events = []
+  for await (const event of runtime.services.run({
+    threadId: 'manifest-thread',
+    runId: 'manifest-run',
+    state: {},
+    tools: [],
+    context: [],
+    messages: [{ id: 'user', role: 'user', content: 'Use the configured tool' }]
+  }))
+    events.push(event)
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect((await runtime.services.session.get('manifest-thread'))?.messages).toContainEqual(
+    expect.objectContaining({ role: 'assistant', content: 'external-package: runtime-tool-result' })
+  )
+})
+
+test('매니페스트에 tools가 없으면 defaultTools와 options.tools를 함께 제공한다', async () => {
+  const host = await createAgentRuntime(
+    {
+      KEUNDAL_PROVIDER: 'openai',
+      OPENAI_API_KEY: 'test-key',
+      KEUNDAL_MODEL: 'small',
+      KEUNDAL_API_TOKEN: 'runtime-test-token',
+      KEUNDAL_SQLITE_PATH: sqlitePath()
+    },
+    {
+      compose: createNodeComposition,
+      runtimePlugins: {
+        plugins: [{ module: 'builtin:llm' }, { module: 'builtin:store' }],
+        agent: { module: 'builtin:agent' }
+      },
+      defaultTools: [
+        { name: 'default-tool', description: 'Default', parameters: { type: 'object' }, execute: async () => '' }
+      ],
+      tools: [{ name: 'option-tool', description: 'Option', parameters: { type: 'object' }, execute: async () => '' }]
+    }
+  )
+  hosts.push(host)
+  expect((await host.services.catalog?.())?.tools.map(({ name }) => name)).toEqual(['default-tool', 'option-tool'])
+})
+
+test('명시한 매니페스트 파일이 없으면 기본 구성을 사용하지 않는다', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-missing-manifest-'))
+  directories.push(directory)
+  await expect(
+    createAgentRuntime(
+      { KEUNDAL_PROVIDER: 'openai', KEUNDAL_MODEL: 'test', KEUNDAL_PLUGIN_CONFIG: join(directory, 'missing.json') },
+      { compose: createNodeComposition }
+    )
+  ).rejects.toThrow('failed to read runtime plugin manifest')
+})
+
+test('builtin LLM은 알 수 없는 공급자를 기본값으로 대체하지 않는다', async () => {
+  await expect(
+    createAgentRuntime(
+      { KEUNDAL_PROVIDER: 'unknown-provider', KEUNDAL_MODEL: 'small' },
+      {
+        compose: createNodeComposition,
+        runtimePlugins: {
+          plugins: [{ module: 'builtin:llm' }],
+          agent: { module: 'builtin:agent' }
+        }
+      }
+    )
+  ).rejects.toThrow('unsupported KEUNDAL_PROVIDER for builtin:llm: unknown-provider')
+})
+
+test('플러그인 setup 오류가 먼저 등록한 정리 효과를 실행한다', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-runtime-cleanup-'))
+  directories.push(directory)
+  const cleanupKey = '__keundal_runtime_cleanup_test__'
+  const globalState = globalThis as typeof globalThis & { __keundal_runtime_cleanup_test__?: string[] }
+  globalState[cleanupKey] = []
+  writeFileSync(
+    join(directory, 'cleanup.mjs'),
+    `export default ctx => ctx.effect(() => () => globalThis.${cleanupKey}.push('disposed'))`
+  )
+  writeFileSync(join(directory, 'fail.mjs'), "export default () => { throw new Error('fixture setup failure') }")
+  try {
+    await expect(
+      createAgentRuntime(
+        { KEUNDAL_PROVIDER: 'openai', KEUNDAL_MODEL: 'test' },
+        {
+          compose: createNodeComposition,
+          runtimePluginBasePath: directory,
+          runtimePlugins: {
+            plugins: [{ module: './cleanup.mjs' }, { module: './fail.mjs' }],
+            agent: { module: 'builtin:agent' }
+          }
+        }
+      )
+    ).rejects.toThrow('fixture setup failure')
+    expect(globalState[cleanupKey]).toEqual(['disposed'])
+  } finally {
+    delete globalState[cleanupKey]
+  }
+})
+
+test('외부 에이전트는 설정한 모델 예산을 유지하며 생성한 답변을 저장한다', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-runtime-agent-'))
+  directories.push(directory)
+  writeFileSync(
+    join(directory, 'agent.mjs'),
+    `export default Object.assign((ctx, config) => {
+    ctx.provide('agent', { async *run(input, execution) {
+      const prepared = await ctx.session.prepare(input, execution)
+      yield* ctx.generation.run({ input: prepared.input, sessionRevision: prepared.revision, model: config.model, maxOutputTokens: config.maxOutputTokens }, {
+        ...execution,
+        stream: async function* () {
+          yield { type: 'TEXT_MESSAGE_START', messageId: 'custom-answer', role: 'assistant' }
+          yield { type: 'TEXT_MESSAGE_CONTENT', messageId: 'custom-answer', delta: config.label + ':' + config.model + ':' + config.maxOutputTokens }
+          yield { type: 'TEXT_MESSAGE_END', messageId: 'custom-answer' }
+        }
+      })
+    } })
+  }, { inject: ['session', 'generation'] })`
+  )
+  const host = await createNodeAgentHost(
+    {
+      provider: 'openai',
+      apiKey: '',
+      model: 'small',
+      models: { small: { contextWindow: 8000, maxOutputTokens: 500 } },
+      maxOutputTokens: 2000,
+      sqlitePath: ':memory:',
+      runtimePluginBasePath: directory,
+      runtimePlugins: {
+        plugins: [{ module: 'builtin:llm' }, { module: 'builtin:store' }],
+        agent: { module: './agent.mjs', config: { label: 'external', model: 'wrong', maxOutputTokens: 9000 } }
+      }
+    },
+    createNodeComposition
+  )
+  hosts.push(host)
+  const events = []
+  for await (const event of host.services.run({
+    threadId: 'external-agent-thread',
+    runId: 'external-agent-run',
+    state: {},
+    tools: [],
+    context: [],
+    messages: [{ id: 'user', role: 'user', content: 'Run the configured agent' }]
+  }))
+    events.push(event)
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect((await host.services.session.get('external-agent-thread'))?.messages).toContainEqual(
+    expect.objectContaining({ role: 'assistant', content: 'external:small:500' })
+  )
+})
 test('설정한 모델 목록과 기본 모델을 노출한다', async () => {
   const host = await createAgentHost({
     provider: 'openai',

@@ -8,7 +8,7 @@ const host = process.env.KEUNDAL_HOST ?? '127.0.0.1'
 const port = Number(process.env.PORT ?? (sidecar ? 0 : 8000))
 if (!host.trim()) throw new Error('KEUNDAL_HOST는 비어 있을 수 없습니다.')
 if (!Number.isSafeInteger(port) || port < 0 || port > 65_535) throw new Error('PORT가 올바르지 않습니다.')
-const agentHost = await createAgentRuntime(process.env, { tools: createChatTools(), compose: createNodeComposition })
+const agentHost = await createAgentRuntime(process.env, { defaultTools: createChatTools(), compose: createNodeComposition })
 const app = agentHost.app
 
 const server = createServer(app).listen(port, host, () => {

@@ -63,8 +63,8 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
           store,
           remoteAgent: false,
           catalog: async execution => ({
-            skills: (await root.skills.prepare(execution)).skills,
-            tools: (await mcp.tools(execution)).map(({ name, description }) => ({ name, description }))
+            skills: root.skills ? (await root.skills.prepare(execution)).skills : [],
+            tools: (await composition.tools?.(execution ?? {}) ?? []).map(({ name, description }) => ({ name, description }))
           }),
           dispose: async () => {
             try {

@@ -1,6 +1,6 @@
 # 플랫폼별 플러그인 조립
 
-web과 desktop은 공통 UI를 사용하면서 각 앱의 `app/platform.ts`에서 서로 다른 구현을 선택합니다. 앱의 `chat-platform.client.ts`가 이 구성을 먼저 제공하고, 공통 채팅 레이어가 `ChatPlatform` 계약으로 설정·대화·모델 목록·받아쓰기를 사용합니다.
+web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도구를 런타임 JSON 설정으로 선택합니다. 앱의 `app/platform.ts`는 실행 환경과 기본 플러그인 목록을 제공합니다. 공통 채팅 레이어는 `ChatPlatform` 계약으로 설정·대화·모델 목록·받아쓰기를 사용합니다.
 
 | 경계                                        | 담당 패키지 또는 경로                   |
 | ------------------------------------------- | --------------------------------------- |
@@ -14,6 +14,7 @@ web과 desktop은 공통 UI를 사용하면서 각 앱의 `app/platform.ts`에�
 | 브라우저 받아쓰기의 기본 공급자 구성        | `@keundal/plugin-transcription-browser` |
 | 공급자와 무관한 호스트와 HTTP 연결          | `@keundal/agent-host`                   |
 | Node.js 환경 설정과 기본 플러그인 구성      | `@keundal/agent-runtime-node`           |
+| 런타임 플러그인 설정과 Cordis 모듈 로딩    | `@keundal/plugin-runtime`              |
 
 `@keundal/agent`, `@keundal/tools`, `@keundal/context`, `@keundal/mcp`는 구현을 가져오지 않는 계약입니다. `@keundal/shell`, `@keundal/transcription`, `@keundal/fs`도 서비스 계약만 제공합니다. 기본 실행 루프와 축약·도구 정책은 `@keundal/agent-loop`가 소유합니다. 독립적인 에이전트는 `AgentService`를 구현하고, 기본 루프를 재사용할 때는 `agent-loop`의 `Agent`를 상속합니다.
 
@@ -21,8 +22,8 @@ web과 desktop은 공통 UI를 사용하면서 각 앱의 `app/platform.ts`에�
 
 ## 구현 교체
 
-- web의 `apps/web/app/platform.ts`에서 IndexedDB 플러그인, LLM 플러그인, `mountAgent`와 도구를 선택합니다. `agentEndpoint`를 설정하면 HTTP 연결 구현을 사용합니다.
-- desktop의 `apps/desktop/app/platform.ts`에서 네이티브 설정 저장소, 스킬 파일 공급자, sidecar 연결을 선택합니다. 공통 UI에는 Tauri 의존성이 없습니다.
+- web은 `/keundal.plugins.json`을 연결할 때 읽습니다. `NUXT_PUBLIC_PLUGIN_CONFIG`로 다른 설정 URL을 지정합니다. `agentEndpoint`가 있으면 브라우저 설정 대신 HTTP 호스트 구성을 사용합니다.
+- desktop은 `KEUNDAL_PLUGIN_CONFIG`로 설정 파일을 선택합니다. 환경 변수가 없으면 앱 데이터 디렉터리의 `keundal.plugins.json`을 우선합니다. 공통 UI에는 Tauri 의존성이 없습니다.
 - MCP 설정과 연결은 앱이 `ChatPlatform.mcp`로 제공합니다. Node.js의 MCP와 Agent Plugins 구성은 `@keundal/agent-runtime-node`가 담당합니다.
 - MCP 설정과 검증은 `@keundal/mcp`, SDK 연결은 `@keundal/plugin-mcp-client`가 담당합니다. 연결 관리자는 설정 저장소를 주입받으며, 브라우저와 네이티브 저장소 선택은 앱이 담당합니다.
 - `@keundal/chat`은 화면 계약과 데이터 변환을 제공합니다. 공급자 설정 정책은 `@keundal/llm-settings`, 날씨·차트 실행은 `@keundal/plugin-tool-chat`, 스킬 저장·로딩은 플랫폼 구현에 둡니다.
@@ -37,10 +38,48 @@ web과 desktop은 공통 UI를 사용하면서 각 앱의 `app/platform.ts`에�
 
 `chatCapabilities.secureSettings`와 `chatCapabilities.localSkills`는 화면에 표시할 저장소 설명과 스킬 파일 설정을 정합니다. 구현 선택은 이 플래그가 아니라 앱의 조립 코드가 담당합니다. 저장소 키, IndexedDB 이름, SQLite 형식과 보안 저장소 이전 규칙은 유지합니다.
 
+## 런타임 설정
+
+다음 형식으로 서비스 플러그인, 에이전트, 도구 팩터리를 선택합니다. 기본 플러그인도 같은 로더를 사용합니다.
+
+```json
+{
+  "plugins": [
+    { "module": "./plugins/llm.mjs", "config": { "endpoint": "https://llm.example.com" } },
+    { "module": "builtin:store" }
+  ],
+  "agent": { "module": "builtin:agent", "config": { "maxToolRounds": 4 } },
+  "tools": [{ "module": "./plugins/tools.mjs", "export": "createTools", "config": { "project": "example" } }]
+}
+```
+
+`plugins`는 배열 순서대로 Cordis 플러그인을 등록합니다. 기본 내보내기는 `default`이며, `export`로 다른 내보내기를 선택합니다. 플러그인은 사용하는 서비스의 `inject`를 선언하고, 자원 정리 함수를 전달받은 컨텍스트에 등록해야 합니다. 에이전트는 `ctx.agent`를 제공해야 합니다.
+
+도구 팩터리는 `(config, execution)`을 받아 `ExecutableTool[]` 또는 해당 Promise를 반환합니다. 목록을 조회할 때마다 호출하며 취소 신호도 전달합니다. 실행의 모델·출력 예산·추론 설정은 매니페스트의 에이전트 설정보다 우선합니다. 도구는 `agent.config.tools`가 아니라 최상위 `tools`에 지정합니다.
+
+### 브라우저
+
+배포한 `/keundal.plugins.json`을 수정하면 앱을 다시 빌드하지 않아도 새 연결에 적용됩니다. 외부 모듈은 브라우저가 직접 실행할 수 있는 ESM 파일이어야 합니다. 상대 경로는 설정 응답 URL을 기준으로 해석합니다. 다른 origin의 설정과 모듈은 CORS를 허용해야 합니다. bare 패키지 이름과 Node.js 전용 모듈은 지원하지 않습니다.
+
+`builtin:llm`은 기존 공급자 설정을 읽고, `builtin:store`는 IndexedDB를 사용합니다. `builtin:skills`, `builtin:agent`, `builtin:chat-tools`도 제공합니다. `tools: []`는 기본 날씨·차트 도구를 제외합니다. 사용자가 별도로 활성화한 MCP와 Agent Plugins 도구는 유지합니다.
+
+### Node.js와 desktop
+
+`KEUNDAL_PLUGIN_CONFIG`가 없으면 현재 디렉터리의 `keundal.plugins.json`을 찾습니다. desktop은 이 탐색 전에 앱 데이터 디렉터리의 설정을 선택합니다. 파일이 없으면 기존 기본 구성을 사용합니다. 명시한 파일을 읽지 못하거나 설정·모듈이 잘못됐으면 시작을 거부합니다.
+
+외부 모듈은 설정 파일 기준 상대 경로, 절대 경로, `file:` URL 또는 설치된 패키지 이름으로 지정합니다. 패키지도 설정 파일 디렉터리를 기준으로 찾으며 ESM `exports.import` 조건을 사용합니다. 외부 패키지는 별도로 설치해야 합니다. 앱은 실행 중 패키지를 설치하지 않습니다. `builtin:store`는 SQLite를 사용합니다.
+
+설정을 변경한 뒤 웹 호스트나 desktop sidecar를 다시 시작해야 합니다. 기존 저장소와 같은 경로를 선택하면 대화 기록을 유지합니다. 저장소를 바꿔도 데이터를 자동으로 이전하지 않습니다.
+
+### 신뢰 경계
+
+설정은 실행할 코드를 선택하므로 신뢰할 수 있는 파일과 URL만 사용해야 합니다. 플러그인은 샌드박스에서 실행하지 않습니다. 브라우저 플러그인은 앱 origin의 데이터에, Node.js 플러그인은 호스트 프로세스의 권한과 환경 변수에 접근할 수 있습니다. 브라우저에 전달하는 공개 설정에는 비밀 값을 넣지 않습니다.
+
+
 ## 경계 검증
 
 `pnpm check:boundaries`는 앱 간 의존성과 함께 공통 UI·계약 패키지의 구현 의존성을 검사합니다. 통합 테스트의 개발 의존성은 허용하지만, 실행 의존성과 `src`, `app`, `shared`의 구현 직접 참조는 거부합니다.
 
 ## 참고
 
-[DeepSeek Harness의 패키지 구성](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/README.md)과 [프로필별 조립](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/apps/cli/composition.md)을 참고했습니다. 서비스 계약, 구현 공급자, 앱별 조립을 나누는 원칙을 적용했습니다. 현재 저장소에서는 타입이 검사되는 TypeScript 조립을 사용하며 YAML 로더나 실행 중 패키지 설치 기능은 추가하지 않았습니다.
+[DeepSeek Harness의 패키지 구성](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/README.md)과 [프로필별 조립](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/apps/cli/composition.md)을 참고했습니다. 서비스 계약, 구현 공급자, 앱별 조립을 나누는 원칙을 적용했습니다. TypeScript 조립 API와 런타임 JSON 로더를 함께 제공합니다. YAML 로더와 실행 중 패키지 설치 기능은 제공하지 않습니다.

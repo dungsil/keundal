@@ -62,7 +62,8 @@ function validateConfig(value: unknown, label: string): Readonly<Record<string, 
 function parseModuleSpec(value: unknown, label: string): RuntimeModuleSpec {
   if (!isRecord(value)) throw new TypeError(`${label} must be an object`)
   for (const key of Object.keys(value)) {
-    if (key !== 'module' && key !== 'export' && key !== 'config') throw new TypeError(`${label} has unknown key: ${key}`)
+    if (key !== 'module' && key !== 'export' && key !== 'config')
+      throw new TypeError(`${label} has unknown key: ${key}`)
   }
   if (typeof value.module !== 'string' || !value.module.trim()) {
     throw new TypeError(`${label}.module must be a non-blank string`)
@@ -105,7 +106,6 @@ export function parseRuntimePluginManifest(value: unknown): RuntimePluginManifes
   }
 }
 
-
 function asPlugin(value: unknown, module: string, exportName: string): Plugin {
   if (typeof value === 'function') return value as Plugin
   if (isRecord(value) && hasOwn(value, 'apply') && typeof value.apply === 'function') return value as unknown as Plugin
@@ -128,9 +128,8 @@ async function resolveExport(
   let builtinConfig: Readonly<Record<string, unknown>> | undefined
   if (spec.module.startsWith('builtin:')) {
     const builtins = options.builtins
-    const name = spec.module.slice('builtin:'.length)
-    if (!builtins || !hasOwn(builtins, name)) throw new Error(`unknown builtin module: ${spec.module}`)
-    const builtin = builtins[name]
+    if (!builtins || !hasOwn(builtins, spec.module)) throw new Error(`unknown builtin module: ${spec.module}`)
+    const builtin = builtins[spec.module]
     exports = builtin.exports
     builtinConfig = builtin.config
   } else {
@@ -141,7 +140,7 @@ async function resolveExport(
   }
   return {
     selected: exports[exportName],
-    config: { ...(builtinConfig ?? {}), ...(spec.config ?? {}) }
+    config: { ...builtinConfig, ...spec.config }
   }
 }
 
@@ -165,6 +164,7 @@ export async function loadRuntimePlugins(
 ): Promise<{
   setup(ctx: Context): Promise<void>
   mountAgent(ctx: Context, config: Readonly<Record<string, unknown>>): Promise<Fiber>
+  readonly tools?: ToolProvider
 }> {
   if (manifest.agent.config && hasOwn(manifest.agent.config, 'tools')) {
     throw new TypeError('agent.config.tools is not allowed; configure tools with manifest.tools or options.tools')
@@ -198,6 +198,7 @@ export async function loadRuntimePlugins(
       : undefined
 
   return {
+    tools: composedTools,
     async setup(ctx) {
       for (const { plugin, config } of plugins) await ctx.plugin(plugin, config)
     },

@@ -1,9 +1,10 @@
-import type { RuntimePluginManifest } from '@keundal/plugin-runtime'
+import process from 'node:process'
 
 import { createAgentHost, type AgentHostModel, type AgentHostOptions, type AgentHost } from '@keundal/agent-host'
 import { createAgentApp, type AgentAppOptions } from '@keundal/agent-host/http'
 import type { AgentPluginOptions, LoadedAgentPlugin } from '@keundal/agent-plugins'
 import type { McpClientConfig } from '@keundal/mcp'
+import type { RuntimePluginManifest } from '@keundal/plugin-runtime'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 
 export { createNodeComposition } from './default-composition.js'
@@ -21,6 +22,7 @@ export interface NodeHostOptions {
   readonly sqlitePath: string
   readonly maxOutputTokens?: number
   readonly tools?: readonly ExecutableTool[] | ToolProvider
+  readonly defaultTools?: readonly ExecutableTool[] | ToolProvider
   readonly subagents?: boolean
   readonly maxActiveSubagents?: number
   readonly maxToolRounds?: number
@@ -29,6 +31,7 @@ export interface NodeHostOptions {
   readonly runtimePlugins?: RuntimePluginManifest
   readonly runtimePluginBasePath?: string
   readonly pluginConfigPath?: string
+  readonly requireProviderApiKey?: boolean
 }
 
 export type HostComposition = Pick<AgentHostOptions, 'setup' | 'mountAgent' | 'toolCatalog'> & {
@@ -58,7 +61,13 @@ export async function createAgentRuntime(
   env: Readonly<Record<string, string | undefined>> = process.env,
   options: Pick<
     NodeHostOptions,
-    'tools' | 'plugins' | 'subagents' | 'maxActiveSubagents' | 'runtimePlugins' | 'runtimePluginBasePath'
+    | 'tools'
+    | 'defaultTools'
+    | 'plugins'
+    | 'subagents'
+    | 'maxActiveSubagents'
+    | 'runtimePlugins'
+    | 'runtimePluginBasePath'
   > & {
     compose: HostCompositionFactory
   }
@@ -73,9 +82,8 @@ export async function createAgentRuntime(
         : provider === 'anthropic'
           ? env.ANTHROPIC_API_KEY
           : undefined
+  const model = env.KEUNDAL_MODEL
   if (!model?.trim()) throw new Error('KEUNDAL_MODEL 환경 변수를 설정하세요.')
-  if (!env.KEUNDAL_PROVIDER && !apiKey?.trim())
-    throw new Error('OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY 중 하나를 설정하세요.')
   const contextWindow = Number(env.KEUNDAL_CONTEXT_WINDOW ?? 128_000)
   const maxOutputTokens = Number(env.KEUNDAL_MAX_OUTPUT_TOKENS ?? 4_096)
   const appOptions: AgentAppOptions = {
@@ -91,12 +99,14 @@ export async function createAgentRuntime(
   const host = await createNodeAgentHost(
     {
       tools: options.tools,
+      defaultTools: options.defaultTools,
       subagents: options.subagents,
       maxActiveSubagents: options.maxActiveSubagents,
       plugins: options.plugins,
       runtimePlugins: options.runtimePlugins,
       runtimePluginBasePath: options.runtimePluginBasePath,
       pluginConfigPath: env.KEUNDAL_PLUGIN_CONFIG,
+      requireProviderApiKey: !env.KEUNDAL_PROVIDER,
       mcpServers: env.KEUNDAL_MCP_SERVERS ? JSON.parse(env.KEUNDAL_MCP_SERVERS) : [],
       provider,
       apiKey: apiKey ?? '',

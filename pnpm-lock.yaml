@@ -613,6 +613,9 @@ importers:
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
+      import-meta-resolve:
+        specifier: 4.2.0
+        version: 4.2.0
     devDependencies:
       '@keundal/core':
         specifier: workspace:*
