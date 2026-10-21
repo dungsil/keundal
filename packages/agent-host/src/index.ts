@@ -1,4 +1,4 @@
-import agentPlugin from '@keundal/agent'
+import agentPlugin, { type AgentConfig } from '@keundal/agent'
 import {
   EventType,
   type AGUIEvent,
@@ -32,6 +32,7 @@ export interface AgentHostOptions {
   readonly models?: Readonly<Record<string, Omit<AgentHostModel, 'id' | 'provider'>>>
   readonly sqlitePath: string
   readonly maxOutputTokens?: number
+  readonly tools?: AgentConfig['tools']
   readonly maxToolRounds?: number
   readonly baseURL?: string
   readonly headers?: Readonly<Record<string, string>>
@@ -133,6 +134,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
       return isolated.plugin(agentPlugin, {
         model: selected.id,
         maxOutputTokens,
+        tools: options.tools,
         maxToolRounds: options.maxToolRounds ?? 4
       })
     })()
