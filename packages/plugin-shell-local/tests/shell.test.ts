@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, symlink } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -90,16 +90,55 @@ test('잘못된 설정과 요청 및 실행 전 취소를 거부한다', async (
   ).rejects.toThrow('before spawn')
 })
 
-async function waitFile(path: string) {
+async function waitPid(path: string) {
   for (let i = 0; i < 300; i++) {
+    let text: string | undefined
     try {
-      return await readFile(path, 'utf8')
-    } catch {
-      await delay(10)
+      text = await readFile(path, 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
     }
+    if (text?.endsWith('\n')) {
+      const pid = Number(text)
+      if (!/^[1-9]\d*\n$/.test(text) || !Number.isSafeInteger(pid) || pid <= 1) {
+        throw new Error('invalid child pid')
+      }
+      return pid
+    }
+    await delay(10)
   }
   throw new Error('child did not start')
 }
+
+test('PID 파일이 비어 있거나 일부만 기록되면 완성된 PID를 기다린다', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'keundal-pid-'))
+  t.onTestFinished(() => rm(dir, { recursive: true, force: true }))
+  const marker = join(dir, 'pid')
+  await writeFile(marker, '')
+  let resolved = false
+  const pending = waitPid(marker).then((pid) => {
+    resolved = true
+    return pid
+  })
+  await delay(30)
+  expect(resolved).toBe(false)
+  await writeFile(marker, '123')
+  await delay(30)
+  expect(resolved).toBe(false)
+  await writeFile(marker, '12345\n')
+  expect(await pending).toBe(12345)
+})
+
+test.for(['0\n', '1\n', '-1\n', '1.5\n', 'NaN\n', '9007199254740992\n'])(
+  '종료 대상이 될 수 없는 PID %s를 거부한다',
+  async (contents, t) => {
+    const dir = await mkdtemp(join(tmpdir(), 'keundal-pid-'))
+    t.onTestFinished(() => rm(dir, { recursive: true, force: true }))
+    const marker = join(dir, 'pid')
+    await writeFile(marker, contents)
+    await expect(waitPid(marker)).rejects.toThrow('invalid child pid')
+  }
+)
 
 async function assertDead(pid: number) {
   for (let i = 0; i < 100; i++) {
@@ -121,7 +160,7 @@ for (const mode of ['timeout', 'cancel', 'dispose', 'exit'] as const) {
       const { ctx, cwd, provider } = await setup(t, { timeoutMs: 3000 })
       const marker = join(cwd, 'pid \'"$`\n한글')
       const child = node(
-        "process.on('SIGTERM',()=>{}); require('fs').writeFileSync(process.argv[1], String(process.pid)); setInterval(()=>{},1000)",
+        "process.on('SIGTERM',()=>{}); const fs=require('fs'); fs.writeFileSync(process.argv[1]+'.tmp', process.pid+'\\n'); fs.renameSync(process.argv[1]+'.tmp', process.argv[1]); setInterval(()=>{},1000)",
         marker
       )
       const controller = new AbortController()
@@ -132,8 +171,9 @@ for (const mode of ['timeout', 'cancel', 'dispose', 'exit'] as const) {
         { signal: controller.signal }
       )
       const retained = ctx.shell
-      const pid = Number(await waitFile(marker))
+      const pid = await waitPid(marker)
       t.onTestFinished(() => {
+        if (!Number.isSafeInteger(pid) || pid <= 1) throw new Error('invalid child pid')
         try {
           process.kill(pid, 'SIGKILL')
         } catch {
