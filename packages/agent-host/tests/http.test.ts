@@ -126,6 +126,7 @@ const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {
   }
   return {
     base,
+    server,
     services,
     requestJson,
     requestText,
@@ -534,4 +535,84 @@ test('제목 요청 연결을 중단하면 공급자 호출에 취소 신호를 
   abort.abort()
   await expect.poll(() => signal?.aborted).toBe(true)
   await request
+})
+
+test('SSE 쓰기가 막히면 다음 이벤트를 요청하지 않고 연결 종료 때 공급자를 닫는다', async (t) => {
+  const { base, server, services } = await setup(t)
+  let advanced = false
+  let closed = false
+  let signal: AbortSignal | undefined
+  const blocked = Promise.withResolvers<void>()
+  server.prependListener('request', (_request, response) => {
+    response.write = (() => {
+      blocked.resolve()
+      return false
+    }) as typeof response.write
+  })
+  services.run = async function* (_request, options) {
+    signal = options?.signal
+    try {
+      yield { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'r1' }
+      advanced = true
+      yield { type: EventType.RUN_FINISHED, threadId: 'thread', runId: 'r1' }
+    } finally {
+      closed = true
+    }
+  }
+  const abort = new AbortController()
+  const pending = fetch(`${base}/runs`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+    signal: abort.signal
+  }).catch(() => undefined)
+  await blocked.promise
+  expect(advanced).toBe(false)
+  abort.abort()
+  await pending
+  await expect.poll(() => closed).toBe(true)
+  expect(signal?.aborted).toBe(true)
+  expect(advanced).toBe(false)
+})
+
+test('SSE 쓰기의 drain을 기다린 뒤 남은 이벤트를 전달한다', async (t) => {
+  const { server, services, requestText } = await setup(t)
+  let advanced = false
+  const blocked = Promise.withResolvers<import('node:http').ServerResponse>()
+  server.prependListener('request', (_request, response) => {
+    const write = response.write.bind(response)
+    response.write = ((chunk: string) => {
+      response.write = write
+      blocked.resolve(response)
+      write(chunk)
+      return false
+    }) as typeof response.write
+  })
+  services.run = async function* () {
+    yield { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'r1' }
+    advanced = true
+    yield { type: EventType.RUN_FINISHED, threadId: 'thread', runId: 'r1' }
+  }
+  const pending = requestText('POST', '/runs', input)
+  const response = await blocked.promise
+  expect(advanced).toBe(false)
+  response.emit('drain')
+  expect(parseSse((await pending).text).at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(advanced).toBe(true)
+  expect(response.listenerCount('drain')).toBe(0)
+})
+
+test('큰 SSE 이벤트는 직렬화 전에 거부하고 오류 이벤트만 전달한다', async (t) => {
+  const { services, requestText } = await setup(t)
+  let closed = false
+  services.run = async function* () {
+    try {
+      yield { type: EventType.CUSTOM, name: 'large', value: 'x'.repeat(8 * 1024 * 1024 + 1) }
+    } finally {
+      closed = true
+    }
+  }
+  const events = parseSse((await requestText('POST', '/runs', input)).text)
+  expect(events).toEqual([{ type: EventType.RUN_ERROR, message: 'stream byte limit exceeded' }])
+  expect(closed).toBe(true)
 })
