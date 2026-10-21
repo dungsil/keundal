@@ -1,6 +1,3 @@
-import { AsyncLocalStorage } from 'node:async_hooks'
-import { Buffer } from 'node:buffer'
-
 import type { Transport } from '@modelcontextprotocol/client'
 
 const MAX_CATALOG_TOOLS = 256
@@ -8,6 +5,8 @@ const MAX_CATALOG_BYTES = 1024 * 1024
 const MAX_DEFINITION_BYTES = 64 * 1024
 const MAX_DESCRIPTION_BYTES = 16 * 1024
 const MAX_DEPTH = 32
+const SCOPE_KEY = 'io.keundal/catalog-discovery'
+const encoder = new globalThis.TextEncoder()
 
 function fail(): never {
   throw new Error('MCP tool catalog exceeds size, count or depth limits')
@@ -22,7 +21,7 @@ function jsonBytes(value: unknown, limit: number): number {
   }
   const string = (text: string) => {
     if (text.length > limit - bytes) fail()
-    add(Buffer.byteLength(JSON.stringify(text)))
+    add(encoder.encode(JSON.stringify(text)).byteLength)
   }
   const visit = (item: unknown, depth: number) => {
     if (depth > MAX_DEPTH) fail()
@@ -68,7 +67,7 @@ class CatalogBudget {
       if (typeof definition?.description === 'string') {
         if (
           definition.description.length > MAX_DESCRIPTION_BYTES ||
-          Buffer.byteLength(definition.description) > MAX_DESCRIPTION_BYTES
+          encoder.encode(definition.description).byteLength > MAX_DESCRIPTION_BYTES
         )
           fail()
       }
@@ -78,15 +77,24 @@ class CatalogBudget {
 
 /** Guard decoded pages before SDK validation, pagination accumulation and caching. */
 export class CatalogDiscovery {
-  private readonly active = new AsyncLocalStorage<CatalogBudget>()
+  private readonly active = new Map<string, CatalogBudget>()
   private readonly pending = new Map<number, CatalogBudget>()
 
   constructor(transport: Transport) {
     const send = transport.send.bind(transport)
     transport.send = async (message, options) => {
       if ('method' in message && message.method === 'tools/list' && 'id' in message) {
-        const budget = this.active.getStore()
-        if (budget) this.pending.set(Number(message.id), budget)
+        const token = message.params?._meta?.[SCOPE_KEY]
+        const budget = typeof token === 'string' ? this.active.get(token) : undefined
+        if (!budget) throw new Error('MCP catalog discovery is missing its budget')
+        this.pending.set(Number(message.id), budget)
+        // Keep the scope on SDK page parameters, but never send it to the peer.
+        const metadata = { ...message.params?._meta }
+        delete metadata[SCOPE_KEY]
+        const params = { ...message.params }
+        if (Object.keys(metadata).length) params._meta = metadata
+        else delete params._meta
+        message = { ...message, params }
       }
       await send(message, options)
     }
@@ -116,11 +124,14 @@ export class CatalogDiscovery {
     }
   }
 
-  async run<T>(discover: () => Promise<T>): Promise<T> {
+  async run<T>(discover: (metadata: Record<string, string>) => Promise<T>): Promise<T> {
     const budget = new CatalogBudget()
+    const token = globalThis.crypto.randomUUID()
+    this.active.set(token, budget)
     try {
-      return await this.active.run(budget, discover)
+      return await discover({ [SCOPE_KEY]: token })
     } finally {
+      this.active.delete(token)
       for (const [id, owner] of this.pending) {
         if (owner === budget) this.pending.delete(id)
       }

@@ -1,4 +1,5 @@
 import {
+  assertGenerationMessageIds,
   mergeMessages,
   parseRunAgentInput,
   SessionService,
@@ -105,6 +106,8 @@ export class SqliteSessionService extends SessionService {
           `session revision conflict for ${change.threadId}: expected ${change.expectedRevision}, stored ${current.revision}`
         )
       }
+
+      assertGenerationMessageIds(current.messages, change)
 
       if (generation) {
         const runId = generation.request.input.runId

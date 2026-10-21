@@ -1,5 +1,6 @@
 import {
   EventType,
+  StreamBudget,
   GenerationService,
   type AGUIEvent,
   type ExecutionOptions,
@@ -211,9 +212,11 @@ export class MemoryGenerationService extends GenerationService {
       recorder.record(started)
       yield started
       signal.throwIfAborted()
+      const budget = new StreamBudget()
       const events = stream ? stream(request, { signal }) : this.ctx.llm.stream(request, { signal })
       for await (const event of events) {
         signal.throwIfAborted()
+        budget.accept(event)
         if (!current()) return
         recorder.record(event)
         yield event

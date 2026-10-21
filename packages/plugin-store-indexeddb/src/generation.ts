@@ -1,5 +1,6 @@
 import {
   EventType,
+  StreamBudget,
   GenerationService,
   type AGUIEvent,
   type ExecutionOptions,
@@ -179,9 +180,11 @@ export class IndexedDBGenerationService extends GenerationService {
 
       signal.throwIfAborted()
 
+      const budget = new StreamBudget()
       const events = stream ? stream(request, { signal }) : this.ctx.llm.stream(request, { signal })
       for await (const event of events) {
         signal.throwIfAborted()
+        budget.accept(event)
         if (!this.isCurrent(runId, token)) return
         recorder.record(event)
         appendJournal(event)

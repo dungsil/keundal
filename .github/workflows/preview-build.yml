@@ -7,6 +7,7 @@ on:
     # preview.yml의 배포 대상 검사와 같은 제외 경로를 유지한다.
     # tools/tsdown과 tools/tsconfig는 앱 빌드 입력이므로 제외하지 않는다.
     paths-ignore:
+      - 'apps/desktop/**'
       - '.github/**'
       - 'ci/**'
       - 'docs/**'

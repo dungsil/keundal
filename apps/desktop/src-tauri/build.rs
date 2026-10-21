@@ -3,6 +3,8 @@ fn main() {
         tauri_build::AppManifest::new().commands(&[
             "load_llm_settings",
             "save_llm_settings",
+            "load_mcp_settings",
+            "save_mcp_settings",
             "list_skill_files",
             "read_skill_file",
             "sidecar_info",

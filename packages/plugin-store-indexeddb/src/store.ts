@@ -1,4 +1,5 @@
 import {
+  assertGenerationMessageIds,
   mergeMessages,
   type AGUIEvent,
   type AgentMessage,
@@ -206,6 +207,8 @@ export class IndexedDBStore {
             `session revision conflict for ${change.threadId}: expected ${change.expectedRevision}, stored ${current.revision}`
           )
         }
+
+        assertGenerationMessageIds(current.messages, change)
 
         if (generation) {
           const runId = generation.request.input.runId

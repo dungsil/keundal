@@ -13,6 +13,7 @@ export interface ConformanceStore {
     commit(change: {
       threadId: string
       expectedRevision: number
+      mode?: 'merge' | 'replace'
       messages: RunAgentInput['messages']
       state?: RunAgentInput['state']
       generation?: unknown
@@ -250,7 +251,83 @@ const contextScenario = async (store: ConformanceStore): Promise<unknown> => {
   }
 }
 
+const messageCollisionScenario = async (store: ConformanceStore): Promise<unknown> => {
+  const original = [
+    { id: 'victim-user', role: 'user' as const, content: 'trusted question' },
+    { id: 'victim-assistant', role: 'assistant' as const, content: 'trusted answer' }
+  ]
+  await store.session.commit({ threadId: 'thread', expectedRevision: 0, messages: original })
+  const rejected: boolean[] = []
+  for (const mode of ['merge', 'replace'] as const) {
+    for (const victim of original) {
+      const messages = [{ id: victim.id, role: 'assistant' as const, content: 'overwrite' }]
+      const run = request(`${mode}-${victim.id}`, 1)
+      try {
+        await store.session.commit({
+          threadId: 'thread',
+          expectedRevision: 1,
+          mode,
+          messages,
+          generation: { request: run, status: 'completed', journal: [], messages }
+        })
+        rejected.push(false)
+      } catch (error) {
+        rejected.push(String(error).includes('generation message conflicts with committed history'))
+      }
+    }
+  }
+  const afterRejected = await store.session.get('thread')
+  const noRunsWritten = (await store.generation.list()).length === 0
+  const triggers: AGUIEvent[] = [
+    { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'victim-user', delta: 'overwrite' },
+    { type: EventType.REASONING_MESSAGE_START, messageId: 'victim-assistant', role: 'reasoning' },
+    { type: EventType.TOOL_CALL_START, toolCallId: 'victim-user', toolCallName: 'lookup' },
+    { type: EventType.TOOL_CALL_RESULT, messageId: 'victim-assistant', toolCallId: 'call', content: 'overwrite' }
+  ]
+  const failed: boolean[] = []
+  for (const [index, trigger] of triggers.entries()) {
+    const revision = (await store.session.get('thread'))!.revision
+    const run = request(`collision-${index}`, revision)
+    const events: AGUIEvent[] = []
+    try {
+      for await (const event of store.generation.run(run, {
+        stream: async function* () {
+          yield trigger
+        }
+      }))
+        events.push(event)
+      failed.push(false)
+    } catch (error) {
+      const terminal = await store.generation.get(run.input.runId)
+      failed.push(
+        String(error).includes('generation message conflicts with committed history') &&
+          (terminal?.status === 'failed' || terminal?.status === 'interrupted') &&
+          terminal.messages[0]?.id === original[index % 2].id &&
+          !events.some((event) => event.type === EventType.RUN_FINISHED)
+      )
+    }
+  }
+  const historyPreserved = JSON.stringify((await store.session.get('thread'))?.messages) === JSON.stringify(original)
+  const revision = (await store.session.get('thread'))!.revision
+  await store.session.commit({
+    threadId: 'thread',
+    expectedRevision: revision,
+    messages: [{ ...original[0], content: 'authorized edit' }]
+  })
+  return {
+    rejected,
+    rejectionWasAtomic:
+      afterRejected?.revision === 1 &&
+      JSON.stringify(afterRejected.messages) === JSON.stringify(original) &&
+      noRunsWritten,
+    failed,
+    historyPreserved,
+    editingPreserved: (await store.session.get('thread'))?.messages[0].content === 'authorized edit'
+  }
+}
+
 const scenarios: ReadonlyArray<{ name: string; run: (store: ConformanceStore) => Promise<unknown> }> = [
+  { name: 'messageCollisions', run: messageCollisionScenario },
   { name: 'success', run: successScenario },
   { name: 'durableContext', run: contextScenario },
   { name: 'failedPartial', run: failedPartialScenario },
@@ -263,6 +340,13 @@ const scenarios: ReadonlyArray<{ name: string; run: (store: ConformanceStore) =>
 
 /** 세 저장소가 같은 결과를 내야 하는 시나리오의 기대 보고서입니다. */
 export const expectedConformanceReport: ConformanceReport = {
+  messageCollisions: {
+    rejected: [true, true, true, true],
+    rejectionWasAtomic: true,
+    failed: [true, true, true, true],
+    historyPreserved: true,
+    editingPreserved: true
+  },
   durableContext: {
     run: [
       { id: 'keundal:context:instructions:initial', role: 'user', content: 'Use tabs.' },

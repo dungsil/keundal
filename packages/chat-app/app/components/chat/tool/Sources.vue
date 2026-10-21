@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { getCitationUrl } from '../../../utils/url'
+
 defineProps<{
   sources: Source[]
 }>()
@@ -9,7 +11,7 @@ defineProps<{
     <a
       v-for="source in sources"
       :key="source.url"
-      :href="source.url"
+      :href="getCitationUrl(source.url)"
       target="_blank"
       rel="noopener noreferrer"
       class="flex items-center gap-2 px-2 py-1 text-sm text-muted hover:text-default hover:bg-elevated/50 transition-colors min-w-0 rounded-md"

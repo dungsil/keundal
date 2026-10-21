@@ -4,6 +4,17 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - 'apps/desktop/**'
+      - '.github/**'
+      - 'ci/**'
+      - 'docs/**'
+      - 'examples/**'
+      - 'tools/store-conformance/**'
+      - '*.md'
+      - 'apps/*/README.md'
+      - 'packages/*/README.md'
+      - 'tools/*/README.md'
 
 permissions:
   contents: read
