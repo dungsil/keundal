@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { parseSkillMarkdown } from '@keundal/plugin-skill-filesystem/markdown'
+import { importSkillFile } from '../../shared/utils/skill-import'
 
 import { managedSkillSchema, type LocalSkillFile, type ManagedSkill, type SkillSettings } from '../../shared/utils/skills'
 
@@ -104,7 +104,7 @@ async function importFile(event: Event) {
   const file = input.files?.[0]
   if (!file) return
   try {
-    const definition = parseSkillMarkdown(await file.text())
+    const definition = await importSkillFile(file)
     edit()
     draft.value = { ...definition, enabled: true }
   } catch (cause) {
@@ -229,7 +229,7 @@ function toggleFile(path: string, enabled: boolean) {
             <input
               ref="importInput"
               type="file"
-              accept=".md,text/markdown"
+              accept=".md,.zip,text/markdown,application/zip,application/x-zip-compressed"
               :aria-label="t('skill.importFile')"
               class="hidden"
               @change="importFile"
@@ -287,6 +287,9 @@ function toggleFile(path: string, enabled: boolean) {
             />
           </li>
         </ul>
+        <p class="text-xs text-muted">
+          {{ t('skill.importHelp') }}
+        </p>
         <p class="text-xs text-muted">
           {{ t('skill.persistence') }}
         </p>
