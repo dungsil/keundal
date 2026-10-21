@@ -4,6 +4,22 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'apps/web/app/**'
+      - 'apps/web/public/**'
+      - 'apps/web/shared/**'
+      - 'apps/web/nuxt.config.ts'
+      - 'apps/web/package.json'
+      - 'packages/chat-app/app/**'
+      - 'packages/chat-app/public/**'
+      - 'packages/chat-app/shared/**'
+      - 'packages/chat-app/nuxt.config.ts'
+      - 'packages/chat-app/package.json'
+      - 'packages/ui/app/**'
+      - 'packages/ui/public/**'
+      - 'packages/ui/shared/**'
+      - 'packages/ui/nuxt.config.ts'
+      - 'packages/ui/package.json'
     paths-ignore:
       - 'apps/desktop/**'
       - '.github/**'
