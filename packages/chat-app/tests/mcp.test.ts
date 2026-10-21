@@ -117,3 +117,22 @@ test('웹 대화의 에이전트는 MCP 도구를 실행하고 결과를 모델�
   expect(JSON.stringify(requests[0])).toContain('weather')
   expect(requests[1]!.input.messages).toContainEqual(expect.objectContaining({ role: 'tool', content: JSON.stringify({ content: [{ type: 'text', text: 'MCP search result' }] }) }))
 })
+
+test('데스크톱 서버별 HTTP 허용을 저장하고 다시 불러와도 다른 서버에는 적용하지 않는다', async () => {
+  const local = storage()
+  let saved: string | null = null
+  const native = vi.fn(async (command: string, args?: { settings: string | null }) => {
+    if (command === 'load_mcp_settings') return saved
+    if (command === 'save_mcp_settings') saved = args!.settings
+    return null
+  }) as unknown as typeof invoke
+  const manager = new McpManager(local, native)
+  const config = { ...remote, url: 'http://192.168.1.20/mcp', allowInsecureHttp: true }
+  await manager.save([config], async () => {})
+  const restored = new McpManager(local, native)
+  await restored.load()
+  expect(restored.configuration).toEqual([config])
+  await expect(restored.save([config, { ...remote, serverName: 'other', url: config.url }], async () => {})).rejects.toThrow('HTTPS')
+  expect(restored.configuration).toEqual([config])
+  expect(local.values.size).toBe(0)
+})

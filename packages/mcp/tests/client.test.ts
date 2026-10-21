@@ -758,3 +758,109 @@ test('브라우저의 도구와 리소스에도 결과 예산을 적용하고 �
   expect(JSON.stringify(requests)).not.toContain('io.keundal/result-operation')
   expect(JSON.stringify(requests)).not.toContain('io.keundal/catalog-discovery')
 })
+
+test('MCP 설정은 원격 평문 주소를 거부하고 HTTPS와 루프백 주소를 허용한다', () => {
+  const config = (url: string) => ({ serverName: 'endpoint', transport: 'streamable-http', url })
+  for (const url of [
+    'http://mcp.example.com/mcp',
+    'http://localhost.example.com/mcp',
+    'http://127.0.0.1.example.com/mcp',
+    'http://[::ffff:192.168.1.1]/mcp',
+    'http://user:secret@localhost/mcp'
+  ]) {
+    for (const allowStdio of [true, false]) {
+      expect(() =>
+        parseMcpServers([{ ...config(url), headers: { Authorization: 'Bearer test' } }], allowStdio)
+      ).toThrow()
+    }
+  }
+  for (const url of [
+    'https://mcp.example.com/mcp',
+    'http://localhost/mcp',
+    'http://127.1/mcp',
+    'http://127.255.255.255/mcp',
+    'http://[::1]/mcp'
+  ]) {
+    expect(parseMcpServers([config(url)])[0]).toMatchObject({ url })
+  }
+})
+
+test('두 MCP 진입점은 설정 파서를 거치지 않은 원격 평문 연결도 전송 전에 거부한다', async () => {
+  const fetch = vi.spyOn(globalThis, 'fetch')
+  try {
+    for (const client of [McpClient, BrowserMcpClient]) {
+      await expect(
+        client.connect({
+          serverName: 'remote',
+          transport: 'streamable-http',
+          url: 'http://mcp.example.com/mcp',
+          headers: { Authorization: 'Bearer test' }
+        })
+      ).rejects.toThrow('HTTPS')
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  } finally {
+    fetch.mockRestore()
+  }
+})
+
+test('두 MCP 진입점은 리디렉션 대상으로 자격 증명을 전달하지 않는다', async (t) => {
+  const { url, requests, headers } = await httpFixture(t)
+  const redirect = createServer((_req, res) => {
+    res.writeHead(307, { Location: url })
+    res.end()
+  })
+  await new Promise<void>((resolve) => redirect.listen(0, '127.0.0.1', resolve))
+  t.onTestFinished(async () => {
+    redirect.closeAllConnections()
+    await new Promise<void>((resolve) => redirect.close(() => resolve()))
+  })
+  const address = redirect.address()
+  if (!address || typeof address === 'string') throw new Error('missing redirect address')
+  for (const client of [McpClient, BrowserMcpClient]) {
+    await expect(
+      client.connect({
+        serverName: 'redirect',
+        allowInsecureHttp: true,
+        transport: 'streamable-http',
+        url: `http://127.0.0.1:${address.port}/mcp`,
+        headers: { Authorization: 'Bearer test', 'X-Api-Key': 'test' },
+        timeoutMs: 2000
+      })
+    ).rejects.toThrow()
+  }
+  expect(requests).toEqual([])
+  expect(headers).toEqual([])
+})
+
+test('원격 HTTP는 해당 서버의 명시적인 boolean 허용만 적용한다', async () => {
+  const config = { serverName: 'lan', transport: 'streamable-http' as const, url: 'http://192.168.1.20/mcp' }
+  expect(parseMcpServers([{ ...config, allowInsecureHttp: true }])[0]).toMatchObject({ allowInsecureHttp: true })
+  expect(() => parseMcpServers([{ ...config, allowInsecureHttp: false }])).toThrow('HTTPS')
+  for (const url of [config.url, 'https://example.com/mcp', 'http://localhost/mcp']) {
+    for (const allowInsecureHttp of ['true', 1, null, {}]) {
+      expect(() => parseMcpServers([{ ...config, url, allowInsecureHttp }])).toThrow('boolean')
+      for (const client of [McpClient, BrowserMcpClient]) {
+        await expect(
+          client.connect({ ...config, url, allowInsecureHttp: allowInsecureHttp as boolean })
+        ).rejects.toThrow('boolean')
+      }
+    }
+  }
+  for (const url of ['ftp://example.com/mcp', 'http://user:pass@example.com/mcp', 'http://example.com/mcp#fragment']) {
+    expect(() => parseMcpServers([{ ...config, url, allowInsecureHttp: true }])).toThrow()
+  }
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('transport reached'))
+  try {
+    for (const client of [McpClient, BrowserMcpClient]) {
+      await expect(client.connect({ ...config, allowInsecureHttp: true, timeoutMs: 1000 })).rejects.toThrow()
+      expect(fetch).toHaveBeenCalled()
+      expect(fetch.mock.calls[0]?.[1]?.redirect).toBe('error')
+      fetch.mockClear()
+      await expect(client.connect({ ...config, serverName: 'other' })).rejects.toThrow('HTTPS')
+      expect(fetch).not.toHaveBeenCalled()
+    }
+  } finally {
+    fetch.mockRestore()
+  }
+})
