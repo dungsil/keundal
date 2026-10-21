@@ -6,6 +6,7 @@ const wrangler = { name: 'keundal-web', preview_urls: true, previews: {} }
 export default defineNuxtConfig({
   extends: ['@keundal/chat-app'],
   devtools: { enabled: true },
+  runtimeConfig: { public: { pluginConfig: '/keundal.plugins.json' } },
   alias: {
     '#agent-host-runtime': fileURLToPath(new URL('./server/agent/runtime-node.ts', import.meta.url))
   },

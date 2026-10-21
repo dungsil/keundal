@@ -328,6 +328,9 @@ importers:
       '@keundal/plugin-llm-browser':
         specifier: workspace:*
         version: link:../../packages/plugin-llm-browser
+      '@keundal/plugin-runtime':
+        specifier: workspace:*
+        version: link:../../packages/plugin-runtime
       '@keundal/plugin-skill':
         specifier: workspace:*
         version: link:../../packages/plugin-skill
@@ -340,6 +343,9 @@ importers:
       '@keundal/plugin-transcription-browser':
         specifier: workspace:*
         version: link:../../packages/plugin-transcription-browser
+      '@keundal/tools':
+        specifier: workspace:*
+        version: link:../../packages/tools
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
@@ -592,6 +598,9 @@ importers:
       '@keundal/plugin-mcp-client':
         specifier: workspace:*
         version: link:../plugin-mcp-client
+      '@keundal/plugin-runtime':
+        specifier: workspace:*
+        version: link:../plugin-runtime
       '@keundal/plugin-skill':
         specifier: workspace:*
         version: link:../plugin-skill
@@ -604,6 +613,9 @@ importers:
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
+      import-meta-resolve:
+        specifier: 4.2.0
+        version: 4.2.0
     devDependencies:
       '@keundal/core':
         specifier: workspace:*
@@ -1557,6 +1569,31 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/plugin-runtime:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/tools':
+        specifier: workspace:*
+        version: link:../tools
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   packages/plugin-shell-local:
     dependencies:

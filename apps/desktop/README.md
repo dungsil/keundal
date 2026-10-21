@@ -114,7 +114,7 @@ rustc --edition=2021 --test apps/desktop/src-tauri/src/skill_files.rs -o /tmp/ke
 
 아이콘은 `packages/chat-app/public/favicon.ico`에서 Tauri CLI의 `icon` 명령으로 생성했습니다.
 
-앱별 플러그인은 `app/platform.ts`에서 조립합니다. [계약과 구현의 경계](../../docs/plugin-composition.md)를 참고합니다.
+LLM·저장소·에이전트·도구는 앱 데이터 디렉터리의 `keundal.plugins.json`으로 교체합니다. `KEUNDAL_PLUGIN_CONFIG`를 지정하면 해당 파일을 우선합니다. 외부 ESM 파일이나 설치된 패키지를 선택할 수 있으며 앱을 다시 빌드할 필요가 없습니다. 설정 변경 후 앱을 다시 시작하면 sidecar가 새 구성을 읽습니다. 형식과 신뢰 경계는 [플러그인 조립 문서](../../docs/plugin-composition.md#런타임-설정)를 참고합니다.
 
 ## MCP
 
