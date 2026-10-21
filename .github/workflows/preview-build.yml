@@ -13,7 +13,9 @@ on:
       - 'examples/**'
       - 'tools/store-conformance/**'
       - '*.md'
-      - '{apps,packages,tools}/*/README.md'
+      - 'apps/*/README.md'
+      - 'packages/*/README.md'
+      - 'tools/*/README.md'
 
 permissions:
   contents: read
