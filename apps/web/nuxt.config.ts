@@ -16,6 +16,14 @@ export default defineNuxtConfig({
     experimental: { openAPI: true }
   },
   hooks: {
+    'build:manifest'(manifest) {
+      // Load optional provider SDKs through their dynamic imports when needed.
+      for (const entry of Object.values(manifest)) {
+        entry.prefetch = false
+        // Let the inline page and fonts render before importing the remaining modules.
+        if (entry.resourceType === 'script' && !entry.isEntry) entry.preload = false
+      }
+    },
     'nitro:config'(config) {
       if (String(config.preset ?? '').startsWith('cloudflare')) {
         config.alias ??= {}

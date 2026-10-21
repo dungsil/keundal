@@ -153,7 +153,6 @@ defineShortcuts({
 
       <template #footer="{ collapsed }">
         <div class="flex flex-col gap-1 w-full">
-          <SkillSettings :collapsed="collapsed" />
           <UButton
             :label="collapsed ? '' : t('settings.title')"
             :to="{ path: '/settings', query: route.path === '/settings' ? route.query : { returnTo: route.path } }"

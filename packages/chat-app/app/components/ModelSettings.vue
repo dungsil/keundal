@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useMounted } from '@vueuse/core'
+
 const { t } = useLocale()
 const {
   models,
@@ -10,8 +12,13 @@ const {
   error: modelError,
   refresh
 } = useModels()
-const draft = ref(defaultModel.value)
-const titleDraft = ref(titleModel.value)
+const mounted = useMounted()
+const draft = ref('')
+const titleDraft = ref('')
+onMounted(() => {
+  draft.value = defaultModel.value
+  titleDraft.value = titleModel.value
+})
 const error = ref('')
 const toast = useToast()
 function modelItems(value: string, fallback: string) {
@@ -36,7 +43,7 @@ function save() {
 </script>
 
 <template>
-  <section class="mb-8 space-y-4" aria-labelledby="model-settings-title">
+  <section class="space-y-4" aria-labelledby="model-settings-title">
     <h2 id="model-settings-title" class="text-lg font-semibold text-highlighted">
       {{ t('model.defaultTitle') }}
     </h2>
@@ -46,7 +53,8 @@ function save() {
           v-model="draft"
           :items="items"
           value-key="value"
-          :loading="loading"
+          :loading="mounted && loading"
+          :disabled="!mounted"
           class="w-full"
           @update:open="
             (open) => {
@@ -60,7 +68,8 @@ function save() {
           v-model="titleDraft"
           :items="titleItems"
           value-key="value"
-          :loading="loading"
+          :loading="mounted && loading"
+          :disabled="!mounted"
           class="w-full"
           @update:open="
             (open) => {
@@ -69,7 +78,7 @@ function save() {
           "
         />
       </UFormField>
-      <p v-if="modelError" role="alert" class="text-sm text-error">
+      <p v-if="mounted && modelError" role="alert" class="text-sm text-error">
         {{ modelError }}
       </p>
       <p v-if="error" role="alert" class="text-sm text-error">
@@ -81,10 +90,10 @@ function save() {
           icon="i-lucide-refresh-cw"
           color="neutral"
           variant="ghost"
-          :loading="loading"
+          :loading="mounted && loading"
           @click="refresh()"
         />
-        <UButton type="submit" :label="t('common.save')" />
+        <UButton type="submit" :disabled="!mounted" :label="t('common.save')" />
       </div>
     </form>
   </section>
