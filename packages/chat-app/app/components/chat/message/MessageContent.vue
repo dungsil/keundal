@@ -29,8 +29,8 @@ const emit = defineEmits<{
     </UChatReasoning>
 
     <template v-else-if="'toolCallId' in part">
-      <ChatToolChart v-if="part.type === 'tool-chart'" :invocation="{ ...(part as ChartUIToolInvocation) }" />
-      <ChatToolWeather
+      <LazyChatToolChart v-if="part.type === 'tool-chart'" :invocation="{ ...(part as ChartUIToolInvocation) }" />
+      <LazyChatToolWeather
         v-else-if="part.type === 'tool-weather'"
         :invocation="{ ...(part as WeatherUIToolInvocation) }"
       />
