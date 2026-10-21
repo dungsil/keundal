@@ -1,5 +1,6 @@
 export default {
   'plugin.title': 'Agent plugins',
+  'plugin.manage': 'Installed plugins',
   'plugin.description': 'Import an Agent Plugins 1.0.0 folder to use its skills and HTTP MCP tools in web chats.',
   'plugin.unavailable':
     'Browser plugin imports are unavailable for this connection. Configure plugins on the agent host instead.',

@@ -2,6 +2,7 @@ import type en from './en'
 
 export default {
   'plugin.title': '에이전트 플러그인',
+  'plugin.manage': '설치된 플러그인',
   'plugin.description': 'Agent Plugins 1.0.0 폴더를 가져와 웹 대화에서 스킬과 HTTP MCP 도구를 사용합니다.',
   'plugin.unavailable':
     '이 연결에서는 브라우저로 플러그인을 가져올 수 없습니다. 에이전트 호스트에서 플러그인을 설정하세요.',
