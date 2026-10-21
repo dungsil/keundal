@@ -12,7 +12,7 @@ import { McpClient as BrowserMcpClient } from '@keundal/mcp/browser'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { WebStandardStreamableHTTPServerTransport, type ServerCapabilities } from '@modelcontextprotocol/server'
 import { Context } from 'cordis'
-import { expect, test, type TestContext } from 'vitest'
+import { expect, test, vi, type TestContext } from 'vitest'
 
 import { createFixture } from './fixtures/server.ts'
 
@@ -52,13 +52,37 @@ async function httpFixture(t: TestContext, capabilities?: ServerCapabilities) {
     const body: Buffer[] = []
     for await (const chunk of req) body.push(Buffer.from(chunk))
     if (body.length) requests.push(JSON.parse(Buffer.concat(body).toString()))
-    const response = await transport.handleRequest(
+    let response = await transport.handleRequest(
       new Request('http://localhost/mcp', {
         method: req.method,
         headers: req.headers as Record<string, string>,
         ...(body.length ? { body: Buffer.concat(body) } : {})
       })
     )
+    if (
+      ['invalid-image', 'id-alias', 'method-field', 'orphan-body', 'orphan-id'].includes(fixture.state.resultMode) &&
+      body.length
+    ) {
+      const request = JSON.parse(Buffer.concat(body).toString())
+      if (request.method === 'tools/call') {
+        response = new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id:
+              fixture.state.resultMode === 'orphan-body'
+                ? 999999
+                : fixture.state.resultMode === 'orphan-id'
+                  ? fixture.state.resultText
+                  : fixture.state.resultMode === 'id-alias'
+                    ? String(request.id)
+                    : request.id,
+            ...(fixture.state.resultMode === 'method-field' ? { method: 'unexpected' } : {}),
+            result: { content: [{ type: 'image', mimeType: 'image/png', data: fixture.state.resultText }] }
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+      }
+    }
     res.writeHead(response.status, Object.fromEntries(response.headers))
     if (fixture.state.stringifyResponseIds && response.headers.get('content-type')?.includes('application/json')) {
       const body = (await response.json()) as Record<string, unknown>
@@ -79,7 +103,8 @@ async function httpFixture(t: TestContext, capabilities?: ServerCapabilities) {
   const connect = async (
     serverName = 'alpha',
     permissions: McpPermissions = { tools: '*', resources: '*' },
-    timeoutMs = 2000
+    timeoutMs = 2000,
+    maxResultBytes?: number
   ) => {
     const client = await McpClient.connect({
       serverName,
@@ -87,7 +112,8 @@ async function httpFixture(t: TestContext, capabilities?: ServerCapabilities) {
       url: `http://127.0.0.1:${address.port}/mcp`,
       headers: { Authorization: 'Bearer fixture-test' },
       permissions,
-      timeoutMs
+      timeoutMs,
+      maxResultBytes
     })
     clients.add(client)
     return client
@@ -445,6 +471,193 @@ test('SDK가 허용하는 문자열 응답 ID도 같은 도구 목록 제한을 
   await expect(client.tools()).rejects.toThrow('catalog exceeds')
 })
 
+test.for([
+  'text',
+  'structured',
+  'image',
+  'invalid-image',
+  'id-alias',
+  'method-field',
+  'error',
+  'protocol',
+  'protocol-data'
+] as const)('%s MCP 결과가 크기 한도를 넘으면 원문을 포함하지 않는 오류로 거부한다', async (mode, t) => {
+  const { connect, state } = await httpFixture(t)
+  const client = await connect('budget', { tools: ['subtract'] }, 2000, 256)
+  const tools = await client.tools()
+  state.resultMode = mode
+  if (mode === 'protocol') state.protocolError = 'REMOTE_PAYLOAD'.repeat(100)
+  else state.resultText = 'REMOTE_PAYLOAD'.repeat(100)
+  await expect(execute(tools, 'mcp__budget__tool__subtract')).rejects.toThrow(
+    /^MCP result exceeds the configured size or nesting limit$/
+  )
+})
+
+test.for(['한글😀', '\u0000"\\', '\ud800'])(
+  '%s의 JSON 이스케이프와 UTF-8 바이트를 한도 경계에서 정확히 계산한다',
+  async (text, t) => {
+    const { connect, state } = await httpFixture(t)
+    state.resultText = text.repeat(8)
+    const expected = { content: [{ type: 'text', text: state.resultText }] }
+    const size = Buffer.byteLength(JSON.stringify(expected))
+    const exact = await connect('exact', { tools: ['subtract'] }, 2000, size)
+    expect(await execute(await exact.tools(), 'mcp__exact__tool__subtract')).toEqual(expected)
+    const smaller = await connect('smaller', { tools: ['subtract'] }, 2000, size - 1)
+    await expect(execute(await smaller.tools(), 'mcp__smaller__tool__subtract')).rejects.toThrow(
+      'size or nesting limit'
+    )
+  }
+)
+
+test.for(['read', 'list', 'templates'] as const)(
+  '%s 리소스의 직접 조회와 도구 호출에 같은 결과 한도를 적용한다',
+  async (kind, t) => {
+    const { connect, state } = await httpFixture(t)
+    const client = await connect('budget', { resources: '*' }, 2000, 256)
+    const tools = await client.tools()
+    if (kind === 'read') state.resourceText = 'REMOTE_PAYLOAD'.repeat(100)
+    if (kind === 'list') state.listText = 'REMOTE_PAYLOAD'.repeat(100)
+    if (kind === 'templates') state.templateText = 'REMOTE_PAYLOAD'.repeat(100)
+    const direct = () =>
+      kind === 'read'
+        ? client.readResource('fixture://public')
+        : kind === 'list'
+          ? client.listResources()
+          : client.listResourceTemplates()
+    await expect(direct()).rejects.toThrow('size or nesting limit')
+    await expect(execute(tools, `mcp__budget__resource__${kind}`, { uri: 'fixture://public' })).rejects.toThrow(
+      'size or nesting limit'
+    )
+  }
+)
+
+test('리소스의 개별 페이지가 작아도 전체 페이지의 합이 한도를 넘으면 거부한다', async (t) => {
+  const { connect } = await httpFixture(t)
+  const client = await connect('budget', { resources: '*' }, 2000, 100)
+  await expect(client.listResources()).rejects.toThrow('size or nesting limit')
+})
+
+test('결과 한도가 잘못되면 서버 연결 전에 거부한다', async () => {
+  for (const maxResultBytes of [0, -1, 0.5, Number.MAX_SAFE_INTEGER + 1]) {
+    await expect(
+      McpClient.connect({ serverName: 'valid', transport: 'stdio', command: 'missing-command', maxResultBytes })
+    ).rejects.toThrow('maxResultBytes')
+  }
+})
+
+test('바이트 한도 안에 있어도 과도하게 중첩된 결과는 거부한다', async (t) => {
+  const { connect, state } = await httpFixture(t)
+  const client = await connect('nested', { tools: ['subtract'] })
+  const tools = await client.tools()
+  state.resultMode = 'nested'
+  state.resultText = 'small'
+  await expect(execute(tools, 'mcp__nested__tool__subtract')).rejects.toThrow('size or nesting limit')
+})
+
+test('큰 MCP 결과는 이벤트와 저장소 및 후속 생성에 전달하지 않는다', async (t) => {
+  const { connect, state } = await httpFixture(t)
+  state.resultText = 'REMOTE_PAYLOAD'.repeat(100)
+  const client = await connect('budget', { tools: ['subtract'] }, 2000, 256)
+  const ctx = new Context()
+  let calls = 0
+  class LLM extends LLMService {
+    async getModel() {
+      return { contextWindow: 2000, maxOutputTokens: 200 }
+    }
+    async countTokens() {
+      return 10
+    }
+    async *stream(): AsyncGenerator<LLMEvent> {
+      calls++
+      yield { type: EventType.TOOL_CALL_START, toolCallId: 'call', toolCallName: 'mcp__budget__tool__subtract' }
+      yield { type: EventType.TOOL_CALL_ARGS, toolCallId: 'call', delta: '{"left":3,"right":10}' }
+      yield { type: EventType.TOOL_CALL_END, toolCallId: 'call' }
+    }
+  }
+  const llm = await ctx.plugin(LLM)
+  const store = await ctx.plugin(memoryStorePlugin)
+  const agent = await ctx.plugin(agentPlugin, {
+    model: 'fixture',
+    maxOutputTokens: 100,
+    tools: (options) => client.tools(options)
+  })
+  t.onTestFinished(async () => {
+    await agent.dispose()
+    await store.dispose()
+    await llm.dispose()
+  })
+  const events: LLMEvent[] = []
+  const run = async () => {
+    for await (const event of ctx.agent.run({
+      threadId: 'bounded',
+      runId: 'bounded-run',
+      state: {},
+      context: [],
+      tools: [],
+      messages: []
+    })) {
+      if (event.type === EventType.TOOL_CALL_RESULT) events.push(event)
+    }
+  }
+  await expect(run()).rejects.toThrow('size or nesting limit')
+  expect(calls).toBe(1)
+  expect(events).toEqual([])
+  const generation = await ctx.generation.get('bounded-run')
+  expect(generation?.status).toBe('failed')
+  expect(JSON.stringify(generation)).not.toContain('REMOTE_PAYLOAD')
+  expect((await ctx.session.get('bounded'))?.messages).toEqual([])
+})
+
+test('큰 결과와 작은 결과를 동시에 호출해도 각 요청의 결과를 구분한다', async (t) => {
+  const { connect, state } = await httpFixture(t)
+  state.names = ['large', 'small']
+  state.resultText = 'REMOTE_PAYLOAD'.repeat(100)
+  const client = await connect('parallel', { tools: '*' }, 2000, 256)
+  const tools = await client.tools()
+  await Promise.all([
+    expect(execute(tools, 'mcp__parallel__tool__large')).rejects.toThrow('size or nesting limit'),
+    expect(execute(tools, 'mcp__parallel__tool__small')).resolves.toMatchObject({
+      structuredContent: { name: 'small' }
+    })
+  ])
+})
+
+test('stdio의 큰 도구 결과도 HTTP와 같은 제한으로 거부한다', async (t) => {
+  const client = await McpClient.connect({
+    serverName: 'stdio',
+    transport: 'stdio',
+    command: process.execPath,
+    args: [fileURLToPath(new URL('./fixtures/stdio.ts', import.meta.url))],
+    env: { MCP_FIXTURE_LARGE_RESULT: '1' },
+    permissions: { tools: ['subtract'] },
+    maxResultBytes: 256,
+    timeoutMs: 3000
+  })
+  t.onTestFinished(() => client.close())
+  await expect(execute(await client.tools(), 'mcp__stdio__tool__subtract')).rejects.toThrow('size or nesting limit')
+})
+
+test.for(['orphan-body', 'orphan-id'] as const)(
+  '%s 응답은 SDK의 알 수 없는 응답 오류로 다시 직렬화하지 않는다',
+  async (mode, t) => {
+    const { connect, state } = await httpFixture(t)
+    const client = await connect('orphan', { tools: ['subtract'] }, 100, 256)
+    const tools = await client.tools()
+    state.resultMode = mode
+    state.resultText = 'REMOTE_PAYLOAD'.repeat(170000)
+    const stringify = vi.spyOn(JSON, 'stringify')
+    t.onTestFinished(() => stringify.mockRestore())
+    await expect(execute(tools, 'mcp__orphan__tool__subtract')).rejects.toThrow()
+    const oversized = stringify.mock.calls.filter(
+      ([value]) =>
+        value &&
+        typeof value === 'object' &&
+        (value.id === 999999 || (typeof value.id === 'string' && value.id.startsWith('REMOTE_PAYLOAD')))
+    )
+    // HTTP 테스트 서버의 전송용 직렬화 한 번만 허용합니다.
+    expect(oversized).toHaveLength(1)
+  }
+)
 test('브라우저 진입점으로 HTTP 도구를 조회하고 실행한다', async (t) => {
   const { url } = await httpFixture(t)
   const client = await BrowserMcpClient.connect({
@@ -472,11 +685,15 @@ test('MCP 설정 검증은 잘못된 권한과 전송 설정을 거부하고 원
   const parsed = parseMcpServers([server], false)
   server.permissions.tools.push('delete')
   expect(parsed[0]?.permissions?.tools).toEqual(['search'])
+  expect(parseMcpServers([{ ...server, maxResultBytes: 256 }])[0]?.maxResultBytes).toBe(256)
   for (const change of [
     { transport: 'sse' },
     { url: 'file:///tmp/server' },
     { permissions: { tools: true } },
     { timeoutMs: -1 },
+    { maxResultBytes: 0 },
+    { maxResultBytes: 0.5 },
+    { maxResultBytes: Number.MAX_SAFE_INTEGER + 1 },
     { headers: { Authorization: 'line\nbreak' } }
   ]) {
     expect(() => parseMcpServers([{ ...server, ...change }])).toThrow()
@@ -504,5 +721,40 @@ test('브라우저에서도 누적 목록 예산을 분리하고 과도한 응�
   await expect(client.tools()).rejects.toThrow('catalog exceeds')
   state.catalog = [[catalogTool('safe')]]
   expect((await client.tools())[0]!.description).toBe('safe')
+  expect(JSON.stringify(requests)).not.toContain('io.keundal/catalog-discovery')
+})
+
+test('브라우저의 도구와 리소스에도 결과 예산을 적용하고 내부 토큰은 전송하지 않는다', async (t) => {
+  const { url, state, requests } = await httpFixture(t)
+  state.names = ['subtract', 'small']
+  const client = await BrowserMcpClient.connect({
+    serverName: 'browser',
+    transport: 'streamable-http',
+    url,
+    permissions: { tools: '*', resources: '*' },
+    maxResultBytes: 256
+  })
+  t.onTestFinished(() => client.close())
+  const tools = await client.tools()
+  expect(await execute(tools, 'mcp__browser__tool__subtract', { left: 9, right: 4 })).toMatchObject({
+    structuredContent: { difference: 5 }
+  })
+  state.resultText = 'REMOTE_PAYLOAD'.repeat(100)
+  await Promise.all([
+    expect(execute(tools, 'mcp__browser__tool__subtract')).rejects.toThrow('size or nesting limit'),
+    expect(execute(tools, 'mcp__browser__tool__small')).resolves.toMatchObject({ structuredContent: { name: 'small' } })
+  ])
+  state.resultMode = 'id-alias'
+  await expect(execute(tools, 'mcp__browser__tool__subtract')).rejects.toThrow('size or nesting limit')
+  state.resultMode = 'text'
+  state.resourceText = state.listText = state.templateText = state.resultText
+  await expect(client.readResource('fixture://public')).rejects.toThrow('size or nesting limit')
+  await expect(client.listResources()).rejects.toThrow('size or nesting limit')
+  await expect(client.listResourceTemplates()).rejects.toThrow('size or nesting limit')
+  for (const name of ['read', 'list', 'templates'])
+    await expect(execute(tools, `mcp__browser__resource__${name}`, { uri: 'fixture://public' })).rejects.toThrow(
+      'size or nesting limit'
+    )
+  expect(JSON.stringify(requests)).not.toContain('io.keundal/result-operation')
   expect(JSON.stringify(requests)).not.toContain('io.keundal/catalog-discovery')
 })

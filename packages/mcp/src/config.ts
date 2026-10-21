@@ -19,6 +19,11 @@ export function parseMcpServers(value: unknown, allowStdio = true): McpClientCon
       (!Number.isSafeInteger(server.timeoutMs) || (server.timeoutMs as number) <= 0)
     )
       throw new Error('MCP timeout must be a positive integer')
+    if (
+      server.maxResultBytes !== undefined &&
+      (!Number.isSafeInteger(server.maxResultBytes) || (server.maxResultBytes as number) <= 0)
+    )
+      throw new Error('MCP maxResultBytes must be a positive integer')
     if (server.permissions !== undefined) {
       if (
         !record(server.permissions) ||

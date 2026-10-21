@@ -1,4 +1,4 @@
-import { Server, type ServerCapabilities, type Tool } from '@modelcontextprotocol/server'
+import { ProtocolError, Server, type ServerCapabilities, type Tool } from '@modelcontextprotocol/server'
 
 export function createFixture(
   capabilities: ServerCapabilities = { tools: {}, resources: {} },
@@ -10,6 +10,12 @@ export function createFixture(
     catalog: undefined as Tool[][] | undefined,
     catalogRequests: 0,
     stringifyResponseIds: false,
+    resultText: '',
+    resultMode: 'text',
+    resourceText: '',
+    listText: '',
+    templateText: '',
+    protocolError: '',
     started: Promise.withResolvers<void>()
   }
 ) {
@@ -43,6 +49,27 @@ export function createFixture(
     })
     server.setRequestHandler('tools/call', async (request, ctx) => {
       const { name, arguments: args } = request.params
+      if (state.protocolError) throw new Error(state.protocolError)
+      if (state.resultText && name !== 'small') {
+        if (state.resultMode === 'protocol-data')
+          throw new ProtocolError(-32603, 'fixture failure', { value: state.resultText })
+        if (state.resultMode === 'nested') {
+          let value: unknown = state.resultText
+          for (let depth = 0; depth < 80; depth++) value = { nested: value }
+          return { content: [], structuredContent: { value } }
+        }
+        if (state.resultMode === 'structured') return { content: [], structuredContent: { value: state.resultText } }
+        if (state.resultMode === 'invalid-image')
+          return { content: [{ type: 'image', mimeType: 'image/png', data: state.resultText }] }
+        if (state.resultMode === 'image')
+          return {
+            content: [{ type: 'image', mimeType: 'image/png', data: Buffer.from(state.resultText).toString('base64') }]
+          }
+        return {
+          content: [{ type: 'text', text: state.resultText }],
+          ...(state.resultMode === 'error' ? { isError: true } : {})
+        }
+      }
       if (name === 'fail') return { content: [{ type: 'text', text: 'fixture failure' }], isError: true }
       if (name === 'wait') {
         state.started.resolve()
@@ -75,14 +102,27 @@ export function createFixture(
     server.setRequestHandler('resources/list', (request) =>
       request.params?.cursor === 'second'
         ? { resources: [{ name: 'private', uri: 'fixture://private' }] }
-        : { resources: [{ name: 'public', uri: 'fixture://public' }], nextCursor: 'second' }
+        : {
+            resources: [
+              { name: 'public', uri: 'fixture://public', ...(state.listText ? { description: state.listText } : {}) }
+            ],
+            nextCursor: 'second'
+          }
     )
     server.setRequestHandler('resources/templates/list', () => ({
-      resourceTemplates: [{ name: 'document', uriTemplate: 'fixture://document/{id}' }]
+      resourceTemplates: [
+        {
+          name: 'document',
+          uriTemplate: 'fixture://document/{id}',
+          ...(state.templateText ? { description: state.templateText } : {})
+        }
+      ]
     }))
     server.setRequestHandler('resources/read', (request) => {
       state.resourceReads++
-      return { contents: [{ uri: request.params.uri, text: 'resource body', mimeType: 'text/plain' }] }
+      return {
+        contents: [{ uri: request.params.uri, text: state.resourceText || 'resource body', mimeType: 'text/plain' }]
+      }
     })
   }
   return { server, state }
