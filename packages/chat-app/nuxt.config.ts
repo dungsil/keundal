@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 
 export default defineNuxtConfig({
   extends: ['@keundal/ui'],
-  modules: ['@nuxt/eslint', '@nuxt/ui', '@comark/nuxt', 'nuxt-charts'],
+  modules: ['@nuxt/eslint', '@nuxt/ui', '@nuxt/fonts', '@comark/nuxt', 'nuxt-charts'],
   app: { head: { style: [{ innerHTML: 'html.dark { --startup-bg: #09090b; --startup-fg: #fafafa; }' }] } },
   css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],
   ui: { fonts: false },
