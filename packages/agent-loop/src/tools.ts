@@ -8,7 +8,9 @@ import {
   type LLMService,
   type RunAgentInput
 } from '@keundal/core'
+import { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 import type { ExecutableTool, ToolExecutionContext } from '@keundal/tools'
+export { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 export type { ExecutableTool, ToolExecutionContext } from '@keundal/tools'
 export function parseTools(value: unknown): ExecutableTool[] {
   if (value === undefined) return []
@@ -124,44 +126,9 @@ export async function* streamWithTools(
       toolCallId: call.id,
       signal
     })
-    if (options.parallel) {
-      // 실행을 겹쳐 시작하고 결과는 호출 순서대로 전달합니다. 순서가 되기 전에 실패한 실행이
-      // 있으면 그 오류를 전달하고, 아직 전달하지 않은 나머지 실행의 결과는 기록하지 않습니다.
-      // 감싼 거부는 순서가 될 때까지 처리되지 않으므로 원래 오류를 보존하려 상자로 받습니다.
-      const pending = executions.map(({ call, tool, args }) => ({
-        call,
-        tool,
-        task: Promise.resolve(tool.execute(args, executionContext(call))).catch((error: unknown) => error)
-      }))
-      for (const { call, tool, task } of pending) {
-        signal.throwIfAborted()
-        const content = await task
-        signal.throwIfAborted()
-        if (content instanceof Error) throw content
-        if (typeof content !== 'string') throw new Error(`tool result must be a string: ${tool.name}`)
-        const event: LLMEvent = {
-          type: EventType.TOOL_CALL_RESULT,
-          messageId: globalThis.crypto.randomUUID(),
-          toolCallId: call.id,
-          role: 'tool',
-          content
-        }
-        assembly.apply(event)
-        yield event
-      }
-    } else {
-      for (const { call, tool, args } of executions) {
-        signal.throwIfAborted()
-        const content = await tool.execute(args, executionContext(call))
-        signal.throwIfAborted()
-        if (typeof content !== 'string') throw new Error(`tool result must be a string: ${tool.name}`)
-        const event: LLMEvent = {
-          type: EventType.TOOL_CALL_RESULT,
-          messageId: globalThis.crypto.randomUUID(),
-          toolCallId: call.id,
-          role: 'tool',
-          content
-        }
+    const batches = options.parallel ? [executions] : executions.map((execution) => [execution])
+    for (const batch of batches) {
+      for await (const event of executeBatch(batch, executionContext, signal)) {
         assembly.apply(event)
         yield event
       }
@@ -179,6 +146,77 @@ export async function* streamWithTools(
       }
     }
     current = { ...current, input: prepared }
+  }
+}
+
+async function* executeBatch(
+  executions: { call: PendingCall; tool: ExecutableTool; args: Record<string, unknown> }[],
+  context: (call: PendingCall) => ToolExecutionContext,
+  signal: AbortSignal
+): AsyncGenerator<LLMEvent> {
+  const progress: LLMEvent[] = []
+  let wake: (() => void) | undefined
+  let closed = false
+  const notify = () => wake?.()
+  signal.addEventListener('abort', notify, { once: true })
+  try {
+    signal.throwIfAborted()
+    const pending = executions.map(({ call, tool, args }) => {
+      let settled = false
+      const task = Promise.resolve()
+        .then(() => {
+          signal.throwIfAborted()
+          return tool.execute(args, {
+            ...context(call),
+            reportProgress(value) {
+              if (closed || signal.aborted) return
+              progress.push({
+                type: EventType.CUSTOM,
+                name: TOOL_PROGRESS_EVENT,
+                value: { toolCallId: call.id, value }
+              })
+              notify()
+            }
+          })
+        })
+        .then(
+          (value) => ({ ok: true as const, value }),
+          (error: unknown) => ({ ok: false as const, error })
+        )
+        .finally(() => {
+          settled = true
+          notify()
+        })
+      return { call, tool, task, settled: () => settled }
+    })
+    for (const entry of pending) {
+      while (true) {
+        signal.throwIfAborted()
+        const event = progress.shift()
+        if (event) {
+          yield event
+          continue
+        }
+        if (entry.settled()) break
+        await new Promise<void>((resolve) => {
+          wake = resolve
+        })
+      }
+      const result = await entry.task
+      signal.throwIfAborted()
+      if (!result.ok) throw result.error
+      if (typeof result.value !== 'string') throw new Error(`tool result must be a string: ${entry.tool.name}`)
+      yield {
+        type: EventType.TOOL_CALL_RESULT,
+        messageId: globalThis.crypto.randomUUID(),
+        toolCallId: entry.call.id,
+        role: 'tool',
+        content: result.value
+      }
+    }
+  } finally {
+    closed = true
+    signal.removeEventListener('abort', notify)
   }
 }
 

@@ -1,9 +1,12 @@
 import type { AgentTool, ExecutionOptions } from '@keundal/core'
 
+export const TOOL_PROGRESS_EVENT = 'keundal.tool.progress'
+
 export interface ToolExecutionContext {
   readonly threadId: string
   readonly runId: string
   readonly toolCallId: string
+  readonly reportProgress?: (value: unknown) => void
   readonly signal: AbortSignal
 }
 

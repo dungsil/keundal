@@ -34,6 +34,10 @@ const emit = defineEmits<{
         v-else-if="part.type === 'tool-weather'"
         :invocation="{ ...(part as WeatherUIToolInvocation) }"
       />
+      <ChatToolSubagent
+        v-else-if="part.type === 'tool-delegate_task'"
+        :invocation="part"
+      />
       <UChatTool
         v-else-if="part.type === 'tool-skill'"
         :text="
