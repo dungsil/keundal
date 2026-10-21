@@ -59,8 +59,9 @@ PR 프리뷰는 `preview-build.yml`에서 Workers와 의존 패키지만 별도�
 프리뷰 배포도 PR의 전체 변경 파일을 확인하여 같은 경로만 바뀌었으면 배포와 댓글 생성을 생략한다.
 배포 입력이 함께 바뀐 PR은 프리뷰를 생성한다. `tools/tsdown`과 `tools/tsconfig`는 실제 앱 빌드에
 사용하므로 README를 제외한 변경은 프리뷰 대상에 포함한다. 앱이 사용하는 Markdown도 포함한다.
-제외 경로를 바꿀 때는 `ci.yml`의 `source`·`web`·`desktop` 필터, `preview-build.yml`과 `lighthouse.yml`의 `paths-ignore`,
-`preview.yml`의 배포 대상 검사를 함께 수정한다. 경로 확인과 빌드 결과 집계, 린트, CodeQL은 계속 실행한다.
+제외 경로를 바꿀 때는 `ci.yml`의 `source`·`web`·`desktop` 필터, `preview-build.yml`의 `paths-ignore`,
+`lighthouse.yml`의 `paths` 제외 패턴, `preview.yml`의 배포 대상 검사를 함께 수정한다.
+경로 확인과 빌드 결과 집계, 린트, CodeQL은 계속 실행한다.
 
 전체 CI 성공은 별도 데스크톱 프리뷰 댓글의 다운로드 링크만 갱신한다. 웹은 `PR 프리뷰 빌드` 성공 시 배포한다. 네이티브 빌드가 실패하거나
 생략되어도 별도 웹 빌드가 성공하면 웹 프리뷰는 배포된다. 별도 빌드와 CI의 웹 빌드는 기존 Turbo 캐시를
@@ -208,6 +209,10 @@ macOS의 DMG 생성은 [실행 39454203709](https://github.com/dungsil/keundal/a
 각 패키지의 `nuxt.config.ts`, `package.json`이다. PR 전체 변경 파일을 기준으로 판단한다.
 문서, 서버, 데스크톱 전용 코드, 검사 설정 또는 루트 잠금 파일만 바뀐 PR에서는 실행하지 않는다.
 따라서 UI 변경이 없는 PR에서는 프리뷰 배포 대기와 Lighthouse 결과 댓글 갱신도 생략한다.
+
+GitHub Actions는 같은 이벤트에서 `paths`와 `paths-ignore`를 함께 정의할 수 없다.
+둘 중 하나만 쓸 수 있으므로 제외 경로는 `paths`의 `!` 패턴으로 적는다. 뒤에 오는 `!` 패턴은 앞선 일치 경로를 제외한다.
+루트 Markdown 문서와 앱·패키지·도구의 README을 제외하는 규칙은 `preview-build.yml`의 `paths-ignore`와 같은 경로를 쓴다.
 
 기존 프리뷰 배포가 남긴 봇 댓글에서 현재 PR 커밋과 일치하는 배포 URL을 최대 20분간 기다린 뒤,
 그 URL의 홈(`/`)과 설정 하위 화면 다섯 개를 Unlighthouse 0.19.1로 검사한다.
