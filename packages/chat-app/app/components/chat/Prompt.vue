@@ -59,7 +59,7 @@ function appendTranscript(text: string) {
     :aria-label="t('chat.prompt')"
     color="neutral"
     variant="subtle"
-    :ui="{ base: ['px-1.5', dictation !== 'idle' && 'placeholder:italic'] }"
+    :ui="{ base: ['px-1.5', dictation !== 'idle' && 'placeholder:italic'], footer: 'flex-wrap gap-y-2' }"
     @submit="emit('submit', $event)"
   >
     <template v-if="files.length > 0" #header>
@@ -69,8 +69,9 @@ function appendTranscript(text: string) {
     <template #footer>
       <ChatPromptMenu :open="open" />
 
-      <div class="flex items-center gap-1">
+      <div class="flex min-w-0 flex-wrap items-center justify-end gap-1 ml-auto">
         <ModelSelect />
+        <ChatReasoningSelect />
 
         <ChatDictateButton
           v-if="canDictate"

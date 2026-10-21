@@ -69,6 +69,8 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
     mountAgent: async (ctx, config) =>
       ctx.plugin(agentPlugin, {
         ...config,
+        reasoning:
+          options.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.model) ? undefined : config.reasoning,
         skills: plugins.length > 0,
         tools: async (execution) => {
           const signal = execution?.signal

@@ -3,7 +3,7 @@ import { ChatMessageAssembly, type ChatMessage } from '@keundal/chat/chat-messag
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
 import { validateChatTitle } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
-import { EventType, type AGUIEvent, type AgentMessage } from '@keundal/core'
+import { type Reasoning, EventType, type AGUIEvent, type AgentMessage } from '@keundal/core'
 import type { Fiber } from 'cordis'
 import type { Context } from 'cordis'
 export { toMessages } from '@keundal/chat/messages'
@@ -20,7 +20,7 @@ const input = (
 export async function createKeundalChat(
   context: Context,
   name: string,
-  options: { webSearch?: boolean; reasoning?: boolean; maxOutputTokens?: number },
+  options: { webSearch?: boolean; reasoning?: Reasoning; maxOutputTokens?: number },
   mountAgent: (ctx: Context, config: AgentConfig) => Promise<Fiber>
 ) {
   const config = resolveModel(name)
@@ -32,7 +32,7 @@ export async function createKeundalChat(
       maxOutputTokens,
       webSearch: !!options.webSearch && config.provider !== 'google',
       reasoning:
-        options.reasoning === false && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id)
+        options.reasoning !== undefined && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id)
           ? undefined
           : options.reasoning,
       maxToolRounds: 4,

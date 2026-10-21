@@ -27,12 +27,21 @@ export interface LLMModelInfo {
   readonly maxOutputTokens?: number
 }
 
+export type ReasoningLevel = 'low' | 'medium' | 'high'
+export type Reasoning = boolean | ReasoningLevel
+
+export function parseReasoning(value: unknown): Reasoning | undefined {
+  if (value === undefined || typeof value === 'boolean' || value === 'low' || value === 'medium' || value === 'high')
+    return value
+  throw new Error('reasoning must be a boolean or low, medium, high')
+}
+
 export interface LLMRequest {
   readonly input: RunAgentInput
   readonly model: string
   readonly maxOutputTokens: number
   readonly webSearch?: boolean
-  readonly reasoning?: boolean
+  readonly reasoning?: Reasoning
 }
 
 export abstract class LLMService extends Service {

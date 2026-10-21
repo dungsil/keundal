@@ -30,6 +30,7 @@ export interface AgentHostOptions {
 }
 
 export interface AgentHostRunOptions extends ExecutionOptions {
+  readonly reasoning?: AgentConfig['reasoning']
   readonly model?: string
 }
 

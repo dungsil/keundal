@@ -1,4 +1,4 @@
-import type { AGUIEvent } from '@keundal/core'
+import type { Reasoning, AGUIEvent } from '@keundal/core'
 
 import type { ChatMessage } from './chat-message'
 export interface ChatStoreLike {
@@ -15,7 +15,7 @@ export interface ChatStoreLike {
       messages: ChatMessage[]
       model: string
       titleModel?: string
-      reasoning?: boolean
+      reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void
       onTitle?: (title: string) => void
