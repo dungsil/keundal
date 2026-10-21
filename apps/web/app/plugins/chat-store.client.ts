@@ -5,12 +5,12 @@ import skillPlugin from '@keundal/plugin-skill'
 import { ChatStore, type ChatStoreLike } from '../../shared/utils/chat-store'
 import { RemoteChatStore, type RemoteAgentInfo } from '../../shared/utils/remote-chat-store'
 import { createDesktopChatStore } from '../../shared/utils/desktop-chat-store'
-import type { ModelOption } from '../../shared/utils/models'
+import { resolveModel, type ModelOption } from '../../shared/utils/models'
 import { browserLLMPlugin } from '../../shared/utils/browser-llm'
 import { defaultLLMSettings, type LLMSettings } from '../../shared/utils/llm-settings'
 import { createLLMSettingsStorage, LLM_SETTINGS_KEY } from '../../shared/utils/llm-settings-storage'
 import { SkillManager } from '../../shared/utils/skills'
-import { FALLBACK_MODEL, MODEL_KEY, loadModelPreferences } from '../../shared/utils/model-preferences'
+import { FALLBACK_MODEL, MODEL_KEY, DEFAULT_MODEL_KEY, loadModelPreferences } from '../../shared/utils/model-preferences'
 
 export default defineNuxtPlugin(async () => {
   const { t } = useLocale()
@@ -40,13 +40,22 @@ export default defineNuxtPlugin(async () => {
     await storage.save(next)
     if (desktopStore) {
       try {
-        await desktopStore.reloadSettings()
+        if (!next[resolveModel(desktopStore.selectedModel).configuration]) {
+          await desktopStore.selectModel(FALLBACK_MODEL, true)
+        } else {
+          await desktopStore.reloadSettings()
+        }
       } catch (error) {
         await storage.save(settings.value)
         throw error
       }
     }
     settings.value = next
+    if (!next[resolveModel(model.value).configuration]) model.value = FALLBACK_MODEL
+    if (defaultModel.value && !next[resolveModel(defaultModel.value).configuration]) {
+      defaultModel.value = ''
+      localStorage.removeItem(DEFAULT_MODEL_KEY)
+    }
   }
   const modelCatalog = useModelCatalog(settings, () => t('model.loadFailed'))
   const skillManager = new SkillManager(localStorage, invokeNative)
@@ -54,7 +63,7 @@ export default defineNuxtPlugin(async () => {
   let desktopStore: Awaited<ReturnType<typeof createDesktopChatStore>> | undefined
   const selectModel = desktop && invokeNative ? (value: string) => desktopStore!.selectModel(value) : undefined
   if (desktop && invokeNative) {
-    desktopStore = await createDesktopChatStore(invokeNative, () => modelCatalog.models.value, initialModel || undefined)
+    desktopStore = await createDesktopChatStore(invokeNative, () => modelCatalog.models.value, initialModel && settings.value[resolveModel(initialModel).configuration] ? initialModel : undefined)
     model.value = desktopStore.selectedModel
     await desktopStore.recover()
     if (import.meta.hot) import.meta.hot.dispose(() => desktopStore!.stop())

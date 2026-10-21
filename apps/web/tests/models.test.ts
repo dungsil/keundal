@@ -175,3 +175,21 @@ test.each(['openai', 'anthropic', 'google'] as const)('%s 모델 목록은 빈 A
   expect(requests[2]!.headers['x-api-key']).toBeUndefined()
   expect(requests[2]!.headers['x-goog-api-key']).toBeUndefined()
 })
+
+test('같은 종류의 공급자는 모델 ID가 같아도 인증·모델 선택·캐시를 분리한다', async () => {
+  const { settings, storage, requests, values } = await fixture((_req, res) => {
+    res.end(JSON.stringify({ data: [{ id: 'shared/model' }] }))
+  })
+  settings['openai@work'] = { ...settings.openai, name: 'Work', apiKey: 'work-key' }
+  settings['openai@home'] = { ...settings.openai, name: 'Home', apiKey: 'home-key' }
+  const work = await loadModels('openai@work', settings, storage)
+  const home = await loadModels('openai@home', settings, storage)
+  expect(work[0]).toMatchObject({ value: 'openai@work/shared/model', label: 'shared/model · Work' })
+  expect(home[0]).toMatchObject({ value: 'openai@home/shared/model', label: 'shared/model · Home' })
+  expect(requests.map(request => request.headers.authorization)).toEqual(['Bearer work-key', 'Bearer home-key'])
+  await loadModels('openai@work', settings, storage)
+  await loadModels('openai@home', settings, storage)
+  expect(requests).toHaveLength(2)
+  expect(values.size).toBe(2)
+  expect([...values.values()].join('')).not.toContain('work-key')
+})

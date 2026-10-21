@@ -1,4 +1,4 @@
-import { defaultLLMSettings, LLM_PROVIDERS, providerCredentials } from '#shared/utils/llm-settings'
+import { defaultLLMSettings, configuredProviders, providerCredentials } from '#shared/utils/llm-settings'
 
 export function useLLMSettings() {
   // The client plugin owns one shared ref; SSR only receives empty defaults.
@@ -6,7 +6,7 @@ export function useLLMSettings() {
   const route = useRoute()
   function ensureConfigured(model: string) {
     if (useNuxtApp().$remoteAgent) return true
-    const provider = LLM_PROVIDERS.find(item => model.startsWith(`${item.id}/`))
+    const provider = configuredProviders(settings.value).find(item => model.startsWith(`${item.id}/`))
     if (!provider) return false
     try {
       providerCredentials(settings.value, provider.id)

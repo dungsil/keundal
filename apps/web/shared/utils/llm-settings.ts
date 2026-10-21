@@ -9,6 +9,19 @@ export const LLM_PROVIDERS = [
 
 export type LLMProvider = typeof LLM_PROVIDERS[number]['id']
 
+export function providerType(id: string): LLMProvider {
+  if (!/^(openai|anthropic|google)(@[a-zA-Z0-9-]+)?$/.test(id)) throw new Error('Unknown provider configuration')
+  return id.split('@')[0] as LLMProvider
+}
+
+export function configuredProviders(settings: LLMSettings) {
+  return Object.entries(settings).map(([id, value]) => {
+    const type = providerType(id)
+    const preset = LLM_PROVIDERS.find(item => item.id === type)!
+    return { ...preset, id, providerType: type, label: value.name || preset.label }
+  })
+}
+
 const headersSchema = z.record(
   z.string().regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/, 'Invalid request header name'),
   z.string().max(4096).regex(/^[\t\x20-\x7e]*$/, 'Header values must use ASCII without line breaks')
@@ -18,6 +31,7 @@ const headersSchema = z.record(
 }).transform(headers => Object.fromEntries(Object.entries(headers).map(([name, value]) => [name.toLowerCase(), value])))
 
 export const providerSettingsSchema = z.object({
+  name: z.string().trim().max(100).optional(),
   apiKey: z.string().trim().max(4096).regex(/^[^\r\n]*$/, 'API key must not contain line breaks'),
   baseURL: z.string().trim().refine((value) => {
     if (!value) return true
@@ -34,19 +48,27 @@ export const providerSettingsSchema = z.object({
 })
 
 export type ProviderSettings = z.infer<typeof providerSettingsSchema>
-export type LLMSettings = Record<LLMProvider, ProviderSettings>
+export type LLMSettings = Record<LLMProvider, ProviderSettings> & Record<string, ProviderSettings>
 
 export const llmSettingsSchema = z.object({
   anthropic: providerSettingsSchema.default({ apiKey: '', baseURL: '' }),
   google: providerSettingsSchema.default({ apiKey: '', baseURL: '' }),
   openai: providerSettingsSchema.default({ apiKey: '', baseURL: '' })
+}).catchall(providerSettingsSchema).superRefine((settings, ctx) => {
+  for (const id of Object.keys(settings)) {
+    try {
+      providerType(id)
+    } catch {
+      ctx.addIssue({ code: 'custom', path: [id], message: 'Unknown provider configuration' })
+    }
+  }
 })
 
 export function defaultLLMSettings(): LLMSettings {
   return llmSettingsSchema.parse({})
 }
 
-export function providerCredentials(settings: LLMSettings, provider: LLMProvider) {
+export function providerCredentials(settings: LLMSettings, provider: string) {
   const parsed = providerSettingsSchema.safeParse(settings[provider])
   if (!parsed.success) throw new Error(`Open LLM settings and check the ${provider} configuration`)
   return { apiKey: parsed.data.apiKey, baseURL: parsed.data.baseURL || undefined, headers: parsed.data.headers }

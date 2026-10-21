@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { LLM_PROVIDERS, defaultLLMSettings, providerSettingsSchema, type LLMProvider } from '#shared/utils/llm-settings'
+import {
+  LLM_PROVIDERS,
+  defaultLLMSettings,
+  configuredProviders,
+  providerSettingsSchema,
+  type LLMProvider
+} from '#shared/utils/llm-settings'
 
 const { t } = useLocale()
 
@@ -11,34 +17,50 @@ const { model } = useModels()
 const { $chatStore, $saveLLMSettings } = useNuxtApp()
 const desktop = useRuntimeConfig().public.desktop
 const toast = useToast()
-const provider = ref<LLMProvider>('anthropic')
+const provider = ref('anthropic')
+const newType = ref<LLMProvider>('openai')
 const draft = ref(defaultLLMSettings())
-const headerRows = ref<Record<LLMProvider, { id: string; key: string; value: string }[]>>({
+const headerRows = ref<Record<string, { id: string; key: string; value: string }[]>>({
   anthropic: [],
   google: [],
   openai: []
 })
 const error = ref('')
 const saving = ref(false)
-const current = computed(() => LLM_PROVIDERS.find((item) => item.id === provider.value)!)
+const providers = computed(() => configuredProviders(draft.value))
+const current = computed(() => providers.value.find((item) => item.id === provider.value)!)
+const currentDraft = computed(() => draft.value[provider.value]!)
+const currentHeaders = computed(() => headerRows.value[provider.value]!)
+
+function addProvider() {
+  const id = `${newType.value}@${crypto.randomUUID()}`
+  const preset = LLM_PROVIDERS.find((item) => item.id === newType.value)!
+  draft.value[id] = {
+    name: `${preset.label} ${providers.value.filter((item) => item.providerType === newType.value).length + 1}`,
+    apiKey: '',
+    baseURL: preset.baseURL
+  }
+  headerRows.value[id] = []
+  provider.value = id
+}
 
 function loadDraft() {
   draft.value = JSON.parse(JSON.stringify(settings.value))
-  for (const item of LLM_PROVIDERS)
-    headerRows.value[item.id] = Object.entries(draft.value[item.id].headers ?? {}).map(([key, value]) => ({
+  for (const item of configuredProviders(draft.value))
+    headerRows.value[item.id] = Object.entries(draft.value[item.id]!.headers ?? {}).map(([key, value]) => ({
       id: crypto.randomUUID(),
       key,
       value
     }))
 }
 
-onMounted(loadDraft)
+loadDraft()
 watch(
   [() => route.query.provider, model],
   ([value]) => {
     provider.value =
-      LLM_PROVIDERS.find((item) => item.id === value)?.id ??
-      LLM_PROVIDERS.find((item) => model.value.startsWith(`${item.id}/`))?.id ??
+      configuredProviders(settings.value).find((item) => item.id === value)?.id ??
+      configuredProviders(settings.value).find((item) => model.value.startsWith(`${item.id}/`))?.id ??
       'anthropic'
   },
   { immediate: true }
@@ -48,7 +70,7 @@ onBeforeRouteLeave(() => !saving.value)
 
 async function addHeader() {
   const id = crypto.randomUUID()
-  headerRows.value[provider.value].push({ id, key: '', value: '' })
+  currentHeaders.value.push({ id, key: '', value: '' })
   await nextTick()
   document.getElementById(id)?.focus()
 }
@@ -57,12 +79,14 @@ async function save(forget = false) {
   if (saving.value) return
   error.value = ''
   const next = JSON.parse(JSON.stringify(settings.value))
-  if (forget) next[provider.value] = { apiKey: '', baseURL: '' }
-  else {
-    for (const item of LLM_PROVIDERS) {
-      const rows = headerRows.value[item.id]
-        .map((row) => ({ key: row.key.trim(), value: row.value }))
-        .filter((row) => row.key || row.value)
+  if (forget) {
+    if (provider.value.includes('@')) delete next[provider.value]
+    else next[provider.value] = { apiKey: '', baseURL: '' }
+  } else {
+    for (const item of configuredProviders(draft.value)) {
+      const rows = headerRows.value[item.id]!.map((row) => ({ key: row.key.trim(), value: row.value })).filter(
+        (row) => row.key || row.value
+      )
       if (rows.some((row) => !row.key)) {
         provider.value = item.id
         error.value = t('llm.headerKeyRequired')
@@ -73,13 +97,19 @@ async function save(forget = false) {
         error.value = t('llm.duplicateHeaders')
         return
       }
-      draft.value[item.id].headers = Object.fromEntries(rows.map((row) => [row.key, row.value]))
+      draft.value[item.id]!.headers = Object.fromEntries(rows.map((row) => [row.key, row.value]))
       const parsed = providerSettingsSchema.safeParse(draft.value[item.id])
       if (!parsed.success) {
         provider.value = item.id
         const field = parsed.error.issues[0]!.path[0]
         error.value = t(
-          field === 'apiKey' ? 'llm.invalidKey' : field === 'baseURL' ? 'llm.invalidURL' : 'llm.invalidHeaders'
+          field === 'name'
+            ? 'llm.invalidName'
+            : field === 'apiKey'
+              ? 'llm.invalidKey'
+              : field === 'baseURL'
+                ? 'llm.invalidURL'
+                : 'llm.invalidHeaders'
         )
         return
       }
@@ -96,6 +126,7 @@ async function save(forget = false) {
       color: 'success'
     })
     loadDraft()
+    if (!draft.value[provider.value]) provider.value = 'anthropic'
   } catch {
     error.value = desktop ? t('llm.saveFailedOS') : t('llm.saveFailedBrowser')
   } finally {
@@ -116,11 +147,39 @@ async function save(forget = false) {
       <UFormField :label="t('llm.provider')" name="provider">
         <USelect
           v-model="provider"
-          :items="[...LLM_PROVIDERS]"
+          :items="providers"
           value-key="id"
           label-key="label"
           class="w-full"
           :disabled="saving"
+        />
+      </UFormField>
+      <div class="flex items-end gap-2">
+        <UFormField :label="t('llm.providerType')" class="flex-1">
+          <USelect
+            v-model="newType"
+            :items="[...LLM_PROVIDERS]"
+            value-key="id"
+            label-key="label"
+            class="w-full"
+            :disabled="saving"
+          />
+        </UFormField>
+        <UButton
+          type="button"
+          icon="i-lucide-plus"
+          :label="t('llm.addProvider')"
+          :disabled="saving"
+          @click="addProvider"
+        />
+      </div>
+      <UFormField :label="t('llm.providerName')" name="providerName">
+        <UInput
+          v-model="currentDraft.name"
+          :placeholder="current.label"
+          :maxlength="100"
+          :disabled="saving"
+          class="w-full"
         />
       </UFormField>
       <p class="text-sm text-muted">
@@ -128,7 +187,7 @@ async function save(forget = false) {
       </p>
       <UFormField :label="t('llm.apiKey')" name="apiKey">
         <UInput
-          v-model="draft[provider].apiKey"
+          v-model="currentDraft.apiKey"
           type="password"
           autocomplete="off"
           autocapitalize="off"
@@ -140,7 +199,7 @@ async function save(forget = false) {
       </UFormField>
       <UFormField :label="t('llm.baseURL')" name="baseURL" :description="t('llm.baseURLDescription')">
         <UInput
-          v-model="draft[provider].baseURL"
+          v-model="currentDraft.baseURL"
           :placeholder="current.baseURL"
           type="url"
           autocomplete="off"
@@ -153,7 +212,7 @@ async function save(forget = false) {
         <p class="text-sm text-muted">
           {{ t('llm.headersDescription') }}
         </p>
-        <div v-for="(row, index) in headerRows[provider]" :key="row.id" class="flex items-start gap-2">
+        <div v-for="(row, index) in currentHeaders" :key="row.id" class="flex items-start gap-2">
           <UInput
             :id="row.id"
             v-model="row.key"
@@ -182,7 +241,7 @@ async function save(forget = false) {
             color="neutral"
             variant="ghost"
             :disabled="saving"
-            @click="headerRows[provider].splice(index, 1)"
+            @click="currentHeaders.splice(index, 1)"
           />
         </div>
         <UButton
@@ -213,7 +272,9 @@ async function save(forget = false) {
         variant="ghost"
         :disabled="
           saving ||
-          (!settings[provider]?.apiKey &&
+          (!provider.includes('@') &&
+            !settings[provider]?.name &&
+            !settings[provider]?.apiKey &&
             !settings[provider]?.baseURL &&
             !Object.keys(settings[provider]?.headers ?? {}).length)
         "

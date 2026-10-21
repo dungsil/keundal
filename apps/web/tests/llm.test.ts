@@ -477,3 +477,36 @@ test.each([
     expect(requests.at(-1)!.headers.authorization).toBeUndefined()
   }
 })
+
+test('같은 종류의 공급자를 전환하면 제목과 생성 요청을 선택한 주소와 키로 보내고 삭제된 설정은 거부한다', async () => {
+  const settings = defaultLLMSettings()
+  const requests: string[] = []
+  for (const name of ['work', 'home']) {
+    const baseURL = await setup((_body, response) => send(response, openaiText(name)), 200, (request) => {
+      requests.push(`${name}:${request.headers.authorization}`)
+    })
+    settings[`openai@${name}`] = { name, apiKey: `${name}-key`, baseURL }
+  }
+  const ctx = new Context()
+  const llm = ctx.plugin(browserLLMPlugin, { getSettings: () => settings })
+  await llm
+  const store = ctx.plugin(memoryStorePlugin)
+  await store
+  onTestFinished(async () => {
+    await store.dispose()
+    await llm.dispose()
+  })
+  for (const name of ['work', 'home']) {
+    const chat = await createChat(ctx, `openai@${name}/shared`, {})
+    try {
+      expect(await chat.title(user)).toBe(name)
+      const events: AGUIEvent[] = []
+      for await (const event of chat.respond({ threadId: crypto.randomUUID(), messages: [user], instructions: '' })) events.push(event)
+      expect(events.some(event => event.type === EventType.RUN_FINISHED)).toBe(true)
+    } finally { await chat.dispose() }
+  }
+  expect(requests).toContain('work:Bearer work-key')
+  expect(requests).toContain('home:Bearer home-key')
+  delete settings['openai@work']
+  await expect(ctx.llm.getModel('openai@work/shared')).rejects.toThrow('configuration')
+})

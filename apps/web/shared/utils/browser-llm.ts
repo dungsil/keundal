@@ -19,8 +19,8 @@ export function browserLLMPlugin(ctx: Context, config: { getSettings: () => LLMS
   })
 
   async function open(model: string, options?: ExecutionOptions) {
-    const { provider, id, value } = resolveModel(model)
-    const credentials = providerCredentials(config.getSettings(), provider)
+    const { provider, configuration, id, value } = resolveModel(model)
+    const credentials = providerCredentials(config.getSettings(), configuration)
     const metadata = config.getModels?.().find(item => item.value === value)
     const plugin = await plugins[provider]()
     options?.signal?.throwIfAborted()

@@ -89,3 +89,17 @@ test('잘못된 설정은 저장·이전하지 않고 기존 보안 설정을 �
   expect(native.secret).toBeNull()
   expect(storage.getItem(LLM_SETTINGS_KEY)).toBe(JSON.stringify(invalid))
 })
+
+test('추가 공급자를 웹과 보안 저장소에 보존하고 하나를 삭제해도 나머지 설정을 유지한다', async () => {
+  for (const desktop of [false, true]) {
+    const { storage, invokeNative, settings } = fixture()
+    const persistence = createLLMSettingsStorage(storage, desktop ? invokeNative : undefined)
+    settings['openai@work'] = { name: 'Work', apiKey: 'work-key', baseURL: 'https://work.example/v1' }
+    settings['openai@home'] = { name: 'Home', apiKey: 'home-key', baseURL: 'https://home.example/v1' }
+    await persistence.save(settings)
+    expect(await persistence.load()).toEqual(settings)
+    delete settings['openai@work']
+    await persistence.save(settings)
+    expect(await persistence.load()).toEqual(settings)
+  }
+})

@@ -1,6 +1,6 @@
 import { onScopeDispose, ref, watch, type Ref } from 'vue'
 
-import { LLM_PROVIDERS, type LLMSettings } from '#shared/utils/llm-settings'
+import { configuredProviders, type LLMSettings } from '#shared/utils/llm-settings'
 import { loadModels, type ModelOption } from '#shared/utils/models'
 
 /** Owned by the client plugin, shared by the selector and the browser LLM service. */
@@ -9,14 +9,22 @@ export function useModelCatalog(settings: Ref<LLMSettings>, loadErrorMessage = (
   const loading = ref(false)
   const error = ref('')
   let active: AbortController | undefined
+  let previousIds: string[] = []
 
   async function refresh(force = false) {
     active?.abort()
     const controller = (active = new AbortController())
+    const ids = Object.keys(settings.value)
+    for (const id of previousIds.filter(id => !ids.includes(id))) {
+      try {
+        localStorage.removeItem(`keundal:models:${id}`)
+      } catch { /* Storage may be unavailable. */ }
+    }
+    previousIds = ids
     loading.value = true
     error.value = ''
     const results = await Promise.all(
-      LLM_PROVIDERS.map(async (provider) => {
+      configuredProviders(settings.value).map(async (provider) => {
         const configured = settings.value[provider.id]
         if (!configured?.apiKey && !configured?.baseURL && !Object.keys(configured?.headers ?? {}).length) {
           try {

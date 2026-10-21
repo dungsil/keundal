@@ -110,3 +110,16 @@ test('이전 연결의 journal 복구가 끝난 뒤 전환하고 새 연결도 �
     'http://localhost:9001/recover', 'http://localhost:9002/recover'
   ])
 })
+
+test('같은 종류와 모델의 공급자 전환에도 설정 식별자를 전달하고 재적용 시 유지한다', async () => {
+  const fixture = createFixture()
+  const store = await createDesktopChatStore(fixture.invokeNative, () => [], 'openai@work/shared', fixture.request)
+  await store.selectModel('openai@home/shared')
+  await store.reloadSettings()
+  expect(store.selectedModel).toBe('openai@home/shared')
+  expect(fixture.calls.map(call => call.args)).toEqual([
+    { selection: { provider: 'openai', configuration: 'openai@work', model: 'shared', contextWindow: 128000, maxOutputTokens: 4096 }, restart: false },
+    { selection: { provider: 'openai', configuration: 'openai@home', model: 'shared', contextWindow: 128000, maxOutputTokens: 4096 }, restart: false },
+    { selection: { provider: 'openai', configuration: 'openai@home', model: 'shared', contextWindow: 128000, maxOutputTokens: 4096 }, restart: true }
+  ])
+})
