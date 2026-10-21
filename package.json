@@ -14,7 +14,8 @@
     "lintfix": "oxlint --fix && oxfmt && pnpm --filter @keundal/chat-app exec eslint . --fix && pnpm --filter @keundal/web exec eslint . --fix && pnpm --filter @keundal/desktop exec eslint . --fix",
     "prepare": "simple-git-hooks",
     "check:boundaries": "node tools/workspace-boundaries/check.mjs",
-    "test:boundaries": "node --test tools/workspace-boundaries/tests/*.test.ts"
+    "test:boundaries": "node --test tools/workspace-boundaries/tests/*.test.ts",
+    "lighthouse:local": "pnpm dlx @unlighthouse/cli@0.19.1 --site http://localhost:3000"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",

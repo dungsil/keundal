@@ -58,6 +58,8 @@ jobs:
     if: needs.source.outputs.pr != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      url: ${{ steps.deploy.outputs.deployment-url }}
     permissions:
       contents: read
       actions: read
@@ -170,4 +172,65 @@ jobs:
             커밋: `${{ github.event.workflow_run.head_sha }}`
 
             [빌드 실행 로그](${{ github.event.workflow_run.html_url }})
+
+            Lighthouse 결과는 아래 프리뷰 배포 로그의 작업 요약과 `lighthouse-reports` 아티팩트에서 확인합니다.
+            검사는 배포 후 실행되므로 결과가 표시되기까지 몇 분이 걸릴 수 있습니다.
+
             [프리뷰 배포 로그](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }})
+
+  lighthouse:
+    name: 프리뷰 Lighthouse 검사
+    needs: deploy-preview
+    if: needs.deploy-preview.outputs.url != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    continue-on-error: true
+    permissions:
+      contents: read
+    env:
+      LIGHTHOUSE_BASE_URL: ${{ needs.deploy-preview.outputs.url }}
+      SKIP_INSTALL_SIMPLE_GIT_HOOKS: '1'
+    steps:
+      # workflow_run의 기본 브랜치 커밋을 사용하며 PR 코드를 실행하지 않는다.
+      - name: 검사 설정 가져오기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: 개발 환경 준비
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+        with:
+          cache: true
+          require-lockfile: true
+
+      - name: 결과 요약 로직 검사
+        run: node --test tools/lighthouse/summary.test.mjs
+
+      - name: 프리뷰 응답 대기
+        run: >-
+          curl --fail --silent --show-error --output /dev/null
+          --retry 12 --retry-all-errors --retry-delay 5 --max-time 10
+          "$LIGHTHOUSE_BASE_URL/"
+
+      - name: Lighthouse 3회 측정
+        run: pnpm dlx @lhci/cli@0.15.1 collect --config=tools/lighthouse/lighthouserc.cjs
+
+      - name: Lighthouse 결과 요약
+        run: node tools/lighthouse/summary.mjs >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 검사 오류 표시
+        if: failure()
+        run: |
+          echo '::warning::Lighthouse 검사를 완료하지 못했습니다. 검사 로그와 보고서를 확인하세요.'
+          echo 'Lighthouse 검사를 완료하지 못했습니다. 낮은 점수에 따른 실패가 아닙니다. 작업 로그와 보고서를 확인하세요.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Lighthouse 보고서 보관
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7

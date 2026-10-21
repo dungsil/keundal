@@ -149,3 +149,45 @@ macOS의 DMG 생성은 [실행 39454203709](https://github.com/dungsil/keundal/a
 - [인자 분리를 제거한 실행](https://github.com/dungsil/keundal/actions/runs/39460442472)에서 패키지·예제 23개 작업이 이전 커밋의 캐시에 모두 적중했다. Linux 빌드 훅의 18개 작업도 전부 적중하여 32ms에 끝났다.
 - 검증 중 main의 병합 대상이 바뀌어 웹·네이티브 일부 입력도 변경됐다. 변경 없는 패키지의 재사용과 변경된 입력의 재빌드를 구분했다.
 - 같은 입력의 후속 실행에서는 `build:native`의 캐시 적중, 설치 파일 업로드 및 Windows 포터블 실행 검증을 함께 확인한다. 캐시가 있는 실행과 없는 실행의 빌드 단계 시간을 구분해 비교한다.
+
+## Lighthouse 검사
+
+프리뷰 배포가 성공하여 URL이 반환되면 별도 작업에서 홈(`/`)과 설정(`/settings`)을 검사한다.
+Lighthouse CI 0.15.1의 모바일 기본 설정으로 화면마다 3회 실행하고, 성능·접근성·권장사항·SEO 점수의
+항목별 중앙값을 Actions 작업 요약에 표시한다. 전체 HTML·JSON 보고서는 `lighthouse-reports` 아티팩트로
+7일간 보관한다. PR의 기존 프리뷰 댓글에서 해당 실행으로 이동할 수 있다.
+
+초기에는 점수 임계값을 설정하지 않고 필수 병합 검사에도 포함하지 않는다. 측정 자체가 실패하거나
+다른 화면으로 이동한 경우에는 점수 대신 오류를 표시한다. 점수 변동을 관찰한 뒤 임계값을 정한다.
+이 검사는 이전 커밋과의 점수 차이를 자동으로 계산하지 않는다.
+
+검사 작업은 기본 브랜치의 설정을 사용하고 읽기 권한만 가진다. Cloudflare 배포 인증 정보나 PR 코드를
+전달하지 않으며 외부 보고서 호스팅 서비스에 결과를 업로드하지 않는다. 설정 변경은 기본 브랜치에
+반영된 뒤 적용된다. 프리뷰 URL은 검사 러너에서 접근 가능해야 하며, 인증이 필요한 프리뷰는 별도 인증
+설정이 필요하다. PR별 URL을 재사용하므로 검사 도중 새 배포가 이루어지면 결과가 섞일 수 있다.
+
+저장된 대화가 필요한 `/chat/:id`는 검사하지 않는다. 대화 화면을 추가할 때는 고정된 테스트 데이터를
+먼저 준비한다. 메시지 전송과 스트리밍 반응성은 별도 E2E 테스트 대상이다.
+
+로컬에서는 웹과 의존 패키지를 프로덕션 설정으로 빌드하고 서버를 실행한다.
+
+```sh
+pnpm exec turbo run build --filter=@keundal/web
+pnpm --filter @keundal/web preview
+```
+
+다른 터미널에서 다음 명령을 실행하면 Unlighthouse 0.19.1이 로컬 웹을 검사하고 결과 대시보드를 제공한다.
+실행 환경에 Chrome 또는 Chromium이 필요하다.
+
+```sh
+pnpm lighthouse:local
+```
+
+다른 포트를 사용하는 경우에는 `pnpm dlx @unlighthouse/cli@0.19.1 --site http://localhost:포트`로 실행한다.
+CI와 같은 두 경로를 같은 횟수로 측정하려면 다음 명령을 사용한다. `LIGHTHOUSE_BASE_URL`을 생략하면
+`http://localhost:3000`을 사용한다.
+
+```sh
+pnpm dlx @lhci/cli@0.15.1 collect --config=tools/lighthouse/lighthouserc.cjs
+node tools/lighthouse/summary.mjs
+```

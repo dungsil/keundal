@@ -21,3 +21,7 @@ apps/web/*.sqlite*
 .cursor/
 
 apps/web/.data
+
+### Lighthouse reports ###
+.lighthouseci/
+.unlighthouse/
