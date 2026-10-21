@@ -240,4 +240,4 @@ export default {
     'CORS로 이 브라우저의 origin을 허용한 Streamable HTTP 서버에 연결합니다. 인증 정보를 포함한 설정은 이 브라우저에 저장합니다. 저장하면 진행 중인 응답을 중단합니다.',
   'mcp.desktopDescription':
     'HTTP 서버에 연결하거나 신뢰하는 로컬 stdio 서버를 실행합니다. 설정은 OS 보안 저장소에 저장합니다. 저장하면 진행 중인 응답을 중단하고 로컬 호스트를 다시 시작합니다.'
-}
+} satisfies Record<keyof typeof en, string>

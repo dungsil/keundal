@@ -44,6 +44,8 @@ process.once('SIGINT', shutdown)
 process.once('SIGTERM', shutdown)
 
 if (sidecar && process.env.KEUNDAL_SHUTDOWN_ON_STDIN === '1') {
-  process.stdin.once('end', () => { void shutdown() })
+  process.stdin.once('end', () => {
+    void shutdown()
+  })
   process.stdin.resume()
 }

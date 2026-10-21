@@ -147,9 +147,13 @@ test('종료 제어 파이프가 닫히면 sidecar가 정상 종료한다', asyn
     },
     stdio: ['pipe', 'pipe', 'pipe']
   })
-  onTestFinished(() => { if (child.exitCode === null) child.kill() })
+  onTestFinished(() => {
+    if (child.exitCode === null) child.kill()
+  })
   let output = ''
-  child.stdout.on('data', chunk => { output += String(chunk) })
+  child.stdout.on('data', (chunk) => {
+    output += String(chunk)
+  })
   await expect.poll(() => output, { timeout: 5000 }).toContain('keundal-sidecar')
   const exited = once(child, 'exit')
   child.stdin.end()
