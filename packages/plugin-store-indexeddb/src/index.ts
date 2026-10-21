@@ -15,9 +15,15 @@ export const indexedDBStorePlugin = Object.assign(
   function indexedDBStorePlugin(ctx: Context, config: IndexedDBStoreConfig = {}) {
     const store = config.store ?? new IndexedDBStore(config)
     new IndexedDBSessionService(ctx, store)
-    new IndexedDBGenerationService(ctx, store, config.store === undefined)
+    const generation = ctx.inject(['llm', 'session'], (injected) => {
+      new IndexedDBGenerationService(injected, store)
+    })
+    ctx.effect(() => async () => {
+      await generation.dispose()
+      if (config.store === undefined) store.close()
+    })
   },
-  { inject: ['llm'], Config: indexedDBStoreConfigSchema }
+  { Config: indexedDBStoreConfigSchema }
 )
 
 export default indexedDBStorePlugin

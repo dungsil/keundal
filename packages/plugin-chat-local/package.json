@@ -20,7 +20,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@keundal/agent-contract": "workspace:*",
+    "@keundal/agent": "workspace:*",
+    "@keundal/agent-loop": "workspace:*",
     "@keundal/chat": "workspace:*",
     "@keundal/core": "workspace:*",
     "cordis": "catalog:"

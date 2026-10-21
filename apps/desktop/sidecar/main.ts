@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 
 import { createAgentRuntime, createNodeComposition } from '@keundal/agent-runtime-node'
-import { createChatTools } from '@keundal/chat/tools/agent'
+import { createChatTools } from '@keundal/plugin-tool-chat'
 
 const sidecar = process.env.KEUNDAL_SIDECAR === '1'
 const host = process.env.KEUNDAL_HOST ?? '127.0.0.1'

@@ -2,11 +2,12 @@ import { Context } from 'cordis'
 import { EventType, LLMService, type LLMRequest, type LLMEvent } from '@keundal/core'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { createKeundalChat } from '@keundal/plugin-chat-local/keundal'
-import agentPlugin from '@keundal/agent'
-import { createChatTools } from '@keundal/chat/tools/agent'
+import agentPlugin from '@keundal/plugin-agent-chat'
+import { createChatTools } from '@keundal/plugin-tool-chat'
 import type { invoke } from '@tauri-apps/api/core'
 import { expect, test, vi } from 'vitest'
-import { McpManager } from '@keundal/plugin-chat-browser/mcp'
+import { McpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-chat-browser/mcp'
+import { createNativeMcpSettingsStorage } from '@keundal/plugin-chat-desktop/mcp'
 
 function storage() {
   const values = new Map<string, string>()
@@ -19,12 +20,38 @@ function storage() {
 }
 const remote = { serverName: 'docs', transport: 'streamable-http', url: 'https://example.com/mcp', permissions: { tools: ['search'] } }
 
+test('주입한 비동기 저장소의 저장이 끝난 뒤에 호스트를 재시작한다', async () => {
+  let release!: () => void
+  const pending = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let saved: string | null = null
+  const manager = new McpManager({
+    load: async () => saved,
+    save: async (value) => {
+      await pending
+      saved = value
+    }
+  })
+  const restart = vi.fn(async () => {
+    expect(JSON.parse(saved!)).toEqual([remote])
+  })
+  const saving = manager.save([remote], restart)
+  await Promise.resolve()
+  expect(restart).not.toHaveBeenCalled()
+  expect(manager.configuration).toEqual([])
+  release()
+  await saving
+  expect(restart).toHaveBeenCalledOnce()
+  expect(manager.configuration).toEqual([remote])
+})
+
 test('웹 설정을 저장하고 다시 불러오며 삭제하면 저장소를 비운다', async () => {
   const local = storage()
-  const manager = new McpManager(local)
+  const manager = new McpManager(createBrowserMcpSettingsStorage(local))
   const restart = vi.fn(async () => {})
   await manager.save([remote], restart)
-  const restored = new McpManager(local)
+  const restored = new McpManager(createBrowserMcpSettingsStorage(local))
   await restored.load()
   expect(restored.configuration).toEqual([remote])
   expect(restart).toHaveBeenCalledOnce()
@@ -33,7 +60,7 @@ test('웹 설정을 저장하고 다시 불러오며 삭제하면 저장소를 �
 })
 
 test('웹에서 stdio와 중복 서버를 거부하고 기존 설정을 유지한다', async () => {
-  const manager = new McpManager(storage())
+  const manager = new McpManager(createBrowserMcpSettingsStorage(storage()))
   const restart = vi.fn(async () => {})
   await manager.save([remote], restart)
   await expect(manager.save([{ serverName: 'local', transport: 'stdio', command: 'node' }], restart)).rejects.toThrow('Streamable HTTP')
@@ -44,12 +71,12 @@ test('웹에서 stdio와 중복 서버를 거부하고 기존 설정을 유지�
 
 test('호스트 재시작에 실패하면 저장된 설정과 적용 중인 설정을 되돌린다', async () => {
   const local = storage()
-  const manager = new McpManager(local)
+  const manager = new McpManager(createBrowserMcpSettingsStorage(local))
   await manager.save([remote], async () => {})
   await expect(manager.save([], async () => {
     throw new Error('restart failed')
   })).rejects.toThrow('restart failed')
-  const restored = new McpManager(local)
+  const restored = new McpManager(createBrowserMcpSettingsStorage(local))
   await restored.load()
   expect(manager.configuration).toEqual([remote])
   expect(restored.configuration).toEqual([remote])
@@ -63,10 +90,10 @@ test('데스크톱의 stdio 인증 정보는 OS 보안 저장소만 사용한다
     if (command === 'save_mcp_settings') saved = args!.settings
     return null
   }) as unknown as typeof invoke
-  const manager = new McpManager(local, native)
+  const manager = new McpManager(createNativeMcpSettingsStorage(native), { allowStdio: true })
   const config = { serverName: 'local', transport: 'stdio', command: 'node', env: { TOKEN: 'test-value' } }
   await manager.save([config], async () => {})
-  const restored = new McpManager(local, native)
+  const restored = new McpManager(createNativeMcpSettingsStorage(native), { allowStdio: true })
   await restored.load()
   expect(restored.configuration).toEqual([config])
   expect(local.values.size).toBe(0)
@@ -77,7 +104,7 @@ test('보안 저장소에 접근하지 못하면 브라우저 저장소로 대�
   const native = vi.fn(async () => {
     throw new Error('locked')
   }) as unknown as typeof invoke
-  const manager = new McpManager(local, native)
+  const manager = new McpManager(createNativeMcpSettingsStorage(native), { allowStdio: true })
   await expect(manager.load()).rejects.toThrow('locked')
   await expect(manager.save([remote], async () => {})).rejects.toThrow('locked')
   expect(local.values.size).toBe(0)
@@ -128,10 +155,10 @@ test('데스크톱 서버별 HTTP 허용을 저장하고 다시 불러와도 다
     if (command === 'save_mcp_settings') saved = args!.settings
     return null
   }) as unknown as typeof invoke
-  const manager = new McpManager(local, native)
+  const manager = new McpManager(createNativeMcpSettingsStorage(native), { allowStdio: true })
   const config = { ...remote, url: 'http://192.168.1.20/mcp', allowInsecureHttp: true }
   await manager.save([config], async () => {})
-  const restored = new McpManager(local, native)
+  const restored = new McpManager(createNativeMcpSettingsStorage(native), { allowStdio: true })
   await restored.load()
   expect(restored.configuration).toEqual([config])
   await expect(restored.save([config, { ...remote, serverName: 'other', url: config.url }], async () => {})).rejects.toThrow('HTTPS')

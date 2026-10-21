@@ -1,4 +1,4 @@
-import { AgentService } from '@keundal/agent-contract'
+import { AgentService } from '@keundal/agent'
 import { EventType, LLMService, type LLMEvent, type AGUIEvent, type RunAgentInput } from '@keundal/core'
 import memoryStore from '@keundal/plugin-store-memory'
 import { Context } from 'cordis'

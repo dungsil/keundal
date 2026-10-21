@@ -34,8 +34,8 @@ await host.dispose()
 ## 직접 조합
 
 ```ts
-import agentPlugin from '@keundal/agent'
 import { loadAgentPlugin } from '@keundal/agent-plugins'
+import agentPlugin from '@keundal/plugin-agent-chat'
 import skillPlugin from '@keundal/plugin-skill'
 
 const plugin = await loadAgentPlugin({

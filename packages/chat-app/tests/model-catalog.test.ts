@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { effectScope, ref } from 'vue'
 import { expect, onTestFinished, test, vi } from 'vitest'
-import { defaultLLMSettings } from '@keundal/chat/llm-settings'
+import { defaultLLMSettings } from '@keundal/llm-settings'
 import * as modelRequests from '@keundal/plugin-llm-browser/models'
 import { useModelCatalog } from '../app/composables/useModelCatalog'
 import { translate } from '../../../packages/ui/app/utils/locale'

@@ -1,0 +1,35 @@
+{
+  "name": "@keundal/plugin-agent-coding",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@keundal/agent-loop": "workspace:*",
+    "@keundal/core": "workspace:*",
+    "@keundal/tools": "workspace:*",
+    "@standard-schema/spec": "catalog:",
+    "cordis": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/plugin-store-memory": "workspace:*",
+    "@keundal/tsconfig": "workspace:*",
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

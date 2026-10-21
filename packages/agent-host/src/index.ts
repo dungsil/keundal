@@ -74,9 +74,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         await options.mountAgent(child, {
           model: selected.id,
           reasoning,
-          maxOutputTokens,
-          tools: options.tools,
-          maxToolRounds: options.maxToolRounds ?? 4
+          maxOutputTokens
         })
       })
       try {

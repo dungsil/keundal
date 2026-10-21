@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { defaultLLMSettings, llmSettingsSchema, registeredProviders } from '@keundal/chat/llm-settings'
+import { defaultLLMSettings, llmSettingsSchema, registeredProviders } from '@keundal/llm-settings'
 
 test('설정하지 않은 기본 공급자는 등록 목록에 표시하지 않는다', () => {
   expect(registeredProviders(defaultLLMSettings())).toEqual([])

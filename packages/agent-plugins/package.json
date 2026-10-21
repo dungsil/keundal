@@ -17,9 +17,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@keundal/agent-contract": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/mcp": "workspace:*",
+    "@keundal/plugin-mcp-client": "workspace:*",
+    "@keundal/tools": "workspace:*",
     "yaml": "2.9.1"
   },
   "devDependencies": {

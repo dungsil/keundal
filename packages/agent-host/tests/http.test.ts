@@ -3,7 +3,6 @@ import { once } from 'node:events'
 import { createServer, request as httpRequest } from 'node:http'
 import { connect } from 'node:net'
 
-import agentPlugin from '@keundal/agent'
 import {
   EventType,
   LLMService,
@@ -13,6 +12,7 @@ import {
   type LLMEvent,
   type LLMRequest
 } from '@keundal/core'
+import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { Context, type Fiber } from 'cordis'
 
