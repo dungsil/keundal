@@ -143,6 +143,158 @@ test('종료 메타데이터는 같은 키를 갱신하고 시작 메타데이�
   ])
 })
 
+test('명시한 부모에 도구 호출을 연결하고 교차하는 호출의 인자와 결과를 보존한다', () => {
+  const assembly = new MessageAssembly()
+  for (const messageId of ['A', 'B']) {
+    assembly.apply({
+      type: EventType.TEXT_MESSAGE_START,
+      messageId,
+      role: 'assistant',
+      metadata: { source: messageId }
+    })
+    assembly.apply({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: `Answer ${messageId}` })
+  }
+  assembly.apply({
+    type: EventType.TOOL_CALL_START,
+    toolCallId: 'call-A',
+    toolCallName: 'lookup',
+    parentMessageId: 'A'
+  })
+  assembly.apply({ type: EventType.TOOL_CALL_START, toolCallId: 'call-B', toolCallName: 'search' })
+  assembly.apply({ type: EventType.TOOL_CALL_ARGS, toolCallId: 'call-B', delta: '{"query":"B"}' })
+  assembly.apply({ type: EventType.TOOL_CALL_ARGS, toolCallId: 'call-A', delta: '{"id":' })
+  assembly.apply({
+    type: EventType.TOOL_CALL_RESULT,
+    messageId: 'result-B',
+    toolCallId: 'call-B',
+    content: 'Found B'
+  })
+  assembly.apply({ type: EventType.TOOL_CALL_ARGS, toolCallId: 'call-A', delta: '1}' })
+  assembly.apply({
+    type: EventType.TOOL_CALL_RESULT,
+    messageId: 'result-A',
+    toolCallId: 'call-A',
+    content: 'Found A'
+  })
+
+  expect(assembly.messages).toStrictEqual([
+    {
+      id: 'A',
+      role: 'assistant',
+      content: 'Answer A',
+      metadata: { source: 'A' },
+      toolCalls: [{ id: 'call-A', type: 'function', function: { name: 'lookup', arguments: '{"id":1}' } }]
+    },
+    {
+      id: 'B',
+      role: 'assistant',
+      content: 'Answer B',
+      metadata: { source: 'B' },
+      toolCalls: [{ id: 'call-B', type: 'function', function: { name: 'search', arguments: '{"query":"B"}' } }]
+    },
+    { id: 'result-B', role: 'tool', toolCallId: 'call-B', content: 'Found B' },
+    { id: 'result-A', role: 'tool', toolCallId: 'call-A', content: 'Found A' }
+  ])
+})
+
+test('부모의 텍스트 시작이 늦게 와도 먼저 받은 호출과 내용과 메타데이터를 보존한다', () => {
+  const assembly = new MessageAssembly()
+  assembly.apply({ type: EventType.TEXT_MESSAGE_START, messageId: 'other', role: 'assistant' })
+  const started = assembly.apply({
+    type: EventType.TOOL_CALL_START,
+    toolCallId: 'call',
+    toolCallName: 'lookup',
+    parentMessageId: 'parent'
+  })
+  expect(started).toStrictEqual({
+    id: 'parent',
+    role: 'assistant',
+    toolCalls: [{ id: 'call', type: 'function', function: { name: 'lookup', arguments: '' } }]
+  })
+  assembly.apply({ type: EventType.TOOL_CALL_ARGS, toolCallId: 'call', delta: '{"id":1}' })
+  assembly.apply({
+    type: EventType.REASONING_ENCRYPTED_VALUE,
+    subtype: 'tool-call',
+    entityId: 'call',
+    encryptedValue: 'signature'
+  })
+  assembly.apply({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'parent', delta: 'Before ' })
+  assembly.apply({ type: EventType.TEXT_MESSAGE_END, messageId: 'parent', metadata: { verified: true } })
+  assembly.apply({
+    type: EventType.TEXT_MESSAGE_START,
+    messageId: 'parent',
+    role: 'assistant',
+    metadata: { source: 'provider' }
+  })
+  assembly.apply({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'parent', delta: 'after' })
+  assembly.apply({
+    type: EventType.TOOL_CALL_START,
+    toolCallId: 'second',
+    toolCallName: 'search',
+    parentMessageId: 'parent'
+  })
+  assembly.apply({ type: EventType.TOOL_CALL_ARGS, toolCallId: 'call', delta: ' ' })
+
+  expect(assembly.messages).toStrictEqual([
+    { id: 'other', role: 'assistant', content: '' },
+    {
+      id: 'parent',
+      role: 'assistant',
+      content: 'Before after',
+      metadata: { verified: true, source: 'provider' },
+      toolCalls: [
+        {
+          id: 'call',
+          type: 'function',
+          function: { name: 'lookup', arguments: '{"id":1} ' },
+          encryptedValue: 'signature'
+        },
+        { id: 'second', type: 'function', function: { name: 'search', arguments: '' } }
+      ]
+    }
+  ])
+})
+
+test('부모가 없는 도구 호출은 열린 메시지를 재사용하고 결과 이후에는 새 부모를 만든다', () => {
+  const assembly = new MessageAssembly()
+  assembly.apply({ type: EventType.TOOL_CALL_START, toolCallId: 'first', toolCallName: 'lookup' })
+  assembly.apply({ type: EventType.TOOL_CALL_START, toolCallId: 'second', toolCallName: 'search' })
+  assembly.apply({ type: EventType.TOOL_CALL_RESULT, messageId: 'result', toolCallId: 'first', content: 'Found' })
+  assembly.apply({ type: EventType.TOOL_CALL_START, toolCallId: 'third', toolCallName: 'lookup' })
+
+  expect(assembly.messages).toStrictEqual([
+    {
+      id: 'first',
+      role: 'assistant',
+      toolCalls: [
+        { id: 'first', type: 'function', function: { name: 'lookup', arguments: '' } },
+        { id: 'second', type: 'function', function: { name: 'search', arguments: '' } }
+      ]
+    },
+    { id: 'result', role: 'tool', toolCallId: 'first', content: 'Found' },
+    {
+      id: 'third',
+      role: 'assistant',
+      toolCalls: [{ id: 'third', type: 'function', function: { name: 'lookup', arguments: '' } }]
+    }
+  ])
+})
+
+test('어시스턴트가 아닌 메시지를 도구 호출의 부모로 지정하면 기존 메시지를 보존하고 거부한다', () => {
+  const assembly = new MessageAssembly()
+  assembly.apply({ type: EventType.REASONING_MESSAGE_START, messageId: 'reasoning', role: 'reasoning' })
+
+  expect(() =>
+    assembly.apply({
+      type: EventType.TOOL_CALL_START,
+      toolCallId: 'call',
+      toolCallName: 'lookup',
+      parentMessageId: 'reasoning'
+    })
+  ).toThrow('tool call parent is not an assistant message: reasoning')
+  expect(assembly.messages).toStrictEqual([{ id: 'reasoning', role: 'reasoning', content: '' }])
+})
+
 test('컨텍스트 이벤트를 사용자 메시지로 복구하고 같은 ID의 재생을 중복 저장하지 않는다', () => {
   const assembly = new MessageAssembly()
   const value = { id: 'keundal:context:instructions:one', role: 'user', content: 'Workspace instructions' }

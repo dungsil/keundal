@@ -803,3 +803,25 @@ test('플러그인을 해제하면 응답 헤더를 기다리는 토큰 계산 �
   await closed.promise
   expect(getEventListeners(external.signal, 'abort')).toHaveLength(0)
 })
+
+test('큰 중첩 공급자 payload를 변환하거나 반환하기 전에 거부한다', { timeout: 30_000 }, async (t) => {
+  const oversized = 'x'.repeat(8 * 1024 * 1024 + 1)
+  const closed = Promise.withResolvers<void>()
+  const { ctx } = await setup(t, (_request, response) => {
+    response.on('close', () => closed.resolve())
+    response.writeHead(200, { 'content-type': 'text/event-stream' })
+    response.write(
+      wire([
+        { candidates: [{ content: { parts: [{ functionCall: { name: 'lookup', args: { value: oversized } } }] } }] }
+      ])
+    )
+  })
+  const accepted: LLMEvent[] = []
+  await expect(
+    (async () => {
+      for await (const event of ctx.llm.stream(request)) accepted.push(event)
+    })()
+  ).rejects.toThrow('stream byte limit exceeded')
+  expect(accepted).toHaveLength(0)
+  await closed.promise
+})

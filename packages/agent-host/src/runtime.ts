@@ -12,7 +12,7 @@ export interface AgentRuntime extends AgentHost {
 /** 웹 서버와 데스크톱이 같은 환경 설정으로 호스트를 조립합니다. */
 export async function createAgentRuntime(
   env: Readonly<Record<string, string | undefined>> = process.env,
-  options: Pick<AgentHostOptions, 'tools'> = {}
+  options: Pick<AgentHostOptions, 'tools' | 'plugins'> = {}
 ): Promise<AgentRuntime> {
   const provider = (env.KEUNDAL_PROVIDER ||
     (env.OPENAI_API_KEY ? 'openai' : env.GEMINI_API_KEY ? 'gemini' : 'anthropic')) as AgentHostProvider
@@ -40,7 +40,9 @@ export async function createAgentRuntime(
   if (sqlitePath !== ':memory:') mkdirSync(dirname(sqlitePath), { recursive: true })
   const host = await createAgentHost({
     tools: options.tools,
+    plugins: options.plugins,
     provider,
+    mcpServers: env.KEUNDAL_MCP_SERVERS ? JSON.parse(env.KEUNDAL_MCP_SERVERS) : [],
     apiKey: apiKey ?? '',
     model,
     models: { [model]: { contextWindow, maxOutputTokens } },

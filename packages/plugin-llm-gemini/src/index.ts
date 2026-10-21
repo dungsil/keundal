@@ -1,5 +1,13 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai'
-import { LLMService, type ExecutionOptions, type LLMEvent, type LLMModel, type LLMRequest } from '@keundal/core'
+import {
+  fetchWithStreamLimit,
+  StreamBudget,
+  LLMService,
+  type ExecutionOptions,
+  type LLMEvent,
+  type LLMModel,
+  type LLMRequest
+} from '@keundal/core'
 import type { Context } from 'cordis'
 
 import { GeminiLLMConfigSchema, parseConfig, type GeminiLLMConfig } from './config.js'
@@ -27,6 +35,7 @@ export class GeminiLLMService extends LLMService {
       httpOptions: {
         baseUrl: parsed.baseURL,
         headers: parsed.headers,
+        fetch: fetchWithStreamLimit,
         ...(noAuth
           ? {
               fetch: (url, init) => {
@@ -34,7 +43,7 @@ export class GeminiLLMService extends LLMService {
                 if (!Object.keys(parsed.headers ?? {}).some((name) => name.toLowerCase() === 'x-goog-api-key')) {
                   headers.delete('x-goog-api-key')
                 }
-                return globalThis.fetch(url, { ...init, headers })
+                return fetchWithStreamLimit(url, { ...init, headers })
               }
             }
           : {})
@@ -78,11 +87,11 @@ export class GeminiLLMService extends LLMService {
 
   stream(request: LLMRequest, options?: ExecutionOptions): AsyncIterableIterator<LLMEvent> {
     const operation = this.operation(options)
-    const iterator = this.execute(request, operation.signal, operation.cleanup)
     const stop = () => {
       operation.controller.abort(new Error('Gemini LLM stream stopped'))
       operation.cleanup()
     }
+    const iterator = this.execute(request, operation.signal, stop)
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -132,9 +141,11 @@ export class GeminiLLMService extends LLMService {
           abortSignal: signal
         }
       })
+      const budget = new StreamBudget()
       const events = new ContentsEvents()
       for await (const chunk of stream) {
         signal.throwIfAborted()
+        budget.accept(chunk)
         for (const mapped of events.convert(chunk)) {
           signal.throwIfAborted()
           yield mapped

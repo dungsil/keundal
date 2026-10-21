@@ -406,9 +406,15 @@ importers:
 
   packages/agent-host:
     dependencies:
+      '@keundal/mcp':
+        specifier: workspace:*
+        version: link:../mcp
       '@keundal/agent':
         specifier: workspace:*
         version: link:../agent
+      '@keundal/agent-plugins':
+        specifier: workspace:*
+        version: link:../agent-plugins
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -421,6 +427,9 @@ importers:
       '@keundal/plugin-llm-openai':
         specifier: workspace:*
         version: link:../plugin-llm-openai
+      '@keundal/plugin-skill':
+        specifier: workspace:*
+        version: link:../plugin-skill
       '@keundal/plugin-store-sqlite':
         specifier: workspace:*
         version: link:../plugin-store-sqlite
@@ -437,6 +446,46 @@ importers:
       '@keundal/tsdown':
         specifier: workspace:*
         version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/agent-plugins:
+    dependencies:
+      '@keundal/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/mcp':
+        specifier: workspace:*
+        version: link:../mcp
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
+    devDependencies:
+      '@keundal/plugin-skill':
+        specifier: workspace:*
+        version: link:../plugin-skill
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@modelcontextprotocol/server':
+        specifier: 2.3.1
+        version: 2.3.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.6
@@ -1218,6 +1267,9 @@ importers:
 
   packages/chat-app:
     dependencies:
+      '@keundal/mcp':
+        specifier: workspace:*
+        version: link:../mcp
       "@comark/nuxt":
         specifier: ^0.7.0
         version: 0.7.0(magicast@0.5.5)(nuxt@4.6.2(f10f8451716ca2c6ce655b791cd5799d))(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
@@ -1278,6 +1330,9 @@ importers:
       date-fns:
         specifier: ^4.4.0
         version: 4.4.0
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
       motion-v:
         specifier: ^2.6.0
         version: 2.7.0(@vueuse/core@14.4.0(vue@3.5.44(typescript@6.0.3)))(vue@3.5.44(typescript@6.0.3))
@@ -5963,6 +6018,9 @@ packages:
 
   fetchdts@0.2.0:
     resolution: {integrity: sha512-PJb4ZTGT2/wK78RmVrxZITStWabhZlKBsL52VOgq+c7clEkdHdEB+0rtzrXCbZJqeYJj+IwNWYqB5/G6vouA6A==}
+
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
 
   file-entry-cache@11.1.5:
     resolution: {integrity: sha512-+PFTHITI08JIGhnNpGNI8T8inUpgZfk3GNEqfT9R2zZV2iFXg3CvqzSl/uEhs7TSGujYRELEANyDvS8Fj7+S7Q==}
@@ -13816,6 +13874,8 @@ snapshots:
       web-streams-polyfill: 3.3.3
 
   fetchdts@0.2.0: {}
+
+  fflate@0.8.3: {}
 
   file-entry-cache@11.1.5:
     dependencies:

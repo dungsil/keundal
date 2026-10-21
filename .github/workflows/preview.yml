@@ -21,6 +21,8 @@ jobs:
     timeout-minutes: 5
     outputs:
       pr: ${{ steps.source.outputs.pr }}
+      web: ${{ steps.source.outputs.web }}
+      desktop: ${{ steps.source.outputs.desktop }}
     steps:
       - name: PR과 빌드 아티팩트 확인
         id: source
@@ -64,8 +66,20 @@ jobs:
             const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
               ...context.repo, run_id: run.id, per_page: 100
             });
-            if (!artifacts.some(artifact => artifact.name === 'cloudflare-workers' && !artifact.expired)) {
-              core.info('배포할 Workers 빌드 아티팩트가 없어 프리뷰를 생략합니다.');
+            const web = files.some(file => [file.filename, file.previous_filename].some(path =>
+              path && isPreviewInput(path) && !path.startsWith('apps/desktop/')
+            )) || pr.changed_files > files.length;
+            const desktop = files.some(file => [file.filename, file.previous_filename].some(path =>
+              path && isPreviewInput(path) && !path.startsWith('apps/web/')
+            )) || pr.changed_files > files.length;
+            const deployWeb = web && run.name === 'PR 프리뷰 빌드' &&
+              artifacts.some(artifact => artifact.name === 'cloudflare-workers' && !artifact.expired);
+            const publishDesktop = desktop && run.name === 'CI' &&
+              artifacts.some(artifact => artifact.name.startsWith('desktop-') && !artifact.expired);
+            core.setOutput('web', deployWeb);
+            core.setOutput('desktop', publishDesktop);
+            if (!deployWeb && !publishDesktop) {
+              core.info('게시할 프리뷰 빌드 아티팩트가 없어 생략합니다.');
               return;
             }
             core.setOutput('pr', pr.number);
@@ -73,7 +87,7 @@ jobs:
   deploy-preview:
     name: PR 프리뷰 배포
     needs: source
-    if: needs.source.outputs.pr != ''
+    if: needs.source.outputs.pr != '' && needs.source.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -127,29 +141,65 @@ jobs:
             preview --name pr-${{ needs.source.outputs.pr }}
             --config server/wrangler.json
 
+      - name: PR 프리뷰 댓글 갱신
+        if: steps.source.outputs.ready == 'true'
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        with:
+          number: ${{ needs.source.outputs.pr }}
+          header: cloudflare-preview
+          message: |
+            ### PR 프리뷰
+
+            ${{ steps.deploy.outputs.deployment-url && format('[웹 프리뷰 열기]({0})', steps.deploy.outputs.deployment-url) || '웹 프리뷰 URL이 설정되지 않았습니다.' }}
+
+            웹 빌드 상태: `success`.
+
+            커밋: `${{ github.event.workflow_run.head_sha }}`
+
+            [빌드 실행 로그](${{ github.event.workflow_run.html_url }})
+            [프리뷰 배포 로그](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }})
+
+  desktop-preview:
+    name: 데스크톱 프리뷰 댓글 갱신
+    needs: source
+    if: needs.source.outputs.pr != '' && needs.source.outputs.desktop == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    concurrency:
+      group: preview-${{ needs.source.outputs.pr }}
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - name: 프리뷰 배포 대상 재확인
+        id: source
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_NUMBER: ${{ needs.source.outputs.pr }}
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const { data: pr } = await github.rest.pulls.get({
+              ...context.repo, pull_number: Number(process.env.PR_NUMBER)
+            });
+            if (pr.state !== 'open' || pr.base.ref !== 'main' ||
+                pr.head.repo?.full_name !== context.payload.repository.full_name ||
+                pr.head.sha !== run.head_sha) {
+              core.info('PR이 닫혔거나 배포 대상이 변경되어 프리뷰를 생략합니다.');
+              return;
+            }
+            core.setOutput('ready', 'true');
+
       - name: 데스크톱 다운로드 링크 생성
         id: desktop
         if: steps.source.outputs.ready == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const sourceRun = context.payload.workflow_run;
-            const { data } = await github.rest.actions.listWorkflowRuns({
-              ...context.repo,
-              workflow_id: 'ci.yml',
-              head_sha: sourceRun.head_sha,
-              event: 'pull_request',
-              status: 'success',
-              per_page: 100
-            });
-            const run = data.workflow_runs.find(run =>
-              run.head_repository?.full_name === context.payload.repository.full_name
-            );
-            if (!run) {
-              core.setOutput('downloads',
-                '데스크톱 빌드는 별도 CI에서 진행합니다. CI가 성공하면 다운로드 링크를 갱신합니다.');
-              return;
-            }
+            const run = context.payload.workflow_run;
             const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
               ...context.repo, run_id: run.id, per_page: 100
             });
@@ -164,22 +214,16 @@ jobs:
             core.setOutput('downloads', downloads.join('\n') ||
               '다운로드할 수 있는 데스크톱 빌드가 없습니다. CI 실행 로그를 확인하세요.');
 
-      - name: PR 프리뷰 댓글 갱신
+      - name: 데스크톱 프리뷰 댓글 갱신
         if: steps.source.outputs.ready == 'true'
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           number: ${{ needs.source.outputs.pr }}
-          header: cloudflare-preview
+          header: desktop-preview
           message: |
-            ### PR 프리뷰
-
-            ${{ steps.deploy.outputs.deployment-url && format('[웹 프리뷰 열기]({0})', steps.deploy.outputs.deployment-url) || '웹 프리뷰 URL이 설정되지 않았습니다.' }}
-
-            #### 데스크톱 다운로드
+            ### 데스크톱 프리뷰
 
             ${{ steps.desktop.outputs.downloads }}
-
-            웹 빌드 상태: `success`.
 
             다운로드에는 GitHub 로그인이 필요하며, 배포 파일은 업로드 후 7일간 보관합니다.
             Windows는 압축을 모두 푼 뒤 `keundal-desktop.exe`를 실행합니다. 함께 들어 있는 호스트와 리소스, WebView2가 필요합니다.
@@ -188,4 +232,3 @@ jobs:
             커밋: `${{ github.event.workflow_run.head_sha }}`
 
             [빌드 실행 로그](${{ github.event.workflow_run.html_url }})
-            [프리뷰 배포 로그](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }})

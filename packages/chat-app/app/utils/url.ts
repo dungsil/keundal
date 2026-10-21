@@ -20,3 +20,14 @@ export function getDomain(url: string): string {
 export function getFaviconUrl(url: string): string {
   return `https://www.google.com/s2/favicons?sz=32&domain=${getDomain(url)}`
 }
+
+/** Citation destinations are untrusted model or provider output. */
+export function getCitationUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : undefined
+  } catch {
+    return undefined
+  }
+}

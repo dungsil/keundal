@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -77,9 +77,10 @@ test('기본 모델이 모델 목록에 없으면 호스트 생성을 거부한�
   ).rejects.toThrow('default model is not configured')
 })
 
-test('호스트는 모델별 에이전트로 실행하고 제목을 생성한다', async () => {
+test.each(['array', 'provider'])('호스트는 기본 도구(%s)와 MCP 도구를 함께 제공하고 제목을 생성한다', async (kind) => {
   const http = await import('node:http')
   const replies: string[] = []
+  const requests: string[] = []
   const server = http.createServer((request, response) => {
     if (request.url === '/v1/responses/input_tokens') {
       response.writeHead(404).end()
@@ -88,6 +89,7 @@ test('호스트는 모델별 에이전트로 실행하고 제목을 생성한다
     let body = ''
     request.on('data', (chunk) => (body += chunk))
     request.on('end', () => {
+      requests.push(body)
       const title = body.includes('Generate a chat title')
       const text = title ? '테스트 제목' : '테스트 응답'
       replies.push(text)
@@ -116,7 +118,36 @@ test('호스트는 모델별 에이전트로 실행하고 제목을 생성한다
     model: 'test',
     models: { test: { contextWindow: 8000, maxOutputTokens: 1000 } },
     sqlitePath: sqlitePath(),
-    baseURL: `http://127.0.0.1:${address.port}/v1`
+    baseURL: `http://127.0.0.1:${address.port}/v1`,
+    tools:
+      kind === 'provider'
+        ? async () => [
+            { name: 'local_tool', description: 'Local', parameters: { type: 'object' }, execute: async () => '{}' }
+          ]
+        : [{ name: 'local_tool', description: 'Local', parameters: { type: 'object' }, execute: async () => '{}' }],
+    mcpServers: [
+      {
+        serverName: 'fixture',
+        transport: 'stdio',
+        command: process.execPath,
+        args: [
+          '-e',
+          `
+        const readline = require('node:readline');
+        readline.createInterface({ input: process.stdin }).on('line', line => {
+          const request = JSON.parse(line);
+          if (request.id === undefined) return;
+          const result = request.method === 'initialize'
+            ? { protocolVersion: request.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'fixture', version: '1' } }
+            : { tools: [{ name: 'search', description: 'Search', inputSchema: { type: 'object', properties: {} } }] };
+          console.log(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }));
+        });
+      `
+        ],
+        permissions: { tools: ['search'] },
+        timeoutMs: 3000
+      }
+    ]
   })
   hosts.push(host)
   try {
@@ -141,6 +172,10 @@ test('호스트는 모델별 에이전트로 실행하고 제목을 생성한다
       message: { id: 'user', role: 'user', content: '안녕하세요' }
     })
     expect(title).toBe('테스트 제목')
+    expect(requests.find((body) => !body.includes('Generate a chat title'))).toContain('mcp__fixture__tool__search')
+    expect(requests.find((body) => body.includes('Generate a chat title'))).not.toContain('mcp__fixture__tool__search')
+    expect(requests.find((body) => !body.includes('Generate a chat title'))).toContain('local_tool')
+    expect(requests.find((body) => body.includes('Generate a chat title'))).not.toContain('local_tool')
     expect(replies).toEqual(['테스트 응답', '테스트 제목'])
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
@@ -242,4 +277,32 @@ test('런타임에 등록한 도구를 실행하고 결과를 후속 요청에 �
   expect(events).toContainEqual(expect.objectContaining({ type: 'TEXT_MESSAGE_CONTENT', delta: '보르도는 흐립니다.' }))
   expect(events.at(-1)?.type).toBe('RUN_FINISHED')
   expect(await host.services.generation.get('weather-run')).toMatchObject({ status: 'completed' })
+})
+
+test('Agent Plugin 스킬을 호스트에 등록하고 종료하면 사용할 수 없다', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-host-plugins-'))
+  directories.push(directory)
+  const root = join(directory, 'plugin')
+  mkdirSync(join(root, 'skills', 'hello'), { recursive: true })
+  writeFileSync(
+    join(root, 'plugin.json'),
+    JSON.stringify({
+      $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+      name: 'test'
+    })
+  )
+  writeFileSync(join(root, 'skills/hello/SKILL.md'), '---\nname: hello\ndescription: Test\n---\nHello')
+  const host = await createAgentHost({
+    provider: 'openai',
+    apiKey: 'test',
+    model: 'small',
+    sqlitePath: sqlitePath(),
+    plugins: [{ root, dataDirectory: join(directory, 'data') }]
+  })
+  hosts.push(host)
+  expect(host.plugins).toHaveLength(1)
+  expect((await host.ctx.skills.prepare()).skills).toEqual([{ name: 'hello', description: 'Test' }])
+  const catalog = await host.ctx.skills.prepare()
+  await host.dispose()
+  await expect(catalog.load('hello')).rejects.toThrow()
 })

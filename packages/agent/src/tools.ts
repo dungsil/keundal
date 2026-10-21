@@ -71,7 +71,7 @@ export async function* streamWithTools(
   maxToolRounds: number,
   prepareInput: (input: RunAgentInput) => Promise<RunAgentInput>,
   signal: AbortSignal,
-  options: { parallel?: boolean; stream?: LLMService['stream'] } = {}
+  options: { parallel?: boolean; stream?: LLMService['stream']; maxToolCalls?: number } = {}
 ): AsyncGenerator<LLMEvent> {
   const registered = new Map(tools.map((tool) => [tool.name, tool]))
   const usedIds = new Set(
@@ -81,6 +81,11 @@ export async function* streamWithTools(
   )
   let current = request
   let rounds = 0
+  let totalCalls = 0
+  const maxToolCalls = options.maxToolCalls ?? 32
+  if (!Number.isSafeInteger(maxToolCalls) || maxToolCalls <= 0) {
+    throw new Error('maxToolCalls must be a positive integer')
+  }
   while (true) {
     signal.throwIfAborted()
     const assembly = new MessageAssembly()
@@ -89,6 +94,8 @@ export async function* streamWithTools(
       signal.throwIfAborted()
       if (event.type === EventType.TOOL_CALL_START) {
         if (usedIds.has(event.toolCallId)) throw new Error(`duplicate tool call id: ${event.toolCallId}`)
+        if (totalCalls >= maxToolCalls) throw new Error(`maximum tool calls exceeded: ${maxToolCalls}`)
+        totalCalls++
         usedIds.add(event.toolCallId)
         calls.set(event.toolCallId, {
           id: event.toolCallId,

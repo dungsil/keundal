@@ -1,4 +1,12 @@
-import { LLMService, type ExecutionOptions, type LLMEvent, type LLMModel, type LLMRequest } from '@keundal/core'
+import {
+  fetchWithStreamLimit,
+  StreamBudget,
+  LLMService,
+  type ExecutionOptions,
+  type LLMEvent,
+  type LLMModel,
+  type LLMRequest
+} from '@keundal/core'
 import type { Context } from 'cordis'
 import OpenAI from 'openai'
 
@@ -29,6 +37,7 @@ export class OpenAILLMService extends LLMService {
       ...(noAuth ? { adminAPIKey: null } : {}),
       defaultHeaders: { ...(noAuth ? { authorization: null, 'api-key': null } : {}), ...parsed.headers },
       dangerouslyAllowBrowser: parsed.dangerouslyAllowBrowser,
+      fetch: fetchWithStreamLimit,
       maxRetries: 0
     })
     ctx.fiber.effect(() => () => {
@@ -114,10 +123,12 @@ export class OpenAILLMService extends LLMService {
         },
         { signal }
       )
+      const budget = new StreamBudget()
       const events = new ResponseEvents()
       try {
         for await (const event of stream) {
           signal.throwIfAborted()
+          budget.accept(event)
           if (event.type === 'error') throw new Error(event.message, { cause: event })
           if (event.type === 'response.failed' || event.type === 'response.incomplete') {
             throw new Error(

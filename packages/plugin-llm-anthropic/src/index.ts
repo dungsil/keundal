@@ -1,5 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { LLMService, type ExecutionOptions, type LLMEvent, type LLMModel, type LLMRequest } from '@keundal/core'
+import {
+  fetchWithStreamLimit,
+  StreamBudget,
+  LLMService,
+  type ExecutionOptions,
+  type LLMEvent,
+  type LLMModel,
+  type LLMRequest
+} from '@keundal/core'
 import type { Context } from 'cordis'
 
 import { AnthropicLLMConfigSchema, parseConfig, type AnthropicLLMConfig } from './config.js'
@@ -30,6 +38,7 @@ export class AnthropicLLMService extends LLMService {
         ...parsed.headers
       },
       dangerouslyAllowBrowser: parsed.dangerouslyAllowBrowser,
+      fetch: fetchWithStreamLimit,
       maxRetries: 0
     })
     ctx.fiber.effect(() => () => {
@@ -101,10 +110,12 @@ export class AnthropicLLMService extends LLMService {
         },
         { signal }
       )
+      const budget = new StreamBudget()
       const events = new MessageEvents()
       try {
         for await (const event of stream) {
           signal.throwIfAborted()
+          budget.accept(event)
           for (const mapped of events.convert(event)) {
             signal.throwIfAborted()
             yield mapped

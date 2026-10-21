@@ -1,5 +1,6 @@
+import { ChatMessagePublisher } from './chat-message-publisher'
 import { EventType, parseRunAgentInput, prepareReplayMessages, type AgentMessage, type AGUIEvent } from '@keundal/core'
-import agentPlugin from '@keundal/agent'
+import agentPlugin, { type ExecutableTool } from '@keundal/agent'
 import type { Context } from 'cordis'
 import { ChatMessageAssembly, type ChatMessage } from './chat-message'
 import { createChatTools } from './tools/agent'
@@ -38,7 +39,7 @@ export function toMessages(messages: ChatMessage[], model: string): AgentMessage
   })
 }
 
-export async function createKeundalChat(context: Context, name: string, options: { webSearch?: boolean, reasoning?: boolean, maxOutputTokens?: number } = {}) {
+export async function createKeundalChat(context: Context, name: string, options: { webSearch?: boolean, reasoning?: boolean, maxOutputTokens?: number, tools?: (options: { signal?: AbortSignal }) => Promise<ExecutableTool[]> } = {}) {
   const config = resolveModel(name)
   const maxOutputTokens = options.maxOutputTokens ?? 4096
   const ctx = context.isolate('agent')
@@ -49,7 +50,7 @@ export async function createKeundalChat(context: Context, name: string, options:
     reasoning: options.reasoning === false && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id) ? undefined : options.reasoning,
     maxToolRounds: 4,
     skills: !!context.skills,
-    tools: createChatTools()
+    tools: async execution => [...createChatTools(), ...await (options.tools?.(execution) ?? [])]
   })
   const dispose = async () => {
     await agent.dispose()
@@ -92,6 +93,7 @@ export async function createKeundalChat(context: Context, name: string, options:
     }): AsyncGenerator<AGUIEvent> {
       const runId = request.runId ?? randomUUID()
       const projection = new ChatMessageAssembly(runId)
+      const publisher = new ChatMessagePublisher(request.onMessage)
       let finished: Extract<AGUIEvent, { type: 'RUN_FINISHED' }> | undefined
       let failed = false
       try {
@@ -100,7 +102,7 @@ export async function createKeundalChat(context: Context, name: string, options:
           ...toMessages(request.messages, name)
         ], request.threadId, runId, request.state), { signal: request.signal })) {
           projection.apply(event)
-          request.onMessage?.(structuredClone(projection.message))
+          publisher.update(event, projection.message)
           if (event.type === EventType.RUN_FINISHED) finished = event
           else {
             if (event.type === EventType.RUN_ERROR) failed = true
@@ -113,7 +115,7 @@ export async function createKeundalChat(context: Context, name: string, options:
       } finally {
         projection.finish(name)
         await request.onFinish?.(projection.message)
-        request.onMessage?.(structuredClone(projection.message))
+        publisher.finish(projection.message)
       }
       // The UI sees success only after the display message is durably saved too.
       if (finished) yield finished

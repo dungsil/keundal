@@ -21,6 +21,8 @@ const { data: chats, status: chatsStatus } = await useAsyncData('chats', () => $
 
 useStartupPending('chats', chatsStatus)
 
+const showChatsSkeleton = computed(() => !chats.value && (chatsStatus.value === 'idle' || chatsStatus.value === 'pending'))
+
 const localizedChats = computed(() => chats.value?.map(chat => ({
   ...chat,
   untitled: !chat.label,
@@ -91,7 +93,24 @@ defineShortcuts({
           </template>
         </UNavigationMenu>
 
-        <div v-if="!collapsed" class="space-y-2">
+        <div
+          v-if="!collapsed && showChatsSkeleton"
+          class="flex flex-col gap-1 px-2.5 py-1.5"
+          aria-hidden="true"
+        >
+          <div class="flex h-8 items-center">
+            <USkeleton class="h-3 w-16 motion-reduce:animate-none" />
+          </div>
+          <div
+            v-for="(width, index) in ['w-4/5', 'w-3/5', 'w-5/6', 'w-2/3', 'w-3/4']"
+            :key="index"
+            class="flex h-8 items-center"
+          >
+            <USkeleton :class="['h-4 motion-reduce:animate-none', width]" />
+          </div>
+        </div>
+
+        <div v-else-if="!collapsed" class="space-y-2">
           <div v-for="group in groups" :key="group.id">
             <p class="px-2.5 py-1.5 text-xs font-semibold text-muted">
               {{ group.label }}

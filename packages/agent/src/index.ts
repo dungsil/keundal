@@ -46,6 +46,8 @@ export interface AgentConfig {
   readonly systemPrompt?: string
   /** 도구를 실행하고 후속 생성을 요청할 최대 횟수입니다. 기본값은 8입니다. */
   readonly maxToolRounds?: number
+  /** 한 실행에서 허용할 도구 호출의 최대 개수입니다. 기본값은 32입니다. */
+  readonly maxToolCalls?: number
   /** 같은 응답의 도구 실행을 겹쳐 시작합니다. 기본값은 false로 순차 실행입니다. */
   readonly parallelTools?: boolean
 }
@@ -87,6 +89,10 @@ export function parseAgentConfig(value: unknown): AgentConfig {
   if (typeof maxToolRounds !== 'number' || !Number.isSafeInteger(maxToolRounds) || maxToolRounds <= 0) {
     throw new Error('maxToolRounds must be a positive integer')
   }
+  const maxToolCalls = 'maxToolCalls' in value ? value.maxToolCalls : 32
+  if (typeof maxToolCalls !== 'number' || !Number.isSafeInteger(maxToolCalls) || maxToolCalls <= 0) {
+    throw new Error('maxToolCalls must be a positive integer')
+  }
   const parallelTools = 'parallelTools' in value ? value.parallelTools : false
   if (typeof parallelTools !== 'boolean') throw new Error('parallelTools must be a boolean')
   return {
@@ -100,6 +106,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     ...('context' in value ? { context: value.context as boolean | undefined } : {}),
     ...(systemPrompt === undefined ? {} : { systemPrompt }),
     maxToolRounds,
+    maxToolCalls,
     parallelTools
   }
 }
@@ -267,6 +274,7 @@ export class Agent extends Service {
       const stream = (request: LLMRequest, execution?: ExecutionOptions) =>
         this.streamWithRetry(request, maxInputTokens, execution?.signal ?? signal)
       const maxToolRounds = this.config.maxToolRounds ?? 8
+      const maxToolCalls = this.config.maxToolCalls ?? 32
       const parallel = this.config.parallelTools ?? false
       const prepareNext = async (next: RunAgentInput, generationSignal: AbortSignal) => {
         const contextual = this.config.context
@@ -308,7 +316,7 @@ export class Agent extends Service {
                   maxToolRounds,
                   (next) => prepareNext(next, generationSignal),
                   generationSignal,
-                  { parallel, stream }
+                  { parallel, stream, maxToolCalls }
                 )
               : stream(generationRequest, { signal: generationSignal })
           }

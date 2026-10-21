@@ -44,7 +44,7 @@ export class ChatStore implements ChatStoreLike {
   private readonly runtimes = new Map<string, { key: string, runtime: Awaited<ReturnType<typeof createKeundalChat>> }>()
   private readonly active = new Map<string, { abort: AbortController, done: Promise<void> }>()
 
-  constructor(private readonly ctx: Context) {}
+  constructor(private readonly ctx: Context, private readonly tools?: NonNullable<Parameters<typeof createKeundalChat>[2]>['tools']) {}
 
   private async trimRuntimes(limit: number) {
     while (this.runtimes.size > limit) {
@@ -177,7 +177,7 @@ export class ChatStore implements ChatStoreLike {
       }
       if (!cached) {
         await this.trimRuntimes(7)
-        cached = { key, runtime: await createKeundalChat(this.ctx, request.model, { ...request, maxOutputTokens }) }
+        cached = { key, runtime: await createKeundalChat(this.ctx, request.model, { ...request, maxOutputTokens, tools: this.tools }) }
         this.runtimes.set(id, cached)
       }
       runtime = cached.runtime

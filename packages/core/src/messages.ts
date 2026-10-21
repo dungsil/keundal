@@ -1,4 +1,5 @@
 import { EventType, type AGUIEvent, type AgentMessage } from './protocol.js'
+import type { SessionCommit } from './session.js'
 
 type AssistantMessage = Extract<AgentMessage, { role: 'assistant' }>
 type AssistantToolCall = NonNullable<AssistantMessage['toolCalls']>[number]
@@ -51,6 +52,15 @@ export function mergeMessages(stored: readonly AgentMessage[], incoming: readonl
   return merged
 }
 
+/** 생성 결과는 이미 확정된 메시지를 덮어쓸 수 없습니다. 일반 편집과 종료 재시도는 호출자가 구분합니다. */
+export function assertGenerationMessageIds(stored: readonly AgentMessage[], change: SessionCommit): void {
+  if (!change.generation || !change.messages.length) return
+  const ids = new Set(stored.map((message) => message.id))
+  for (const message of change.messages) {
+    if (ids.has(message.id)) throw new Error(`generation message conflicts with committed history: ${message.id}`)
+  }
+}
+
 /**
  * 실행 이벤트를 실행 메시지로 조립합니다. 어시스턴트 텍스트·도구 호출·추론 요약을 하나의 실행
  * 결과로 모으므로, 저장소 구현은 실행 이벤트마다 apply()가 돌려주는 메시지를 저장하면 됩니다.
@@ -87,14 +97,18 @@ export class MessageAssembly {
         this.open = undefined
         return this.write({ id: value.id, role: 'user', content: value.content })
       }
-      case EventType.TEXT_MESSAGE_START:
+      case EventType.TEXT_MESSAGE_START: {
+        const existing = this.message(event.messageId)
+        const message = existing?.role === 'assistant' ? existing : undefined
         this.open = event.messageId
         return this.write({
+          ...message,
           id: event.messageId,
           role: 'assistant',
-          content: '',
-          ...(event.metadata === undefined ? {} : { metadata: event.metadata })
+          content: message?.content ?? '',
+          ...(event.metadata === undefined ? {} : { metadata: { ...message?.metadata, ...event.metadata } })
         })
+      }
       case EventType.TEXT_MESSAGE_CONTENT:
         return this.append(event.messageId, { id: event.messageId, role: 'assistant', content: '' }, event.delta)
       case EventType.TEXT_MESSAGE_END: {
@@ -103,7 +117,7 @@ export class MessageAssembly {
         return this.write({ ...message, metadata: { ...message.metadata, ...event.metadata } })
       }
       case EventType.TOOL_CALL_START: {
-        const host = this.host(event.toolCallId)
+        const host = this.host(event.toolCallId, event.parentMessageId)
         this.callHosts.set(event.toolCallId, host.id)
         return this.write({
           ...host,
@@ -159,8 +173,15 @@ export class MessageAssembly {
     }
   }
 
-  /** 도구 호출을 붙일 어시스턴트 메시지입니다. 열린 메시지가 없으면 도구 전용 메시지를 만듭니다. */
-  private host(toolCallId: string): AssistantMessage {
+  /** 명시한 부모를 우선하며, 부모가 없으면 열린 메시지나 도구 전용 메시지를 사용합니다. */
+  private host(toolCallId: string, parentMessageId?: string): AssistantMessage {
+    if (parentMessageId !== undefined) {
+      const parent = this.message(parentMessageId)
+      if (parent !== undefined && parent.role !== 'assistant') {
+        throw new Error(`tool call parent is not an assistant message: ${parentMessageId}`)
+      }
+      return parent ?? { id: parentMessageId, role: 'assistant', toolCalls: [] }
+    }
     const open = this.open === undefined ? undefined : this.message(this.open)
     if (open?.role === 'assistant') return open
     const created: AssistantMessage = { id: toolCallId, role: 'assistant', toolCalls: [] }

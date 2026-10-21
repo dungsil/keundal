@@ -1,4 +1,5 @@
 import {
+  assertGenerationMessageIds,
   mergeMessages,
   parseRunAgentInput,
   SessionService,
@@ -107,6 +108,8 @@ export class MemorySessionService extends SessionService {
         `session revision conflict for ${change.threadId}: expected ${change.expectedRevision}, stored ${current.revision}`
       )
     }
+
+    assertGenerationMessageIds(current.messages, change)
 
     const next: StoredThread = {
       revision: current.revision + 1,
