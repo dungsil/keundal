@@ -287,6 +287,87 @@ describe('세션 참조 URI와 스냅숏', () => {
       await bounded.close()
     }
   })
+  test('여러 메시지에 분산한 참조가 요청 한도를 넘으면 세션을 읽기 전에 거부한다', async () => {
+    const snapshots = ['a', 'b', 'c', 'd'].map((id) => sourceSnapshot(id, []))
+    for (const maxReferences of [1, 3]) {
+      const { resolver, calls, close } = await resolverFor(snapshots, { maxReferences })
+      try {
+        const request: RunAgentInput = {
+          ...fixture,
+          messages: snapshots.slice(0, maxReferences + 1).map((snapshot, index) => ({
+            id: `cite-${index}`,
+            role: 'user',
+            content: index % 2 === 0 ? encodeSessionReferenceUri(snapshot.threadId) : legacyUri(snapshot.threadId)
+          }))
+        }
+        await expect(resolver.prepare(request, request)).rejects.toMatchObject({ code: 'SESSION_REFERENCE_TOO_MANY' })
+        expect(calls).toEqual([])
+      } finally {
+        await close()
+      }
+    }
+  })
+
+  test('같은 출처의 반복 스냅숏도 요청 바이트 한도를 적용하고 넘친 원문은 한 번만 저장한다', async () => {
+    let spills = 0
+    const { resolver, calls, close } = await resolverFor(
+      [sourceSnapshot('shared', [{ id: 'long', role: 'assistant', content: '가'.repeat(6000) }])],
+      {
+        maxReferenceBytes: 2000,
+        spill: async () => {
+          spills++
+          return 'artifact:shared'
+        }
+      }
+    )
+    const request = (count: number): RunAgentInput => ({
+      ...fixture,
+      messages: Array.from({ length: count }, (_, index) => ({
+        id: `repeat-${index}`,
+        role: 'user',
+        content: index % 2 ? legacyUri('shared') : encodeSessionReferenceUri('shared')
+      }))
+    })
+    try {
+      const allowed = request(2)
+      const output = await resolver.prepare(allowed, allowed)
+      expect(output.messages).toHaveLength(4)
+      expect(spills).toBe(1)
+      expect(calls).toEqual(['shared'])
+      const oversized = request(100)
+      await expect(resolver.prepare(oversized, oversized)).rejects.toMatchObject({
+        code: 'SESSION_REFERENCE_BUDGET_EXCEEDED'
+      })
+      expect(spills).toBe(2)
+      expect(calls).toEqual(['shared', 'shared'])
+      expect(oversized.messages).toHaveLength(100)
+    } finally {
+      await close()
+    }
+  })
+
+  test('요청 한도 안의 서로 다른 출처와 반복된 URI 별칭을 한 번씩만 읽는다', async () => {
+    const snapshots = ['a', 'b', 'c'].map((id) => sourceSnapshot(id, []))
+    const { resolver, calls, close } = await resolverFor(snapshots)
+    try {
+      const request: RunAgentInput = {
+        ...fixture,
+        messages: ['a', 'b', 'c', 'a'].map((id, index) => ({
+          id: `cite-${index}`,
+          role: 'user',
+          content: index === 3 ? legacyUri(id) : encodeSessionReferenceUri(id)
+        }))
+      }
+      const output = await resolver.prepare(request, request)
+      expect(calls).toEqual(['a', 'b', 'c'])
+      expect(output.messages).toHaveLength(8)
+      await resolver.prepare(output, request)
+      expect(calls).toEqual(['a', 'b', 'c'])
+    } finally {
+      await close()
+    }
+  })
+
   test('서로 다른 메시지의 같은 출처는 메시지별 스냅숏으로 각각 붙이고 출처는 한 번만 읽는다', async () => {
     const source = sourceSnapshot('shared', [{ id: 'source-msg', role: 'assistant', content: 'captured once' }])
     const { resolver, calls, close } = await resolverFor([source])
