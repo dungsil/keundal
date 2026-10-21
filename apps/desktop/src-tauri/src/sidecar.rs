@@ -209,6 +209,12 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
 
     let token = uuid::Uuid::new_v4().simple().to_string();
     let mut command = Command::new(&binary);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
     command
         .args(&args)
         .env("KEUNDAL_SIDECAR", "1")
@@ -222,6 +228,7 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
             "KEUNDAL_CORS_ORIGINS",
             "http://tauri.localhost,https://tauri.localhost,tauri://localhost,http://localhost:1420",
         )
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
     if let Some(selected) = selection.as_ref() {

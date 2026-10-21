@@ -1,5 +1,5 @@
 import type { invoke } from '@tauri-apps/api/core'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { createDesktopChatStore } from '../shared/utils/desktop-chat-store'
 
 function createFixture() {
@@ -49,6 +49,24 @@ test('저장한 선택이 없으면 네이티브 공급자와 환경 변수의 �
   const store = await createDesktopChatStore(fixture.invokeNative, () => [], undefined, fixture.request)
   expect(fixture.calls[0]!.args).toEqual({ selection: null, restart: false })
   expect(store.selectedModel).toBe('openai/first')
+})
+
+test('기본 fetch가 브라우저 전역 객체를 수신자로 사용해 초기화와 복구를 완료한다', async () => {
+  const fixture = createFixture()
+  vi.stubGlobal('fetch', function (this: unknown, input: Parameters<typeof fetch>[0], init?: RequestInit) {
+    if (this !== globalThis) throw new TypeError('Illegal invocation')
+    if (String(input).endsWith('/threads')) return Promise.resolve(Response.json([]))
+    return fixture.request(input, init)
+  })
+  try {
+    const store = await createDesktopChatStore(fixture.invokeNative, () => [])
+    expect(store.selectedModel).toBe('openai/first')
+    await store.recover()
+    expect(await store.list()).toEqual([])
+    expect((await store.models())[0]!.value).toBe('openai/first')
+  } finally {
+    vi.unstubAllGlobals()
+  }
 })
 
 test('전환 후 journal 복구가 실패해도 선택한 모델과 새 연결을 유지한다', async () => {
