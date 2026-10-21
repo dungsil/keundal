@@ -79,6 +79,14 @@ export default {
   'file.imagesOnly': 'Keundal currently supports image attachments only',
   'file.tooLarge': 'File exceeds 8MB',
   'file.failed': 'Upload failed',
+  'model.select': 'Select model',
+  'model.defaultTitle': 'Default model',
+  'model.defaultLabel': 'Model',
+  'model.defaultDescription':
+    'Used when the app opens and when you start a new chat. Saved on this device. Save your provider settings first to load its models.',
+  'model.noDefault': 'Use the last selected model',
+  'model.defaultSaved': 'Default model saved.',
+  'model.defaultSaveFailed': 'Could not save the default model. Check that browser storage is available.',
   'model.refresh': 'Refresh models',
   'model.cache':
     "Provider models are cached in this browser for 1 hour. Listed models must support this app's text, tools and token-counting APIs.",

@@ -64,7 +64,7 @@ test.each([undefined, '0.0.0.0'])('실행 파일은 기본 loopback과 명시적
 
   const external = Object.values(networkInterfaces())
     .flat()
-    .find((address) => address?.family === 'IPv4' && !address.internal)
+    .find(address => address?.family === 'IPv4' && !address.internal)
   if (external) {
     const request = fetch(`http://${external.address}:${port}/threads`, {
       headers: { authorization: `Bearer ${token}` },
@@ -111,7 +111,7 @@ test('명시한 공급자는 키 없는 사용자 지정 API를 사용하고 같
     })
     await expect.poll(() => output, { timeout: 5000 }).toContain('"kind":"keundal-sidecar"')
     const endpoint = /http:\/\/127\.0\.0\.1:\d+/.exec(output)![0]
-    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
+    const headers = { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }
     return { stop, call: (route: string, init?: RequestInit) => fetch(`${endpoint}${route}`, { ...init, headers }) }
   }
   const first = await start('openai', 'first')

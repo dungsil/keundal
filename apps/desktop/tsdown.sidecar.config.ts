@@ -2,6 +2,7 @@ import { defineConfig } from 'tsdown'
 
 export default defineConfig({
   entry: ['sidecar/main.ts'],
+  tsconfig: 'tsconfig.sidecar.json',
   format: 'esm',
   fixedExtension: false,
   platform: 'node',
