@@ -26,6 +26,16 @@ export function strings(value: unknown): value is Record<string, string> {
 function only(value: Record<string, unknown>, keys: string[]) {
   if (Object.keys(value).some((key) => !keys.includes(key))) throw new Error('unknown configuration field')
 }
+export function mcpServers(value: unknown): Record<string, unknown> {
+  if (
+    !object(value) ||
+    value.$schema !== MCP_SCHEMA ||
+    !object(value.mcpServers) ||
+    Object.keys(value).some((key) => !['$schema', 'mcpServers'].includes(key))
+  )
+    throw new Error('invalid or unsupported mcp.json')
+  return value.mcpServers
+}
 export function manifest(value: unknown, report: Report): PluginManifest {
   if (!object(value)) throw new Error('plugin.json must be an object')
   if (value.$schema !== PLUGIN_SCHEMA) throw new Error('unsupported plugin $schema')

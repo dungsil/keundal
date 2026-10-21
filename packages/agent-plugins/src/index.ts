@@ -11,7 +11,7 @@ import type { ExecutableTool } from '@keundal/tools'
 
 import { contained, exists } from './files.js'
 import { skills } from './skills.js'
-import { manifest, MCP_SCHEMA, object, server, type PluginDiagnostic, type PluginManifest } from './validation.js'
+import { manifest, mcpServers, server, type PluginDiagnostic, type PluginManifest } from './validation.js'
 
 export { PLUGIN_SCHEMA, MCP_SCHEMA, type PluginDiagnostic, type PluginManifest } from './validation.js'
 export interface AgentPluginOptions {
@@ -81,15 +81,8 @@ export async function loadAgentPlugin(
       try {
         if (await exists(resolve(root, 'mcp.json'))) {
           const path = await contained(root, 'mcp.json', 'file')
-          const value: unknown = JSON.parse(await readFile(path, { encoding: 'utf8', signal }))
-          if (
-            !object(value) ||
-            value.$schema !== MCP_SCHEMA ||
-            !object(value.mcpServers) ||
-            Object.keys(value).some((key) => !['$schema', 'mcpServers'].includes(key))
-          )
-            throw new Error('invalid or unsupported mcp.json')
-          for (const [name, raw] of Object.entries(value.mcpServers)) {
+          const entries = mcpServers(JSON.parse(await readFile(path, { encoding: 'utf8', signal })))
+          for (const [name, raw] of Object.entries(entries)) {
             signal.throwIfAborted()
             try {
               const entry = server(raw, process.platform === 'win32')

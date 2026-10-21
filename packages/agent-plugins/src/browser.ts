@@ -2,7 +2,7 @@ import type { SkillDefinition } from '@keundal/core'
 import { parseMcpServers, type McpClientConfig } from '@keundal/mcp'
 
 import { pluginSkill } from './skill-metadata.js'
-import { manifest, MCP_SCHEMA, object, server, type PluginDiagnostic } from './validation.js'
+import { manifest, mcpServers, server, type PluginDiagnostic } from './validation.js'
 
 export { PLUGIN_SCHEMA, MCP_SCHEMA } from './validation.js'
 
@@ -30,15 +30,8 @@ export async function inspectAgentPlugin(files: Readonly<Record<string, string>>
   const servers: McpClientConfig[] = []
   if (files['mcp.json']) {
     try {
-      const value: unknown = JSON.parse(files['mcp.json'])
-      if (
-        !object(value) ||
-        value.$schema !== MCP_SCHEMA ||
-        !object(value.mcpServers) ||
-        Object.keys(value).some((key) => !['$schema', 'mcpServers'].includes(key))
-      )
-        throw new Error('invalid or unsupported mcp.json')
-      for (const [name, raw] of Object.entries(value.mcpServers)) {
+      const entries = mcpServers(JSON.parse(files['mcp.json']))
+      for (const [name, raw] of Object.entries(entries)) {
         try {
           const entry = server(raw)
           if (entry.type !== 'streamable-http')
