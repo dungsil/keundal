@@ -211,5 +211,30 @@ export default {
   'error.secureStorageDescription':
     'Could not load LLM settings. Unlock your OS secret store and restart the app. No browser storage fallback is used.',
   'settings.title': 'Settings',
-  'settings.back': 'Back to chat'
+  'settings.back': 'Back to chat',
+  'mcp.name': 'Server name',
+  'mcp.transport': 'Transport',
+  'mcp.command': 'Command',
+  'mcp.url': 'Server URL',
+  'mcp.args': 'Arguments (JSON array)',
+  'mcp.cwd': 'Working directory (optional)',
+  'mcp.env': 'Environment variables (JSON object)',
+  'mcp.headers': 'HTTP headers (JSON object)',
+  'mcp.tools': 'Allowed tools',
+  'mcp.resources': 'Allowed resource URIs',
+  'mcp.permissions': 'One name or URI per line. Use * to allow all; leave empty to deny access.',
+  'mcp.timeout': 'Timeout (ms)',
+  'mcp.edit': 'Edit',
+  'mcp.remove': 'Remove',
+  'mcp.add': 'Add server',
+  'mcp.save': 'Save changes',
+  'mcp.cancel': 'Cancel',
+  'mcp.saved': 'MCP settings saved. They apply to the next response.',
+  'mcp.saveFailed': 'Could not save or connect. Check the server, configuration, and secret store.',
+  'mcp.invalidJSON': 'Enter valid JSON for arguments and credentials.',
+  'mcp.hosted': 'This app uses a remote agent. Configure MCP on its host with KEUNDAL_MCP_SERVERS.',
+  'mcp.webDescription':
+    'Connect to Streamable HTTP servers that allow this browser origin through CORS. Settings, including credentials, are saved in this browser. Saving stops active responses.',
+  'mcp.desktopDescription':
+    'Connect to HTTP servers or run trusted local stdio servers. Settings are saved in the OS secret store. Saving stops active responses and restarts the local host.'
 }

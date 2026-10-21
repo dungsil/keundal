@@ -8,6 +8,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             settings::load_llm_settings,
             settings::save_llm_settings,
+            settings::load_mcp_settings,
+            settings::save_mcp_settings,
             skills::list_skill_files,
             skills::read_skill_file,
             sidecar::sidecar_info

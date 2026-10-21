@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -65,6 +65,15 @@ impl SidecarState {
 
 impl Drop for Sidecar {
     fn drop(&mut self) {
+        // Closing the control pipe lets the host dispose MCP sessions and children.
+        self.child.stdin.take();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < deadline {
+            if matches!(self.child.try_wait(), Ok(Some(_))) {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
@@ -230,6 +239,7 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
     command
         .args(&args)
         .env("KEUNDAL_SIDECAR", "1")
+        .env("KEUNDAL_SHUTDOWN_ON_STDIN", "1")
         .env("KEUNDAL_HOST", "127.0.0.1")
         .env("PORT", "0")
         .env("KEUNDAL_PARENT_PID", std::process::id().to_string())
@@ -240,6 +250,7 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
             "KEUNDAL_CORS_ORIGINS",
             "http://tauri.localhost,https://tauri.localhost,tauri://localhost,http://localhost:1420",
         )
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
     if let Some(selected) = selection.as_ref() {
@@ -264,6 +275,10 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
     let headers = serde_json::to_string(&provider.headers.unwrap_or_default())
         .map_err(|_| "Could not encode request headers".to_string())?;
     command.env("KEUNDAL_HEADERS", headers);
+    command.env(
+        "KEUNDAL_MCP_SERVERS",
+        settings::load_mcp_settings_json()?.unwrap_or_else(|| "[]".to_string()),
+    );
     if let Ok(data) = app.path().app_data_dir() {
         std::fs::create_dir_all(&data).ok();
         command.env("KEUNDAL_SQLITE_PATH", data.join("keundal.sqlite"));

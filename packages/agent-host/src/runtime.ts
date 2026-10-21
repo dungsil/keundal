@@ -39,6 +39,7 @@ export async function createAgentRuntime(
   if (sqlitePath !== ':memory:') mkdirSync(dirname(sqlitePath), { recursive: true })
   const host = await createAgentHost({
     provider,
+    mcpServers: env.KEUNDAL_MCP_SERVERS ? JSON.parse(env.KEUNDAL_MCP_SERVERS) : [],
     apiKey: apiKey ?? '',
     model,
     models: { [model]: { contextWindow, maxOutputTokens } },

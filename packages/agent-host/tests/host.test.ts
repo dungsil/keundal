@@ -80,6 +80,7 @@ test('기본 모델이 모델 목록에 없으면 호스트 생성을 거부한�
 test('호스트는 모델별 에이전트로 실행하고 제목을 생성한다', async () => {
   const http = await import('node:http')
   const replies: string[] = []
+  const requests: string[] = []
   const server = http.createServer((request, response) => {
     if (request.url === '/v1/responses/input_tokens') {
       response.writeHead(404).end()
@@ -88,6 +89,7 @@ test('호스트는 모델별 에이전트로 실행하고 제목을 생성한다
     let body = ''
     request.on('data', (chunk) => (body += chunk))
     request.on('end', () => {
+      requests.push(body)
       const title = body.includes('Generate a chat title')
       const text = title ? '테스트 제목' : '테스트 응답'
       replies.push(text)
@@ -116,7 +118,30 @@ test('호스트는 모델별 에이전트로 실행하고 제목을 생성한다
     model: 'test',
     models: { test: { contextWindow: 8000, maxOutputTokens: 1000 } },
     sqlitePath: sqlitePath(),
-    baseURL: `http://127.0.0.1:${address.port}/v1`
+    baseURL: `http://127.0.0.1:${address.port}/v1`,
+    mcpServers: [
+      {
+        serverName: 'fixture',
+        transport: 'stdio',
+        command: process.execPath,
+        args: [
+          '-e',
+          `
+        const readline = require('node:readline');
+        readline.createInterface({ input: process.stdin }).on('line', line => {
+          const request = JSON.parse(line);
+          if (request.id === undefined) return;
+          const result = request.method === 'initialize'
+            ? { protocolVersion: request.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'fixture', version: '1' } }
+            : { tools: [{ name: 'search', description: 'Search', inputSchema: { type: 'object', properties: {} } }] };
+          console.log(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }));
+        });
+      `
+        ],
+        permissions: { tools: ['search'] },
+        timeoutMs: 3000
+      }
+    ]
   })
   hosts.push(host)
   try {
@@ -141,6 +166,8 @@ test('호스트는 모델별 에이전트로 실행하고 제목을 생성한다
       message: { id: 'user', role: 'user', content: '안녕하세요' }
     })
     expect(title).toBe('테스트 제목')
+    expect(requests.find((body) => !body.includes('Generate a chat title'))).toContain('mcp__fixture__tool__search')
+    expect(requests.find((body) => body.includes('Generate a chat title'))).not.toContain('mcp__fixture__tool__search')
     expect(replies).toEqual(['테스트 응답', '테스트 제목'])
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))

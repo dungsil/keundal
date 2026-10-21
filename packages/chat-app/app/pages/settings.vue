@@ -32,6 +32,7 @@ useHead(() => ({ title: t('settings.title') }))
           class="mb-6"
         />
         <ClientOnly>
+          <McpSettings />
           <ModelSettings />
           <LLMSettings :return-to="returnTo" />
         </ClientOnly>

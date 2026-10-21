@@ -8,6 +8,7 @@ import {
   type RunAgentInput,
   type SessionService
 } from '@keundal/core'
+import { McpClient, parseMcpServers, type McpClientConfig } from '@keundal/mcp'
 import anthropicLLMPlugin from '@keundal/plugin-llm-anthropic'
 import geminiLLMPlugin from '@keundal/plugin-llm-gemini'
 import openaiLLMPlugin from '@keundal/plugin-llm-openai'
@@ -24,6 +25,7 @@ export interface AgentHostModel {
 export type AgentHostProvider = 'openai' | 'gemini' | 'anthropic'
 
 export interface AgentHostOptions {
+  readonly mcpServers?: readonly McpClientConfig[]
   readonly provider: AgentHostProvider
   readonly apiKey: string
   /** 기본 모델 ID입니다. `models`에 포함되어야 합니다. */
@@ -96,17 +98,23 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
   const models: AgentHostModel[] = modelIds.map((id) => ({ id, provider: options.provider, ...configured[id]! }))
   const limits = new Map(models.map((model) => [model.id, model]))
 
+  const mcpServers = parseMcpServers(options.mcpServers ?? [])
+  const mcpClients = new Map<string, Promise<McpClient>>()
+  const mcpLifetime = new globalThis.AbortController()
   const ctx = new Context()
   const fibers: Fiber[] = []
   const agents = new Map<string, Promise<Fiber>>()
 
   const dispose = async () => {
+    mcpLifetime.abort()
     const created = await Promise.allSettled(agents.values())
     agents.clear()
     for (const result of created) {
       if (result.status === 'fulfilled') await result.value.dispose()
     }
     for (const fiber of fibers.toReversed()) await fiber.dispose()
+    await Promise.allSettled([...mcpClients.values()].map(async (client) => (await client).close()))
+    mcpClients.clear()
   }
 
   const model = (id: string | undefined): AgentHostModel => {
@@ -133,7 +141,33 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
       return isolated.plugin(agentPlugin, {
         model: selected.id,
         maxOutputTokens,
-        maxToolRounds: options.maxToolRounds ?? 4
+        maxToolRounds: options.maxToolRounds ?? 4,
+        tools: async (execution) => {
+          const signal = execution?.signal
+            ? globalThis.AbortSignal.any([execution.signal, mcpLifetime.signal])
+            : mcpLifetime.signal
+          const tools = []
+          for (const server of mcpServers) {
+            signal.throwIfAborted()
+            let pending = mcpClients.get(server.serverName)
+            if (!pending) {
+              pending = McpClient.connect(server, { signal })
+              mcpClients.set(server.serverName, pending)
+              void pending.catch(() => {
+                if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
+              })
+            }
+            try {
+              tools.push(...(await (await pending).tools({ signal })))
+            } catch (error) {
+              if (signal.aborted) throw error
+              if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
+              await pending.then((client) => client.close()).catch(() => {})
+              throw error
+            }
+          }
+          return tools
+        }
       })
     })()
     agents.set(id, created)

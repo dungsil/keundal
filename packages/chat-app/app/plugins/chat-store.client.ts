@@ -1,3 +1,4 @@
+import { McpManager } from '../../shared/utils/mcp'
 import { Context } from 'cordis'
 import { useLocalStorage } from '@vueuse/core'
 import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
@@ -26,6 +27,8 @@ export default defineNuxtPlugin(async () => {
   const ctx = new Context()
   const desktop = useRuntimeConfig().public.desktop
   const invokeNative = desktop ? (await import('@tauri-apps/api/core')).invoke : undefined
+  const mcpManager = new McpManager(localStorage, invokeNative)
+  await mcpManager.load()
   const storage = createLLMSettingsStorage(localStorage, invokeNative)
   // Desktop must never bind credentials to a localStorage-backed ref.
   const settings = desktop
@@ -67,6 +70,12 @@ export default defineNuxtPlugin(async () => {
   const skillManager = new SkillManager(localStorage, invokeNative)
   const runtime = useRuntimeConfig().public
   let desktopStore: Awaited<ReturnType<typeof createDesktopChatStore>> | undefined
+  async function saveMcpSettings(value: unknown) {
+    await mcpManager.save(value, async () => {
+      if (desktopStore) await desktopStore.reloadSettings()
+      else await chatStore.stop()
+    })
+  }
   const selectModel = desktop && invokeNative ? (value: string) => desktopStore!.selectModel(value) : undefined
   if (desktop && invokeNative) {
     desktopStore = await createDesktopChatStore(invokeNative, () => modelCatalog.models.value, initialModel && settings.value[resolveModel(initialModel).configuration] ? initialModel : undefined)
@@ -82,7 +91,9 @@ export default defineNuxtPlugin(async () => {
         llmSettings: settings,
         saveLLMSettings,
         modelCatalog,
-        skillManager
+        skillManager,
+        mcpManager,
+        saveMcpSettings
       }
     }
   }
@@ -110,7 +121,9 @@ export default defineNuxtPlugin(async () => {
         llmSettings: settings,
         saveLLMSettings,
         modelCatalog,
-        skillManager
+        skillManager,
+        mcpManager,
+        saveMcpSettings
       }
     }
   }
@@ -120,11 +133,12 @@ export default defineNuxtPlugin(async () => {
   const store = ctx.plugin(indexedDBStorePlugin, { databaseName: 'keundal-web' })
   await store
   const skills = await ctx.plugin(skillPlugin, { providers: skillManager.providers })
-  const local = new ChatStore(ctx)
+  const local = new ChatStore(ctx, options => mcpManager.tools(options))
   chatStore = local
   await local.recover()
   if (import.meta.hot) import.meta.hot.dispose(async () => {
     await local.stop()
+    await mcpManager.close()
     await skills.dispose()
     await store.dispose()
     await llm.dispose()
@@ -138,7 +152,9 @@ export default defineNuxtPlugin(async () => {
       llmSettings: settings,
       saveLLMSettings,
       modelCatalog,
-      skillManager
+      skillManager,
+      mcpManager,
+      saveMcpSettings
     }
   }
 })

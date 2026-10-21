@@ -15,6 +15,7 @@
     "@iconify-json/lucide": "^1.2.142",
     "@iconify-json/simple-icons": "^1.2.99",
     "@keundal/core": "workspace:*",
+    "@keundal/mcp": "workspace:*",
     "@keundal/ui": "workspace:*",
     "@keundal/agent": "workspace:*",
     "@keundal/plugin-llm-anthropic": "workspace:*",

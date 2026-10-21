@@ -136,3 +136,22 @@ test('명시한 공급자는 키 없는 사용자 지정 API를 사용하고 같
   })
   await second.stop()
 })
+
+test('종료 제어 파이프가 닫히면 sidecar가 정상 종료한다', async () => {
+  const child = spawn(process.execPath, ['dist-sidecar/main.js'], {
+    env: {
+      PORT: '0', KEUNDAL_SIDECAR: '1', KEUNDAL_SHUTDOWN_ON_STDIN: '1',
+      KEUNDAL_PROVIDER: 'openai', KEUNDAL_MODEL: 'test', KEUNDAL_API_TOKEN: token,
+      KEUNDAL_SQLITE_PATH: ':memory:',
+      KEUNDAL_MCP_SERVERS: JSON.stringify([{ serverName: 'offline', transport: 'streamable-http', url: 'http://127.0.0.1:1', permissions: { tools: '*' } }])
+    },
+    stdio: ['pipe', 'pipe', 'pipe']
+  })
+  onTestFinished(() => { if (child.exitCode === null) child.kill() })
+  let output = ''
+  child.stdout.on('data', chunk => { output += String(chunk) })
+  await expect.poll(() => output, { timeout: 5000 }).toContain('keundal-sidecar')
+  const exited = once(child, 'exit')
+  child.stdin.end()
+  expect(await exited).toEqual([0, null])
+})
