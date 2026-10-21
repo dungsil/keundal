@@ -22,6 +22,14 @@ export function configuredProviders(settings: LLMSettings) {
   })
 }
 
+/** Legacy empty defaults are placeholders, not user registrations. */
+export function registeredProviders(settings: LLMSettings) {
+  return configuredProviders(settings).filter(({ id }) => {
+    const value = settings[id]!
+    return id.includes('@') || !!(value.name?.trim() || value.apiKey.trim() || value.baseURL.trim() || Object.keys(value.headers ?? {}).length)
+  })
+}
+
 const headersSchema = z.record(
   z.string().regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/, 'Invalid request header name'),
   z.string().max(4096).regex(/^[\t\x20-\x7e]*$/, 'Header values must use ASCII without line breaks')

@@ -3,6 +3,7 @@ import {
   LLM_PROVIDERS,
   defaultLLMSettings,
   configuredProviders,
+  registeredProviders,
   providerSettingsSchema,
   type LLMProvider
 } from '../../shared/utils/llm-settings'
@@ -17,7 +18,10 @@ const { model } = useModels()
 const { $chatStore, $saveLLMSettings } = useNuxtApp()
 const desktop = useRuntimeConfig().public.desktop
 const toast = useToast()
-const provider = ref('anthropic')
+const provider = ref('')
+const adding = ref(false)
+const newName = ref('')
+const visibleIds = ref<string[]>([])
 const newType = ref<LLMProvider>('openai')
 const draft = ref(defaultLLMSettings())
 const headerRows = ref<Record<string, { id: string, key: string, value: string }[]>>({
@@ -27,8 +31,8 @@ const headerRows = ref<Record<string, { id: string, key: string, value: string }
 })
 const error = ref('')
 const saving = ref(false)
-const providers = computed(() => configuredProviders(draft.value))
-const current = computed(() => providers.value.find(item => item.id === provider.value)!)
+const providers = computed(() => configuredProviders(draft.value).filter(item => visibleIds.value.includes(item.id)))
+const current = computed(() => providers.value.find(item => item.id === provider.value))
 const currentDraft = computed(() => draft.value[provider.value]!)
 const currentHeaders = computed(() => headerRows.value[provider.value]!)
 
@@ -36,16 +40,20 @@ function addProvider() {
   const id = `${newType.value}@${crypto.randomUUID()}`
   const preset = LLM_PROVIDERS.find(item => item.id === newType.value)!
   draft.value[id] = {
-    name: `${preset.label} ${providers.value.filter(item => item.providerType === newType.value).length + 1}`,
+    name: newName.value.trim() || preset.label,
     apiKey: '',
     baseURL: preset.baseURL
   }
   headerRows.value[id] = []
+  visibleIds.value.push(id)
   provider.value = id
+  adding.value = false
+  newName.value = ''
 }
 
 function loadDraft() {
   draft.value = JSON.parse(JSON.stringify(settings.value))
+  visibleIds.value = registeredProviders(settings.value).map(item => item.id)
   for (const item of configuredProviders(draft.value))
     headerRows.value[item.id] = Object.entries(draft.value[item.id]!.headers ?? {}).map(([key, value]) => ({
       id: crypto.randomUUID(),
@@ -59,9 +67,9 @@ watch(
   [() => route.query.provider, model],
   ([value]) => {
     provider.value
-      = configuredProviders(settings.value).find(item => item.id === value)?.id
-        ?? configuredProviders(settings.value).find(item => model.value.startsWith(`${item.id}/`))?.id
-        ?? 'anthropic'
+      = registeredProviders(settings.value).find(item => item.id === value)?.id
+        ?? registeredProviders(settings.value).find(item => model.value.startsWith(`${item.id}/`))?.id
+        ?? providers.value[0]?.id ?? ''
   },
   { immediate: true }
 )
@@ -83,7 +91,7 @@ async function save(forget = false) {
     if (provider.value.includes('@')) Reflect.deleteProperty(next, provider.value)
     else next[provider.value] = { apiKey: '', baseURL: '' }
   } else {
-    for (const item of configuredProviders(draft.value)) {
+    for (const item of providers.value) {
       const rows = headerRows.value[item.id]!.map(row => ({ key: row.key.trim(), value: row.value })).filter(
         row => row.key || row.value
       )
@@ -126,7 +134,7 @@ async function save(forget = false) {
       color: 'success'
     })
     loadDraft()
-    if (!draft.value[provider.value]) provider.value = 'anthropic'
+    if (!providers.value.some(item => item.id === provider.value)) provider.value = providers.value[0]?.id ?? ''
   } catch {
     error.value = desktop ? t('llm.saveFailedOS') : t('llm.saveFailedBrowser')
   } finally {
@@ -145,36 +153,78 @@ async function save(forget = false) {
         {{ desktop ? t('llm.descriptionOS') : t('llm.descriptionBrowser') }}
       </p>
     </div>
-    <form id="llm-settings" class="flex flex-col gap-5" @submit.prevent="save()">
-      <UFormField :label="t('llm.provider')" name="provider">
-        <USelect
-          v-model="provider"
-          :items="providers"
-          value-key="id"
-          label-key="label"
-          class="w-full"
-          :disabled="saving"
-        />
-      </UFormField>
-      <div class="flex items-end gap-2">
-        <UFormField :label="t('llm.providerType')" class="flex-1">
-          <USelect
-            v-model="newType"
-            :items="[...LLM_PROVIDERS]"
-            value-key="id"
-            label-key="label"
-            class="w-full"
+    <div class="space-y-3">
+      <p v-if="!providers.length" class="text-sm text-muted">
+        {{ t('llm.noProviders') }}
+      </p>
+      <ul v-else class="space-y-2" :aria-label="t('llm.registeredProviders')">
+        <li v-for="item in providers" :key="item.id">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between rounded-lg border p-4 text-left"
+            :class="provider === item.id ? 'border-primary bg-primary/5' : 'border-default'"
+            :aria-expanded="provider === item.id"
             :disabled="saving"
-          />
-        </UFormField>
-        <UButton
-          type="button"
-          icon="i-lucide-plus"
-          :label="t('llm.addProvider')"
-          :disabled="saving"
-          @click="addProvider"
-        />
-      </div>
+            @click="provider = provider === item.id ? '' : item.id"
+          >
+            <span>
+              <span class="block font-medium text-highlighted">{{ item.label }}</span>
+              <span class="block text-sm text-muted">{{ LLM_PROVIDERS.find(preset => preset.id === item.providerType)?.label }}</span>
+            </span>
+            <UIcon name="i-lucide-chevron-down" :class="provider === item.id ? 'rotate-180' : ''" />
+          </button>
+        </li>
+      </ul>
+      <UButton
+        type="button"
+        icon="i-lucide-plus"
+        :label="t('llm.addProvider')"
+        :disabled="saving"
+        @click="adding = true"
+      />
+    </div>
+    <UModal v-model:open="adding" :title="t('llm.addProvider')">
+      <template #body>
+        <form class="space-y-4" @submit.prevent="addProvider">
+          <UFormField :label="t('llm.providerType')">
+            <USelect
+              v-model="newType"
+              :items="[...LLM_PROVIDERS]"
+              value-key="id"
+              label-key="label"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField :label="t('llm.providerName')">
+            <UInput
+              v-model="newName"
+              :maxlength="100"
+              :placeholder="LLM_PROVIDERS.find(item => item.id === newType)?.label"
+              class="w-full"
+            />
+          </UFormField>
+          <div class="flex justify-end gap-2">
+            <UButton
+              type="button"
+              :label="t('common.cancel')"
+              color="neutral"
+              variant="ghost"
+              @click="adding = false"
+            />
+            <UButton type="submit" :label="t('llm.configureProvider')" />
+          </div>
+        </form>
+      </template>
+    </UModal>
+    <form
+      v-if="current"
+      id="llm-settings"
+      class="flex flex-col gap-5"
+      @submit.prevent="save()"
+    >
+      <h3 class="font-semibold text-highlighted">
+        {{ current.label }}
+      </h3>
       <UFormField :label="t('llm.providerName')" name="providerName">
         <UInput
           v-model="currentDraft.name"
@@ -271,6 +321,7 @@ async function save(forget = false) {
         {{ error }}
       </p>
       <UButton
+        v-if="current"
         :label="t('llm.forget')"
         color="error"
         variant="ghost"
@@ -293,6 +344,7 @@ async function save(forget = false) {
           :disabled="saving"
         />
         <UButton
+          v-if="current"
           :label="desktop ? t('llm.saveOS') : t('llm.saveBrowser')"
           type="submit"
           form="llm-settings"
