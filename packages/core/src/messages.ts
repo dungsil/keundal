@@ -97,14 +97,18 @@ export class MessageAssembly {
         this.open = undefined
         return this.write({ id: value.id, role: 'user', content: value.content })
       }
-      case EventType.TEXT_MESSAGE_START:
+      case EventType.TEXT_MESSAGE_START: {
+        const existing = this.message(event.messageId)
+        const message = existing?.role === 'assistant' ? existing : undefined
         this.open = event.messageId
         return this.write({
+          ...message,
           id: event.messageId,
           role: 'assistant',
-          content: '',
-          ...(event.metadata === undefined ? {} : { metadata: event.metadata })
+          content: message?.content ?? '',
+          ...(event.metadata === undefined ? {} : { metadata: { ...message?.metadata, ...event.metadata } })
         })
+      }
       case EventType.TEXT_MESSAGE_CONTENT:
         return this.append(event.messageId, { id: event.messageId, role: 'assistant', content: '' }, event.delta)
       case EventType.TEXT_MESSAGE_END: {
@@ -113,7 +117,7 @@ export class MessageAssembly {
         return this.write({ ...message, metadata: { ...message.metadata, ...event.metadata } })
       }
       case EventType.TOOL_CALL_START: {
-        const host = this.host(event.toolCallId)
+        const host = this.host(event.toolCallId, event.parentMessageId)
         this.callHosts.set(event.toolCallId, host.id)
         return this.write({
           ...host,
@@ -169,8 +173,15 @@ export class MessageAssembly {
     }
   }
 
-  /** 도구 호출을 붙일 어시스턴트 메시지입니다. 열린 메시지가 없으면 도구 전용 메시지를 만듭니다. */
-  private host(toolCallId: string): AssistantMessage {
+  /** 명시한 부모를 우선하며, 부모가 없으면 열린 메시지나 도구 전용 메시지를 사용합니다. */
+  private host(toolCallId: string, parentMessageId?: string): AssistantMessage {
+    if (parentMessageId !== undefined) {
+      const parent = this.message(parentMessageId)
+      if (parent !== undefined && parent.role !== 'assistant') {
+        throw new Error(`tool call parent is not an assistant message: ${parentMessageId}`)
+      }
+      return parent ?? { id: parentMessageId, role: 'assistant', toolCalls: [] }
+    }
     const open = this.open === undefined ? undefined : this.message(this.open)
     if (open?.role === 'assistant') return open
     const created: AssistantMessage = { id: toolCallId, role: 'assistant', toolCalls: [] }
