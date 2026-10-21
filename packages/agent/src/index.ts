@@ -53,7 +53,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     throw new Error('model and a positive integer maxOutputTokens are required')
   }
   const compaction = parseCompactionConfig('compaction' in value ? value.compaction : undefined)
-  for (const key of ['webSearch', 'reasoning', 'skills', 'context', 'subagents'] as const) {
+  for (const key of ['webSearch', 'skills', 'context', 'subagents'] as const) {
     const option = (value as Record<string, unknown>)[key]
     if (option !== undefined && typeof option !== 'boolean') {
       throw new Error(`${key} must be a boolean`)
