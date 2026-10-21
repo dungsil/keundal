@@ -14,7 +14,7 @@ web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도�
 | 브라우저 받아쓰기의 기본 공급자 구성        | `@keundal/plugin-transcription-browser` |
 | 공급자와 무관한 호스트와 HTTP 연결          | `@keundal/agent-host`                   |
 | Node.js 환경 설정과 기본 플러그인 구성      | `@keundal/agent-runtime-node`           |
-| 런타임 플러그인 설정과 Cordis 모듈 로딩    | `@keundal/plugin-runtime`              |
+| 런타임 플러그인 설정과 Cordis 모듈 로딩     | `@keundal/plugin-runtime`               |
 
 `@keundal/agent`, `@keundal/tools`, `@keundal/context`, `@keundal/mcp`는 구현을 가져오지 않는 계약입니다. `@keundal/shell`, `@keundal/transcription`, `@keundal/fs`도 서비스 계약만 제공합니다. 기본 실행 루프와 축약·도구 정책은 `@keundal/agent-loop`가 소유합니다. 독립적인 에이전트는 `AgentService`를 구현하고, 기본 루프를 재사용할 때는 `agent-loop`의 `Agent`를 상속합니다.
 
@@ -74,7 +74,6 @@ web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도�
 ### 신뢰 경계
 
 설정은 실행할 코드를 선택하므로 신뢰할 수 있는 파일과 URL만 사용해야 합니다. 플러그인은 샌드박스에서 실행하지 않습니다. 브라우저 플러그인은 앱 origin의 데이터에, Node.js 플러그인은 호스트 프로세스의 권한과 환경 변수에 접근할 수 있습니다. 브라우저에 전달하는 공개 설정에는 비밀 값을 넣지 않습니다.
-
 
 ## 경계 검증
 
