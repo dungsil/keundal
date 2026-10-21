@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ToolPart } from '../../../../shared/utils/chat-message'
+import type { ToolPart } from '@keundal/chat/chat-message'
 
 const props = defineProps<{ invocation: ToolPart }>()
 const { t } = useLocale()
@@ -18,6 +18,16 @@ const task = computed(() => {
   const input = props.invocation.input
   return input && typeof input === 'object' && 'task' in input && typeof input.task === 'string' ? input.task : ''
 })
+const label = computed(() => {
+  const input = props.invocation.input
+  return input && typeof input === 'object' && 'label' in input && typeof input.label === 'string' ? input.label : task.value
+})
+const diagnostic = computed(() => {
+  const output = props.invocation.output
+  if (output && typeof output === 'object' && 'error' in output && output.error && typeof output.error === 'object'
+    && 'message' in output.error && typeof output.error.message === 'string') return output.error.message
+  return props.invocation.subagent?.error ?? ''
+})
 const answer = computed(() => {
   const output = props.invocation.output
   return output && typeof output === 'object' && 'content' in output && typeof output.content === 'string' ? output.content : ''
@@ -27,7 +37,7 @@ const answer = computed(() => {
 <template>
   <UChatTool
     :text="t(labels[status])"
-    :suffix="task.length > 80 ? `${task.slice(0, 80)}…` : task"
+    :suffix="label.length > 80 ? `${label.slice(0, 80)}…` : label"
     :streaming="status === 'queued' || status === 'running'"
     icon="i-lucide-git-fork"
     chevron="leading"
@@ -36,7 +46,13 @@ const answer = computed(() => {
       <p class="whitespace-pre-wrap break-words">
         {{ task }}
       </p>
+      <p v-if="answer && status === 'failed'" class="text-muted">
+        {{ t('tool.subagentPartial') }}
+      </p>
       <ChatComark v-if="answer" :value="answer" />
+      <p v-if="diagnostic" class="text-error whitespace-pre-wrap break-words">
+        {{ diagnostic }}
+      </p>
       <p v-if="invocation.state === 'output-error'" class="text-muted">
         {{ t(labels[status]) }}
       </p>

@@ -1,8 +1,8 @@
 # @keundal/agent
 
-에이전트 구현의 계약과 공통 실행 루프를 제공합니다. `llm`, `session`, `generation` 서비스를 조합하여 `ctx.agent.run()`을 만들고, 입력이 모델의 컨텍스트 예산을 넘으면 이전 대화를 축약합니다. 도구 실행 함수를 등록하면 도구 호출 수집, 실행, 결과 메시지 작성, 후속 생성을 자동으로 처리합니다.
+`@keundal/agent-contract`의 계약을 구현하는 기본 실행 루프를 제공합니다. `llm`, `session`, `generation` 서비스를 조합하여 `ctx.agent.run()`을 만들고, 입력이 모델의 컨텍스트 예산을 넘으면 이전 대화를 축약합니다. 도구 실행 함수를 등록하면 도구 호출 수집, 실행, 결과 메시지 작성, 후속 생성을 자동으로 처리합니다.
 
-범용 대화 에이전트로 바로 쓸 수도 있고, 다른 에이전트 구현이 이 계약을 확장할 수도 있습니다. [`@keundal/coding-agent`](../coding-agent/README.md)는 코딩 작업용 지침을 얹은 구현입니다.
+범용 대화 에이전트로 바로 쓸 수도 있고, 다른 에이전트 구현이 이 루프를 확장할 수도 있습니다. 독립적인 구현은 `@keundal/agent-contract`의 `AgentService`를 상속합니다. [`@keundal/coding-agent`](../coding-agent/README.md)는 코딩 작업용 지침을 얹은 구현입니다.
 
 ## 구현 확장
 
@@ -188,8 +188,8 @@ await ctx.plugin(agentPlugin, {
 ## 서브에이전트
 
 `subagents: true`를 설정하면 모델에 `delegate_task` 도구를 제공합니다. 기본값은 비활성화입니다.
-모델은 `{ "task": "작업 지침과 필요한 문맥" }`으로 작업을 위임하고, 자식 실행이 완료되면
-`{ threadId, runId, content }` 형식의 JSON 문자열로 최종 답변을 받습니다.
+모델은 `{ "task": "작업 지침과 필요한 문맥", "label": "작업 이름" }`으로 위임합니다.
+`label`은 선택 사항이며 1~80자의 이름을 상태 표시와 자식 기록에 사용합니다.
 
 자식은 같은 모델, 시스템 지침, 등록된 도구, 스킬과 축약 정책을 사용합니다.
 부모의 대화 기록, 요청 도구, 상태와 문맥은 복사하지 않으므로 필요한 정보는 `task`에 넣어야 합니다.
@@ -199,5 +199,19 @@ await ctx.plugin(agentPlugin, {
 
 자식은 다시 위임할 수 없습니다. 부모와 자식 각각에 기존 `maxToolRounds`와 `maxToolCalls` 제한을
 적용합니다. `parallelTools: true`이면 같은 응답에서 요청한 여러 위임도 병렬로 실행합니다.
-부모 취소, 순회 중단 또는 플러그인 해제는 자식 실행도 중단합니다. 자식 실행 실패는 부모 실행의
-오류로 전달되며, 실패하거나 중단된 자식의 부분 응답을 성공 결과로 반환하지 않습니다.
+`maxActiveSubagents`는 부모 실행 하나에서 동시에 실행할 자식 수를 제한하며 기본값은 8입니다.
+준비를 시작하기 전에 자리를 확보하고 정리가 끝나면 반환합니다. 한도를 넘는 요청은 대기열에 넣지 않고
+`ACTIVE_LIMIT_REACHED` 오류를 결과로 반환하므로, 부모는 다음 도구 실행 차례에 다시 요청할 수 있습니다.
+
+도구 결과는 다음과 같은 JSON 문자열입니다.
+
+- 성공: `{ status: "completed", threadId, runId, content }`
+- 자식 실행 실패: `{ status: "failed", threadId, runId, content, error: { code, message } }`
+- 한도 초과: `{ status: "rejected", error: { code: "ACTIVE_LIMIT_REACHED", message } }`
+
+`content`는 마지막 비어 있지 않은 어시스턴트 답변입니다. 실패 결과에는 부분 응답이 포함될 수 있지만
+성공을 뜻하지 않습니다. 자식 하나가 실패해도 형제와 부모는 계속 실행하며, 부모 모델이 결과를 보고
+후속 작업을 결정합니다. 부모 취소, 순회 중단 또는 플러그인 해제는 자식 실행도 중단합니다.
+취소는 복구 가능한 도구 결과로 변환하지 않습니다.
+
+설계 참고 자료와 적용 범위는 [서브에이전트 구현 비교](../../docs/subagents.md)에 기록했습니다.

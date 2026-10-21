@@ -1,0 +1,41 @@
+{
+  "name": "@keundal/agent-runtime-node",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@keundal/agent": "workspace:*",
+    "@keundal/agent-contract": "workspace:*",
+    "@keundal/agent-host": "workspace:*",
+    "@keundal/agent-plugins": "workspace:*",
+    "@keundal/mcp": "workspace:*",
+    "@keundal/plugin-llm-anthropic": "workspace:*",
+    "@keundal/plugin-llm-gemini": "workspace:*",
+    "@keundal/plugin-llm-openai": "workspace:*",
+    "@keundal/plugin-skill": "workspace:*",
+    "@keundal/plugin-store-sqlite": "workspace:*",
+    "cordis": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/core": "workspace:*",
+    "@keundal/tsconfig": "workspace:*",
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

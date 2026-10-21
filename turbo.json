@@ -50,7 +50,7 @@
       "dependsOn": ["^build"]
     },
     "@keundal/desktop#build:sidecar": {
-      "dependsOn": ["@keundal/agent-host#build"],
+      "dependsOn": ["@keundal/agent-runtime-node#build"],
       "outputs": ["dist-sidecar/**"],
       "inputs": ["sidecar/**", "tsdown.sidecar.config.ts", "tsconfig.sidecar.json", "package.json"]
     },
@@ -63,7 +63,7 @@
       "inputs": ["$TURBO_DEFAULT$", "!README.md"]
     },
     "@keundal/desktop#test": {
-      "dependsOn": ["build:sidecar"],
+      "dependsOn": ["^build", "build:sidecar"],
       "inputs": ["$TURBO_DEFAULT$", "!src-tauri/**", "!README.md"]
     },
     "@keundal/desktop#build:native": {

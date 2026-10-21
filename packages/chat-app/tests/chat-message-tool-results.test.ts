@@ -1,6 +1,6 @@
 import { EventType, type AGUIEvent } from '@keundal/core'
 import { expect, test } from 'vitest'
-import { ChatMessageAssembly } from '@keundal/chat-app/shared/utils/chat-message'
+import { ChatMessageAssembly } from '@keundal/chat/chat-message'
 
 type ToolResult = Extract<AGUIEvent, { type: typeof EventType.TOOL_CALL_RESULT }>
 
@@ -83,4 +83,19 @@ test('알 수 없는 호출과 잘못된 진행 이벤트는 화면에 추가하
   assembly.apply({ type: EventType.CUSTOM, name: 'keundal.tool.progress', value: { toolCallId: 'missing', value: { status: 'running' } } })
   assembly.apply({ type: EventType.CUSTOM, name: 'keundal.tool.progress', value: null })
   expect(assembly.message.parts).toEqual([])
+})
+
+test.each(['completed', 'failed', 'rejected'])('진행 이벤트 없이 저장된 서브에이전트 결과의 %s 상태를 복원한다', (status) => {
+  const output = { status, content: 'partial result', error: status === 'completed' ? undefined : { message: 'unavailable' } }
+  const message = projectResult('delegate_task', JSON.stringify(output))
+  expect(message.parts).toContainEqual(expect.objectContaining({
+    type: 'tool-delegate_task', state: 'output-available', subagent: { status: status === 'completed' ? 'completed' : 'failed' }
+  }))
+})
+
+test('실행 자리를 얻지 못한 작업의 오류도 자식 ID 없이 표시한다', () => {
+  const assembly = new ChatMessageAssembly('parent')
+  assembly.apply({ type: EventType.TOOL_CALL_START, toolCallId: 'limited', toolCallName: 'delegate_task' })
+  assembly.apply({ type: EventType.CUSTOM, name: 'keundal.tool.progress', value: { toolCallId: 'limited', value: { status: 'failed', label: 'Review', error: 'capacity reached' } } })
+  expect(assembly.message.parts[0]).toMatchObject({ subagent: { status: 'failed', label: 'Review', error: 'capacity reached' } })
 })

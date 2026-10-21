@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import type { ChatMessage } from '../../../../shared/utils/chat-message'
+import type { ChartUIToolInvocation } from '@keundal/chat/tools/chart'
+import type { WeatherUIToolInvocation } from '@keundal/chat/tools/weather'
+
+import type { ChatMessage } from '@keundal/chat/chat-message'
 
 const { t } = useLocale()
 

@@ -1,80 +1,8 @@
-import agentPlugin, { type AgentConfig } from '@keundal/agent'
-import { loadAgentPlugin, type AgentPluginOptions, type LoadedAgentPlugin } from '@keundal/agent-plugins'
-import {
-  EventType,
-  type AGUIEvent,
-  type AgentMessage,
-  type ExecutionOptions,
-  type GenerationService,
-  type RunAgentInput,
-  type SessionService
-} from '@keundal/core'
-import { McpClient, parseMcpServers, type McpClientConfig } from '@keundal/mcp'
-import anthropicLLMPlugin from '@keundal/plugin-llm-anthropic'
-import geminiLLMPlugin from '@keundal/plugin-llm-gemini'
-import openaiLLMPlugin from '@keundal/plugin-llm-openai'
-import skillPlugin from '@keundal/plugin-skill'
-import sqliteStorePlugin from '@keundal/plugin-store-sqlite'
+import { EventType, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import { Context, type Fiber } from 'cordis'
 
-export interface AgentHostModel {
-  readonly id: string
-  readonly provider: AgentHostProvider
-  readonly contextWindow: number
-  readonly maxOutputTokens: number
-}
-
-export type AgentHostProvider = 'openai' | 'gemini' | 'anthropic'
-
-export interface AgentHostOptions {
-  readonly mcpServers?: readonly McpClientConfig[]
-  readonly provider: AgentHostProvider
-  readonly apiKey: string
-  /** 기본 모델 ID입니다. `models`에 포함되어야 합니다. */
-  readonly model: string
-  /** 사용할 수 있는 모델과 한도입니다. */
-  readonly models?: Readonly<Record<string, Omit<AgentHostModel, 'id' | 'provider'>>>
-  readonly sqlitePath: string
-  readonly maxOutputTokens?: number
-  readonly tools?: AgentConfig['tools']
-  readonly plugins?: readonly AgentPluginOptions[]
-  readonly subagents?: boolean
-  readonly maxToolRounds?: number
-  readonly baseURL?: string
-  readonly headers?: Readonly<Record<string, string>>
-}
-
-export interface AgentHostRunOptions extends ExecutionOptions {
-  readonly model?: string
-}
-
-export interface AgentHostTitleRequest {
-  readonly model: string
-  readonly message: AgentMessage
-}
-
-/** HTTP 계층과 sidecar가 공통으로 사용하는 에이전트 표면입니다. */
-export interface AgentHostServices {
-  run(input: RunAgentInput, options?: AgentHostRunOptions): AsyncIterable<AGUIEvent>
-  session: Pick<SessionService, 'get' | 'list' | 'commit' | 'delete'>
-  generation: Pick<GenerationService, 'get' | 'list' | 'recover'>
-  models(): readonly AgentHostModel[]
-  title(request: AgentHostTitleRequest, options?: ExecutionOptions): Promise<string>
-}
-
-export interface AgentHost {
-  readonly ctx: Context
-  readonly model: string
-  readonly plugins: readonly LoadedAgentPlugin[]
-  readonly services: AgentHostServices
-  dispose(): Promise<void>
-}
-
-const providerPlugins = {
-  openai: openaiLLMPlugin,
-  gemini: geminiLLMPlugin,
-  anthropic: anthropicLLMPlugin
-} as const
+import type { AgentHostOptions, AgentHost, AgentHostModel, AgentHostServices } from './contracts.js'
+export * from './contracts.js'
 
 const input = (messages: AgentMessage[]): RunAgentInput => ({
   threadId: globalThis.crypto.randomUUID(),
@@ -94,49 +22,28 @@ const titleInstructions =
  */
 export async function createAgentHost(options: AgentHostOptions): Promise<AgentHost> {
   if (!options.model.trim()) throw new Error('model is required')
-  const configured = options.models ?? {
-    [options.model]: { contextWindow: 128_000, maxOutputTokens: 4_096 }
-  }
-  const modelIds = Object.keys(configured)
-  if (!modelIds.includes(options.model)) {
+  const models = [...options.models]
+  if (!models.some((model) => model.id === options.model))
     throw new Error(`default model is not configured: ${options.model}`)
-  }
-  const models: AgentHostModel[] = modelIds.map((id) => ({ id, provider: options.provider, ...configured[id]! }))
+  if (new Set(models.map((model) => model.id)).size !== models.length) throw new Error('duplicate model id')
   const limits = new Map(models.map((model) => [model.id, model]))
 
-  const mcpServers = parseMcpServers(options.mcpServers ?? [])
-  const mcpClients = new Map<string, Promise<McpClient>>()
-  const mcpLifetime = new globalThis.AbortController()
   const ctx = new Context()
-  const fibers: Fiber[] = []
-  const plugins: LoadedAgentPlugin[] = []
-  const agents = new Map<string, Promise<Fiber>>()
+  let scope: Fiber | undefined
+  let closed = false
+  type MountedAgent = { ctx: Context; dispose(): Promise<void> }
+  const agents = new Map<string, Promise<MountedAgent>>()
 
   const dispose = async () => {
-    mcpLifetime.abort()
+    if (closed) return
+    closed = true
     const created = await Promise.allSettled(agents.values())
     agents.clear()
-    const errors: unknown[] = []
-    for (const result of created) {
-      if (result.status === 'fulfilled') {
-        try {
-          await result.value.dispose()
-        } catch (error) {
-          errors.push(error)
-        }
-      }
-    }
-    for (const fiber of fibers.toReversed()) {
-      try {
-        await fiber.dispose()
-      } catch (error) {
-        errors.push(error)
-      }
-    }
-    await Promise.allSettled([...mcpClients.values()].map(async (client) => (await client).close()))
-    mcpClients.clear()
-    const results = await Promise.allSettled(plugins.map((plugin) => plugin.close()))
-    for (const result of results) if (result.status === 'rejected') errors.push(result.reason)
+    const disposed = await Promise.allSettled(
+      created.flatMap((result) => (result.status === 'fulfilled' ? [result.value.dispose()] : []))
+    )
+    disposed.push(...(await Promise.allSettled([scope?.dispose()])))
+    const errors = disposed.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []))
     if (errors.length) throw new AggregateError(errors, 'failed to dispose agent host')
   }
 
@@ -147,7 +54,8 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
     return value
   }
 
-  const agent = async (id: string): Promise<Fiber> => {
+  const agent = async (id: string): Promise<MountedAgent> => {
+    if (closed) throw new Error('agent host disposed')
     const existing = agents.get(id)
     if (existing) return existing
     const created = (async () => {
@@ -161,43 +69,21 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         throw new Error(`invalid output budget for model: ${id}`)
       }
       const isolated = ctx.isolate('agent')
-      return isolated.plugin(agentPlugin, {
-        model: selected.id,
-        maxOutputTokens,
-        skills: plugins.length > 0,
-        subagents: options.subagents ?? true,
-        parallelTools: true,
-        maxToolRounds: options.maxToolRounds ?? 4,
-        tools: async (execution) => {
-          const signal = execution?.signal
-            ? globalThis.AbortSignal.any([execution.signal, mcpLifetime.signal])
-            : mcpLifetime.signal
-          const tools = [
-            ...(typeof options.tools === 'function' ? await options.tools({ signal }) : (options.tools ?? []))
-          ]
-          for (const server of mcpServers) {
-            signal.throwIfAborted()
-            let pending = mcpClients.get(server.serverName)
-            if (!pending) {
-              pending = McpClient.connect(server, { signal })
-              mcpClients.set(server.serverName, pending)
-              void pending.catch(() => {
-                if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
-              })
-            }
-            try {
-              tools.push(...(await (await pending).tools({ signal })))
-            } catch (error) {
-              if (signal.aborted) throw error
-              if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
-              await pending.then((client) => client.close()).catch(() => {})
-              throw error
-            }
-          }
-          for (const plugin of plugins) tools.push(...(await plugin.tools({ signal })))
-          return tools
-        }
+      const owned = isolated.plugin(async (child: Context) => {
+        await options.mountAgent(child, {
+          model: selected.id,
+          maxOutputTokens,
+          tools: options.tools,
+          maxToolRounds: options.maxToolRounds ?? 4
+        })
       })
+      try {
+        await owned
+        return { ctx: isolated, dispose: () => owned.dispose() }
+      } catch (error) {
+        await owned.dispose()
+        throw error
+      }
     })()
     agents.set(id, created)
     created.catch(() => agents.delete(id))
@@ -205,26 +91,14 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
   }
 
   try {
-    for (const config of options.plugins ?? []) plugins.push(await loadAgentPlugin(config))
-    if (plugins.length)
-      fibers.push(await ctx.plugin(skillPlugin, { providers: plugins.map((plugin) => plugin.skillProvider) }))
-    fibers.push(
-      await ctx.plugin(providerPlugins[options.provider], {
-        apiKey: options.apiKey,
-        baseURL: options.baseURL,
-        headers: options.headers,
-        models: Object.fromEntries(
-          models.map((item) => [
-            item.id,
-            {
-              contextWindow: item.contextWindow,
-              maxOutputTokens: item.maxOutputTokens
-            }
-          ])
-        )
-      })
-    )
-    fibers.push(await ctx.plugin(sqliteStorePlugin, { path: options.sqlitePath }))
+    scope = ctx.plugin(async (owned: Context) => {
+      await options.setup(owned)
+    })
+    await scope
+    const servicesContext = ctx
+    for (const name of ['llm', 'session', 'generation'] as const) {
+      if (!servicesContext[name]) throw new Error(`missing host service: ${name}`)
+    }
 
     const services: AgentHostServices = {
       run(input, runOptions = {}) {
@@ -237,22 +111,22 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         return iterator
       },
       session: {
-        get: (threadId, runOptions) => ctx.session.get(threadId, runOptions),
-        list: (runOptions) => ctx.session.list(runOptions),
-        commit: (change, runOptions) => ctx.session.commit(change, runOptions),
-        delete: (threadId, revision, runOptions) => ctx.session.delete(threadId, revision, runOptions)
+        get: (threadId, runOptions) => servicesContext.session.get(threadId, runOptions),
+        list: (runOptions) => servicesContext.session.list(runOptions),
+        commit: (change, runOptions) => servicesContext.session.commit(change, runOptions),
+        delete: (threadId, revision, runOptions) => servicesContext.session.delete(threadId, revision, runOptions)
       },
       generation: {
-        get: (runId, runOptions) => ctx.generation.get(runId, runOptions),
-        list: (runOptions) => ctx.generation.list(runOptions),
-        recover: (runOptions) => ctx.generation.recover(runOptions)
+        get: (runId, runOptions) => servicesContext.generation.get(runId, runOptions),
+        list: (runOptions) => servicesContext.generation.list(runOptions),
+        recover: (runOptions) => servicesContext.generation.recover(runOptions)
       },
       models: () => models,
       async title(request, runOptions) {
         const selected = model(request.model)
         const maxOutputTokens = Math.min(256, selected.maxOutputTokens, selected.contextWindow - 1)
         let title = ''
-        for await (const event of ctx.llm.stream(
+        for await (const event of servicesContext.llm.stream(
           {
             model: selected.id,
             maxOutputTokens,
@@ -263,13 +137,18 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
           },
           runOptions
         )) {
-          if (event.type === EventType.TEXT_MESSAGE_CONTENT) title += event.delta
+          if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
+            if (title.length + event.delta.length > 1024) throw new Error('Generated title exceeds input limit')
+            title += event.delta
+          }
         }
-        return title.trim()
+        title = title.trim()
+        if (!title || title.length > 100) throw new Error('Title must contain 1–100 characters')
+        return title
       }
     }
 
-    return { ctx, model: options.model, plugins: Object.freeze(plugins), services, dispose }
+    return { ctx: servicesContext, model: options.model, services, dispose }
   } catch (error) {
     await dispose()
     throw error

@@ -105,6 +105,7 @@ test('서브에이전트는 독립된 대화에서 도구를 실행하고 최종
   expect(result?.type).toBe(EventType.TOOL_CALL_RESULT)
   if (result?.type !== EventType.TOOL_CALL_RESULT) throw new Error('missing result')
   expect(JSON.parse(result.content as string)).toEqual({
+    status: 'completed',
     threadId: child.threadId,
     runId: child.runId,
     content: 'done'
@@ -141,9 +142,14 @@ test.for([{}, { task: '' }, { task: '  ' }, { task: 1 }, { task: 'inspect', extr
 
 test('서브에이전트가 다시 위임하려 하면 실행을 거부한다', async (t) => {
   const delegate = call('delegate', JSON.stringify({ task: 'inspect' }), 'delegate_task')
-  const { ctx, requests } = await setup(t, [delegate, delegate], { subagents: true })
-  await expect(collect(ctx.agent.run(input))).rejects.toThrow('no executor registered for tool: delegate_task')
-  expect(requests).toHaveLength(2)
+  const { ctx, requests } = await setup(t, [delegate, delegate, answer], { subagents: true })
+  const events = await collect(ctx.agent.run(input))
+  const result = events.find((event) => event.type === EventType.TOOL_CALL_RESULT)
+  expect(result?.type === EventType.TOOL_CALL_RESULT && JSON.parse(result.content as string)).toMatchObject({
+    status: 'failed',
+    error: { code: 'EXECUTION_FAILED' }
+  })
+  expect(requests).toHaveLength(3)
   expect((await ctx.generation.get(requests[1].input.runId))?.status).toBe('failed')
 })
 
@@ -273,4 +279,103 @@ test('앞선 위임이 실행 중이어도 뒤의 위임 완료 상태를 즉시
     }
   }
   expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+})
+
+test('동시 실행 한도를 넘으면 시작 전에 거절하고 완료 후에는 자리를 재사용한다', async (t) => {
+  const delegate = (id: string) => call(id, JSON.stringify({ task: id }), 'delegate_task')
+  const { ctx, requests } = await setup(
+    t,
+    [[...delegate('first'), ...delegate('second')], answer, delegate('retry'), answer, answer],
+    { subagents: true, parallelTools: true, maxActiveSubagents: 1 }
+  )
+  const events = await collect(ctx.agent.run(input))
+  const results = events
+    .filter((event) => event.type === EventType.TOOL_CALL_RESULT)
+    .map((event) => JSON.parse(event.content as string))
+  expect(results.map((result) => result.status)).toEqual(['completed', 'rejected', 'completed'])
+  expect(results[1]).toMatchObject({ error: { code: 'ACTIVE_LIMIT_REACHED' } })
+  expect(results[1]).not.toHaveProperty('threadId')
+  expect(requests.filter((request) => request.input.threadId !== input.threadId)).toHaveLength(2)
+})
+
+test('실패한 자식의 부분 응답과 오류를 반환하고 형제와 부모는 계속 실행한다', async (t) => {
+  const { ctx } = await setup(
+    t,
+    [],
+    { subagents: true, parallelTools: true },
+    {
+      async *stream(request) {
+        if (request.input.threadId === input.threadId) {
+          if (request.input.messages.some((message) => message.role === 'tool')) yield* answer
+          else {
+            yield* call('bad', JSON.stringify({ task: 'fail' }), 'delegate_task')
+            yield* call('good', JSON.stringify({ task: 'succeed' }), 'delegate_task')
+          }
+        } else {
+          yield* answer
+          if (request.input.messages[0].content === 'fail') throw new Error('child unavailable')
+        }
+      }
+    }
+  )
+  const events = await collect(ctx.agent.run(input))
+  const results = events
+    .filter((event) => event.type === EventType.TOOL_CALL_RESULT)
+    .map((event) => JSON.parse(event.content as string))
+  expect(results[0]).toMatchObject({
+    status: 'failed',
+    content: 'done',
+    error: { code: 'EXECUTION_FAILED', message: 'child unavailable' }
+  })
+  expect(results[1]).toMatchObject({ status: 'completed', content: 'done' })
+  expect((await ctx.generation.get(results[0].runId))?.status).toBe('failed')
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+})
+
+test('마지막 빈 메시지가 앞선 답변을 지우지 않고 작업 이름을 기록한다', async (t) => {
+  const { ctx, requests } = await setup(
+    t,
+    [
+      call('delegate', JSON.stringify({ task: 'inspect', label: 'Review' }), 'delegate_task'),
+      [
+        ...answer,
+        { type: EventType.TEXT_MESSAGE_START, messageId: 'empty', role: 'assistant' },
+        { type: EventType.TEXT_MESSAGE_END, messageId: 'empty' }
+      ],
+      answer
+    ],
+    { subagents: true }
+  )
+  const events = await collect(ctx.agent.run(input))
+  const result = events.find((event) => event.type === EventType.TOOL_CALL_RESULT)
+  expect(result?.type === EventType.TOOL_CALL_RESULT && JSON.parse(result.content as string)).toMatchObject({
+    status: 'completed',
+    content: 'done'
+  })
+  expect(requests[1].input.state).toMatchObject({ subagent: { label: 'Review' } })
+  expect(events).toContainEqual(
+    expect.objectContaining({
+      type: EventType.CUSTOM,
+      value: expect.objectContaining({ value: expect.objectContaining({ label: 'Review', status: 'completed' }) })
+    })
+  )
+})
+
+test.for([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '8', null])(
+  '잘못된 동시 실행 한도 %j를 거부한다',
+  async (maxActiveSubagents) => {
+    expect(
+      await AgentConfigSchema['~standard'].validate({ model: 'test', maxOutputTokens: 100, maxActiveSubagents })
+    ).toHaveProperty('issues')
+  }
+)
+
+test.for(['', ' '.repeat(2), 'x'.repeat(81), 1])('잘못된 작업 이름 %j는 자식을 실행하지 않는다', async (label, t) => {
+  const { ctx, requests } = await setup(
+    t,
+    [call('delegate', JSON.stringify({ task: 'inspect', label }), 'delegate_task')],
+    { subagents: true }
+  )
+  await expect(collect(ctx.agent.run(input))).rejects.toThrow('delegate_task label')
+  expect(requests).toHaveLength(1)
 })

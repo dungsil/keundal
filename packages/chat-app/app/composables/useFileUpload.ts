@@ -1,3 +1,5 @@
+import { type FileWithStatus, FILE_UPLOAD_CONFIG } from '@keundal/chat/file'
+
 function createObjectUrl(file: File): string {
   return URL.createObjectURL(file)
 }

@@ -16,9 +16,9 @@ import { createApp, toNodeListener } from 'h3'
 import { onTestFinished, test, expect } from 'vitest'
 
 import { createAgentHandler } from '../server/agent/handler'
-import type { ChatMessage } from '@keundal/chat-app/shared/utils/chat-message'
-import { RemoteChatStore } from '@keundal/chat-app/shared/utils/remote-chat-store'
-import { createDesktopChatStore } from '@keundal/chat-app/shared/utils/desktop-chat-store'
+import type { ChatMessage } from '@keundal/chat/chat-message'
+import { RemoteChatStore } from '@keundal/plugin-chat-remote'
+import { createDesktopChatStore } from '@keundal/plugin-chat-desktop'
 
 const token = 'remote-test-token'
 const model = 'openai/gpt-5-nano'
@@ -106,6 +106,13 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
   expect(saved.messages).toHaveLength(2)
   expect(saved.messages[1]!.parts).toContainEqual({ type: 'text', text: '원격 응답' })
   expect((await chats.list())[0]!.id).toBe('chat')
+
+  services.title = async () => 'x'.repeat(101)
+  await chats.create('oversized-title', user, model)
+  const oversized = await collect(chats.respond('oversized-title', { model, messages: [user] }))
+  expect(oversized.at(-1)!.type).toBe(EventType.RUN_FINISHED)
+  expect((await chats.get('oversized-title'))!.title).toBeNull()
+  await chats.delete('oversized-title')
 
   await chats.rename('chat', '바꾼 제목')
   await chats.vote('chat', saved.messages[1]!.id, false)

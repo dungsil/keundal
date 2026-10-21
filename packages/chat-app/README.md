@@ -1,22 +1,21 @@
 # 공용 채팅 레이어
 
-`@keundal/chat-app`은 web과 desktop이 함께 사용하는 Nuxt 레이어입니다. `@keundal/ui`를 상속하고 페이지, 레이아웃, 채팅 상태, 모델·스킬 설정, 브라우저 저장소와 데스크톱 sidecar 연결과 공용 에셋을 제공합니다.
+`@keundal/chat-app`은 web과 desktop이 공유하는 화면과 Vue 상태를 제공하는 Nuxt 레이어입니다. `@keundal/ui`를 상속하며 대화·설정·모델 목록·스킬 화면과 공용 에셋을 관리합니다.
 
-각 앱은 `extends: ['@keundal/chat-app']`으로 이 레이어를 사용합니다. 웹 서버·Cloudflare 배포 설정은 `apps/web`, 정적 SPA·Tauri 설정은 `apps/desktop`에서 관리합니다. `runtimeConfig.public.desktop`으로 브라우저 저장소와 데스크톱 sidecar·보안 저장소 동작을 선택합니다.
+앱은 `extends: ['@keundal/chat-app']`으로 레이어를 사용하고, 먼저 실행되는 `chat-platform` Nuxt 플러그인에서 `@keundal/chat/platform`의 `ChatPlatform`을 제공합니다. 공통 레이어는 이 계약을 사용하며 IndexedDB, LLM SDK, Tauri, sidecar 구현을 직접 가져오지 않습니다.
 
-이 패키지는 앱에 의존하지 않습니다. 공용 기능은 이 레이어에서 수정하고 앱별 설정은 해당 앱에서 수정합니다.
+`runtimeConfig.public.chatCapabilities`는 보안 저장소 설명과 로컬 스킬 설정의 표시 여부를 정합니다. 구현과 실행 수명은 각 앱의 `app/platform.ts`에서 관리합니다. 자세한 경계와 교체 방법은 [플러그인 조립 문서](../../docs/plugin-composition.md)를 참고합니다.
 
 ## 검증
 
 ```sh
-pnpm build
 pnpm --filter @keundal/chat-app test
 pnpm --filter @keundal/chat-app typecheck
 pnpm --filter @keundal/chat-app lint
 pnpm check:boundaries
 ```
 
-공급자 연결, 채팅 저장소, 모델 목록과 스킬 테스트는 `tests/`에서 관리합니다. 웹 서버 경로와 HTTP 호스트 연동 검사는 `apps/web/tests/`에 둡니다.
+공급자 연결과 저장소 회귀 테스트는 `tests/`에 있습니다. 앱별 조립 테스트는 각 앱의 `tests/platform.test.ts`에서 실행합니다.
 
 ## MCP 서버
 
@@ -36,4 +35,7 @@ pnpm check:boundaries
 같은 응답에서 여러 작업을 위임하면 병렬로 실행합니다. 대화 화면은 각 작업의 대기, 실행,
 완료, 실패 또는 중단 상태를 표시하며, 항목을 펼치면 작업 지침과 최종 답변을 볼 수 있습니다.
 부모 응답을 중단하면 실행 중인 자식도 중단합니다. 브라우저 실행은
-`createKeundalChat(context, model, { subagents: false })`로 비활성화할 수 있습니다.
+`createKeundalChat(context, model, { subagents: false }, mountAgent)`로 비활성화할 수 있습니다.
+
+작업에 `label`이 있으면 그 이름을 표시합니다. 실패한 자식의 오류와 부분 응답은 완료 결과와 구분하여
+표시하며, 진행 이벤트 없이 저장된 도구 결과만 읽어도 성공과 실패를 구분합니다.

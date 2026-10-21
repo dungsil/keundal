@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ChatMessage } from '../../shared/utils/chat-message'
+import type { ChatMessage } from '@keundal/chat/chat-message'
 import { getGreetingTime } from '../utils/greeting'
 
 const { t } = useLocale()

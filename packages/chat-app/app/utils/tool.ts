@@ -1,5 +1,5 @@
 import { getCitationUrl, getDomain, getFaviconUrl } from './url'
-import type { ToolPart } from '../../shared/utils/chat-message'
+import type { ToolPart } from '@keundal/chat/chat-message'
 
 export interface Source {
   url: string

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import type { ChatStatus } from '../../../shared/utils/chat-message'
+import type { FileWithStatus } from '@keundal/chat/file'
+
+import type { ChatStatus } from '@keundal/chat/chat-message'
 
 const { t } = useLocale()
 

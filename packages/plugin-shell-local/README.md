@@ -53,5 +53,4 @@ Windows에서는 생성 시 확정한 `SystemRoot\System32\taskkill.exe`로 `/T 
 출력 파이프는 유예 시간 뒤에 닫지만 OS가 직접 자식의 종료를 보고할 때까지 기다립니다.
 
 다른 실행 파일은 POSIX의 `-c` 또는 Windows의 `/d /s /c` 인자를 지원해야 합니다.
-`ShellService`, `ShellRequest`, `ShellResult`와 `ctx.shell`의 타입 확장은 이 패키지에서 제공합니다.
-두 번째 공급자를 추가할 때는 계약을 별도 패키지로 분리하고 Tauri나 원격 서버 구현과 공유하십시오.
+`ShellService`, `ShellRequest`, `ShellResult`와 `ctx.shell`의 타입 확장은 `@keundal/shell`에서 제공합니다. 기존 가져오기와의 호환을 위해 이 패키지에서도 계약을 다시 내보냅니다.

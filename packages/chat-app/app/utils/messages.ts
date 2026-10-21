@@ -1,4 +1,4 @@
-import type { ChatPart } from '../../shared/utils/chat-message'
+import type { ChatPart } from '@keundal/chat/chat-message'
 
 export function getMergedParts(parts: ChatPart[]): ChatPart[] {
   const result: ChatPart[] = []

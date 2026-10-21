@@ -70,7 +70,7 @@ pnpm --filter @keundal/web preview
 
 호스트 모드에서는 대화·실행·제목이 SQLite에 저장되고 모델 목록도 호스트에서 조회합니다. UI의 API 키 설정은 호스트 설정을 바꾸지 않습니다. Cloudflare Workers에서는 Node.js SQLite 호스트를 포함하지 않으며 이 API는 `503`을 반환합니다. Workers의 브라우저 모드와 외부 호스트 직접 연결은 유지합니다.
 
-데스크톱은 웹 서버를 실행하지 않습니다. `apps/desktop/sidecar/main.ts`가 `@keundal/agent-host/runtime`을 직접 사용하며, UI는 준비된 로컬 호스트에 연결합니다.
+데스크톱은 웹 서버를 실행하지 않습니다. `apps/desktop/sidecar/main.ts`가 `@keundal/agent-runtime-node`을 직접 사용하며, UI는 준비된 로컬 호스트에 연결합니다.
 
 ## 저장소와 실행 경계
 
@@ -186,6 +186,8 @@ pnpm --filter @keundal/web lint
 컨텍스트 사용량이 입력 예산의 80%에 도달하면 백그라운드에서 축약을 준비합니다. `ChatStore`는 같은 대화와 모델·생성 설정의 에이전트를 턴 사이에 유지하여 다음 입력 검사에서 준비 결과를 재사용합니다. 준비 결과는 원본 대화와 지침을 검사하고 새 메시지와 현재 화면 상태를 보존합니다.
 
 대화 삭제와 전체 중단 시 에이전트와 준비 작업을 해제합니다. 모델·생성 설정이 바뀌면 해당 대화의 에이전트를 교체하며, 대기 중인 에이전트가 누적되지 않도록 최대 8개를 기준으로 오래된 유휴 에이전트부터 해제합니다. 실행 중인 다른 대화는 중단하지 않습니다. `createKeundalChat()`을 직접 사용하는 호출자는 작업을 마친 뒤 `dispose()`를 호출해야 합니다.
+
+앱별 플러그인은 `app/platform.ts`에서 조립합니다. [계약과 구현의 경계](../../docs/plugin-composition.md)를 참고합니다.
 
 ## MCP
 

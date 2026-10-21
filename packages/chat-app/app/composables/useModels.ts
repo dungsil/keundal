@@ -1,5 +1,5 @@
-import { resolveModel, type ModelOption } from '../../shared/utils/models'
-import { FALLBACK_MODEL, saveTitleModel } from '../../shared/utils/model-preferences'
+import { resolveModel, type ModelOption } from '@keundal/chat/models'
+import { FALLBACK_MODEL, saveTitleModel } from '@keundal/chat/model-preferences'
 import { createModelSelection } from '../../shared/utils/model-selection'
 
 export function useModels() {

@@ -51,6 +51,17 @@
         "defineProps": "readonly",
         "defineEmits": "readonly"
       }
+    },
+    {
+      "files": [
+        "packages/chat/src/**",
+        "packages/plugin-chat-*/src/**",
+        "packages/plugin-llm-browser/src/**",
+        "packages/plugin-transcription-browser/src/**"
+      ],
+      "env": {
+        "browser": true
+      }
     }
   ]
 }

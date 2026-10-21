@@ -179,6 +179,7 @@ export default {
   'skill.save': '스킬 저장',
   'skill.readFailed': '저장된 스킬을 읽지 못했습니다. 브라우저 저장소를 확인하세요.',
   'skill.saveFailed': '이 브라우저에 스킬을 저장하지 못했습니다.',
+  'tool.subagentPartial': '부분 응답 (작업 미완료)',
   'tool.subagentQueued': '서브에이전트 대기 중',
   'tool.subagentRunning': '서브에이전트 실행 중',
   'tool.subagentCompleted': '서브에이전트 완료',

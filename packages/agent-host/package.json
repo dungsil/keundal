@@ -14,9 +14,9 @@
       "types": "./dist/http.d.ts",
       "import": "./dist/http.js"
     },
-    "./runtime": {
-      "types": "./dist/runtime.d.ts",
-      "import": "./dist/runtime.js"
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "import": "./dist/contracts.js"
     }
   },
   "scripts": {
@@ -25,18 +25,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@keundal/agent": "workspace:*",
-    "@keundal/agent-plugins": "workspace:*",
+    "@keundal/agent-contract": "workspace:*",
     "@keundal/core": "workspace:*",
-    "@keundal/mcp": "workspace:*",
-    "@keundal/plugin-llm-anthropic": "workspace:*",
-    "@keundal/plugin-llm-gemini": "workspace:*",
-    "@keundal/plugin-llm-openai": "workspace:*",
-    "@keundal/plugin-skill": "workspace:*",
-    "@keundal/plugin-store-sqlite": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {
+    "@keundal/agent": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",

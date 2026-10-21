@@ -8,7 +8,7 @@ Keundal("큰달"으로 읽음)은 개인용 오픈소스 에이전트 도구입�
 | -------------------------------------- | ----------------------------------------------------------------------- |
 | `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.  |
 | `@keundal/agent-host`                  | Node.js에서 에이전트 서비스와 플러그인을 조립합니다.                    |
-| `@keundal/agent`                       | 에이전트 구현 계약과 공통 실행 루프를 제공합니다.                       |
+| `@keundal/agent`                       | 에이전트 계약의 기본 실행 루프를 구현합니다.                            |
 | `@keundal/coding-agent`                | 에이전트 구현 계약을 확장한 코딩 작업용 에이전트입니다.                 |
 | `@keundal/context`                     | 작업 지침·파일과 세션 참조·시간·실행 환경을 요청 컨텍스트로 제공합니다. |
 | `@keundal/plugin-skill`                | 스킬 공급자를 조합하고 목록 조회와 본문 로딩을 제공합니다.              |
@@ -29,12 +29,12 @@ Keundal("큰달"으로 읽음)은 개인용 오픈소스 에이전트 도구입�
 ## 파일과 Shell 도구
 
 `@keundal/fs`의 `FileSystemService`는 `ctx.fs`의 공통 계약입니다.
-`ShellService`와 `ctx.shell`의 타입 확장은 `@keundal/plugin-shell-local`에서 제공합니다.
+`ShellService`와 `ctx.shell`의 타입 확장은 `@keundal/shell`에서 제공합니다.
 실행 공급자와 모델에 노출할 도구는 별도 플러그인으로 연결합니다.
 
-구현이 하나뿐인 기능은 계약과 구현을 같은 패키지에 둡니다. 두 번째 구현이 생기면 계약 패키지를 분리합니다.
+교체 가능한 서비스는 계약과 구현을 분리하며 앱에서 사용할 구현을 선택합니다.
 fs는 로컬 공급자와 정책 구현이 계약을 공유하므로 처음부터 별도 계약 패키지를 사용합니다.
-`TranscriptionService`와 `ctx.transcription`의 타입 확장은 `@keundal/plugin-transcription-openai`에서 제공합니다.
+`TranscriptionService`와 `ctx.transcription`의 타입 확장은 `@keundal/transcription`에서 제공합니다.
 
 - [plugin-fs-local](packages/plugin-fs-local/README.md)은 Node.js 파일 접근을 구현합니다.
 - [plugin-fs-policy](packages/plugin-fs-policy/README.md)는 경로·수정 권한과 대화별 읽기 기록을 검사합니다.
@@ -102,3 +102,5 @@ pnpm --filter @keundal/desktop bundle
 
 [Cordis]: https://github.com/cordiverse/cordis
 [AG-UI]: https://github.com/ag-ui-protocol/ag-ui
+
+플랫폼별 구현 선택과 계약 패키지의 경계는 [플러그인 조립 문서](docs/plugin-composition.md)를 따릅니다. 공통 UI와 계약 패키지는 구현 플러그인에 실행 의존성을 추가하지 않습니다.

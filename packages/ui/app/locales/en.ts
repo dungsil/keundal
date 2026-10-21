@@ -176,6 +176,7 @@ export default {
   'skill.save': 'Save skill',
   'skill.readFailed': 'Could not read saved skills. Check browser storage.',
   'skill.saveFailed': 'Could not save skills in this browser.',
+  'tool.subagentPartial': 'Partial response (task not completed)',
   'tool.subagentQueued': 'Subagent queued',
   'tool.subagentRunning': 'Subagent running',
   'tool.subagentCompleted': 'Subagent completed',
