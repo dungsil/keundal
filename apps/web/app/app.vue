@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { en, ko } from '@nuxt/ui/locale'
+import { greetingTimeScript } from './utils/greeting'
 
 const { locale, t } = useLocale()
 const uiLocale = computed(() => locale.value === 'ko' ? ko : en)
@@ -21,10 +22,7 @@ useHead({
     {
       key: 'greeting-time',
       tagPriority: 'critical',
-      innerHTML: `(() => {
-        const hour = new Date().getHours()
-        document.documentElement.dataset.greetingTime = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'
-      })()`
+      innerHTML: greetingTimeScript
     }
   ],
   htmlAttrs: {

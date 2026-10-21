@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import type { ChatMessage } from '../../shared/utils/chat-message'
+import { getGreetingTime } from '../utils/greeting'
 
 const { t } = useLocale()
+
+if (import.meta.client) {
+  document.documentElement.dataset.greetingTime = getGreetingTime()
+}
 
 const input = useState('new-chat-input', () => '')
 const loading = ref(false)
