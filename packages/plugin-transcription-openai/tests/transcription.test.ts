@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import plugin, { type TranscriptionSession } from '@keundal/plugin-transcription-openai'
 import { encodeRealtimeAudio, resampleAudio, streamTranscription } from '@keundal/plugin-transcription-openai/client'
 import { Context } from 'cordis'
-import { expect, test, onTestFinished, type TestContext } from 'vitest'
+import { expect, test, vi, onTestFinished, type TestContext } from 'vitest'
 import { WebSocketServer } from 'ws'
 
 async function fixture(t: Pick<TestContext, 'onTestFinished'>) {
@@ -376,4 +376,38 @@ test('이벤트를 소비하지 않아도 짧은 전사 결과를 반환하고 �
   expect(parts.filter((part) => part.type === 'transcript-final')).toEqual([
     { type: 'transcript-final', text: '짧은 결과' }
   ])
+})
+
+test.each([200, 400])('인증정보 HTTP %s 응답의 크기 헤더와 누적 바이트를 파싱 전에 제한한다', async (status) => {
+  for (const declared of [true, false]) {
+    let reads = 0
+    const cancelled = vi.fn()
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          reads++
+          controller.enqueue(new Uint8Array(16 * 1024).fill(120))
+        },
+        cancel: cancelled
+      },
+      { highWaterMark: 0 }
+    )
+    const response = new Response(body, {
+      status,
+      headers: { 'content-type': 'application/json', ...(declared ? { 'content-length': '1000000' } : {}) }
+    })
+    const original = globalThis.fetch
+    globalThis.fetch = vi.fn(async () => response)
+    const ctx = new Context()
+    const fiber = await ctx.plugin(plugin, { apiKey: 'test', baseURL: 'https://fixture.invalid/v1' })
+    try {
+      await expect(ctx.transcription.createSession({ model: 'test' })).rejects.toThrow(/byte limit|Connection error/)
+      expect(cancelled).toHaveBeenCalledOnce()
+      expect(reads).toBe(declared ? 0 : 5)
+      expect(globalThis.fetch).toHaveBeenCalledOnce()
+    } finally {
+      await fiber.dispose()
+      globalThis.fetch = original
+    }
+  }
 })
