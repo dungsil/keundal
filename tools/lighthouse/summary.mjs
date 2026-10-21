@@ -38,8 +38,6 @@ export function summarize(reports, collect = config.ci.collect) {
     '| 경로 | 성능 | 접근성 | 권장사항 | SEO |',
     '| --- | --- | --- | --- | --- |',
     ...rows,
-    '',
-    '전체 HTML·JSON 보고서는 이 실행의 `lighthouse-reports` 아티팩트에서 확인하세요.',
     ''
   ].join('\n')
 }
