@@ -1,9 +1,8 @@
-import { parseSkillMarkdown } from '@keundal/skill-markdown'
-
 const MAX_ARCHIVE_BYTES = 10 * 1024 * 1024
 const MAX_MARKDOWN_BYTES = 1024 * 1024
 
 export async function importSkillFile(file: Pick<File, 'name' | 'size' | 'text' | 'arrayBuffer'>) {
+  const { parseSkillMarkdown } = await import('@keundal/skill-markdown')
   if (!file.name.toLowerCase().endsWith('.zip')) return parseSkillMarkdown(await file.text())
   if (file.size > MAX_ARCHIVE_BYTES) throw new Error('ZIP files must be 10 MiB or smaller.')
 

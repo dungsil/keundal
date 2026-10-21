@@ -80,6 +80,9 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
           options.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.model) ? undefined : config.reasoning,
         maxToolRounds: options.maxToolRounds ?? 4,
         skills: plugins.length > 0,
+        subagents: options.subagents ?? true,
+        maxActiveSubagents: options.maxActiveSubagents,
+        parallelTools: true,
         tools
       })
   }

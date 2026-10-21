@@ -1,12 +1,11 @@
-import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 import type { ExecutionOptions, SkillDefinition, SkillProvider } from '@keundal/core'
-import { parse } from 'yaml'
 
 import { contained, exists } from './files.js'
-import { object, strings, type Report } from './validation.js'
+import { pluginSkill } from './skill-metadata.js'
+import type { Report } from './validation.js'
 
 export function skills(root: string, signal: AbortSignal, report: Report): SkillProvider {
   const read = async (directory: string, options?: ExecutionOptions): Promise<SkillDefinition> => {
@@ -14,34 +13,7 @@ export function skills(root: string, signal: AbortSignal, report: Report): Skill
     combined.throwIfAborted()
     const path = await contained(root, `skills/${directory}/SKILL.md`, 'file')
     const content = await readFile(path, { encoding: 'utf8', signal: combined })
-    const match = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)
-    if (!match) throw new Error('YAML frontmatter is required')
-    const metadata: unknown = parse(match[1])
-    if (!object(metadata)) throw new Error('skill metadata must be an object')
-    const { name, description } = metadata
-    if (
-      typeof name !== 'string' ||
-      name !== directory ||
-      [...name].length > 64 ||
-      !/^[\p{Ll}\p{Lo}\p{N}]+(?:-[\p{Ll}\p{Lo}\p{N}]+)*$/u.test(name)
-    )
-      throw new Error('invalid skill name or directory mismatch')
-    if (typeof description !== 'string' || !description.trim() || [...description].length > 1024)
-      throw new Error('invalid skill description')
-    for (const key of ['license', 'compatibility', 'allowed-tools']) {
-      if (key in metadata && typeof metadata[key] !== 'string') throw new Error(`invalid skill ${key}`)
-    }
-    if (
-      typeof metadata.compatibility === 'string' &&
-      (!metadata.compatibility.length || [...metadata.compatibility].length > 500)
-    )
-      throw new Error('invalid skill compatibility')
-    if ('metadata' in metadata && !strings(metadata.metadata)) throw new Error('invalid skill metadata')
-    // The current agent skill tool accepts ASCII names. Expose a stable alias for Unicode names.
-    const exposed = /^[a-z0-9-]+$/.test(name)
-      ? name
-      : `skill-${createHash('sha256').update(name).digest('hex').slice(0, 24)}`
-    return { name: exposed, description, content }
+    return pluginSkill(content, directory)
   }
   return {
     name: `agent-plugin:${root}`,

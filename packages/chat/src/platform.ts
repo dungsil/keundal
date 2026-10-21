@@ -35,6 +35,24 @@ export interface ChatConnectionOptions {
   initialModel?: string
   skills: readonly SkillProvider[]
 }
+export interface AgentPluginSettings {
+  enabled: boolean
+  permissions: Record<string, import('@keundal/mcp').McpPermissions>
+}
+export interface AgentPluginInfo extends AgentPluginSettings {
+  name: string
+  version?: string
+  description?: string
+  skills: string[]
+  servers: { name: string; url: string }[]
+  diagnostics: { component: string; entry?: string; message: string }[]
+}
+export interface AgentPluginManager {
+  list(): Promise<AgentPluginInfo[]>
+  import(files: Record<string, string>, restart: () => Promise<void>): Promise<void>
+  configure(name: string, settings: AgentPluginSettings, restart: () => Promise<void>): Promise<void>
+  remove(name: string, restart: () => Promise<void>): Promise<void>
+}
 export type TranscriptEvent =
   | { type: 'transcript-delta'; delta: string }
   | { type: 'transcript-partial' | 'transcript-final'; text: string }
@@ -43,6 +61,7 @@ export interface TranscriptionStream {
   text: Promise<string>
 }
 export interface ChatPlatform {
+  plugins?: AgentPluginManager
   mcp: {
     readonly configuration: import('@keundal/mcp').McpClientConfig[]
     load(): Promise<void>

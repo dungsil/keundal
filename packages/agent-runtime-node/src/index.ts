@@ -21,6 +21,8 @@ export interface NodeHostOptions {
   readonly sqlitePath: string
   readonly maxOutputTokens?: number
   readonly tools?: readonly ExecutableTool[] | ToolProvider
+  readonly subagents?: boolean
+  readonly maxActiveSubagents?: number
   readonly maxToolRounds?: number
   readonly baseURL?: string
   readonly headers?: Readonly<Record<string, string>>
@@ -51,7 +53,9 @@ export interface AgentRuntime extends AgentHost {
 /** 웹 서버와 데스크톱이 같은 환경 설정으로 호스트를 조립합니다. */
 export async function createAgentRuntime(
   env: Readonly<Record<string, string | undefined>> = process.env,
-  options: Pick<NodeHostOptions, 'tools' | 'plugins'> & { compose: HostCompositionFactory }
+  options: Pick<NodeHostOptions, 'tools' | 'plugins' | 'subagents' | 'maxActiveSubagents'> & {
+    compose: HostCompositionFactory
+  }
 ): Promise<AgentRuntime> {
   const provider = (env.KEUNDAL_PROVIDER ||
     (env.OPENAI_API_KEY ? 'openai' : env.GEMINI_API_KEY ? 'gemini' : 'anthropic')) as AgentHostProvider
@@ -79,6 +83,8 @@ export async function createAgentRuntime(
   const host = await createNodeAgentHost(
     {
       tools: options.tools,
+      subagents: options.subagents,
+      maxActiveSubagents: options.maxActiveSubagents,
       plugins: options.plugins,
       mcpServers: env.KEUNDAL_MCP_SERVERS ? JSON.parse(env.KEUNDAL_MCP_SERVERS) : [],
       provider,

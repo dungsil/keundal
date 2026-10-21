@@ -20,6 +20,8 @@ export interface AgentConfig {
   readonly reasoning?: Reasoning
   readonly compaction?: AgentCompactionConfig
   readonly tools?: readonly ExecutableTool[] | ToolProvider
+  readonly subagents?: boolean
+  readonly maxActiveSubagents?: number
   readonly skills?: boolean
   readonly context?: boolean
   /** 모든 실행에 앞서 모델에 전달할 시스템 지침입니다. */

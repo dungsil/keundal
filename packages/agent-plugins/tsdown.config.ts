@@ -1,3 +1,3 @@
 import config from '@keundal/tsdown'
 
-export default config
+export default { ...config, entry: ['src/index.ts', 'src/browser.ts'] }
