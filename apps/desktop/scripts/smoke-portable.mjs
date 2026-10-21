@@ -100,12 +100,17 @@ async function verifyChatScreen(port) {
   const deadline = Date.now() + 30_000
   let socket
   let lastScreen = ''
+  let discovery = ''
   try {
     while (Date.now() < deadline && !socket) {
       const pages = await fetch(`http://127.0.0.1:${port}/json/list`, {
         signal: AbortSignal.timeout(2_000)
-      }).then(response => response.json()).catch(() => [])
-      const page = pages.find(page => page.type === 'page' && /^https?:\/\/tauri\.localhost/.test(page.url))
+      }).then(response => response.json()).catch((error) => {
+        discovery = String(error)
+        return []
+      })
+      if (pages.length) discovery = JSON.stringify(pages.map(({ type, url }) => ({ type, url })))
+      const page = pages.find(page => ['page', 'webview'].includes(page.type) && /^(?:https?:\/\/tauri\.localhost|tauri:\/\/localhost)/.test(page.url))
       if (page?.webSocketDebuggerUrl) {
         socket = new WebSocket(page.webSocketDebuggerUrl)
         await once(socket, 'open', { signal: AbortSignal.timeout(5_000) })
@@ -113,7 +118,7 @@ async function verifyChatScreen(port) {
         await delay(200)
       }
     }
-    assert.ok(socket, 'Desktop WebView debugging endpoint did not become ready')
+    assert.ok(socket, `Desktop WebView debugging endpoint did not become ready: ${discovery}`)
     let id = 0
     while (Date.now() < deadline) {
       const reply = once(socket, 'message', { signal: AbortSignal.timeout(5_000) })
@@ -167,7 +172,11 @@ try {
     app = spawn(join(portable, 'keundal-desktop.exe'), [], {
       cwd: work,
       stdio: 'inherit',
-      env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` }
+      env: {
+        ...process.env,
+        WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
+        WEBVIEW2_USER_DATA_FOLDER: join(work, 'webview-data')
+      }
     })
     let appError
     app.on('error', error => (appError = error))
