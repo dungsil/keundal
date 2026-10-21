@@ -6,6 +6,7 @@ import { Client, StreamableHTTPClientTransport, type RequestOptions } from '@mod
 import type { Transport } from '@modelcontextprotocol/client'
 
 import { CatalogDiscovery } from './catalog-budget.js'
+import { createHttpTransport } from './http-transport.js'
 import { boundedMcpPages, DEFAULT_MAX_RESULT_BYTES, McpResultBudget, resultBytes } from './result-budget.js'
 export type { McpPermissions, McpClientConfig, McpRequestOptions } from '@keundal/mcp'
 
@@ -70,15 +71,7 @@ export class McpClient {
     if (config.transport === 'streamable-http') parseMcpHttpUrl(config.url, config.allowInsecureHttp)
     const transport = createTransport
       ? createTransport(config)
-      : new StreamableHTTPClientTransport(
-          new globalThis.URL((config as Extract<McpClientConfig, { transport: 'streamable-http' }>).url),
-          {
-            requestInit: {
-              headers: (config as Extract<McpClientConfig, { transport: 'streamable-http' }>).headers,
-              redirect: 'error'
-            }
-          }
-        )
+      : createHttpTransport(config as Extract<McpClientConfig, { transport: 'streamable-http' }>)
     const client = new Client(
       { name: 'keundal-mcp-client', version: '0.0.0' },
       { capabilities: {}, versionNegotiation: { mode: 'auto' } }
@@ -248,10 +241,12 @@ export class McpClient {
   }
 
   close(): Promise<void> {
+    const disconnected = this.lifetime.signal.aborted
     this.lifetime.abort(new Error(`MCP client closed: ${this.serverName}`))
     return (this.closing ??= (async () => {
       try {
-        if (this.transport instanceof StreamableHTTPClientTransport) await this.transport.terminateSession()
+        if (!disconnected && this.transport instanceof StreamableHTTPClientTransport)
+          await this.transport.terminateSession()
       } finally {
         await this.client.close()
       }
