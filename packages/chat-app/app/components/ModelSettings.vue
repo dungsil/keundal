@@ -16,7 +16,7 @@ const error = ref('')
 const toast = useToast()
 function modelItems(value: string, fallback: string) {
   const available = [...models.value]
-  if (value && !available.some((item) => item.value === value))
+  if (value && !available.some(item => item.value === value))
     available.unshift({ value, label: value, icon: 'i-lucide-bot' })
   return [{ value: '', label: fallback, icon: 'i-lucide-bot' }, ...available]
 }
