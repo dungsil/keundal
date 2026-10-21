@@ -30,6 +30,18 @@ const localizedChats = computed(() => chats.value?.map(chat => ({
 })))
 const { groups } = useChats(localizedChats)
 
+const items = computed(() => groups.value?.flatMap((group) => {
+  return [{
+    label: group.label,
+    type: 'label' as const
+  }, ...group.items.map(item => ({
+    ...item,
+    slot: 'chat' as const,
+    icon: undefined,
+    class: item.untitled ? 'text-muted' : ''
+  }))]
+}))
+
 defineShortcuts({
   meta_o: () => {
     navigateTo('/')
@@ -110,51 +122,49 @@ defineShortcuts({
           </div>
         </div>
 
-        <div v-else-if="!collapsed" class="space-y-2">
-          <div v-for="group in groups" :key="group.id">
-            <p class="px-2.5 py-1.5 text-xs font-semibold text-muted">
-              {{ group.label }}
-            </p>
-            <ul class="space-y-0.5">
-              <li
-                v-for="item in group.items"
-                :key="item.id"
-                class="flex items-center gap-0.5"
-              >
-                <ULink
-                  :to="`/chat/${item.id}`"
-                  class="min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 text-sm font-medium focus-visible:outline-primary"
-                  active-class="bg-elevated text-highlighted"
-                  :inactive-class="item.untitled ? 'text-muted hover:bg-elevated/50' : 'text-default hover:bg-elevated/50'"
-                >
-                  {{ item.label }}
-                </ULink>
-                <UTooltip :text="t('common.rename')">
-                  <UButton
-                    icon="i-lucide-pencil"
-                    color="neutral"
-                    variant="ghost"
-                    size="sm"
-                    class="shrink-0"
-                    :aria-label="t('common.rename')"
-                    @click="renameChat(item.id, item.untitled ? '' : item.label)"
-                  />
-                </UTooltip>
-                <UTooltip :text="t('common.delete')">
-                  <UButton
-                    icon="i-lucide-trash"
-                    color="error"
-                    variant="ghost"
-                    size="sm"
-                    class="shrink-0"
-                    :aria-label="t('common.delete')"
-                    @click="deleteChat(item.id)"
-                  />
-                </UTooltip>
-              </li>
-            </ul>
-          </div>
-        </div>
+        <UNavigationMenu
+          v-else-if="!collapsed"
+          :items="items"
+          :collapsed="collapsed"
+          orientation="vertical"
+          :ui="{
+            link: 'overflow-hidden pr-14.5',
+            linkTrailing: 'gap-0 translate-x-full group-hover:translate-x-0 group-focus-within:translate-x-0 transition-transform ms-0 absolute inset-e-px'
+          }"
+        >
+          <template #chat-trailing="{ item }">
+            <UButton
+              as="div"
+              role="button"
+              icon="i-lucide-pencil"
+              color="neutral"
+              variant="link"
+              size="sm"
+              class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50"
+              :aria-label="t('common.rename')"
+              :title="t('common.rename')"
+              tabindex="0"
+              @click.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
+              @keydown.enter.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
+              @keydown.space.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
+            />
+            <UButton
+              as="div"
+              role="button"
+              icon="i-lucide-trash"
+              color="neutral"
+              variant="link"
+              size="sm"
+              class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50"
+              :aria-label="t('common.delete')"
+              :title="t('common.delete')"
+              tabindex="0"
+              @click.stop.prevent="deleteChat(item.id as string)"
+              @keydown.enter.stop.prevent="deleteChat(item.id as string)"
+              @keydown.space.stop.prevent="deleteChat(item.id as string)"
+            />
+          </template>
+        </UNavigationMenu>
       </template>
 
       <template #footer="{ collapsed }">
