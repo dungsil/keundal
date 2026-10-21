@@ -5,6 +5,7 @@
 | 패키지                                 | 역할                                                                                 |
 | -------------------------------------- | ------------------------------------------------------------------------------------ |
 | `@keundal/ui`                          | 웹 UI의 공통 Vue 컴포넌트를 Nuxt 레이어로 제공합니다.                                |
+| `@keundal/chat-app`                    | web과 desktop이 공유하는 채팅 화면과 실행 코드를 Nuxt 레이어로 제공합니다.           |
 | `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.               |
 | `@keundal/agent-host`                  | Node.js에서 LLM·저장소·에이전트 플러그인을 조립하고 HTTP 계층에 서비스를 제공합니다. |
 | `@keundal/agent`                       | 에이전트 구현 계약과 공통 실행 루프를 제공합니다.                                    |
@@ -26,6 +27,12 @@
 구현이 하나뿐이면 계약과 구현을 같은 패키지에 두고, 두 번째 구현이 생기면 계약 패키지를 분리합니다.
 
 플러그인 설정과 사용법은 [에이전트 문서](packages/agent/README.md), [코딩 에이전트 문서](packages/coding-agent/README.md), [OpenAI 문서](packages/plugin-llm-openai/README.md), [Gemini 문서](packages/plugin-llm-gemini/README.md), [Anthropic 문서](packages/plugin-llm-anthropic/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [축약 문서](packages/compaction/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
+
+## 앱 의존성 경계
+
+`apps/*`는 `packages/*`의 공용 패키지와 Nuxt 레이어를 사용하며, 다른 앱을 의존하거나 상속하지 않습니다. `packages/*`도 앱을 참조하지 않습니다. 앱 간에 공유하는 채팅 화면과 실행 코드는 `@keundal/chat-app`에 두고, 공통 표시 컴포넌트는 `@keundal/ui`에 둡니다. 앱별 실행·배포 설정은 각 앱에서 관리합니다.
+
+`pnpm check:boundaries`는 워크스페이스 의존성 선언, 소스 참조, Nuxt 상속과 스크립트의 앱 참조를 검사합니다. 이 검사는 `pnpm lint`와 CI에서도 실행합니다.
 
 ## 서비스 계약
 

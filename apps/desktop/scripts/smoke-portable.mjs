@@ -44,10 +44,10 @@ async function startHost() {
   host = child
   let stdout = ''
   let stderr = ''
-  child.stdout.on('data', (data) => (stdout += data))
-  child.stderr.on('data', (data) => (stderr += data))
+  child.stdout.on('data', data => (stdout += data))
+  child.stderr.on('data', data => (stderr += data))
   let spawnError
-  child.on('error', (error) => (spawnError = error))
+  child.on('error', error => (spawnError = error))
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
     if (spawnError) throw spawnError
@@ -55,7 +55,7 @@ async function startHost() {
     const ready = stdout
       .split(/\r?\n/)
       .slice(0, -1)
-      .find((line) => line.startsWith('{') && line.includes('keundal-sidecar'))
+      .find(line => line.startsWith('{') && line.includes('keundal-sidecar'))
     if (ready) {
       const { url } = JSON.parse(ready)
       assert.equal(new URL(url).hostname, '127.0.0.1')
@@ -69,7 +69,7 @@ async function startHost() {
 async function request(url, path, options = {}) {
   const response = await fetch(`${url}${path}`, {
     ...options,
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' },
     signal: AbortSignal.timeout(5_000)
   })
   assert.equal(response.status, 200, `${path}: ${await response.clone().text()}`)
@@ -83,7 +83,7 @@ try {
   await denied.text()
   assert.deepEqual(await request(url, '/threads'), [])
   const models = await request(url, '/models')
-  assert.ok(models.models.some((entry) => entry.id === model))
+  assert.ok(models.models.some(entry => entry.id === model))
   await request(url, '/threads/portable-smoke', {
     method: 'PUT',
     body: JSON.stringify({ expectedRevision: 0, messages: [message], state: {} })
@@ -97,7 +97,7 @@ try {
   if (process.platform === 'win32') {
     app = spawn(join(portable, 'keundal-desktop.exe'), [], { cwd: work, stdio: 'inherit' })
     let appError
-    app.on('error', (error) => (appError = error))
+    app.on('error', error => (appError = error))
     let ready = false
     const deadline = Date.now() + 30_000
     while (Date.now() < deadline) {
