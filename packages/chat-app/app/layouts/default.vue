@@ -6,6 +6,7 @@ const { t } = useLocale()
 const { renameChat, deleteChat } = useChatActions()
 
 const route = useRoute()
+const isSettings = computed(() => route.path === '/settings' || route.path.startsWith('/settings/'))
 const sidebarOpen = ref(false)
 const searchOpen = ref(false)
 const { $chatStore } = useNuxtApp()
@@ -176,10 +177,10 @@ defineShortcuts({
         <div class="flex flex-col gap-1 w-full">
           <UButton
             :label="collapsed ? '' : t('settings.title')"
-            :to="{ path: '/settings', query: route.path === '/settings' ? route.query : { returnTo: route.path } }"
+            :to="{ path: isSettings ? route.path : '/settings', query: isSettings ? route.query : { returnTo: route.path } }"
             icon="i-lucide-settings-2"
             color="neutral"
-            :variant="route.path === '/settings' ? 'soft' : 'ghost'"
+            :variant="isSettings ? 'soft' : 'ghost'"
             class="w-full"
             :aria-label="t('settings.title')"
             @click="sidebarOpen = false"

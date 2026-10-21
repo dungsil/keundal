@@ -13,12 +13,6 @@ const sections = computed(() => [
   { id: 'mcp', label: 'MCP', icon: 'i-lucide-network' },
   { id: 'skills', label: t('skill.title'), icon: 'i-lucide-book-open' }
 ])
-const activeSection = computed(() => {
-  const section = route.query.section
-  return sections.value.some(item => item.id === section)
-    ? section
-    : route.query.provider ? 'llm' : 'models'
-})
 
 useHead(() => ({ title: t('settings.title') }))
 </script>
@@ -59,34 +53,16 @@ useHead(() => ({ title: t('settings.title') }))
               :key="section.id"
               :label="section.label"
               :icon="section.icon"
-              :to="{ path: '/settings', query: { ...route.query, section: section.id } }"
-              :active="activeSection === section.id"
-              :aria-current="activeSection === section.id ? 'page' : undefined"
-              :variant="activeSection === section.id ? 'soft' : 'ghost'"
+              :to="{ path: `/settings/${section.id}`, query: { returnTo: route.query.returnTo } }"
+              :active="route.path === `/settings/${section.id}`"
+              :aria-current="route.path === `/settings/${section.id}` ? 'page' : undefined"
+              :variant="route.path === `/settings/${section.id}` ? 'soft' : 'ghost'"
               color="neutral"
               class="shrink-0 justify-start md:w-full"
             />
           </nav>
           <div class="min-w-0 flex-1">
-            <section v-show="activeSection === 'appearance'" class="mb-8 space-y-4" aria-labelledby="appearance-settings-title">
-              <h2 id="appearance-settings-title" class="text-lg font-semibold text-highlighted">
-                {{ t('settings.appearance') }}
-              </h2>
-              <div class="flex items-center justify-between gap-3">
-                <span class="text-sm font-medium text-highlighted">{{ t('language.label') }}</span>
-                <LanguageSelect />
-              </div>
-              <div class="flex items-center justify-between gap-3">
-                <span class="text-sm font-medium text-highlighted">{{ t('settings.colorMode') }}</span>
-                <UColorModeSwitch :aria-label="t('settings.colorMode')" />
-              </div>
-            </section>
-            <LLMSettings v-show="activeSection === 'llm'" />
-            <ModelSettings v-show="activeSection === 'models'" />
-            <ClientOnly>
-              <McpSettings v-show="activeSection === 'mcp'" />
-              <SkillSettings v-show="activeSection === 'skills'" />
-            </ClientOnly>
+            <NuxtPage keepalive />
           </div>
         </div>
       </UContainer>
