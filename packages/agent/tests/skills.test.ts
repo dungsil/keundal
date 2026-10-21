@@ -62,7 +62,11 @@ async function setup(
       const index = requests.length
       requests.push(structuredClone(request))
       if (!scripts[index]) throw new Error('unexpected LLM call')
-      yield* scripts[index]
+      yield* scripts[index].map((event) =>
+        'messageId' in event && event.messageId === 'answer'
+          ? { ...event, messageId: `answer:${request.input.runId}` }
+          : event
+      )
     }
   }
   const llm = await ctx.plugin(LLM)

@@ -10,7 +10,8 @@ import {
   parseAGUIEvent,
   type AGUIEvent,
   type ExecutionOptions,
-  type LLMEvent
+  type LLMEvent,
+  type LLMRequest
 } from '@keundal/core'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { Context, type Fiber } from 'cordis'
@@ -45,9 +46,9 @@ const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {
     async countTokens() {
       return 10
     }
-    stream(): AsyncIterableIterator<LLMEvent> {
+    stream(request: LLMRequest): AsyncIterableIterator<LLMEvent> {
       return (async function* () {
-        yield* reply
+        yield* reply.map((event) => ({ ...event, messageId: `reply:${request.input.runId}` }))
       })()
     }
   }
@@ -212,7 +213,7 @@ test('POST /runs는 AG-UI 이벤트를 SSE로 스트리밍하고 저장소에 �
 
   const thread = (await requestJson('GET', '/threads/thread')).json as { revision: number; messages: { id: string }[] }
   expect(thread.revision).toBe(1)
-  expect(thread.messages.map((message) => message.id)).toEqual(['reply'])
+  expect(thread.messages.map((message) => message.id)).toEqual(['reply:r1'])
   const run = (await requestJson('GET', '/runs/r1')).json as { status: string }
   expect(run.status).toBe('completed')
 })
