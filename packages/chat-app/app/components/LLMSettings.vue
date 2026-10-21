@@ -11,8 +11,6 @@ import {
 
 const { t } = useLocale()
 
-defineProps<{ returnTo: string }>()
-
 const { settings } = useLLMSettings()
 const mounted = useMounted()
 const route = useRoute()
@@ -338,22 +336,13 @@ async function save(forget = false) {
         "
         @click="save(true)"
       />
-      <div class="flex gap-2">
-        <UButton
-          :label="t('common.cancel')"
-          :to="returnTo"
-          color="neutral"
-          variant="ghost"
-          :disabled="!mounted || saving"
-        />
-        <UButton
-          v-if="current"
-          :label="desktop ? t('llm.saveOS') : t('llm.saveBrowser')"
-          type="submit"
-          form="llm-settings"
-          :loading="saving"
-        />
-      </div>
+      <UButton
+        v-if="current"
+        :label="desktop ? t('llm.saveOS') : t('llm.saveBrowser')"
+        type="submit"
+        form="llm-settings"
+        :loading="saving"
+      />
     </div>
   </section>
 </template>

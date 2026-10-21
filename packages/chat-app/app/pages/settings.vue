@@ -77,7 +77,7 @@ useHead(() => ({ title: t('settings.title') }))
               </div>
             </section>
             <ModelSettings v-show="activeSection === 'models'" />
-            <LLMSettings v-show="activeSection === 'llm'" :return-to="returnTo" />
+            <LLMSettings v-show="activeSection === 'llm'" />
             <ClientOnly>
               <SkillSettings v-show="activeSection === 'skills'" />
             </ClientOnly>
