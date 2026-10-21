@@ -1,14 +1,15 @@
+import { mountAgent } from './fixtures/agent'
 import { Buffer } from 'node:buffer'
 import { createServer, type ServerResponse, type IncomingMessage } from 'node:http'
 import { EventType, LLM_SOURCE_EVENT, type AGUIEvent, type Reasoning } from '@keundal/core'
-import type { ChatMessage } from '../shared/utils/chat-message'
+import type { ChatMessage } from '@keundal/chat/chat-message'
 import { expect, test, onTestFinished, vi } from 'vitest'
 import { Context } from 'cordis'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
-import { browserLLMPlugin } from '../shared/utils/browser-llm'
-import { createKeundalChat as createChat } from '../shared/utils/keundal'
-import { ChatStore } from '../shared/utils/chat-store'
-import { defaultLLMSettings, providerSettingsSchema } from '../shared/utils/llm-settings'
+import { browserLLMPlugin } from '@keundal/plugin-llm-browser'
+import { createKeundalChat as createChat } from '@keundal/plugin-chat-local/keundal'
+import { ChatStore } from '@keundal/plugin-chat-local'
+import { defaultLLMSettings, providerSettingsSchema } from '@keundal/chat/llm-settings'
 
 test('공급자 모듈을 불러오는 동안 취소하면 모델 조회를 중단한다', async () => {
   const ctx = new Context()
@@ -46,7 +47,7 @@ async function createKeundalChat(name: string, options: { webSearch?: boolean, r
     await store.dispose()
     await llm.dispose()
   })
-  return createChat(ctx, name, options)
+  return createChat(ctx, name, options, mountAgent)
 }
 
 type Frame = Record<string, unknown>
@@ -258,7 +259,7 @@ test.each(['openai', 'anthropic', 'google'] as const)('%s의 토큰·제목·생
   const ctx = new Context()
   const llm = await ctx.plugin(browserLLMPlugin, { getSettings: () => settings })
   const store = await ctx.plugin(memoryStorePlugin)
-  const chats = new ChatStore(ctx)
+  const chats = new ChatStore(ctx, mountAgent)
   onTestFinished(async () => {
     await chats.stop()
     await store.dispose()
@@ -304,7 +305,7 @@ test('토큰 계산이 404인 호환 API에서도 답변을 저장하고 생성 
   const ctx = new Context()
   const llm = await ctx.plugin(browserLLMPlugin, { getSettings: () => settings })
   const store = await ctx.plugin(memoryStorePlugin)
-  const chats = new ChatStore(ctx)
+  const chats = new ChatStore(ctx, mountAgent)
   onTestFinished(async () => {
     await chats.stop()
     await store.dispose()
@@ -347,7 +348,7 @@ test('키와 API URL 변경을 재시작 없이 적용하고 삭제한 키와 �
   await llm
   const store = ctx.plugin(memoryStorePlugin)
   await store
-  const chats = new ChatStore(ctx)
+  const chats = new ChatStore(ctx, mountAgent)
   onTestFinished(async () => {
     await chats.stop()
     await store.dispose()
@@ -447,7 +448,7 @@ test.each([
   await llm
   const store = ctx.plugin(memoryStorePlugin)
   await store
-  const chat = await createChat(ctx, name, { reasoning: false })
+  const chat = await createChat(ctx, name, { reasoning: false }, mountAgent)
   onTestFinished(async () => {
     await chat.dispose()
     await store.dispose()
@@ -497,7 +498,7 @@ test('같은 종류의 공급자를 전환하면 제목과 생성 요청을 선�
     await llm.dispose()
   })
   for (const name of ['work', 'home']) {
-    const chat = await createChat(ctx, `openai@${name}/shared`, {})
+    const chat = await createChat(ctx, `openai@${name}/shared`, {}, mountAgent)
     try {
       expect(await chat.title(user)).toBe(name)
       const events: AGUIEvent[] = []

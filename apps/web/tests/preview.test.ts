@@ -60,7 +60,7 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
       if (url) resolve(url)
     })
   })
-  for (const path of ['/', '/chat/preview-smoke-test', '/settings']) {
+  for (const path of ['/', '/chat/preview-smoke-test', '/settings', '/settings/appearance', '/settings/models', '/settings/llm', '/settings/mcp', '/settings/skills']) {
     const response = await fetch(new URL(path, origin))
     const html = await response.text()
     expect(response.status, html).toBe(200)
@@ -107,9 +107,27 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(settings.status).toBe(200)
     expect(settingsHtml).toContain(`lang="${language}"`)
     expect(settingsHtml).toContain(language === 'ko' ? '대화로 돌아가기' : 'Back to chat')
-    expect(settingsHtml).toContain('id="model-settings-title"')
-    expect(settingsHtml).toContain('id="llm-settings-title"')
+    expect(settingsHtml).toContain('id="appearance-settings-title"')
+    expect(new URL(settings.url).pathname).toBe('/settings/appearance')
+    expect(settingsHtml).not.toContain('id="llm-settings-title"')
+    const llm = await fetch(new URL('/settings/llm', origin), { headers })
+    expect(await llm.text()).toContain('id="llm-settings-title"')
   }))
+  for (const [query, target] of [
+    ['section=appearance', 'appearance'],
+    ['section=skills', 'skills'],
+    ['section=mcp', 'mcp'],
+    ['provider=openai', 'llm'],
+    ['section=invalid', 'appearance']
+  ] as const) {
+    const response = await fetch(new URL(`/settings?${query}&returnTo=/chat/preview-smoke-test`, origin), { redirect: 'manual' })
+    expect(response.status).toBe(302)
+    const location = new URL(response.headers.get('location')!, origin)
+    expect(location.pathname).toBe(`/settings/${target}`)
+    expect(location.searchParams.get('returnTo')).toBe('/chat/preview-smoke-test')
+    expect(location.searchParams.has('section')).toBe(false)
+    if (query.includes('provider=')) expect(location.searchParams.get('provider')).toBe('openai')
+  }
   const missing = await fetch(new URL('/missing-localized-page', origin), { headers: { 'accept': 'text/html', 'accept-language': 'ko-KR' } })
   expect(missing.status).toBe(404)
   expect(await missing.text()).toContain('페이지를 찾을 수 없습니다')

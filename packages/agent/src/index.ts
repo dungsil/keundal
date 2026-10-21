@@ -1,3 +1,4 @@
+import { AgentService, type AgentConfig, type ToolProvider } from '@keundal/agent-contract'
 import { compact } from '@keundal/compaction'
 import type {} from '@keundal/context'
 import {
@@ -15,43 +16,22 @@ import {
   type RunAgentInput
 } from '@keundal/core'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import { Service, type Context } from 'cordis'
+import { type Context } from 'cordis'
+export type { AgentConfig, ToolProvider } from '@keundal/agent-contract'
 
 import {
   parseCompactionConfig,
   applyPrepared,
   matchesPrepared,
   waitForPreparation,
-  type AgentCompactionConfig,
   type PreparedCompaction
 } from './compaction.js'
 import { SYSTEM_PROMPT_ID, withSystemPrompt } from './prompt.js'
 import { SKILL_CATALOG_ID, skillTool, withSkillCatalog } from './skills.js'
-import { addTools, parseTools, streamWithTools, type ExecutableTool } from './tools.js'
+import { addTools, parseTools, streamWithTools } from './tools.js'
 
 export type { AgentCompactionConfig, CompactionPolicy } from './compaction.js'
 export type { ExecutableTool, ToolExecutionContext } from './tools.js'
-
-export type ToolProvider = (options: ExecutionOptions) => readonly ExecutableTool[] | Promise<readonly ExecutableTool[]>
-
-export interface AgentConfig {
-  readonly model: string
-  readonly maxOutputTokens: number
-  readonly webSearch?: boolean
-  readonly reasoning?: LLMRequest['reasoning']
-  readonly compaction?: AgentCompactionConfig
-  readonly tools?: readonly ExecutableTool[] | ToolProvider
-  readonly skills?: boolean
-  readonly context?: boolean
-  /** 모든 실행에 앞서 모델에 전달할 시스템 지침입니다. */
-  readonly systemPrompt?: string
-  /** 도구를 실행하고 후속 생성을 요청할 최대 횟수입니다. 기본값은 8입니다. */
-  readonly maxToolRounds?: number
-  /** 한 실행에서 허용할 도구 호출의 최대 개수입니다. 기본값은 32입니다. */
-  readonly maxToolCalls?: number
-  /** 같은 응답의 도구 실행을 겹쳐 시작합니다. 기본값은 false로 순차 실행입니다. */
-  readonly parallelTools?: boolean
-}
 
 /**
  * 에이전트 설정을 검증하고 기본값을 채웁니다. 잘못된 값은 예외로 알립니다.
@@ -126,17 +106,11 @@ const agentConfigSchema: StandardSchemaV1<AgentConfig, AgentConfig> = {
   }
 }
 
-declare module 'cordis' {
-  interface Context {
-    readonly agent: Agent
-  }
-}
-
 /**
  * 에이전트 구현의 계약입니다. 도구 실행, 후속 생성, 축약, 스킬을 함께 처리하는 기본 구현을
  * 담고, 다른 에이전트 구현은 이 클래스를 확장해 동작을 바꾼다.
  */
-export class Agent extends Service {
+export class Agent extends AgentService {
   private readonly active = new Set<AbortController>()
   private closed = false
   private readonly preparations = new Map<string, PreparedCompaction>()
@@ -146,7 +120,7 @@ export class Agent extends Service {
     ctx: Context,
     protected readonly config: AgentConfig
   ) {
-    super(ctx, 'agent')
+    super(ctx)
     this.compactionPolicy = this.resolveCompactionPolicy()
     ctx.fiber.effect(() => () => {
       this.closed = true
@@ -488,7 +462,7 @@ export class Agent extends Service {
 }
 
 /** 에이전트 구현이 지켜야 할 생성자 계약입니다. */
-export type AgentImplementation = new (ctx: Context, config: AgentConfig) => Agent
+export type AgentImplementation = new (ctx: Context, config: AgentConfig) => AgentService
 
 /**
  * 에이전트 구현을 `ctx.agent`로 등록합니다. 스킬을 켜면 `skills` 서비스를 기다리는 동안 에이전트를

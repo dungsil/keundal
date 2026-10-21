@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { expect, test, vi } from 'vitest'
 import { createModelSelection } from '../shared/utils/model-selection'
-import { DEFAULT_MODEL_KEY, FALLBACK_MODEL } from '../shared/utils/model-preferences'
+import { DEFAULT_MODEL_KEY, FALLBACK_MODEL } from '@keundal/chat/model-preferences'
 
 function fixture(options: { selectModel?: (value: string) => Promise<void>, available?: string[] } = {}) {
   const model = ref(FALLBACK_MODEL)

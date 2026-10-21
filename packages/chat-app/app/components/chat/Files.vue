@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { FileWithStatus } from '@keundal/chat/file'
+
 defineProps<{
   files: FileWithStatus[]
 }>()

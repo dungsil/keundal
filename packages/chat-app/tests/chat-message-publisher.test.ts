@@ -1,7 +1,7 @@
 import { EventType } from '@keundal/core'
 import { afterEach, expect, test, vi } from 'vitest'
-import { ChatMessageAssembly, type ChatMessage } from '../shared/utils/chat-message'
-import { ChatMessagePublisher } from '../shared/utils/chat-message-publisher'
+import { ChatMessageAssembly, type ChatMessage } from '@keundal/chat/chat-message'
+import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
 
 afterEach(() => {
   vi.restoreAllMocks()

@@ -1,11 +1,13 @@
+import { createNativeSkillSource } from '@keundal/plugin-chat-desktop/skills'
+import { mountAgent } from './fixtures/agent'
 import type { invoke } from '@tauri-apps/api/core'
 import { Context } from 'cordis'
 import { EventType, LLMService, type LLMEvent, type LLMRequest } from '@keundal/core'
 import skillPlugin from '@keundal/plugin-skill'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { expect, test, type TestContext } from 'vitest'
-import { SkillManager, SKILL_SETTINGS_KEY } from '../shared/utils/skills'
-import { createKeundalChat } from '../shared/utils/keundal'
+import { SkillManager, SKILL_SETTINGS_KEY } from '@keundal/chat/skills'
+import { createKeundalChat } from '@keundal/plugin-chat-local/keundal'
 
 const review = { name: 'review', description: 'Review code', content: 'Check public behavior.', enabled: true }
 const markdown = (name: string, body: string) => `---\nname: ${name}\ndescription: Review code\n---\n${body}`
@@ -72,7 +74,7 @@ test('데스크톱은 저장한 스킬·실행 디렉터리·홈 순서로 선�
     if (command === 'read_skill_file') return files.find(file => file.path === (args as { path: string }).path)!.markdown as T
     throw new Error('Unknown command')
   }
-  const manager = new SkillManager(local, native)
+  const manager = new SkillManager(local, createNativeSkillSource(native))
   manager.save({ ...manager.load(), skills: [review] })
   const ctx = await registry(t, manager)
   expect((await (await ctx.skills.prepare()).load('review'))?.content).toBe(review.content)
@@ -87,13 +89,13 @@ test('데스크톱은 저장한 스킬·실행 디렉터리·홈 순서로 선�
   await expect(catalog.load('review')).rejects.toThrow('Skill name changed')
   manager.save({ ...manager.load(), loadLocal: false })
   expect((await ctx.skills.prepare()).skills).toEqual([])
-  expect(new SkillManager(local, native).load()).toMatchObject({ loadLocal: false, disabledFiles: [files[0]!.path] })
+  expect(new SkillManager(local, createNativeSkillSource(native)).load()).toMatchObject({ loadLocal: false, disabledFiles: [files[0]!.path] })
 })
 
 test('잘못된 파일을 경로와 함께 표시하고 해당 파일을 끄면 다른 스킬을 사용한다', async (t) => {
   const path = '/home/person/.agents/skills/broken/SKILL.md'
   const native: typeof invoke = async <T>() => ({ roots: [], files: [{ root: '/home/person/.agents/skills', path, markdown: 'Invalid frontmatter' }] }) as T
-  const manager = new SkillManager(storage(), native)
+  const manager = new SkillManager(storage(), createNativeSkillSource(native))
   expect((await manager.listFiles()).files[0]).toMatchObject({ path, error: 'YAML frontmatter is required' })
   const ctx = await registry(t, manager)
   await expect(ctx.skills.prepare()).rejects.toThrow(path)
@@ -109,7 +111,7 @@ test('취소된 네이티브 로딩은 본문을 모델에 전달하지 않는�
     started.resolve(undefined)
     return await pending.promise as T
   }
-  const ctx = await registry(t, new SkillManager(storage(), native))
+  const ctx = await registry(t, new SkillManager(storage(), createNativeSkillSource(native)))
   const catalog = await ctx.skills.prepare()
   const controller = new AbortController()
   const task = catalog.load('review', { signal: controller.signal })
@@ -147,7 +149,7 @@ test('웹 대화의 에이전트는 저장한 스킬을 발견하고 도구 결�
     await store.dispose()
     await llm.dispose()
   })
-  const runtime = await createKeundalChat(ctx, 'openai/gpt-5-nano')
+  const runtime = await createKeundalChat(ctx, 'openai/gpt-5-nano', {}, mountAgent)
   t.onTestFinished(() => runtime.dispose())
   const events = []
   for await (const event of runtime.respond({ threadId: 'chat', instructions: 'Be helpful.', messages: [{ id: 'question', role: 'user', parts: [{ type: 'text', text: 'Review my code.' }] }] })) events.push(event)

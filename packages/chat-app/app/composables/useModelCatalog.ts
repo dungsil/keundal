@@ -1,10 +1,11 @@
 import { onScopeDispose, ref, watch, type Ref } from 'vue'
 
-import { configuredProviders, type LLMSettings } from '../../shared/utils/llm-settings'
-import { loadModels, type ModelOption } from '../../shared/utils/models'
+import { configuredProviders, type LLMSettings } from '@keundal/chat/llm-settings'
+import type { ModelOption } from '@keundal/chat/models'
+import type { ModelLoader } from '@keundal/chat/platform'
 
 /** Owned by the client plugin, shared by the selector and the browser LLM service. */
-export function useModelCatalog(settings: Ref<LLMSettings>, loadErrorMessage = () => 'Could not load models') {
+export function useModelCatalog(settings: Ref<LLMSettings>, loadModels: ModelLoader, loadErrorMessage = () => 'Could not load models') {
   const models = ref<ModelOption[]>([])
   const loading = ref(false)
   const error = ref('')

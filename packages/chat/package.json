@@ -1,0 +1,86 @@
+{
+  "name": "@keundal/chat",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    "./chat-message": {
+      "types": "./dist/chat-message.d.ts",
+      "import": "./dist/chat-message.js"
+    },
+    "./llm-settings": {
+      "types": "./dist/llm-settings.d.ts",
+      "import": "./dist/llm-settings.js"
+    },
+    "./model-preferences": {
+      "types": "./dist/model-preferences.d.ts",
+      "import": "./dist/model-preferences.js"
+    },
+    "./skills": {
+      "types": "./dist/skills.d.ts",
+      "import": "./dist/skills.js"
+    },
+    "./file": {
+      "types": "./dist/file.d.ts",
+      "import": "./dist/file.js"
+    },
+    "./models": {
+      "types": "./dist/models.d.ts",
+      "import": "./dist/models.js"
+    },
+    "./chat-store": {
+      "types": "./dist/chat-store.d.ts",
+      "import": "./dist/chat-store.js"
+    },
+    "./platform": {
+      "types": "./dist/platform.d.ts",
+      "import": "./dist/platform.js"
+    },
+    "./messages": {
+      "types": "./dist/messages.d.ts",
+      "import": "./dist/messages.js"
+    },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./tools/agent": {
+      "types": "./dist/tools/agent.d.ts",
+      "import": "./dist/tools/agent.js"
+    },
+    "./tools/chart": {
+      "types": "./dist/tools/chart.d.ts",
+      "import": "./dist/tools/chart.js"
+    },
+    "./tools/weather": {
+      "types": "./dist/tools/weather.d.ts",
+      "import": "./dist/tools/weather.js"
+    },
+    "./chat-message-publisher": {
+      "types": "./dist/chat-message-publisher.d.ts",
+      "import": "./dist/chat-message-publisher.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@keundal/agent-contract": "workspace:*",
+    "@keundal/core": "workspace:*",
+    "@keundal/mcp": "workspace:*",
+    "@keundal/skill-markdown": "workspace:*",
+    "cordis": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/tsconfig": "workspace:*",
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,10 +1,6 @@
-import type { TranscriptionSession } from '@keundal/plugin-transcription-openai/client'
-import { encodeRealtimeAudio, resampleAudio, streamTranscription } from '@keundal/plugin-transcription-openai/client'
-import { Context } from 'cordis'
+import type { TranscriptionStream } from '@keundal/chat/platform'
+import { resampleAudio } from '../utils/audio'
 
-import { providerCredentials, providerError } from '../../shared/utils/llm-settings'
-
-const SAMPLE_RATE = 24_000
 // Recordings stop on their own after this long.
 const MAX_DURATION = 120_000
 
@@ -22,9 +18,9 @@ interface Session {
   audioContext: AudioContext
   source: MediaStreamAudioSourceNode
   processor: ScriptProcessorNode
-  audio: ReadableStreamDefaultController<string>
+  audio: ReadableStreamDefaultController<Float32Array>
   abort: AbortController
-  result: ReturnType<typeof streamTranscription>
+  result: TranscriptionStream
   finals: string[]
   partial: string
   timeout: ReturnType<typeof setTimeout>
@@ -37,6 +33,7 @@ interface Session {
 export function useDictation() {
   const { t } = useLocale()
   const { settings } = useLLMSettings()
+  const transcription = useNuxtApp().$chatPlatform?.transcription
 
   // Assumed on the server so the button renders in the SSR output, checked once mounted
   const supported = ref(true)
@@ -125,46 +122,19 @@ export function useDictation() {
   }
 
   async function open(abort: AbortController, { onMaxDuration }: { onMaxDuration?: () => void }) {
-    const { default: openaiTranscriptionPlugin } = await import('@keundal/plugin-transcription-openai')
-    abort.signal.throwIfAborted()
-    const context = new Context()
-    const config = providerCredentials(settings.value, 'openai')
-    const fiber = context.plugin(openaiTranscriptionPlugin, {
-      ...config,
-      dangerouslyAllowBrowser: true
-    })
-    let credentials: TranscriptionSession
-    try {
-      await fiber
-      credentials = await context.transcription.createSession(
-        { model: 'gpt-4o-mini-transcribe', expiresAfterSeconds: 300 },
-        { signal: abort.signal }
-      )
-    } catch (error) {
-      abort.signal.throwIfAborted()
-      throw providerError('openai', error, config)
-    } finally {
-      await fiber.dispose()
-    }
-    if (cancelled) return
-
-    // Open the transcription stream first so the WebSocket handshake overlaps the microphone setup
-    let controller!: ReadableStreamDefaultController<string>
-    const audio = new ReadableStream<string>({
+    if (!transcription) throw new Error('Transcription is not configured')
+    let controller!: ReadableStreamDefaultController<Float32Array>
+    const audio = new ReadableStream<Float32Array>({
       start(c) {
         controller = c
       }
     })
-
-    const result = streamTranscription({
-      session: credentials,
-      audio,
-      signal: abort.signal
-    })
+    const result = await transcription.start(settings.value, audio, abort.signal)
     let connectionError: unknown
     void result.text.catch((cause) => {
       connectionError = cause
     })
+    if (cancelled) return
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch((cause: Error) => {
       abort.abort()
@@ -189,7 +159,7 @@ export function useDictation() {
     let processor: ScriptProcessorNode
 
     try {
-      const context = (audioContext = new AudioContext({ sampleRate: SAMPLE_RATE }))
+      const context = (audioContext = new AudioContext({ sampleRate: transcription.sampleRate }))
       source = context.createMediaStreamSource(stream)
       processor = context.createScriptProcessor(4096, 1, 1)
 
@@ -203,10 +173,10 @@ export function useDictation() {
         level.value = Math.min(1, Math.sqrt(sum / input.length) * 5)
 
         const samples
-          = context.sampleRate === SAMPLE_RATE
+          = context.sampleRate === transcription.sampleRate
             ? new Float32Array(input)
-            : resampleAudio(new Float32Array(input), context.sampleRate, SAMPLE_RATE)
-        controller.enqueue(encodeRealtimeAudio(samples))
+            : resampleAudio(new Float32Array(input), context.sampleRate, transcription.sampleRate)
+        controller.enqueue(samples)
       }
       // The processor must be connected to run, mute it so the microphone is not played back
       const silence = context.createGain()

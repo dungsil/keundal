@@ -1,0 +1,34 @@
+{
+  "name": "@keundal/plugin-chat-browser",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp.d.ts",
+      "import": "./dist/mcp.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@keundal/chat": "workspace:*",
+    "@keundal/mcp": "workspace:*"
+  },
+  "devDependencies": {
+    "@keundal/tsconfig": "workspace:*",
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

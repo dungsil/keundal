@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { WeatherUIToolInvocation } from '@keundal/chat/tools/weather'
+
 const { t } = useLocale()
 
 const props = defineProps<{

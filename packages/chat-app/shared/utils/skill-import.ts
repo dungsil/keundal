@@ -1,4 +1,4 @@
-import { parseSkillMarkdown } from '@keundal/plugin-skill-filesystem/markdown'
+import { parseSkillMarkdown } from '@keundal/skill-markdown'
 
 const MAX_ARCHIVE_BYTES = 10 * 1024 * 1024
 const MAX_MARKDOWN_BYTES = 1024 * 1024

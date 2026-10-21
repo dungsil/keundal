@@ -1,6 +1,6 @@
 import type { invoke } from '@tauri-apps/api/core'
 import { expect, test, vi } from 'vitest'
-import { createDesktopChatStore } from '../shared/utils/desktop-chat-store'
+import { createDesktopChatStore } from '@keundal/plugin-chat-desktop'
 
 function createFixture() {
   const calls: { command: string, args: unknown }[] = []

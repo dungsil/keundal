@@ -1,5 +1,5 @@
 import type { ReasoningLevel } from '@keundal/core'
-import { resolveModel } from './models'
+import { resolveModel } from '@keundal/chat/models'
 
 export function reasoningLevels(model: string): ReasoningLevel[] {
   const { provider, id } = resolveModel(model)

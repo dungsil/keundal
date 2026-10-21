@@ -1,6 +1,6 @@
 import type { Reasoning, ReasoningLevel } from '@keundal/core'
 import { reasoningLevels, selectedReasoning } from '../../shared/utils/reasoning-settings'
-import { FALLBACK_MODEL } from '../../shared/utils/model-preferences'
+import { FALLBACK_MODEL } from '@keundal/chat/model-preferences'
 
 export function useChatSettings() {
   const webSearch = useCookie<boolean>('web-search', { default: () => true })

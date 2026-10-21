@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@keundal/agent-contract": "workspace:*",
     "@keundal/compaction": "workspace:*",
     "@keundal/context": "workspace:*",
     "@keundal/core": "workspace:*",

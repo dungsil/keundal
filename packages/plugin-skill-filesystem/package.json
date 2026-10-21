@@ -22,8 +22,8 @@
   },
   "dependencies": {
     "@keundal/core": "workspace:*",
-    "cordis": "catalog:",
-    "yaml": "2.9.1"
+    "@keundal/skill-markdown": "workspace:*",
+    "cordis": "catalog:"
   },
   "devDependencies": {
     "@keundal/plugin-skill": "workspace:*",

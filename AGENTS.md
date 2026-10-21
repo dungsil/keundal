@@ -2,29 +2,29 @@
 
 ## 패키지 구성
 
-| 패키지                                 | 역할                                                                                 |
-| -------------------------------------- | ------------------------------------------------------------------------------------ |
-| `@keundal/ui`                          | 웹 UI의 공통 Vue 컴포넌트를 Nuxt 레이어로 제공합니다.                                |
-| `@keundal/chat-app`                    | web과 desktop이 공유하는 채팅 화면과 실행 코드를 Nuxt 레이어로 제공합니다.           |
-| `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.               |
-| `@keundal/agent-host`                  | Node.js에서 LLM·저장소·에이전트 플러그인을 조립하고 HTTP 계층에 서비스를 제공합니다. |
-| `@keundal/agent`                       | 에이전트 구현 계약과 공통 실행 루프를 제공합니다.                                    |
-| `@keundal/coding-agent`                | 에이전트 구현 계약을 확장한 코딩 작업용 에이전트입니다.                              |
-| `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                                           |
-| `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                                     |
-| `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                                         |
-| `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                               |
-| `@keundal/compaction`                  | 이전 대화를 요약하고 최근 대화를 보존하는 축약 함수를 제공합니다.                    |
-| `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.                        |
-| `@keundal/plugin-store-sqlite`         | SQLite 파일로 `session`과 `generation`을 구현합니다.                                 |
-| `@keundal/tsconfig`, `@keundal/tsdown` | 공통 TypeScript·빌드 설정을 제공합니다.                                              |
+| 패키지                                 | 역할                                                                       |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| `@keundal/ui`                          | 웹 UI의 공통 Vue 컴포넌트를 Nuxt 레이어로 제공합니다.                      |
+| `@keundal/chat-app`                    | web과 desktop이 공유하는 채팅 화면과 실행 코드를 Nuxt 레이어로 제공합니다. |
+| `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.     |
+| `@keundal/agent-host`                  | 주입받은 LLM·저장소·에이전트로 호스트와 HTTP 계층에 서비스를 제공합니다.   |
+| `@keundal/agent`                       | 에이전트 계약의 기본 실행 루프를 구현합니다.                               |
+| `@keundal/coding-agent`                | 에이전트 구현 계약을 확장한 코딩 작업용 에이전트입니다.                    |
+| `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                                 |
+| `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                           |
+| `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                               |
+| `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                     |
+| `@keundal/compaction`                  | 이전 대화를 요약하고 최근 대화를 보존하는 축약 함수를 제공합니다.          |
+| `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.              |
+| `@keundal/plugin-store-sqlite`         | SQLite 파일로 `session`과 `generation`을 구현합니다.                       |
+| `@keundal/tsconfig`, `@keundal/tsdown` | 공통 TypeScript·빌드 설정을 제공합니다.                                    |
 
 서비스 계약은 `packages/core/src/{llm,session,generation,compaction}.ts`에 정의하고, 구체 구현은 플러그인으로 주입합니다. 저장소가 공유하는 대화 병합과 실행 메시지 조립은 `packages/core/src/messages.ts`에 둡니다. AG-UI 타입, 이벤트 상수, 검증 기능은 `@keundal/core`에서 가져옵니다. `@ag-ui/core` 직접 의존은 코어의 프로토콜 래퍼에서만 관리합니다.
 
 기능 서비스의 계약과 Cordis Context 확장은 해당 기능 패키지에서 관리합니다.
 `FileSystemService`는 `@keundal/fs`에 두고 로컬 공급자와 정책 구현이 공유합니다.
-`ShellService`는 `@keundal/plugin-shell-local`에, `TranscriptionService`는 `@keundal/plugin-transcription-openai`에 둡니다.
-구현이 하나뿐이면 계약과 구현을 같은 패키지에 두고, 두 번째 구현이 생기면 계약 패키지를 분리합니다.
+`ShellService`는 `@keundal/shell`에, `TranscriptionService`는 `@keundal/transcription`에 둡니다.
+교체 가능한 서비스의 계약은 구현과 분리합니다. 소비자는 계약에 의존하고 앱에서 구현을 조립합니다.
 
 플러그인 설정과 사용법은 [에이전트 문서](packages/agent/README.md), [코딩 에이전트 문서](packages/coding-agent/README.md), [OpenAI 문서](packages/plugin-llm-openai/README.md), [Gemini 문서](packages/plugin-llm-gemini/README.md), [Anthropic 문서](packages/plugin-llm-anthropic/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [축약 문서](packages/compaction/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
 
@@ -47,7 +47,7 @@
 
 ## 에이전트 조합
 
-`@keundal/agent`는 에이전트 구현의 계약과 공통 실행 루프를 제공합니다. `agentPlugin`은 `llm`, `session`, `generation`을 주입받고 `@keundal/compaction`의 축약 함수를 직접 호출합니다. 축약 설정은 에이전트의 `compaction` 옵션으로 전달합니다. `ctx.agent.run(input, { signal })`은 AG-UI `RunAgentInput`을 받아 `AsyncIterable<AGUIEvent>`를 반환합니다.
+`@keundal/agent`는 `@keundal/agent-contract`의 계약을 구현하는 기본 실행 루프를 제공합니다. `agentPlugin`은 `llm`, `session`, `generation`을 주입받고 `@keundal/compaction`의 축약 함수를 직접 호출합니다. 축약 설정은 에이전트의 `compaction` 옵션으로 전달합니다. `ctx.agent.run(input, { signal })`은 AG-UI `RunAgentInput`을 받아 `AsyncIterable<AGUIEvent>`를 반환합니다.
 
 세션 입력을 준비한 뒤 컨텍스트 한도에서 출력 예산과 `reserveTokens`를 뺀 크기와 입력 크기를 비교합니다. `threshold`에 도달하면 백그라운드에서 축약을 준비하고, 예산을 넘으면 준비 결과를 기다리거나 동기 축약합니다. 준비 결과는 원본 메시지와 메타데이터가 일치할 때만 적용하고 추가 메시지를 보존하며 최신 토큰 수를 검사합니다. `compaction.models`로 모델별 정책을 재정의하고 `keepRecentTokens`로 최근 대화의 최소 보존 토큰 수를 지정합니다. 공급자의 컨텍스트 초과 오류는 해당 모델 요청의 첫 응답 이벤트 전에만 축약 후 한 번 재시도하며, 부분 응답과 완료된 도구는 다시 실행하지 않습니다. 축약 후에도 예산을 넘으면 생성을 시작하지 않습니다. 준비된 입력·revision·축약 결과는 `generation.run()`에 전달하고, 반환된 이벤트를 그대로 전달합니다. 준비 오류는 순회 중 예외로 전달합니다.
 
@@ -59,7 +59,7 @@
 
 ## 앱의 호스트 실행
 
-`apps/web`의 Nitro API와 `apps/desktop`의 sidecar는 `@keundal/agent-host`를 직접 사용합니다. 공통 HTTP 계약은 `@keundal/agent-host/http`에 두고, 환경 변수로 호스트와 요청 리스너를 조립하는 기능은 `@keundal/agent-host/runtime`에 둡니다. 웹은 `/api/agent/**`에서 요청을 처리하고 Nitro 종료 때 호스트를 정리합니다. 데스크톱의 프로세스 진입점과 번들은 `apps/desktop/sidecar`와 `dist-sidecar`에 둡니다. 데스크톱 호스트는 웹 서버에 의존하지 않습니다.
+`apps/web`의 Nitro API와 `apps/desktop`의 sidecar는 `@keundal/agent-runtime-node`에서 호스트를 조립합니다. 공통 HTTP 계약은 `@keundal/agent-host/http`에 두고, 환경 변수로 호스트와 요청 리스너를 조립하는 기능은 `@keundal/agent-runtime-node`에 둡니다. 웹은 `/api/agent/**`에서 요청을 처리하고 Nitro 종료 때 호스트를 정리합니다. 데스크톱의 프로세스 진입점과 번들은 `apps/desktop/sidecar`와 `dist-sidecar`에 둡니다. 데스크톱 호스트는 웹 서버에 의존하지 않습니다.
 
 ## 개발과 검증
 
@@ -116,3 +116,5 @@ pnpm lint
 
 - PR 제목은 [Commit Message Convention](#commit-message-convention)을 따릅니다.
 - PR 본문은 한국어로 작성하고 [PR 템플릿](.github/PULL_REQUEST_TEMPLATE.md)을 따릅니다.
+
+플랫폼별 구현 선택과 계약 패키지의 경계는 [플러그인 조립 문서](docs/plugin-composition.md)를 따릅니다. 공통 UI와 계약 패키지는 구현 플러그인에 실행 의존성을 추가하지 않습니다.
