@@ -39,7 +39,8 @@
     "striptags": "3.2.0",
     "tailwindcss": "^4.3.3",
     "vue": "3.5.44",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "@keundal/workspace-changes": "workspace:*"
   },
   "devDependencies": {
     "@keundal/plugin-store-memory": "workspace:*",

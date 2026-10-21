@@ -1,3 +1,5 @@
+import { resolve } from 'node:path'
+
 import agentPlugin, { type AgentConfig } from '@keundal/agent'
 import { loadAgentPlugin, type AgentPluginOptions, type LoadedAgentPlugin } from '@keundal/agent-plugins'
 import {
@@ -10,11 +12,15 @@ import {
   type SessionService
 } from '@keundal/core'
 import { McpClient, parseMcpServers, type McpClientConfig } from '@keundal/mcp'
+import localFileSystemPlugin from '@keundal/plugin-fs-local'
+import fileSystemPolicyPlugin from '@keundal/plugin-fs-policy'
 import anthropicLLMPlugin from '@keundal/plugin-llm-anthropic'
 import geminiLLMPlugin from '@keundal/plugin-llm-gemini'
 import openaiLLMPlugin from '@keundal/plugin-llm-openai'
 import skillPlugin from '@keundal/plugin-skill'
 import sqliteStorePlugin from '@keundal/plugin-store-sqlite'
+import fileSystemToolsPlugin from '@keundal/plugin-tool-fs'
+import { recordWorkspaceChanges, type WorkspaceChangesOptions } from '@keundal/workspace-changes'
 import { Context, type Fiber } from 'cordis'
 
 export interface AgentHostModel {
@@ -27,6 +33,9 @@ export interface AgentHostModel {
 export type AgentHostProvider = 'openai' | 'gemini' | 'anthropic'
 
 export interface AgentHostOptions {
+  readonly workspaceChanges?: WorkspaceChangesOptions
+  /** Enables guarded file tools inside this explicitly configured directory. */
+  readonly workspace?: string
   readonly mcpServers?: readonly McpClientConfig[]
   readonly provider: AgentHostProvider
   readonly apiKey: string
@@ -106,6 +115,9 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
   const mcpServers = parseMcpServers(options.mcpServers ?? [])
   const mcpClients = new Map<string, Promise<McpClient>>()
   const mcpLifetime = new globalThis.AbortController()
+  const workspace = options.workspace ? resolve(options.workspace) : undefined
+  const changes = options.workspaceChanges ?? (workspace ? { cwd: workspace } : undefined)
+  const wrapRunStream = changes ? recordWorkspaceChanges(changes) : undefined
   const ctx = new Context()
   const fibers: Fiber[] = []
   const plugins: LoadedAgentPlugin[] = []
@@ -164,13 +176,15 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         model: selected.id,
         maxOutputTokens,
         skills: plugins.length > 0,
+        wrapRunStream,
         maxToolRounds: options.maxToolRounds ?? 4,
         tools: async (execution) => {
           const signal = execution?.signal
             ? globalThis.AbortSignal.any([execution.signal, mcpLifetime.signal])
             : mcpLifetime.signal
           const tools = [
-            ...(typeof options.tools === 'function' ? await options.tools({ signal }) : (options.tools ?? []))
+            ...(typeof options.tools === 'function' ? await options.tools({ signal }) : (options.tools ?? [])),
+            ...(workspace ? ctx.fsTools.tools : [])
           ]
           for (const server of mcpServers) {
             signal.throwIfAborted()
@@ -202,6 +216,18 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
   }
 
   try {
+    if (workspace) {
+      const raw = ctx.isolate('fs')
+      fibers.push(await raw.plugin(localFileSystemPlugin, { cwd: workspace }))
+      fibers.push(
+        await ctx.plugin(fileSystemPolicyPlugin, {
+          backend: raw.fs,
+          roots: [workspace],
+          writableRoots: [workspace]
+        })
+      )
+      fibers.push(await ctx.plugin(fileSystemToolsPlugin))
+    }
     for (const config of options.plugins ?? []) plugins.push(await loadAgentPlugin(config))
     if (plugins.length)
       fibers.push(await ctx.plugin(skillPlugin, { providers: plugins.map((plugin) => plugin.skillProvider) }))

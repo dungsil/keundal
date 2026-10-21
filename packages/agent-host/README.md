@@ -54,3 +54,7 @@ API 키 없이 구성할 때는 `KEUNDAL_PROVIDER`를 명시합니다. HTTP 연�
 ## Agent Plugins
 
 `createAgentHost({ plugins })`와 `createAgentRuntime(env, { plugins })`는 Agent Plugins 1.0.0 패키지를 로드합니다. 각 설정에 `root`와 설치 인스턴스별 `dataDirectory`를 지정합니다. `mcp`를 명시한 경우에만 MCP 서버를 실행합니다. 호스트가 스킬 등록과 도구 조합, 종료 시 연결 정리를 담당합니다. 지원 범위와 권한 설정은 [Agent Plugins 문서](../agent-plugins/README.md)를 참고하세요.
+
+## 파일 변경 내역과 Diff
+
+`KEUNDAL_WORKSPACE`에 Git 작업 폴더의 경로를 지정하면 파일 도구와 턴별 변경 기록을 활성화합니다. API에서는 `workspace` 옵션을 사용합니다. 채팅 화면에 변경 파일, 추가·삭제 줄 수와 원본·수정본 비교를 표시하며, 기록은 SQLite journal에 남습니다. 등록된 도구의 구성을 그대로 두고 기록만 추가하려면 `workspaceChanges: { cwd }`를 사용합니다. 기록 범위와 크기 제한은 [변경 기록 문서](../workspace-changes/README.md)를 참고합니다.

@@ -33,7 +33,15 @@ export type { ExecutableTool, ToolExecutionContext } from './tools.js'
 
 export type ToolProvider = (options: ExecutionOptions) => readonly ExecutableTool[] | Promise<readonly ExecutableTool[]>
 
+export type RunStreamWrapper = (
+  events: AsyncIterable<LLMEvent>,
+  input: RunAgentInput,
+  options: ExecutionOptions
+) => AsyncIterable<LLMEvent>
+
 export interface AgentConfig {
+  /** Wraps the complete tool loop inside the durable generation journal. */
+  readonly wrapRunStream?: RunStreamWrapper
   readonly model: string
   readonly maxOutputTokens: number
   readonly webSearch?: boolean
@@ -76,6 +84,9 @@ export function parseAgentConfig(value: unknown): AgentConfig {
       throw new Error(`${key} must be a boolean`)
     }
   }
+  const wrapRunStream = 'wrapRunStream' in value ? value.wrapRunStream : undefined
+  if (wrapRunStream !== undefined && typeof wrapRunStream !== 'function')
+    throw new Error('wrapRunStream must be a function')
   const configuredTools = 'tools' in value ? value.tools : undefined
   const tools = typeof configuredTools === 'function' ? (configuredTools as ToolProvider) : parseTools(configuredTools)
   const skills = 'skills' in value ? (value.skills as boolean | undefined) : undefined
@@ -96,6 +107,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
   const parallelTools = 'parallelTools' in value ? value.parallelTools : false
   if (typeof parallelTools !== 'boolean') throw new Error('parallelTools must be a boolean')
   return {
+    wrapRunStream: wrapRunStream as RunStreamWrapper | undefined,
     model: value.model,
     maxOutputTokens: value.maxOutputTokens,
     ...('webSearch' in value ? { webSearch: value.webSearch as boolean | undefined } : {}),
@@ -289,6 +301,7 @@ export class Agent extends Service {
       }
 
       signal.throwIfAborted()
+      const wrapRunStream = this.config.wrapRunStream
       const generation = this.ctx.generation.run(
         {
           input: fitted.input,
@@ -308,7 +321,7 @@ export class Agent extends Service {
               yield { type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value: message }
             }
             generationSignal.throwIfAborted()
-            yield* tools.length
+            const events = tools.length
               ? streamWithTools(
                   llm,
                   generationRequest,
@@ -319,6 +332,7 @@ export class Agent extends Service {
                   { parallel, stream, maxToolCalls }
                 )
               : stream(generationRequest, { signal: generationSignal })
+            yield* wrapRunStream ? wrapRunStream(events, generationRequest.input, { signal: generationSignal }) : events
           }
         }
       )

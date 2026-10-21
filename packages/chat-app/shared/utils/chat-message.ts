@@ -1,3 +1,4 @@
+import { WORKSPACE_CHANGES_EVENT, isWorkspaceChanges, type WorkspaceChanges } from '@keundal/workspace-changes/shared'
 import { EventType, LLM_SOURCE_EVENT, MessageAssembly, prepareReplayMessages, type AGUIEvent, type AgentMessage, type LLMSource } from '@keundal/core'
 
 export type ChatStatus = 'ready' | 'submitted' | 'streaming' | 'error'
@@ -15,6 +16,8 @@ export type ToolInvocation<T extends { input: unknown, output: unknown } = { inp
 export type ToolPart = ToolInvocation & { type: `tool-${string}`, providerExecuted?: boolean }
 export type ChatPart = TextPart | FilePart | ToolPart
   | { type: 'source-url', sourceId: string, url: string, title?: string }
+  | { type: 'data-workspace-changes', data: WorkspaceChanges }
+  | { type: 'data-workspace-changes-ref', data: { runId: string } }
   | { type: 'data-keundal', data: { model: string, messages: AgentMessage[] } }
 
 /** Presentation state owned by the web app, not a provider or transport protocol. */
@@ -93,6 +96,11 @@ export class ChatMessageAssembly {
         break
       }
       case EventType.CUSTOM:
+        if (event.name === WORKSPACE_CHANGES_EVENT && isWorkspaceChanges(event.value) && event.value.runId === this.message.id) {
+          const existing = this.message.parts.find(part => part.type === 'data-workspace-changes')
+          if (existing?.type === 'data-workspace-changes') existing.data = event.value
+          else this.message.parts.push({ type: 'data-workspace-changes', data: event.value })
+        }
         if (event.name === LLM_SOURCE_EVENT) {
           const source = event.value as LLMSource
           if (!this.sources.has(source.id)) {

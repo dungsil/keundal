@@ -306,3 +306,31 @@ test('Agent Plugin 스킬을 호스트에 등록하고 종료하면 사용할 �
   await host.dispose()
   await expect(catalog.load('hello')).rejects.toThrow()
 })
+
+test('작업 폴더를 지정하면 기존 도구와 함께 파일 도구를 제공하고 폴더 밖 쓰기를 거부한다', async () => {
+  const database = sqlitePath()
+  const { dirname } = await import('node:path')
+  const workspace = dirname(database)
+  const host = await createAgentHost({
+    provider: 'openai',
+    apiKey: 'test-key',
+    model: 'test',
+    sqlitePath: database,
+    workspace
+  })
+  hosts.push(host)
+  const execute = (name: string, args: Record<string, unknown>) =>
+    host.ctx.fsTools.tools
+      .find((tool) => tool.name === name)!
+      .execute(args, {
+        threadId: 't',
+        runId: 'r',
+        toolCallId: 'c',
+        signal: new AbortController().signal
+      })
+  await execute('write_file', { path: 'new.txt', content: 'new\n' })
+  expect(JSON.parse(await execute('read_file', { path: 'new.txt' }))).toMatchObject({ content: 'new\n' })
+  await expect(execute('write_file', { path: '../outside.txt', content: 'outside' })).rejects.toThrow(
+    'outside allowed roots'
+  )
+})

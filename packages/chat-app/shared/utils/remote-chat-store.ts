@@ -1,3 +1,4 @@
+import { WORKSPACE_CHANGES_EVENT, isWorkspaceChanges, type WorkspaceChanges } from '@keundal/workspace-changes/shared'
 import { EventType, type AGUIEvent, type GenerationSnapshot, type SessionSnapshot } from '@keundal/core'
 import { ChatMessageAssembly } from './chat-message'
 import type { ChatMessage } from './chat-message'
@@ -81,7 +82,37 @@ export class RemoteChatStore implements ChatStoreLike {
     const response = await this.raw(`/threads/${encodeURIComponent(id)}`)
     if (response.status === 404) return undefined
     if (!response.ok) throw new Error(`Keundal host request failed (HTTP ${response.status})`)
-    return this.chat(this.snapshot(await response.json()))
+    const chat = this.chat(this.snapshot(await response.json()))
+    if (!chat) return undefined
+    return { ...chat, messages: await Promise.all(chat.messages.map(async message => ({
+      ...message,
+      parts: await Promise.all(message.parts.map(async (part) => {
+        if (part.type !== 'data-workspace-changes-ref') return part
+        let data: WorkspaceChanges = { version: 1, runId: part.data.runId, status: 'unavailable', files: [] }
+        try {
+          const response = await this.call(`/runs/${encodeURIComponent(part.data.runId)}`)
+          const run = await response.json() as GenerationSnapshot
+          if (run.request.input.threadId === id) {
+            for (const { event } of run.journal) {
+              if (event.type === EventType.CUSTOM && event.name === WORKSPACE_CHANGES_EVENT
+                && isWorkspaceChanges(event.value) && event.value.runId === part.data.runId) data = event.value
+            }
+          }
+        } catch {
+          // A missing journal must not make the rest of a conversation unreadable.
+        }
+        return { type: 'data-workspace-changes' as const, data }
+      }))
+    }))) }
+  }
+
+  private persistedChat(chat: LocalChat): LocalChat {
+    return { ...chat, messages: chat.messages.map(message => ({
+      ...message,
+      parts: message.parts.map(part => part.type === 'data-workspace-changes'
+        ? { type: 'data-workspace-changes-ref' as const, data: { runId: part.data.runId } }
+        : part)
+    })) }
   }
 
   private async save(snapshot: SessionSnapshot | undefined, chat: LocalChat) {
@@ -91,7 +122,7 @@ export class RemoteChatStore implements ChatStoreLike {
         expectedRevision: snapshot?.revision ?? 0,
         mode: 'replace',
         messages: toMessages(chat.messages, chat.model),
-        state: { web: chat }
+        state: { web: this.persistedChat(chat) }
       })
     })
     return this.snapshot(await response.json())
@@ -247,7 +278,7 @@ export class RemoteChatStore implements ChatStoreLike {
           body: JSON.stringify({
             threadId: id,
             runId,
-            state: { web: chat },
+            state: { web: this.persistedChat(chat) },
             context: [],
             tools: [],
             messages: [

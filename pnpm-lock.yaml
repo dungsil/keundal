@@ -406,6 +406,18 @@ importers:
 
   packages/agent-host:
     dependencies:
+      '@keundal/workspace-changes':
+        specifier: workspace:*
+        version: link:../workspace-changes
+      '@keundal/plugin-fs-local':
+        specifier: workspace:*
+        version: link:../plugin-fs-local
+      '@keundal/plugin-fs-policy':
+        specifier: workspace:*
+        version: link:../plugin-fs-policy
+      '@keundal/plugin-tool-fs':
+        specifier: workspace:*
+        version: link:../plugin-tool-fs
       '@keundal/mcp':
         specifier: workspace:*
         version: link:../mcp
@@ -1237,6 +1249,43 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
+  packages/workspace-changes:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      diff:
+        specifier: 8.0.4
+        version: 8.0.4
+    devDependencies:
+      '@keundal/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@keundal/plugin-store-sqlite':
+        specifier: workspace:*
+        version: link:../plugin-store-sqlite
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   tools/store-conformance:
     dependencies:
       '@keundal/core':
@@ -1267,6 +1316,9 @@ importers:
 
   packages/chat-app:
     dependencies:
+      '@keundal/workspace-changes':
+        specifier: workspace:*
+        version: link:../workspace-changes
       '@keundal/mcp':
         specifier: workspace:*
         version: link:../mcp

@@ -40,6 +40,7 @@ export async function createAgentRuntime(
   if (sqlitePath !== ':memory:') mkdirSync(dirname(sqlitePath), { recursive: true })
   const host = await createAgentHost({
     tools: options.tools,
+    workspace: env.KEUNDAL_WORKSPACE || undefined,
     plugins: options.plugins,
     provider,
     mcpServers: env.KEUNDAL_MCP_SERVERS ? JSON.parse(env.KEUNDAL_MCP_SERVERS) : [],

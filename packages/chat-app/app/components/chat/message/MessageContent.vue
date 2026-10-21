@@ -16,8 +16,9 @@ const emit = defineEmits<{
 
 <template>
   <template v-for="(part, index) in getMergedParts(message.parts)" :key="`${message.id}-${part.type}-${index}`">
+    <ChatMessageWorkspaceChanges v-if="part.type === 'data-workspace-changes'" :changes="part.data" />
     <UChatReasoning
-      v-if="part.type === 'reasoning'"
+      v-else-if="part.type === 'reasoning'"
       :text="part.text"
       :streaming="part.state === 'streaming'"
       chevron="leading"

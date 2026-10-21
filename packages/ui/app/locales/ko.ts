@@ -1,6 +1,31 @@
 import type en from './en'
 
 export default {
+  'changes.baseline': '턴 시작 시 비교 대상에서 제외된 파일입니다.',
+  'changes.title': '변경 파일',
+  'changes.count': '{count}개 파일',
+  'changes.partial': '현재까지 기록',
+  'changes.unavailable': '변경 내역을 기록하지 못했습니다. Git 작업 폴더와 기록 제한을 확인하세요.',
+  'changes.empty': '기록된 변경이 없습니다.',
+  'changes.added': '생성',
+  'changes.modified': '수정',
+  'changes.deleted': '삭제',
+  'changes.binary': '바이너리 파일',
+  'changes.oversized': '파일이 비교 크기 제한을 초과했습니다.',
+  'changes.unsupported': '이 파일 형식은 비교하지 않습니다.',
+  'changes.unreadable': '파일을 읽지 못했습니다.',
+  'changes.budget': '스냅샷 저장 크기 제한에 도달했습니다.',
+  'changes.diff': 'Diff',
+  'changes.before': '원본',
+  'changes.after': '수정본',
+  'changes.coarse': '비교 제한에 도달하여 파일 전체를 교체한 것으로 표시합니다.',
+  'changes.noNewline': '파일 끝 개행 없음',
+  'changes.noLines': '변경된 텍스트 줄이 없습니다.',
+  'changes.rowLimit': 'Diff는 최대 2,000줄까지 표시합니다. 원본이나 수정본에서 기록된 전체 내용을 확인하세요.',
+  'changes.emptyFile': '(빈 파일 또는 파일 없음)',
+  'changes.coverage':
+    'Git 작업 폴더의 파일을 비교합니다. 무시된 파일과 서브모듈 내부는 제외하며, 실행 중 다른 작업의 수정이 포함될 수 있습니다.',
+
   'common.save': '저장',
   'common.cancel': '취소',
   'common.delete': '삭제',
