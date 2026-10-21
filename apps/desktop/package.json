@@ -18,7 +18,7 @@
     "typecheck": "nuxt typecheck && tsc -p tsconfig.sidecar.json",
     "build:ui": "nuxt generate",
     "postinstall": "nuxt prepare",
-    "lint": "eslint ."
+    "lint": "oxlint ."
   },
   "dependencies": {
     "@keundal/chat-app": "workspace:*",
@@ -38,7 +38,6 @@
     "@keundal/tsconfig": "workspace:*",
     "@tauri-apps/cli": "2.12.3",
     "@types/node": "catalog:",
-    "eslint": "^10.12.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
