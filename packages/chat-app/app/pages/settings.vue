@@ -73,7 +73,7 @@ useHead(() => ({ title: t('settings.title') }))
               </div>
               <div class="flex items-center justify-between gap-3">
                 <span class="text-sm font-medium text-highlighted">{{ t('settings.colorMode') }}</span>
-                <UColorModeButton />
+                <UColorModeSwitch :aria-label="t('settings.colorMode')" />
               </div>
             </section>
             <ClientOnly>
