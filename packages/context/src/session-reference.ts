@@ -52,6 +52,7 @@ export interface SessionReferenceCandidate {
 }
 
 export interface SessionReferenceConfig {
+  /** Maximum distinct sessions newly read across one prepare request. */
   maxReferences?: number
   candidateLimit?: number
   maxReferenceBytes?: number
@@ -253,10 +254,12 @@ export class SessionReferenceResolver extends Service {
         if (seen.has(reference.sessionId)) continue
         seen.add(reference.sessionId)
         messageReferences.push(reference)
-        if (!sourceInputs.has(reference.sessionId)) sourceInputs.set(reference.sessionId, reference)
+        if (!sourceInputs.has(reference.sessionId)) {
+          if (sourceInputs.size >= this.config.maxReferences)
+            throw new SessionReferenceError('too many distinct session references', 'SESSION_REFERENCE_TOO_MANY')
+          sourceInputs.set(reference.sessionId, reference)
+        }
       }
-      if (messageReferences.length > this.config.maxReferences)
-        throw new SessionReferenceError('too many distinct session references', 'SESSION_REFERENCE_TOO_MANY')
       if (messageReferences.some((reference) => reference.sessionId === request.threadId))
         throw new SessionReferenceError('cannot reference the current session', 'SESSION_REFERENCE_SELF_REFERENCE')
       refsByMessage.set(item.message.id, messageReferences)
@@ -275,7 +278,23 @@ export class SessionReferenceResolver extends Service {
         }
       })
     )
-    const prepared = new Map<string, { references: Record<string, unknown>[]; notices: unknown[] }>()
+    const maxBytes =
+      this.config.maxReferenceBytes ??
+      Math.max(
+        DEFAULT_MAX_REFERENCE_BYTES,
+        Math.floor((contextWindow ?? 0) * 4 * (this.config.referenceContextFraction ?? 0.2))
+      )
+    const maxRequestBytes = maxBytes * this.config.maxReferences
+    let preparedBytes = 0
+    const budgetExceeded = () =>
+      new SessionReferenceError(
+        'session references exceed the request byte budget',
+        'SESSION_REFERENCE_BUDGET_EXCEEDED'
+      )
+    const retainedCaptures = new Map<string, ReturnType<typeof retainCapture>>()
+    type SpillOutcome = { status: 'saved'; locator: string } | { status: 'unavailable' | 'failed' }
+    const spillOutcomes = new Map<string, SpillOutcome>()
+    const prepared = new Map<string, string>()
     for (const item of parsed) {
       const messageReferences = refsByMessage.get(item.message.id)
       if (!messageReferences || messageReferences.length === 0) continue
@@ -285,20 +304,33 @@ export class SessionReferenceResolver extends Service {
         const source = captures.get(reference.sessionId)
         if (!source) throw readFailure(new Error('captured session is unavailable'))
         const label = reference.label || titleOf(source.snapshot) || reference.sessionId
-        const maxBytes =
-          this.config.maxReferenceBytes ??
-          Math.max(
-            DEFAULT_MAX_REFERENCE_BYTES,
-            Math.floor((contextWindow ?? 0) * 4 * (this.config.referenceContextFraction ?? 0.2))
-          )
-        const retained = retainCapture(source.snapshot, label, source.captured, maxBytes)
+        const captureKey = JSON.stringify([reference.sessionId, label])
+        let retained = retainedCaptures.get(captureKey)
+        if (!retainedCaptures.has(captureKey)) {
+          retained = retainCapture(source.snapshot, label, source.captured, maxBytes)
+          retainedCaptures.set(captureKey, retained)
+        }
         if (!retained)
           throw new SessionReferenceError(
             'referenced session cannot fit its byte budget',
             'SESSION_REFERENCE_BUDGET_EXCEEDED'
           )
-        let spillOutcome: { status: 'saved'; locator: string } | { status: 'unavailable' | 'failed' } | undefined
-        if (retained.omittedMessages > 0 || retained.omittedBytes > 0) {
+        group.references.push({
+          sessionId: reference.sessionId,
+          label,
+          cwd: metadataString(source.snapshot.state, 'cwd') ?? null,
+          capturedThroughRevision: source.snapshot.revision,
+          conversation: retained.conversation,
+          originalMessages: retained.originalMessages,
+          retainedMessages: retained.conversation.length,
+          omittedMessages: retained.omittedMessages,
+          omittedBytes: retained.omittedBytes,
+          truncated: retained.omittedMessages > 0 || retained.omittedBytes > 0
+        })
+        if (preparedBytes + Buffer.byteLength(renderSnapshot(group.references, group.notices)) > maxRequestBytes)
+          throw budgetExceeded()
+        let spillOutcome = spillOutcomes.get(reference.sessionId)
+        if (!spillOutcome && (retained.omittedMessages > 0 || retained.omittedBytes > 0)) {
           if (!this.config.spill) spillOutcome = { status: 'unavailable' }
           else {
             try {
@@ -320,18 +352,7 @@ export class SessionReferenceResolver extends Service {
             }
           }
         }
-        group.references.push({
-          sessionId: reference.sessionId,
-          label,
-          cwd: metadataString(source.snapshot.state, 'cwd') ?? null,
-          capturedThroughRevision: source.snapshot.revision,
-          conversation: retained.conversation,
-          originalMessages: retained.originalMessages,
-          retainedMessages: retained.conversation.length,
-          omittedMessages: retained.omittedMessages,
-          omittedBytes: retained.omittedBytes,
-          truncated: retained.omittedMessages > 0 || retained.omittedBytes > 0
-        })
+        if (spillOutcome) spillOutcomes.set(reference.sessionId, spillOutcome)
         if (spillOutcome)
           group.notices.push({
             sessionId: reference.sessionId,
@@ -341,7 +362,10 @@ export class SessionReferenceResolver extends Service {
             spill: spillOutcome
           })
       }
-      prepared.set(item.message.id, group)
+      const rendered = renderSnapshot(group.references, group.notices)
+      preparedBytes += Buffer.byteLength(rendered)
+      if (preparedBytes > maxRequestBytes) throw budgetExceeded()
+      prepared.set(item.message.id, rendered)
     }
     if (parsed.length === 0) return input
     const messages = [...input.messages]
@@ -357,7 +381,7 @@ export class SessionReferenceResolver extends Service {
       const existing = latestContextMessage(input, key)
       const group = prepared.get(item.message.id)
       if (!group && !existing) continue
-      const context = group ? contextMessage(key, renderSnapshot(group.references, group.notices)) : existing
+      const context = group ? contextMessage(key, group) : existing
       if (!context) continue
       const contextIndex = messages.findIndex((message) => message.id === context.id)
       if (contextIndex === index + 1) continue
