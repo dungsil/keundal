@@ -186,6 +186,7 @@ function appendTranscript(text: string) {
         </button>
       </div>
     </div>
+    <!-- Keep the native textbox role: a combobox role is invalid on textarea and hides the input from Windows UI Automation. -->
     <UChatPrompt
       ref="prompt"
       v-model="input"
@@ -194,9 +195,7 @@ function appendTranscript(text: string) {
       :disabled="uploading || disabled"
       :placeholder="placeholder"
       :aria-label="t('chat.prompt')"
-      role="combobox"
       aria-haspopup="listbox"
-      :aria-expanded="commandsOpen"
       :aria-controls="commandsOpen ? listId : undefined"
       :aria-activedescendant="commandsOpen && matches.length ? `${listId}-${selected}` : undefined"
       aria-autocomplete="list"
