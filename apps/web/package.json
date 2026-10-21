@@ -24,6 +24,7 @@
     "@nuxt/eslint": "^1.17.0",
     "@types/node": "^24.19.2",
     "eslint": "^10.12.0",
+    "htmlparser2": "12.0.0",
     "typescript": "^6.0.3",
     "vitest": "catalog:",
     "vue-tsc": "^3.3.13",

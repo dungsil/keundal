@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { en, ko } from '@nuxt/ui/locale'
+import { greetingTimeScript } from './utils/greeting'
 
 const { locale, t } = useLocale()
 const uiLocale = computed(() => locale.value === 'ko' ? ko : en)
@@ -16,6 +17,13 @@ useHead({
   ],
   link: [
     { rel: 'icon', href: '/favicon.ico' }
+  ],
+  script: [
+    {
+      key: 'greeting-time',
+      tagPriority: 'critical',
+      innerHTML: greetingTimeScript
+    }
   ],
   htmlAttrs: {
     lang: locale

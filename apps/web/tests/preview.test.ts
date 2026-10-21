@@ -1,7 +1,30 @@
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { createServer } from 'node:net'
+import { runInNewContext } from 'node:vm'
+import { DomUtils, parseDocument } from 'htmlparser2'
 import { expect, onTestFinished, test } from 'vitest'
+import { translate } from '../../../packages/ui/app/utils/locale'
+
+function readHeadScripts(html: string) {
+  const document = parseDocument(html)
+  const head = DomUtils.findOne(node => node.name === 'head', document.children)
+  return head
+    ? DomUtils.findAll(node => node.name === 'script', head.children).map(node => DomUtils.textContent(node))
+    : []
+}
+
+test.each([
+  { name: '일반 태그', start: 'script', end: 'script', attributes: '' },
+  { name: '대문자 태그', start: 'SCRIPT', end: 'SCRIPT', attributes: '' },
+  { name: '닫는 태그의 공백', start: 'script', end: 'script ', attributes: '' },
+  { name: '혼합 대소문자와 줄바꿈', start: 'ScRiPt', end: 'sCrIpT\t\n ', attributes: '' },
+  { name: '속성 안의 꺾쇠', start: 'script', end: 'script', attributes: ' data-note=">"' }
+])('$name: head의 스크립트 내용을 정확히 읽는다', ({ start, end, attributes }) => {
+  const source = 'document.documentElement.dataset.greetingTime = "morning"'
+  const html = `<head><${start}${attributes}>${source}</${end}></head><body><script>ignore</script></body>`
+  expect(readHeadScripts(html)).toEqual([source])
+})
 
 test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이 렌더링한다', async () => {
   const listener = createServer().listen(0, '127.0.0.1')
@@ -43,6 +66,19 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(response.status, html).toBe(200)
     expect(response.headers.get('content-type')).toContain('text/html')
     expect(html).toContain('id="__nuxt"')
+    if (path === '/') {
+      const script = readHeadScripts(html)
+        .find(content => content?.includes('dataset.greetingTime'))
+      expect(script, '앱 스크립트 실행 전에 인사말을 선택해야 한다').toBeDefined()
+      for (const [hour, period] of [[0, 'morning'], [11, 'morning'], [12, 'afternoon'], [17, 'afternoon'], [18, 'evening'], [23, 'evening']] as const) {
+        const dataset: Record<string, string> = {}
+        runInNewContext(script!, {
+          document: { documentElement: { dataset } },
+          Date: class { getHours() { return hour } }
+        })
+        expect(dataset.greetingTime, `${hour}시`).toBe(period)
+      }
+    }
     expect(html.match(/<button\b[^>]*aria-label="Skills"/), path).not.toBeNull()
     expect(html.match(/<a\b[^>]*aria-label="Settings"/), path).not.toBeNull()
   }
@@ -58,6 +94,12 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(response.status).toBe(200)
     expect(html).toContain(`lang="${language}"`)
     expect(html).toContain(label)
+    const heading = /<h1\b[^>]*>([\s\S]*?)<\/h1>/.exec(html)?.[1]
+    expect(heading).toBeDefined()
+    for (const period of ['morning', 'afternoon', 'evening'] as const) {
+      expect(heading).toContain(`data-greeting="${period}"`)
+      expect(heading).toContain(translate(language === 'ko' ? 'ko' : 'en', `greeting.${period}`))
+    }
     expect(html).toContain(`aria-label="${language === 'ko' ? '스킬' : 'Skills'}"`)
     expect(html).toContain(`aria-label="${language === 'ko' ? '설정' : 'Settings'}"`)
     const settings = await fetch(new URL('/settings', origin), { headers })
