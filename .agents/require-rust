@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+for tool in rustc cargo; do
+  if ! command -v "$tool" >/dev/null 2>&1 || ! "$tool" --version >/dev/null 2>&1; then
+    echo "Rust prerequisite unavailable: $tool. Provision a trusted Rust toolchain in the development image, then rerun .agents/setup. Setup does not download or execute a Rust installer." >&2
+    exit 1
+  fi
+done

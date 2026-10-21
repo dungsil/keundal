@@ -102,3 +102,8 @@ pnpm --filter @keundal/desktop bundle
 
 [Cordis]: https://github.com/cordiverse/cordis
 [AG-UI]: https://github.com/ag-ui-protocol/ag-ui
+
+`.agents/setup`을 실행할 개발 이미지에는 신뢰할 수 있는 Rust 도구 체인을 미리 준비해야 합니다.
+스크립트는 `rustc`와 `cargo`를 실행할 수 있는지 먼저 확인하며, 없거나 실행에 실패하면
+설치를 중단합니다. Rust 설치 프로그램을 자동으로 내려받아 실행하지 않습니다.
+이 준비 조건은 `node --test .agents/tests/require-rust.test.mjs`로 검증할 수 있습니다.

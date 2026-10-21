@@ -15,6 +15,10 @@ apps/web/*.sqlite*
 .agents/*
 !.agents/setup
 !.agents/resume
+!.agents/require-rust
+!.agents/tests/
+.agents/tests/*
+!.agents/tests/require-rust.test.mjs
 .amp/portals/
 .codex/
 .claude/

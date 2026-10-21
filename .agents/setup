@@ -3,6 +3,10 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+# Check trusted prerequisites before downloading or changing the environment.
+export PATH="$HOME/.cargo/bin:$PATH"
+bash .agents/require-rust
+
 export PNPM_HOME="$HOME/.local/share/pnpm"
 export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH"
 package_manager="$(node -p 'require("./package.json").packageManager')"
@@ -32,11 +36,6 @@ echo "Toolchain ready in ${SECONDS}s: $(node --version), pnpm $(pnpm --version)"
 
 echo 'Preparing Rust for desktop builds and tests'
 SECONDS=0
-export PATH="$HOME/.cargo/bin:$PATH"
-if ! command -v rustc >/dev/null 2>&1; then
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
-    sh -s -- -y --profile minimal --default-toolchain stable --no-modify-path
-fi
 profile_marker='# Keundal orb Rust toolchain'
 if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
   cat >> "$HOME/.bash_profile" <<'EOF'
