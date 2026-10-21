@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { spawn } from 'node:child_process'
 import { realpathSync, statSync } from 'node:fs'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { isAbsolute, relative, resolve, sep, win32 } from 'node:path'
 import process from 'node:process'
 import { clearTimeout, setTimeout } from 'node:timers'
 import { TextDecoder } from 'node:util'
@@ -32,9 +32,17 @@ function pathString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0 && !value.includes('\0')
 }
 
+function windowsExecutablePath(value: unknown, name: string): string {
+  if (!pathString(value) || !win32.isAbsolute(value) || /^[\\/]+$/.test(win32.parse(value).root)) {
+    throw new TypeError(`${name} must be a fully qualified Windows path`)
+  }
+  return value
+}
+
 export class LocalShellService extends ShellService {
   private readonly root: string
   private readonly shell: string
+  private readonly taskkill: string | undefined
   private readonly timeoutMs: number
   private readonly maxOutputBytes: number
   private readonly killGraceMs: number
@@ -47,7 +55,16 @@ export class LocalShellService extends ShellService {
     this.root = realpathSync(config.cwd)
     if (!statSync(this.root).isDirectory()) throw new TypeError('cwd must be a directory')
     if (config.shell !== undefined && !pathString(config.shell)) throw new TypeError('invalid shell executable')
-    this.shell = config.shell ?? (process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : '/bin/sh')
+    const systemDirectory =
+      process.platform === 'win32'
+        ? win32.join(windowsExecutablePath(process.env.SystemRoot, 'SystemRoot'), 'System32')
+        : undefined
+    this.taskkill = systemDirectory ? win32.join(systemDirectory, 'taskkill.exe') : undefined
+    this.shell =
+      config.shell ??
+      (systemDirectory
+        ? windowsExecutablePath(process.env.ComSpec ?? win32.join(systemDirectory, 'cmd.exe'), 'ComSpec')
+        : '/bin/sh')
     this.timeoutMs = positive(config.timeoutMs === undefined ? 120000 : config.timeoutMs, 'timeoutMs')
     this.maxOutputBytes = positive(
       config.maxOutputBytes === undefined ? 64000 : config.maxOutputBytes,
@@ -118,7 +135,7 @@ export class LocalShellService extends ShellService {
       const kill = (force: boolean) => {
         if (!child.pid) return
         if (windows) {
-          const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+          const killer = spawn(this.taskkill!, ['/PID', String(child.pid), '/T', '/F'], {
             stdio: 'ignore',
             windowsHide: true
           })
