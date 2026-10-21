@@ -13,7 +13,7 @@ export function useLLMSettings() {
       return true
     } catch {
       void navigateTo({
-        path: '/settings',
+        path: '/settings/llm',
         query: { provider: provider.id, returnTo: route.path }
       })
       return false
