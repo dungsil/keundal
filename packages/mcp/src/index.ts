@@ -5,6 +5,7 @@ import { Client, StreamableHTTPClientTransport, type RequestOptions } from '@mod
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 
 import { CatalogDiscovery } from './catalog-budget.ts'
+import { boundedMcpPages, DEFAULT_MAX_RESULT_BYTES, McpResultBudget, resultBytes } from './result-budget.js'
 
 export interface McpPermissions {
   readonly tools?: '*' | readonly string[]
@@ -15,6 +16,7 @@ export type McpClientConfig = {
   readonly serverName: string
   readonly permissions?: McpPermissions
   readonly timeoutMs?: number
+  readonly maxResultBytes?: number
 } & (
   | {
       readonly transport: 'stdio'
@@ -55,14 +57,17 @@ export class McpClient {
   private readonly permissions: McpPermissions
   private closing?: Promise<void>
   private readonly catalog: CatalogDiscovery
+  private readonly resultBudget: McpResultBudget
 
   private constructor(
     private readonly client: Client,
     private readonly transport: StdioClientTransport | StreamableHTTPClientTransport,
     readonly serverName: string,
     private readonly timeoutMs: number,
-    permissions: McpPermissions
+    permissions: McpPermissions,
+    private readonly maxResultBytes: number
   ) {
+    this.resultBudget = new McpResultBudget(transport, maxResultBytes)
     this.catalog = new CatalogDiscovery(transport)
     this.permissions = {
       tools: permissions.tools === '*' ? '*' : [...(permissions.tools ?? [])],
@@ -78,6 +83,9 @@ export class McpClient {
     }
     const timeoutMs = config.timeoutMs ?? 60_000
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw new Error('timeoutMs must be a positive integer')
+    const maxResultBytes = config.maxResultBytes ?? DEFAULT_MAX_RESULT_BYTES
+    if (!Number.isSafeInteger(maxResultBytes) || maxResultBytes <= 0)
+      throw new Error('maxResultBytes must be a positive integer')
     const transport =
       config.transport === 'stdio'
         ? new StdioClientTransport({
@@ -103,7 +111,7 @@ export class McpClient {
     try {
       await client.connect(transport, { signal: options.signal, timeout: timeoutMs })
       options.signal?.throwIfAborted()
-      return new McpClient(client, transport, config.serverName, timeoutMs, config.permissions ?? {})
+      return new McpClient(client, transport, config.serverName, timeoutMs, config.permissions ?? {}, maxResultBytes)
     } catch (error) {
       await closing
       await client.close()
@@ -133,11 +141,13 @@ export class McpClient {
             if (definition.execution?.taskSupport === 'required') {
               throw new Error(`MCP task execution is not supported: ${definition.name}`)
             }
-            const result = await this.client.callTool(
-              { name: definition.name, arguments: args },
-              { ...execution, toolDefinition: definition }
+            const result = await this.resultBudget.run(() =>
+              this.client.callTool(
+                { name: definition.name, arguments: args },
+                { ...execution, toolDefinition: definition }
+              )
             )
-            if (result.isError) throw new Error(`MCP tool failed: ${definition.name}: ${JSON.stringify(result)}`)
+            if (result.isError) throw new Error(`MCP tool failed: ${JSON.stringify(result)}`)
             return JSON.stringify(result)
           }
         })
@@ -198,23 +208,49 @@ export class McpClient {
     if (this.permissions.resources !== '*' && !this.permissions.resources?.length) {
       throw new Error(`MCP resource access denied: ${this.serverName}`)
     }
-    const result = await this.client.listResources(undefined, { ...request, cacheMode: 'refresh' })
-    return {
-      ...result,
-      resources: result.resources.filter((resource) => allows(this.permissions.resources, resource.uri))
+    if (!this.client.getServerCapabilities()?.resources) return { resources: [] }
+    const pages = await boundedMcpPages(
+      (cursor) =>
+        this.resultBudget.run(() =>
+          this.client.request({ method: 'resources/list', params: cursor === undefined ? {} : { cursor } }, request)
+        ),
+      (page) => page.resources,
+      this.maxResultBytes
+    )
+    const { nextCursor: _cursor, ...first } = pages.first
+    const result = {
+      ...first,
+      resources: pages.items.filter((resource) => allows(this.permissions.resources, resource.uri))
     }
+    resultBytes(result, this.maxResultBytes)
+    return result
   }
 
   async listResourceTemplates(options: McpRequestOptions = {}) {
     const request = this.requestOptions(options)
     if (this.permissions.resources !== '*') throw new Error(`MCP resource template access denied: ${this.serverName}`)
-    return this.client.listResourceTemplates(undefined, { ...request, cacheMode: 'refresh' })
+    if (!this.client.getServerCapabilities()?.resources) return { resourceTemplates: [] }
+    const pages = await boundedMcpPages(
+      (cursor) =>
+        this.resultBudget.run(() =>
+          this.client.request(
+            { method: 'resources/templates/list', params: cursor === undefined ? {} : { cursor } },
+            request
+          )
+        ),
+      (page) => page.resourceTemplates,
+      this.maxResultBytes
+    )
+    const { nextCursor: _cursor, ...first } = pages.first
+    const result = { ...first, resourceTemplates: pages.items }
+    resultBytes(result, this.maxResultBytes)
+    return result
   }
 
   async readResource(uri: string, options: McpRequestOptions = {}) {
     const request = this.requestOptions(options)
     if (!allows(this.permissions.resources, uri)) throw new Error(`MCP resource access denied: ${uri}`)
-    return this.client.readResource({ uri }, { ...request, cacheMode: 'refresh' })
+    return this.resultBudget.run(() => this.client.request({ method: 'resources/read', params: { uri } }, request))
   }
 
   close(): Promise<void> {
