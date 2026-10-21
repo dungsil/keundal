@@ -15,6 +15,11 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-06-30',
   vite: { optimizeDeps: { include: ['striptags'] } },
   eslint: { config: { stylistic: { commaDangle: 'never', braceStyle: '1tbs' } } },
+  fonts: {
+    families: [
+      { name: 'Pretendard', provider: 'npm', weights: [400, 500, 700], global: true, preload: true }
+    ]
+  },
   icon: {
     provider: 'none',
     clientBundle: {
