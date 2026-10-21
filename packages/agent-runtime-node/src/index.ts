@@ -1,6 +1,6 @@
-import process from 'node:process'
+import type { RuntimePluginManifest } from '@keundal/plugin-runtime'
 
-import { createAgentHost, type AgentHostOptions, type AgentHost } from '@keundal/agent-host'
+import { createAgentHost, type AgentHostModel, type AgentHostOptions, type AgentHost } from '@keundal/agent-host'
 import { createAgentApp, type AgentAppOptions } from '@keundal/agent-host/http'
 import type { AgentPluginOptions, LoadedAgentPlugin } from '@keundal/agent-plugins'
 import type { McpClientConfig } from '@keundal/mcp'
@@ -8,7 +8,7 @@ import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 
 export { createNodeComposition } from './default-composition.js'
 
-export type AgentHostProvider = 'openai' | 'gemini' | 'anthropic'
+export type AgentHostProvider = 'openai' | 'gemini' | 'anthropic' | (string & {})
 export interface NodeHostOptions {
   readonly plugins?: readonly AgentPluginOptions[]
   readonly mcpServers?: readonly McpClientConfig[]
@@ -17,7 +17,7 @@ export interface NodeHostOptions {
   /** 기본 모델 ID입니다. `models`에 포함되어야 합니다. */
   readonly model: string
   /** 사용할 수 있는 모델과 한도입니다. */
-  readonly models?: Readonly<Record<string, Omit<import('@keundal/agent-host').AgentHostModel, 'id' | 'provider'>>>
+  readonly models?: Readonly<Record<string, Omit<AgentHostModel, 'id' | 'provider'>>>
   readonly sqlitePath: string
   readonly maxOutputTokens?: number
   readonly tools?: readonly ExecutableTool[] | ToolProvider
@@ -26,6 +26,9 @@ export interface NodeHostOptions {
   readonly maxToolRounds?: number
   readonly baseURL?: string
   readonly headers?: Readonly<Record<string, string>>
+  readonly runtimePlugins?: RuntimePluginManifest
+  readonly runtimePluginBasePath?: string
+  readonly pluginConfigPath?: string
 }
 
 export type HostComposition = Pick<AgentHostOptions, 'setup' | 'mountAgent' | 'toolCatalog'> & {
@@ -53,18 +56,23 @@ export interface AgentRuntime extends AgentHost {
 /** 웹 서버와 데스크톱이 같은 환경 설정으로 호스트를 조립합니다. */
 export async function createAgentRuntime(
   env: Readonly<Record<string, string | undefined>> = process.env,
-  options: Pick<NodeHostOptions, 'tools' | 'plugins' | 'subagents' | 'maxActiveSubagents'> & {
+  options: Pick<
+    NodeHostOptions,
+    'tools' | 'plugins' | 'subagents' | 'maxActiveSubagents' | 'runtimePlugins' | 'runtimePluginBasePath'
+  > & {
     compose: HostCompositionFactory
   }
 ): Promise<AgentRuntime> {
   const provider = (env.KEUNDAL_PROVIDER ||
     (env.OPENAI_API_KEY ? 'openai' : env.GEMINI_API_KEY ? 'gemini' : 'anthropic')) as AgentHostProvider
-  if (!['openai', 'gemini', 'anthropic'].includes(provider)) {
-    throw new Error('KEUNDAL_PROVIDER는 openai, gemini, anthropic 중 하나여야 합니다.')
-  }
   const apiKey =
-    provider === 'openai' ? env.OPENAI_API_KEY : provider === 'gemini' ? env.GEMINI_API_KEY : env.ANTHROPIC_API_KEY
-  const model = env.KEUNDAL_MODEL
+    provider === 'openai'
+      ? env.OPENAI_API_KEY
+      : provider === 'gemini'
+        ? env.GEMINI_API_KEY
+        : provider === 'anthropic'
+          ? env.ANTHROPIC_API_KEY
+          : undefined
   if (!model?.trim()) throw new Error('KEUNDAL_MODEL 환경 변수를 설정하세요.')
   if (!env.KEUNDAL_PROVIDER && !apiKey?.trim())
     throw new Error('OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY 중 하나를 설정하세요.')
@@ -86,6 +94,9 @@ export async function createAgentRuntime(
       subagents: options.subagents,
       maxActiveSubagents: options.maxActiveSubagents,
       plugins: options.plugins,
+      runtimePlugins: options.runtimePlugins,
+      runtimePluginBasePath: options.runtimePluginBasePath,
+      pluginConfigPath: env.KEUNDAL_PLUGIN_CONFIG,
       mcpServers: env.KEUNDAL_MCP_SERVERS ? JSON.parse(env.KEUNDAL_MCP_SERVERS) : [],
       provider,
       apiKey: apiKey ?? '',

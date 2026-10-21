@@ -13,8 +13,9 @@ import { openaiTranscription } from '@keundal/plugin-transcription-browser'
 import { createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
 import { createChatTools } from '@keundal/plugin-tool-chat'
 import type { ChatPlatform } from '@keundal/chat/platform'
+import { loadWebRuntimePlugins } from './runtime-plugins'
 
-export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: string, agentToken?: string } = {}): ChatPlatform {
+export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: string, agentToken?: string, pluginConfig?: string } = {}): ChatPlatform {
   const mcp = new McpManager(createBrowserMcpSettingsStorage(storage))
   const plugins = runtime.agentEndpoint ? undefined : new BrowserAgentPluginManager(storage)
   const platform: ChatPlatform = {
@@ -35,16 +36,28 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
           throw error
         }
       }
+      const composition = await loadWebRuntimePlugins(runtime.pluginConfig, {
+        'builtin:llm': { exports: { default: browserLLMPlugin }, config: { getSettings: options.getSettings, getModels: options.getModels } },
+        'builtin:store': { exports: { default: indexedDBStorePlugin }, config: { databaseName: 'keundal-web' } },
+        'builtin:skills': { exports: { default: skillPlugin }, config: { providers: [...options.skills, ...(plugins ? [plugins.provider] : [])] } },
+        'builtin:agent': { exports: { default: agentPlugin }, config: { maxToolRounds: 4, subagents: true, parallelTools: true } },
+        'builtin:chat-tools': { exports: { default: createChatTools } }
+      }, async execution => [...await mcp.tools(execution), ...await plugins!.tools(execution)])
       const root = new Context()
-      const scope = root.plugin(async (ctx: Context) => {
-        await ctx.plugin(browserLLMPlugin, { getSettings: options.getSettings, getModels: options.getModels })
-        await ctx.plugin(indexedDBStorePlugin, { databaseName: 'keundal-web' })
-        await ctx.plugin(skillPlugin, { providers: [...options.skills, ...(plugins ? [plugins.provider] : [])] })
-      })
+      const scope = root.plugin(async (ctx: Context) => composition.setup(ctx))
       let store: ChatStore | undefined
       try {
         await scope
-        store = new ChatStore(root, async (ctx, config) => ctx.plugin(agentPlugin, { ...config, tools: async execution => [...createChatTools(), ...await mcp.tools(execution), ...await plugins!.tools(execution)] }))
+        for (const service of ['llm', 'session', 'generation'] as const) {
+          if (!root[service]) throw new Error(`Missing browser service: ${service}`)
+        }
+        store = new ChatStore(root, (ctx, config) => composition.mountAgent(ctx, {
+          model: config.model,
+          maxOutputTokens: config.maxOutputTokens,
+          reasoning: config.reasoning,
+          webSearch: config.webSearch,
+          skills: config.skills
+        }))
         await store.recover()
         return {
           store,

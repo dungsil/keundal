@@ -1,0 +1,9 @@
+{
+  "plugins": [
+    { "module": "builtin:llm" },
+    { "module": "builtin:store" },
+    { "module": "builtin:skills" }
+  ],
+  "agent": { "module": "builtin:agent" },
+  "tools": [{ "module": "builtin:chat-tools" }]
+}
