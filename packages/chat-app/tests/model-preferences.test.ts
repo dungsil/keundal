@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { DEFAULT_MODEL_KEY, MODEL_KEY, loadModelPreferences, saveDefaultModel } from '../shared/utils/model-preferences'
+import { DEFAULT_MODEL_KEY, MODEL_KEY, TITLE_MODEL_KEY, readModelPreference, saveTitleModel, loadModelPreferences, saveDefaultModel } from '../shared/utils/model-preferences'
 
 function storage() {
   const values = new Map<string, string>()
@@ -44,4 +44,17 @@ test('추가 공급자의 기본 모델을 저장하고 공급자 식별자와 �
   const saved = storage()
   saveDefaultModel(saved, 'openai@work/vendor/model')
   expect(loadModelPreferences(saved)).toEqual({ defaultModel: 'openai@work/vendor/model', model: 'openai@work/vendor/model' })
+})
+
+test('제목 모델은 채팅 기본 모델과 독립적으로 저장하고 해제한다', () => {
+  const saved = storage()
+  saveDefaultModel(saved, 'openai/chat')
+  saveTitleModel(saved, 'anthropic/claude-haiku-4.5')
+  expect(readModelPreference(saved, TITLE_MODEL_KEY)).toBe('anthropic/claude-haiku-4-5')
+  expect(loadModelPreferences(saved).defaultModel).toBe('openai/chat')
+  expect(() => saveTitleModel(saved, 'unknown/title')).toThrow()
+  expect(readModelPreference(saved, TITLE_MODEL_KEY)).toBe('anthropic/claude-haiku-4-5')
+  saveTitleModel(saved, '')
+  expect(readModelPreference(saved, TITLE_MODEL_KEY)).toBeUndefined()
+  expect(loadModelPreferences(saved).defaultModel).toBe('openai/chat')
 })

@@ -69,11 +69,13 @@ export async function createKeundalChat(context: Context, name: string, options:
   }
   return {
     dispose,
-    async title(message: ChatMessage, signal?: AbortSignal) {
+    async title(message: ChatMessage, signal?: AbortSignal, titleModel = config.value) {
+      const selected = resolveModel(titleModel).value
+      const limits = await ctx.llm.getModel(selected, { signal })
       let title = ''
       for await (const event of ctx.llm.stream({
-        model: config.value,
-        maxOutputTokens,
+        model: selected,
+        maxOutputTokens: Math.min(4096, limits.maxOutputTokens, limits.contextWindow - 1),
         input: input([
           { id: randomUUID(), role: 'system', content: 'Generate a chat title under 30 characters from the first user message. No quotes, punctuation, markdown, or commentary. Return only the title.' },
           { id: message.id, role: 'user', content: JSON.stringify(message) }

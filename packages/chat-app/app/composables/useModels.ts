@@ -1,11 +1,12 @@
 import { resolveModel, type ModelOption } from '../../shared/utils/models'
-import { FALLBACK_MODEL } from '../../shared/utils/model-preferences'
+import { FALLBACK_MODEL, saveTitleModel } from '../../shared/utils/model-preferences'
 import { createModelSelection } from '../../shared/utils/model-selection'
 
 export function useModels() {
   const { t } = useLocale()
   const toast = useToast()
   const model = useState('chat-model', () => FALLBACK_MODEL)
+  const titleModel = useState('title-model', () => '')
   const defaultModel = useState('default-model', () => '')
   const { $modelCatalog: catalog, $remoteModels: remoteModels, $selectModel: selectModel } = useNuxtApp()
   const switching = useState('model-switching', () => false)
@@ -51,6 +52,8 @@ export function useModels() {
     models,
     model,
     defaultModel,
+    titleModel,
+    saveTitleModel: (value: string) => { titleModel.value = saveTitleModel(localStorage, value) },
     ...selection,
     switching,
     loading: computed(() => switching.value || !!catalog?.loading.value),

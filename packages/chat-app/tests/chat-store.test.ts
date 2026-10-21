@@ -299,3 +299,33 @@ test('웹 대화가 다음 턴에서도 준비한 축약을 재사용하고 최�
   expect(requests[1]!.input.messages.some(message => message.id === next.id)).toBe(true)
   expect((requests[1]!.input.state as { web: { messages: ChatMessage[] } }).web.messages.at(-1)).toEqual(next)
 })
+
+test.each([undefined, 'anthropic/title', 'anthropic/failing'])('제목 모델 %s을 사용해도 채팅 모델과 응답은 유지한다', async (titleModel) => {
+  const ctx = new Context()
+  const requests: LLMRequest[] = []
+  class ScriptedLLM extends LLMService {
+    async getModel(name: string) { return { contextWindow: 128_000, maxOutputTokens: name === 'anthropic/title' ? 512 : 4096 } }
+    async countTokens() { return 40 }
+    async* stream(request: LLMRequest): AsyncIterable<LLMEvent> {
+      requests.push(request)
+      if (request.model === 'anthropic/failing') throw new Error('Title unavailable')
+      yield { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' }
+      yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'reply', delta: '응답' }
+      yield { type: EventType.TEXT_MESSAGE_END, messageId: 'reply' }
+    }
+  }
+  const llm = await ctx.plugin(ScriptedLLM)
+  const storage = await ctx.plugin(memoryStorePlugin)
+  const chats = new ChatStore(ctx)
+  onTestFinished(async () => {
+    await chats.stop()
+    await storage.dispose()
+    await llm.dispose()
+  })
+  await chats.create('separate-models', user, model)
+  const events = await collect(chats.respond('separate-models', { model, titleModel, messages: [user] }))
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(requests.map(request => request.model)).toEqual([titleModel ?? model, model])
+  if (titleModel === 'anthropic/title') expect(requests[0]!.maxOutputTokens).toBe(512)
+  expect((await chats.get('separate-models'))!.model).toBe(model)
+})

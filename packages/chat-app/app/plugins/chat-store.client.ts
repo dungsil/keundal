@@ -10,13 +10,15 @@ import { browserLLMPlugin } from '../../shared/utils/browser-llm'
 import { defaultLLMSettings, type LLMSettings } from '../../shared/utils/llm-settings'
 import { createLLMSettingsStorage, LLM_SETTINGS_KEY } from '../../shared/utils/llm-settings-storage'
 import { SkillManager } from '../../shared/utils/skills'
-import { FALLBACK_MODEL, MODEL_KEY, DEFAULT_MODEL_KEY, loadModelPreferences } from '../../shared/utils/model-preferences'
+import { FALLBACK_MODEL, MODEL_KEY, DEFAULT_MODEL_KEY, TITLE_MODEL_KEY, readModelPreference, loadModelPreferences } from '../../shared/utils/model-preferences'
 
 export default defineNuxtPlugin(async () => {
   const { t } = useLocale()
   const preferences = loadModelPreferences(localStorage)
   const defaultModel = useState('default-model', () => '')
   defaultModel.value = preferences.defaultModel
+  const titleModel = useState('title-model', () => '')
+  titleModel.value = readModelPreference(localStorage, TITLE_MODEL_KEY) ?? ''
   const initialModel = preferences.model
   const model = useState('chat-model', () => FALLBACK_MODEL)
   useLocalStorage(MODEL_KEY, model, { writeDefaults: false })
@@ -55,6 +57,10 @@ export default defineNuxtPlugin(async () => {
     if (defaultModel.value && !next[resolveModel(defaultModel.value).configuration]) {
       defaultModel.value = ''
       localStorage.removeItem(DEFAULT_MODEL_KEY)
+    }
+    if (titleModel.value && !next[resolveModel(titleModel.value).configuration]) {
+      titleModel.value = ''
+      localStorage.removeItem(TITLE_MODEL_KEY)
     }
   }
   const modelCatalog = useModelCatalog(settings, () => t('model.loadFailed'))

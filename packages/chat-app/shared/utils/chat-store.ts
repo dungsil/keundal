@@ -14,6 +14,7 @@ export interface ChatStoreLike {
   respond(id: string, request: {
     messages: ChatMessage[]
     model: string
+    titleModel?: string
     reasoning?: boolean
     webSearch?: boolean
     onMessage?: (message: ChatMessage) => void
@@ -144,6 +145,7 @@ export class ChatStore implements ChatStoreLike {
   async* respond(id: string, request: {
     messages: ChatMessage[]
     model: string
+    titleModel?: string
     reasoning?: boolean
     webSearch?: boolean
     onMessage?: (message: ChatMessage) => void
@@ -181,9 +183,14 @@ export class ChatStore implements ChatStoreLike {
       runtime = cached.runtime
       const titleGenerated = !chat.title
       if (titleGenerated) {
-        chat = { ...chat, title: await runtime.title(chat.messages[0]!, combined) }
-        await this.save(saved, chat)
-        request.onTitle?.(chat.title!)
+        try {
+          chat = { ...chat, title: await runtime.title(chat.messages[0]!, combined, request.titleModel || request.model) }
+          await this.save(saved, chat)
+          request.onTitle?.(chat.title!)
+        } catch {
+          // A title failure must not prevent the chat response.
+        }
+        combined.throwIfAborted()
       }
       yield* runtime.respond({
         threadId: id, runId, messages: request.messages, signal: combined, state: { web: chat }, onMessage: request.onMessage,
