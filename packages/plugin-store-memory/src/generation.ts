@@ -2,6 +2,7 @@ import {
   EventType,
   StreamBudget,
   GenerationService,
+  reconcileTerminalTraceJournal,
   type AGUIEvent,
   type ExecutionOptions,
   type GenerationOptions,
@@ -17,7 +18,7 @@ import type { MemoryStore, StoredRun } from './store.js'
 const snapshot = (r: StoredRun): GenerationSnapshot => ({
   request: r.request,
   status: r.status,
-  journal: [...r.journal],
+  journal: reconcileTerminalTraceJournal(r.journal, r.status),
   messages: [...r.messages]
 })
 export class MemoryGenerationService extends GenerationService {

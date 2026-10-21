@@ -41,7 +41,7 @@ test('웹 조립은 네이티브 IPC 없이 IndexedDB 대화를 저장하고 재
   }
 })
 
-test('웹 조립은 활성 플러그인의 스킬과 허용한 MCP 도구를 실행하고 결과를 저장한다', async (t) => {
+test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도구와 스킬을 실행하고 Journal을 저장한다', async (deferred, t) => {
   const requests: Record<string, unknown>[] = []
   const calls: string[] = []
   let generations = 0
@@ -59,6 +59,14 @@ test('웹 조립은 활성 플러그인의 스킬과 허용한 MCP 도구를 실
   const server = createServer(async (request, response) => {
     const chunks = []
     for await (const chunk of request) chunks.push(Buffer.from(chunk))
+    if (request.url === '/keundal.plugins.json') {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
+        plugins: [{ module: 'builtin:llm' }, { module: 'builtin:store' }, { module: 'builtin:skills' }],
+        agent: { module: 'builtin:agent', config: { deferredTools: {} } },
+        tools: [{ module: 'builtin:chat-tools' }]
+      }))
+      return
+    }
     if (request.url === '/mcp') {
       if (request.method !== 'POST') {
         response.writeHead(405).end()
@@ -78,12 +86,15 @@ test('웹 조립은 활성 플러그인의 스킬과 허용한 MCP 도구를 실
     const title = JSON.stringify(body.input).includes('Generate a chat title')
     if (!title) requests.push(body)
     const tool = body.tools?.find((tool: { name: string }) => tool.name?.startsWith('mcp__plugin_') && tool.name.endsWith('__search'))
-    const outputs = !title && generations++ === 0
-      ? [
-          { type: 'function_call', id: 'fc_skill', call_id: 'skill_call', name: 'skill', arguments: '{"name":"review"}' },
-          { type: 'function_call', id: 'fc_mcp', call_id: 'mcp_call', name: tool?.name ?? 'missing-plugin-tool', arguments: '{}' }
-        ]
-      : [{ type: 'message', id: 'answer', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: 'Checked: 37', annotations: [] }] }]
+    const round = title ? -1 : generations++
+    const outputs = !title && deferred && round === 0
+      ? [{ type: 'function_call', id: 'fc_search', call_id: 'search_call', name: 'search_tool', arguments: '{"query":"search reports"}' }]
+      : !title && round === (deferred ? 1 : 0)
+        ? [
+            { type: 'function_call', id: 'fc_skill', call_id: 'skill_call', name: 'skill', arguments: '{"name":"review"}' },
+            { type: 'function_call', id: 'fc_mcp', call_id: 'mcp_call', name: tool?.name ?? 'missing-plugin-tool', arguments: '{}' }
+          ]
+        : [{ type: 'message', id: 'answer', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: 'Checked: 37', annotations: [] }] }]
     const frames: Record<string, unknown>[] = outputs.flatMap((item, output_index) => [
       { type: 'response.output_item.added', output_index, item },
       { type: 'response.output_item.done', output_index, item }
@@ -100,7 +111,7 @@ test('웹 조립은 활성 플러그인의 스킬과 허용한 MCP 도구를 실
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('No port')
   const endpoint = `http://127.0.0.1:${address.port}`
-  const platform = createWebPlatform(storage())
+  const platform = createWebPlatform(storage(), deferred ? { pluginConfig: `${endpoint}/keundal.plugins.json` } : {})
   const markdown = '---\nname: review\ndescription: Review totals\n---\nCompare totals independently.'
   await platform.plugins!.import({
     'plugin.json': JSON.stringify({ $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json', name: 'reports' }),
@@ -121,9 +132,19 @@ test('웹 조립은 활성 플러그인의 스킬과 허용한 MCP 도구를 실
   for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user] })) events.push(event)
   expect(events.at(-1), JSON.stringify(events)).toMatchObject({ type: 'RUN_FINISHED' })
   expect(calls, JSON.stringify({ requests, events })).toEqual(['search'])
-  expect(JSON.stringify(requests[0]!.tools)).not.toContain('__delete')
-  expect(JSON.stringify(requests[1]!.input)).toContain('Compare totals independently.')
-  expect(JSON.stringify(requests[1]!.input)).toContain('Total: 37')
-  expect((await connection.store.get(id))!.messages[1]!.parts).toContainEqual({ type: 'text', text: 'Checked: 37' })
+  expect(JSON.stringify(requests.map(request => request.tools))).not.toContain('__delete')
+  if (deferred) {
+    expect(JSON.stringify(requests[0]!.tools)).toContain('search_tool')
+    expect(JSON.stringify(requests[0]!.tools)).not.toContain('mcp__')
+    expect(JSON.stringify(requests[1]!.tools)).toContain('__search')
+  }
+  const followup = requests[deferred ? 2 : 1]!
+  expect(JSON.stringify(followup.input)).toContain('Compare totals independently.')
+  expect(JSON.stringify(followup.input)).toContain('Total: 37')
+  const answer = (await connection.store.get(id))!.messages[1]!
+  expect(answer.parts).toContainEqual({ type: 'text', text: 'Checked: 37' })
+  const run = await connection.store.getRun?.(answer.id)
+  expect(run?.status).toBe('completed')
+  expect(run?.journal.map(entry => entry.event)).toContainEqual(expect.objectContaining({ type: 'CUSTOM', name: 'keundal.trace' }))
   await connection.store.delete(id)
 })

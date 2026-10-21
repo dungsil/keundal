@@ -1,17 +1,18 @@
 import { EventType } from '@keundal/core'
+import type { AGUIEvent } from '@keundal/core'
 import { shallowRef } from 'vue'
 
 import type { ChatMessage, ChatStatus, FilePart } from '@keundal/chat/chat-message'
-import type { ChatStoreLike } from '@keundal/chat/chat-store'
 
 export function useKeundalChat(options: {
   respond: (
     messages: ChatMessage[],
     onMessage: (message: ChatMessage) => void,
     signal: AbortSignal
-  ) => ReturnType<ChatStoreLike['respond']>
+  ) => AsyncGenerator<AGUIEvent>
   onFinish?: () => Promise<void>
   onError?: (error: Error) => void
+  onEvent?: (event: AGUIEvent) => void
 }) {
   const messages = shallowRef<ChatMessage[]>([])
   const status = shallowRef<ChatStatus>('ready')
@@ -38,6 +39,7 @@ export function useKeundalChat(options: {
           },
           abort.signal
         )) {
+          options.onEvent?.(event)
           if (event.type === EventType.RUN_ERROR && !abort.signal.aborted) {
             // Drain the iterator before reporting the error so partial output is saved.
             error.value = new Error(event.message)

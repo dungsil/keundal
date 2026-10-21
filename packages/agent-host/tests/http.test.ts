@@ -7,6 +7,9 @@ import {
   EventType,
   LLMService,
   parseAGUIEvent,
+  readTraceSpans,
+  TRACE_EVENT,
+  type GenerationSnapshot,
   type AGUIEvent,
   type ExecutionOptions,
   type LLMEvent,
@@ -205,7 +208,9 @@ test('POST /runs는 AG-UI 이벤트를 SSE로 스트리밍하고 저장소에 �
   expect(response.status).toBe(200)
   expect(response.contentType).toContain('text/event-stream')
   const events = parseSse(response.text)
-  expect(events.map((event) => event.type)).toEqual([
+  expect(
+    events.filter((event) => event.type !== EventType.CUSTOM || event.name !== TRACE_EVENT).map((event) => event.type)
+  ).toEqual([
     EventType.RUN_STARTED,
     EventType.TEXT_MESSAGE_START,
     EventType.TEXT_MESSAGE_CONTENT,
@@ -216,8 +221,10 @@ test('POST /runs는 AG-UI 이벤트를 SSE로 스트리밍하고 저장소에 �
   const thread = (await requestJson('GET', '/threads/thread')).json as { revision: number; messages: { id: string }[] }
   expect(thread.revision).toBe(1)
   expect(thread.messages.map((message) => message.id)).toEqual(['reply:r1'])
-  const run = (await requestJson('GET', '/runs/r1')).json as { status: string }
+  const run = (await requestJson('GET', '/runs/r1')).json as GenerationSnapshot
   expect(run.status).toBe('completed')
+  expect(run.journal.map((entry) => entry.event)).toEqual(events)
+  expect(readTraceSpans(events, input.runId).map((span) => span.kind)).toEqual(['agent', 'model'])
 })
 
 test('GET /catalog는 등록 목록을 반환하며 생성과 대화 저장을 시작하지 않는다', async (t) => {

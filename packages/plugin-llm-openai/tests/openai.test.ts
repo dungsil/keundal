@@ -5,6 +5,7 @@ import { setImmediate } from 'node:timers/promises'
 
 import {
   EventType,
+  LLM_USAGE_EVENT,
   MessageAssembly,
   parseAGUIEvent,
   type AgentMessage,
@@ -976,3 +977,58 @@ test('큰 중첩 공급자 payload를 변환하거나 반환하기 전에 거부
   ).rejects.toThrow('stream byte limit exceeded')
   expect(accepted).toHaveLength(0)
 })
+
+test('공급자의 입력·출력 토큰과 캐시 입력 토큰을 기록한다', async (t) => {
+  const { ctx } = await setup(t, (_request, response) =>
+    send(response, [
+      ...textFrames.slice(0, -1),
+      {
+        type: 'response.completed',
+        response: {
+          id: 'resp_1',
+          status: 'completed',
+          usage: { input_tokens: 12, output_tokens: 3, input_tokens_details: { cached_tokens: 4 } }
+        }
+      }
+    ])
+  )
+  const events = await collect(ctx.llm.stream(request))
+  expect(events.at(-1)).toEqual({
+    type: EventType.CUSTOM,
+    name: LLM_USAGE_EVENT,
+    value: { source: 'provider', inputTokens: 12, outputTokens: 3, cacheReadTokens: 4 }
+  })
+})
+
+test.for(['response.failed', 'response.incomplete'])(
+  'OpenAI의 %s 응답도 알려진 사용량을 보존하고 실패를 전달한다',
+  async (type, t) => {
+    const { ctx } = await setup(t, (_request, response) =>
+      send(response, [
+        {
+          type,
+          response: {
+            id: 'failed-usage',
+            status: type === 'response.failed' ? 'failed' : 'incomplete',
+            error: { message: 'provider stopped' },
+            incomplete_details: { reason: 'max_output_tokens' },
+            usage: { input_tokens: 12, output_tokens: 7, input_tokens_details: { cached_tokens: 4 } }
+          }
+        }
+      ])
+    )
+    const accepted: LLMEvent[] = []
+    await expect(
+      (async () => {
+        for await (const event of ctx.llm.stream(request)) accepted.push(event)
+      })()
+    ).rejects.toThrow('provider stopped')
+    expect(accepted).toEqual([
+      {
+        type: EventType.CUSTOM,
+        name: LLM_USAGE_EVENT,
+        value: { source: 'provider', inputTokens: 12, outputTokens: 7, cacheReadTokens: 4 }
+      }
+    ])
+  }
+)

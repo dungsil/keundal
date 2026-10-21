@@ -52,6 +52,12 @@ fs는 로컬 공급자와 정책 구현이 계약을 공유하므로 처음부�
 Shell 명령은 파일 정책을 거치지 않습니다. 신뢰할 수 없는 실행에는 OS 격리를 적용하십시오.
 Node.js 공급자 대신 Tauri IPC나 원격 서버 공급자를 연결할 수 있습니다. 앱의 자동 도구 등록은 포함하지 않습니다.
 
+## Execution Trace와 Deferred Tools
+
+공통 에이전트 루프는 모델 호출, 도구 실행, Compaction을 같은 실행의 Trace로 연결합니다. 공용 Chat UI에서 실행 단계, 타임라인, 토큰·캐시·시간과 알려진 비용을 조회합니다. Trace는 기존 Generation Journal의 버전이 있는 메타데이터로 저장합니다.
+
+MCP 도구가 많으면 Deferred Tools를 선택하여 검색한 도구의 Schema만 후속 모델 요청에 노출합니다. 직접 등록한 기본 도구와 MCP 권한은 유지합니다. 데이터 계약, 검색 한도, 사용 방법과 검증 결과는 [실행 관측 문서](docs/execution-trace.md)를 참고합니다.
+
 ## 시작하기
 
 Node.js 24와 pnpm이 필요합니다. 버전은 루트 `package.json`의 `devEngines`를 따릅니다.

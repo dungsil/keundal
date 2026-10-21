@@ -5,6 +5,7 @@ import { setImmediate } from 'node:timers/promises'
 
 import {
   EventType,
+  LLM_USAGE_EVENT,
   MessageAssembly,
   parseAGUIEvent,
   type AgentMessage,
@@ -89,6 +90,9 @@ const collect = async (stream: AsyncIterable<LLMEvent>) => {
   }
   return events
 }
+
+const withoutUsage = (events: readonly LLMEvent[]) =>
+  events.filter((event) => event.type !== EventType.CUSTOM || event.name !== LLM_USAGE_EVENT)
 
 async function setup(
   t: TestContext,
@@ -264,7 +268,7 @@ test('Messages 요청을 보내고 분할된 UTF-8 SSE를 실행 수명 이벤�
     response.end(bytes.subarray(split))
   })
   const signal = new globalThis.AbortController().signal
-  expect(await collect(ctx.llm.stream(request, { signal }))).toStrictEqual([
+  expect(withoutUsage(await collect(ctx.llm.stream(request, { signal })))).toStrictEqual([
     { type: EventType.TEXT_MESSAGE_START, messageId: 'msg_1-0', role: 'assistant' },
     { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'msg_1-0', delta: '안녕' },
     { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'msg_1-0', delta: '하세요' },
@@ -396,7 +400,7 @@ test('여러 도구 호출을 공급자 ID로 스트리밍하고 분할된 JSON 
       stop
     ])
   )
-  expect(await collect(ctx.llm.stream(request))).toStrictEqual([
+  expect(withoutUsage(await collect(ctx.llm.stream(request)))).toStrictEqual([
     { type: EventType.TOOL_CALL_START, toolCallId: 'call_1', toolCallName: 'clock' },
     { type: EventType.TOOL_CALL_ARGS, toolCallId: 'call_1', delta: '{"city":' },
     { type: EventType.TOOL_CALL_ARGS, toolCallId: 'call_1', delta: '"Seoul"}' },
@@ -564,7 +568,7 @@ test.for(['text', 'tool_use'] as const)('메시지 조립 후 %s, 추론, 도구
 
 test.for(['end_turn', 'tool_use', 'stop_sequence'])('정상 종료 사유인 %s를 허용한다', async (reason, t) => {
   const { ctx } = await setup(t, (_request, response) => send(response, [start, finish(reason), stop]))
-  expect(await collect(ctx.llm.stream(request))).toStrictEqual([])
+  expect(withoutUsage(await collect(ctx.llm.stream(request)))).toStrictEqual([])
 })
 
 test('서버가 연결을 유지해도 message_stop을 받으면 순회를 마치고 HTTP 스트림을 닫는다', async (t) => {
@@ -574,7 +578,7 @@ test('서버가 연결을 유지해도 message_stop을 받으면 순회를 마�
     response.writeHead(200, { 'content-type': 'text/event-stream' })
     response.write(wire([start, { type: 'ping' }, finish(), stop]))
   })
-  expect(await collect(ctx.llm.stream(request))).toStrictEqual([])
+  expect(withoutUsage(await collect(ctx.llm.stream(request)))).toStrictEqual([])
   await closed.promise
 })
 
@@ -634,7 +638,7 @@ test('공급자 오류로 SSE 스트림이 중단되어도 이미 전달한 내�
     for await (const event of ctx.llm.stream(request)) received.push(event)
   }
   await expect(consume()).rejects.toThrow(/provider overloaded/)
-  expect(received).toStrictEqual([
+  expect(withoutUsage(received)).toStrictEqual([
     { type: EventType.TEXT_MESSAGE_START, messageId: 'msg_1-0', role: 'assistant' },
     { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'msg_1-0', delta: '안녕' }
   ])
@@ -753,7 +757,9 @@ test.for(['signal', 'return', 'throw', 'dispose'] as const)(
     const external = new globalThis.AbortController()
     const service = ctx.llm
     const iterator = service.stream(request, { signal: external.signal })[Symbol.asyncIterator]()
-    expect((await iterator.next()).value.type).toBe(EventType.TEXT_MESSAGE_START)
+    let next = await iterator.next()
+    while (next.value?.type === EventType.CUSTOM && next.value.name === LLM_USAGE_EVENT) next = await iterator.next()
+    expect(next.value.type).toBe(EventType.TEXT_MESSAGE_START)
     const pending = iterator.next()
     const rejected = expect(pending).rejects.toThrow(/cancelled|stopped|disposed/)
     let returned: Promise<IteratorResult<LLMEvent>> | undefined
@@ -825,4 +831,36 @@ test('큰 중첩 공급자 payload를 변환하거나 반환하기 전에 거부
     })()
   ).rejects.toThrow('stream byte limit exceeded')
   expect(accepted).toHaveLength(0)
+})
+
+test('Anthropic의 캐시 입력과 일반 입력 토큰을 구분하여 기록한다', async (t) => {
+  const startWithCache: Frame = {
+    ...start,
+    message: {
+      ...(start.message as Record<string, unknown>),
+      usage: { input_tokens: 3, output_tokens: 0, cache_read_input_tokens: 2, cache_creation_input_tokens: 1 }
+    }
+  }
+  const { ctx } = await setup(t, (_request, response) => send(response, [startWithCache, finish(), stop]))
+  const events = await collect(ctx.llm.stream(request))
+  expect(events).toContainEqual({
+    type: EventType.CUSTOM,
+    name: LLM_USAGE_EVENT,
+    value: { source: 'provider', inputTokens: 6, outputTokens: 4, cacheReadTokens: 2, cacheWriteTokens: 1 }
+  })
+})
+
+test('Anthropic의 출력 한도 종료도 누적 사용량을 전달한 뒤 실패한다', async (t) => {
+  const { ctx } = await setup(t, (_request, response) => send(response, [start, finish('max_tokens'), stop]))
+  const accepted: LLMEvent[] = []
+  await expect(
+    (async () => {
+      for await (const event of ctx.llm.stream(request)) accepted.push(event)
+    })()
+  ).rejects.toThrow('max_tokens')
+  expect(accepted.filter((event) => event.type === EventType.CUSTOM && event.name === LLM_USAGE_EVENT).at(-1)).toEqual({
+    type: EventType.CUSTOM,
+    name: LLM_USAGE_EVENT,
+    value: { source: 'provider', inputTokens: 3, outputTokens: 4 }
+  })
 })
