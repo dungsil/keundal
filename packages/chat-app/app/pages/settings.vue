@@ -10,6 +10,7 @@ const sections = computed(() => [
   { id: 'appearance', label: t('settings.appearance'), icon: 'i-lucide-palette' },
   { id: 'llm', label: 'LLM', icon: 'i-lucide-plug' },
   { id: 'models', label: t('model.defaultTitle'), icon: 'i-lucide-bot' },
+  { id: 'plugins', label: t('plugin.title'), icon: 'i-lucide-blocks' },
   { id: 'mcp', label: 'MCP', icon: 'i-lucide-network' },
   { id: 'skills', label: t('skill.title'), icon: 'i-lucide-book-open' }
 ])

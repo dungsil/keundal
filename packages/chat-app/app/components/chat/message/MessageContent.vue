@@ -60,6 +60,16 @@ const emit = defineEmits<{
       >
         <ChatToolSources :sources="getSources(part)" />
       </UChatTool>
+      <UChatTool
+        v-else
+        :text="t(part.state === 'output-error' ? 'plugin.toolFailed' : isToolStreaming(part) ? 'plugin.toolRunning' : 'plugin.toolFinished')"
+        :suffix="part.type.slice(5)"
+        :streaming="isToolStreaming(part)"
+        chevron="leading"
+      >
+        <pre class="text-xs whitespace-pre-wrap break-words">{{ JSON.stringify(part.input, null, 2) }}</pre>
+        <pre class="mt-2 text-xs whitespace-pre-wrap break-words">{{ part.state === 'output-error' ? part.errorText : typeof part.output === 'string' ? part.output : JSON.stringify(part.output, null, 2) }}</pre>
+      </UChatTool>
     </template>
 
     <template v-else-if="part.type === 'text'">

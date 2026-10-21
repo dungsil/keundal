@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { access, mkdir, readFile, realpath } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import process from 'node:process'
 
 import type { ExecutionOptions, SkillProvider } from '@keundal/core'
 import type { McpClientConfig, McpPermissions } from '@keundal/mcp'
@@ -91,7 +92,7 @@ export async function loadAgentPlugin(
           for (const [name, raw] of Object.entries(value.mcpServers)) {
             signal.throwIfAborted()
             try {
-              const entry = server(raw)
+              const entry = server(raw, process.platform === 'win32')
               if (entry.type === 'sse') {
                 report('mcp', 'unsupported transport: sse', name)
                 continue

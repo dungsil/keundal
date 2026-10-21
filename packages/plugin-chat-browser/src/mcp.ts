@@ -23,7 +23,7 @@ export class McpManager {
   private lifetime = new AbortController()
 
   constructor(
-    private readonly storage: McpSettingsStorage,
+    private readonly storage?: McpSettingsStorage,
     private readonly options: { allowStdio?: boolean } = {}
   ) {}
 
@@ -32,7 +32,7 @@ export class McpManager {
   }
 
   async load() {
-    const saved = await this.storage.load()
+    const saved = await this.storage?.load()
     this.servers = parseMcpServers(saved ? JSON.parse(saved) : [], this.options.allowStdio ?? false)
   }
 
@@ -51,7 +51,7 @@ export class McpManager {
   }
 
   private async persist(servers: McpClientConfig[]) {
-    await this.storage.save(servers.length ? JSON.stringify(servers) : null)
+    await this.storage?.save(servers.length ? JSON.stringify(servers) : null)
   }
 
   async tools(options: McpRequestOptions = {}) {

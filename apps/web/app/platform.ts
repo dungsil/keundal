@@ -1,5 +1,6 @@
 import { McpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-chat-browser/mcp'
 import { SkillManager } from '@keundal/plugin-chat-browser/skills'
+import { BrowserAgentPluginManager } from '@keundal/plugin-chat-browser/plugins'
 import { Context } from 'cordis'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
@@ -15,8 +16,10 @@ import type { ChatPlatform } from '@keundal/chat/platform'
 
 export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: string, agentToken?: string } = {}): ChatPlatform {
   const mcp = new McpManager(createBrowserMcpSettingsStorage(storage))
+  const plugins = runtime.agentEndpoint ? undefined : new BrowserAgentPluginManager(storage)
   const platform: ChatPlatform = {
     mcp,
+    plugins,
     settings: createBrowserSettingsStorage(storage),
     skills: new SkillManager(storage),
     loadModels,
@@ -36,12 +39,12 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
       const scope = root.plugin(async (ctx: Context) => {
         await ctx.plugin(browserLLMPlugin, { getSettings: options.getSettings, getModels: options.getModels })
         await ctx.plugin(indexedDBStorePlugin, { databaseName: 'keundal-web' })
-        await ctx.plugin(skillPlugin, { providers: options.skills })
+        await ctx.plugin(skillPlugin, { providers: [...options.skills, ...(plugins ? [plugins.provider] : [])] })
       })
       let store: ChatStore | undefined
       try {
         await scope
-        store = new ChatStore(root, async (ctx, config) => ctx.plugin(agentPlugin, { ...config, tools: async execution => [...createChatTools(), ...await mcp.tools(execution)] }))
+        store = new ChatStore(root, async (ctx, config) => ctx.plugin(agentPlugin, { ...config, tools: async execution => [...createChatTools(), ...await mcp.tools(execution), ...await plugins!.tools(execution)] }))
         await store.recover()
         return {
           store,
@@ -50,6 +53,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
             try {
               await store!.stop()
             } finally {
+              await plugins?.close()
               await scope.dispose()
             }
           }
@@ -58,6 +62,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         try {
           await store?.stop()
         } finally {
+          await plugins?.close()
           await scope.dispose()
         }
         throw error
