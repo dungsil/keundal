@@ -31,10 +31,8 @@ useHead(() => ({ title: t('settings.title') }))
           variant="ghost"
           class="mb-6"
         />
-        <ClientOnly>
-          <ModelSettings />
-          <LLMSettings :return-to="returnTo" />
-        </ClientOnly>
+        <ModelSettings />
+        <LLMSettings :return-to="returnTo" />
       </UContainer>
     </template>
   </UDashboardPanel>
