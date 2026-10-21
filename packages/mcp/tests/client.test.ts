@@ -821,6 +821,7 @@ test('두 MCP 진입점은 리디렉션 대상으로 자격 증명을 전달하�
     await expect(
       client.connect({
         serverName: 'redirect',
+        allowInsecureHttp: true,
         transport: 'streamable-http',
         url: `http://127.0.0.1:${address.port}/mcp`,
         headers: { Authorization: 'Bearer test', 'X-Api-Key': 'test' },
@@ -830,4 +831,36 @@ test('두 MCP 진입점은 리디렉션 대상으로 자격 증명을 전달하�
   }
   expect(requests).toEqual([])
   expect(headers).toEqual([])
+})
+
+test('원격 HTTP는 해당 서버의 명시적인 boolean 허용만 적용한다', async () => {
+  const config = { serverName: 'lan', transport: 'streamable-http' as const, url: 'http://192.168.1.20/mcp' }
+  expect(parseMcpServers([{ ...config, allowInsecureHttp: true }])[0]).toMatchObject({ allowInsecureHttp: true })
+  expect(() => parseMcpServers([{ ...config, allowInsecureHttp: false }])).toThrow('HTTPS')
+  for (const url of [config.url, 'https://example.com/mcp', 'http://localhost/mcp']) {
+    for (const allowInsecureHttp of ['true', 1, null, {}]) {
+      expect(() => parseMcpServers([{ ...config, url, allowInsecureHttp }])).toThrow('boolean')
+      for (const client of [McpClient, BrowserMcpClient]) {
+        await expect(
+          client.connect({ ...config, url, allowInsecureHttp: allowInsecureHttp as boolean })
+        ).rejects.toThrow('boolean')
+      }
+    }
+  }
+  for (const url of ['ftp://example.com/mcp', 'http://user:pass@example.com/mcp', 'http://example.com/mcp#fragment']) {
+    expect(() => parseMcpServers([{ ...config, url, allowInsecureHttp: true }])).toThrow()
+  }
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('transport reached'))
+  try {
+    for (const client of [McpClient, BrowserMcpClient]) {
+      await expect(client.connect({ ...config, allowInsecureHttp: true, timeoutMs: 1000 })).rejects.toThrow()
+      expect(fetch).toHaveBeenCalled()
+      expect(fetch.mock.calls[0]?.[1]?.redirect).toBe('error')
+      fetch.mockClear()
+      await expect(client.connect({ ...config, serverName: 'other' })).rejects.toThrow('HTTPS')
+      expect(fetch).not.toHaveBeenCalled()
+    }
+  } finally {
+    fetch.mockRestore()
+  }
 })

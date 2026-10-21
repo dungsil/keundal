@@ -1,12 +1,15 @@
 import type { McpClientConfig } from './browser.js'
 
-/** Plaintext MCP is restricted to local development endpoints. */
-export function parseMcpHttpUrl(value: string): URL {
+/** Remote plaintext MCP requires an explicit per-server opt-in. */
+export function parseMcpHttpUrl(value: string, allowInsecureHttp?: boolean): URL {
+  if (allowInsecureHttp !== undefined && typeof allowInsecureHttp !== 'boolean')
+    throw new Error('MCP allowInsecureHttp must be a boolean')
   const url = new globalThis.URL(value)
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash)
     throw new Error('MCP URL must use HTTP or HTTPS without embedded credentials or fragment')
   const loopback = url.hostname === 'localhost' || url.hostname === '[::1]' || /^127\.\d+\.\d+\.\d+$/.test(url.hostname)
-  if (url.protocol === 'http:' && !loopback) throw new Error('Remote MCP URLs must use HTTPS')
+  if (url.protocol === 'http:' && !loopback && allowInsecureHttp !== true)
+    throw new Error('Remote MCP URLs must use HTTPS')
   return url
 }
 
@@ -45,7 +48,7 @@ export function parseMcpServers(value: unknown, allowStdio = true): McpClientCon
     }
     if (server.transport === 'streamable-http') {
       if (typeof server.url !== 'string') throw new Error('MCP HTTP URL is required')
-      parseMcpHttpUrl(server.url)
+      parseMcpHttpUrl(server.url, server.allowInsecureHttp as boolean | undefined)
       if (
         server.headers !== undefined &&
         (!dictionary(server.headers) ||

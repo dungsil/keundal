@@ -30,6 +30,7 @@ export type McpClientConfig = {
       readonly url: string
       readonly headers?: Record<string, string>
       readonly redirect?: 'error'
+      readonly allowInsecureHttp?: boolean
     }
 )
 
@@ -95,7 +96,7 @@ export class McpClient {
     if (!Number.isSafeInteger(maxResultBytes) || maxResultBytes <= 0)
       throw new Error('maxResultBytes must be a positive integer')
     if (config.transport === 'stdio' && !createTransport) throw new Error('stdio requires the Node.js MCP client')
-    if (config.transport === 'streamable-http') parseMcpHttpUrl(config.url)
+    if (config.transport === 'streamable-http') parseMcpHttpUrl(config.url, config.allowInsecureHttp)
     const transport = createTransport
       ? createTransport(config)
       : new StreamableHTTPClientTransport(

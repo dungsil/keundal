@@ -10,6 +10,7 @@ const editing = ref<number | null>(null)
 const name = ref('')
 const transport = ref('streamable-http')
 const address = ref('')
+const allowInsecureHttp = ref(false)
 const args = ref('[]')
 const credentials = ref('{}')
 const tools = ref('')
@@ -25,6 +26,7 @@ function reset() {
   editing.value = null
   name.value = ''
   address.value = ''
+  allowInsecureHttp.value = false
   args.value = '[]'
   credentials.value = '{}'
   tools.value = ''
@@ -36,6 +38,7 @@ function edit(server: McpClientConfig, index: number) {
   editing.value = index
   name.value = server.serverName
   transport.value = server.transport
+  allowInsecureHttp.value = server.transport === 'streamable-http' && server.allowInsecureHttp === true
   address.value = server.transport === 'stdio' ? server.command : server.url
   args.value = JSON.stringify(server.transport === 'stdio' ? server.args ?? [] : [])
   credentials.value = JSON.stringify(server.transport === 'stdio' ? server.env ?? {} : server.headers ?? {})
@@ -46,6 +49,7 @@ function edit(server: McpClientConfig, index: number) {
 }
 watch(transport, () => {
   credentials.value = '{}'
+  allowInsecureHttp.value = false
 }, { flush: 'sync' })
 const scope = (value: string) => value.trim() === '*' ? '*' as const : value.split('\n').map(item => item.trim()).filter(Boolean)
 async function apply(next: unknown) {
@@ -70,7 +74,7 @@ async function save() {
       permissions: { tools: scope(tools.value), resources: scope(resources.value) },
       ...(transport.value === 'stdio'
         ? { command: address.value, args: JSON.parse(args.value), env: JSON.parse(credentials.value), ...(cwd.value ? { cwd: cwd.value } : {}) }
-        : { url: address.value, headers: JSON.parse(credentials.value) })
+        : { url: address.value, headers: JSON.parse(credentials.value), ...(allowInsecureHttp.value ? { allowInsecureHttp: true } : {}) })
     }
     const next = [...servers.value]
     if (editing.value === null) next.push(server as McpClientConfig)
@@ -131,6 +135,13 @@ async function save() {
             :disabled="saving"
           />
         </UFormField>
+        <UCheckbox
+          v-if="transport === 'streamable-http'"
+          v-model="allowInsecureHttp"
+          :label="t('mcp.allowInsecureHttp')"
+          :description="t('mcp.allowInsecureHttpDescription')"
+          :disabled="saving"
+        />
         <template v-if="transport === 'stdio'">
           <UFormField :label="t('mcp.args')">
             <UTextarea v-model="args" class="w-full" :disabled="saving" />

@@ -239,6 +239,9 @@ export default {
   'mcp.hosted': 'This app uses a remote agent. Configure MCP on its host with KEUNDAL_MCP_SERVERS.',
   'mcp.webDescription':
     'Connect to Streamable HTTP servers that allow this browser origin through CORS. Settings, including credentials, are saved in this browser. Saving stops active responses.',
+  'mcp.allowInsecureHttp': 'Allow HTTP for this server',
+  'mcp.allowInsecureHttpDescription':
+    'Use only on a trusted LAN or VPN. HTTP does not encrypt credentials or MCP traffic.',
   'mcp.desktopDescription':
     'Connect to HTTP servers or run trusted local stdio servers. Settings are saved in the OS secret store. Saving stops active responses and restarts the local host.'
 }
