@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { LLM_PROVIDERS, providerCredentials, providerError, type LLMSettings, type LLMProvider } from './llm-settings'
+import { LLM_PROVIDERS, providerCredentials, providerError, providerType, type LLMSettings } from './llm-settings'
 
 export const MODEL_CACHE_TTL = 60 * 60 * 1000
 const modelLoaders = {
@@ -21,24 +21,25 @@ const cacheSchema = z.object({ scope: z.string(), fetchedAt: z.number(), models:
 /** Preserve model aliases already saved in conversations, but accept discovered IDs verbatim. */
 export function resolveModel(value: string) {
   const separator = value.indexOf('/')
-  const provider = LLM_PROVIDERS.find(item => item.id === value.slice(0, separator))
+  const configuration = value.slice(0, separator)
+  const provider = providerType(configuration)
   let id = value.slice(separator + 1)
   if (!provider || separator < 0 || !id.trim()) throw new Error('Unknown chat model')
   if (value === 'anthropic/claude-haiku-4.5') id = 'claude-haiku-4-5'
   if (value === 'google/gemini-3-flash') id = 'gemini-3-flash-preview'
-  return { provider: provider.id, id, value: `${provider.id}/${id}` }
+  return { provider, configuration, id, value: `${configuration}/${id}` }
 }
 
 /** Credential-scoped cache identity without persisting another copy of the API key. */
-async function cacheScope(provider: LLMProvider, settings: LLMSettings) {
+async function cacheScope(provider: string, settings: LLMSettings) {
   const credentials = providerCredentials(settings, provider)
-  const baseURL = (credentials.baseURL || LLM_PROVIDERS.find(item => item.id === provider)!.baseURL).replace(/\/+$/, '')
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([provider, baseURL, credentials.apiKey, Object.entries(credentials.headers ?? {}).sort(([a], [b]) => a.localeCompare(b))])))
+  const baseURL = (credentials.baseURL || LLM_PROVIDERS.find(item => item.id === providerType(provider))!.baseURL).replace(/\/+$/, '')
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([provider, settings[provider]?.name, baseURL, credentials.apiKey, Object.entries(credentials.headers ?? {}).sort(([a], [b]) => a.localeCompare(b))])))
   return { scope: Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join(''), credentials }
 }
 
 /** Lists provider metadata only. A listed model may not support this app's tools/streaming API. */
-export async function loadModels(provider: LLMProvider, settings: LLMSettings, storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>, options: { force?: boolean, signal?: AbortSignal } = {}): Promise<ModelOption[]> {
+export async function loadModels(provider: string, settings: LLMSettings, storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>, options: { force?: boolean, signal?: AbortSignal } = {}): Promise<ModelOption[]> {
   const key = `keundal:models:${provider}`
   const { scope, credentials } = await cacheScope(provider, settings)
   options.signal?.throwIfAborted()
@@ -51,14 +52,14 @@ export async function loadModels(provider: LLMProvider, settings: LLMSettings, s
   }
   const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000)
   try {
-    const load = await modelLoaders[provider]()
+    const load = await modelLoaders[providerType(provider)]()
     options.signal?.throwIfAborted()
     const models = await load({ ...credentials, dangerouslyAllowBrowser: true }, { signal })
     options.signal?.throwIfAborted()
     const result = models.map(model => ({
       value: `${provider}/${model.id}`,
-      label: model.name,
-      icon: `i-simple-icons-${provider}`,
+      label: provider.includes('@') || settings[provider]?.name ? `${model.name} · ${settings[provider]!.name || provider}` : model.name,
+      icon: `i-simple-icons-${providerType(provider)}`,
       contextWindow: model.contextWindow,
       maxOutputTokens: model.maxOutputTokens
     }))
@@ -70,6 +71,6 @@ export async function loadModels(provider: LLMProvider, settings: LLMSettings, s
     return result
   } catch (error) {
     options.signal?.throwIfAborted()
-    throw providerError(provider, error, credentials)
+    throw providerError(providerType(provider), error, credentials)
   }
 }

@@ -40,6 +40,12 @@ test('잘못된 기본 모델은 기존 선택을 덮어쓰지 않는다', () =>
   expect(loadModelPreferences(saved).defaultModel).toBe('openai/custom/model')
 })
 
+test('추가 공급자의 기본 모델을 저장하고 공급자 식별자와 모델 경로를 그대로 복원한다', () => {
+  const saved = storage()
+  saveDefaultModel(saved, 'openai@work/vendor/model')
+  expect(loadModelPreferences(saved)).toEqual({ defaultModel: 'openai@work/vendor/model', model: 'openai@work/vendor/model' })
+})
+
 test('제목 모델은 채팅 기본 모델과 독립적으로 저장하고 해제한다', () => {
   const saved = storage()
   saveDefaultModel(saved, 'openai/chat')

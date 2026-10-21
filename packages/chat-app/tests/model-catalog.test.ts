@@ -47,6 +47,14 @@ test('API 키 없이 주소만 저장한 공급자의 모델을 조회하고 설
     expect(values.has('keundal:models:openai')).toBe(false)
   })
   expect(paths).toEqual(['/models'])
+  settings.value['openai@work'] = { name: 'Work', apiKey: '', baseURL: `http://127.0.0.1:${address.port}` }
+  await vi.waitFor(() => expect(catalog.models.value.map(model => model.value)).toEqual(['openai@work/local-model']))
+  expect(values.has('keundal:models:openai@work')).toBe(true)
+  delete settings.value['openai@work']
+  await vi.waitFor(() => {
+    expect(catalog.models.value).toEqual([])
+    expect(values.has('keundal:models:openai@work')).toBe(false)
+  })
 })
 
 test('모델 조회의 일반 오류는 현재 표시 언어를 따르고 공급자 진단은 유지한다', async () => {

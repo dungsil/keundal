@@ -111,6 +111,19 @@ test('이전 연결의 journal 복구가 끝난 뒤 전환하고 새 연결도 �
   ])
 })
 
+test('같은 종류와 모델의 공급자 전환에도 설정 식별자를 전달하고 재적용 시 유지한다', async () => {
+  const fixture = createFixture()
+  const store = await createDesktopChatStore(fixture.invokeNative, () => [], 'openai@work/shared', fixture.request)
+  await store.selectModel('openai@home/shared')
+  await store.reloadSettings()
+  expect(store.selectedModel).toBe('openai@home/shared')
+  expect(fixture.calls.map(call => call.args)).toEqual([
+    { selection: { provider: 'openai', configuration: 'openai@work', model: 'shared', contextWindow: 128000, maxOutputTokens: 4096 }, restart: false },
+    { selection: { provider: 'openai', configuration: 'openai@home', model: 'shared', contextWindow: 128000, maxOutputTokens: 4096 }, restart: false },
+    { selection: { provider: 'openai', configuration: 'openai@home', model: 'shared', contextWindow: 128000, maxOutputTokens: 4096 }, restart: true }
+  ])
+})
+
 test('제목 생성 중 모델을 바꾸면 제목 요청을 취소하고 교착 없이 새 모델로 전환한다', async () => {
   const fixture = createFixture()
   const message = { id: 'user', role: 'user' as const, parts: [{ type: 'text' as const, text: '질문' }] }
@@ -148,5 +161,45 @@ test('제목 생성 중 모델을 바꾸면 제목 요청을 취소하고 교착
     { selection: { provider: 'anthropic', model: 'title' } },
     { selection: { provider: 'openai', model: 'first' } },
     { selection: { provider: 'google', model: 'third' } }
+  ])
+})
+
+test('같은 종류의 다른 공급자로 제목을 생성하다 취소하면 원래 공급자를 거쳐 새 공급자로 전환한다', async () => {
+  const fixture = createFixture()
+  const message = { id: 'user', role: 'user' as const, parts: [{ type: 'text' as const, text: '질문' }] }
+  let snapshot = { revision: 1, state: { web: { id: 'chat', title: null, messages: [message], model: 'openai@chat/first' } } }
+  let started!: () => void
+  const titleStarted = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  const request: typeof fetch = async (url, init) => {
+    if (String(url).endsWith('/threads/chat')) {
+      if (init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body))
+        snapshot = { revision: snapshot.revision + 1, state: body.state }
+      }
+      return Response.json(snapshot)
+    }
+    if (String(url).endsWith('/title')) {
+      started()
+      return new Promise<Response>((_resolve, reject) => {
+        init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), { once: true })
+      })
+    }
+    return fixture.request(url, init)
+  }
+  const store = await createDesktopChatStore(fixture.invokeNative, () => [], 'openai@chat/first', request)
+  const response = store.respond('chat', {
+    model: 'openai@chat/first', titleModel: 'openai@title/title', messages: [message]
+  }).next().catch(error => error)
+  await titleStarted
+  await store.selectModel('openai@next/third')
+  expect(await response).toBeInstanceOf(Error)
+  expect(store.selectedModel).toBe('openai@next/third')
+  expect(fixture.calls.map(call => call.args)).toMatchObject([
+    { selection: { provider: 'openai', configuration: 'openai@chat', model: 'first' } },
+    { selection: { provider: 'openai', configuration: 'openai@title', model: 'title' } },
+    { selection: { provider: 'openai', configuration: 'openai@chat', model: 'first' } },
+    { selection: { provider: 'openai', configuration: 'openai@next', model: 'third' } }
   ])
 })

@@ -7,7 +7,7 @@ export function createLLMSettingsStorage(storage: Pick<Storage, 'getItem' | 'set
   async function save(settings: LLMSettings) {
     const next = llmSettingsSchema.parse(settings)
     if (invokeNative) {
-      const empty = Object.values(next).every(provider => !provider.apiKey && !provider.baseURL && !Object.keys(provider.headers ?? {}).length)
+      const empty = Object.values(next).every(provider => !provider.name && !provider.apiKey && !provider.baseURL && !Object.keys(provider.headers ?? {}).length)
       await invokeNative('save_llm_settings', { settings: empty ? null : JSON.stringify(next) })
       // Never remove the legacy copy until native persistence succeeds.
       storage.removeItem(LLM_SETTINGS_KEY)

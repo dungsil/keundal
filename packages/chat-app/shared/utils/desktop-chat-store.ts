@@ -9,6 +9,7 @@ function selection(model: string, models: ModelOption[]) {
   const contextWindow = Math.min(128_000, metadata?.contextWindow ?? 128_000)
   return {
     provider: selected.provider,
+    ...(selected.configuration !== selected.provider ? { configuration: selected.configuration } : {}),
     model: selected.id,
     contextWindow,
     maxOutputTokens: Math.min(4096, metadata?.maxOutputTokens ?? 4096, contextWindow - 1)
@@ -31,7 +32,7 @@ class DesktopChatStore extends RemoteChatStore {
   }
 
   get selectedModel() {
-    return `${this.selected.provider}/${this.selected.model}`
+    return `${this.selected.configuration ?? this.selected.provider}/${this.selected.model}`
   }
 
   selectModel(model: string, restart = false): Promise<void> {
@@ -58,7 +59,7 @@ class DesktopChatStore extends RemoteChatStore {
   }
 
   reloadSettings() {
-    return this.change(() => selection(`${this.selected.provider}/${this.selected.model}`, this.getModels()), true)
+    return this.change(() => selection(`${this.selected.configuration ?? this.selected.provider}/${this.selected.model}`, this.getModels()), true)
   }
 
   protected override async generateTitle(model: string, message: ChatMessage, signal?: AbortSignal) {

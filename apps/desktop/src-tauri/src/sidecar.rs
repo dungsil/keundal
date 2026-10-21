@@ -25,6 +25,7 @@ struct Sidecar {
 #[serde(rename_all = "camelCase")]
 pub struct Selection {
     provider: String,
+    configuration: Option<String>,
     model: String,
     context_window: u32,
     max_output_tokens: u32,
@@ -42,6 +43,13 @@ impl Selection {
             || self.max_output_tokens >= self.context_window
         {
             return Err("Invalid model selection".to_string());
+        }
+        if let Some(id) = &self.configuration {
+            let prefix = format!("{}@", self.provider);
+            let suffix = id.strip_prefix(&prefix).ok_or("Invalid provider configuration")?;
+            if suffix.is_empty() || !suffix.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-') {
+                return Err("Invalid provider configuration".to_string());
+            }
         }
         Ok(())
     }
@@ -85,6 +93,8 @@ struct ProviderSettings {
 #[derive(Deserialize, Default)]
 #[serde(default)]
 struct LlmSettings {
+    #[serde(flatten)]
+    configurations: HashMap<String, ProviderSettings>,
     openai: ProviderSettings,
     anthropic: ProviderSettings,
     google: ProviderSettings,
@@ -97,21 +107,29 @@ struct Provider {
     headers: Option<HashMap<String, String>>,
 }
 
-fn provider(settings: LlmSettings, selected: Option<&Selection>) -> Provider {
+fn provider(mut settings: LlmSettings, selected: Option<&Selection>) -> Result<Provider, String> {
     if let Some(selected) = selected {
         let (name, value) = match selected.provider.as_str() {
             "openai" => ("openai", settings.openai),
             "anthropic" => ("anthropic", settings.anthropic),
             _ => ("gemini", settings.google),
         };
-        return Provider {
+        let value = if let Some(id) = &selected.configuration {
+            settings
+                .configurations
+                .remove(id)
+                .ok_or("Provider configuration was removed")?
+        } else {
+            value
+        };
+        return Ok(Provider {
             name,
             api_key: value.api_key,
             base_url: value.base_url,
             headers: value.headers,
-        };
+        });
     }
-    [
+    Ok([
         ("openai", settings.openai),
         ("anthropic", settings.anthropic),
         ("gemini", settings.google),
@@ -136,7 +154,7 @@ fn provider(settings: LlmSettings, selected: Option<&Selection>) -> Provider {
         api_key: String::new(),
         base_url: String::new(),
         headers: None,
-    })
+    }))
 }
 
 fn model_for(provider: &str) -> String {
@@ -197,7 +215,7 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
         .transpose()
         .map_err(|_| "Stored LLM settings are invalid".to_string())?
         .unwrap_or_default();
-    let provider = provider(parsed, selection.as_ref());
+    let provider = provider(parsed, selection.as_ref())?;
 
     let (binary, mut args) = sidecar_command()?;
     if !cfg!(debug_assertions) {
@@ -366,6 +384,7 @@ mod tests {
     fn selection_uses_the_requested_provider_even_without_a_key() {
         let selected = Selection {
             provider: "google".into(),
+            configuration: None,
             model: "custom-model".into(),
             context_window: 8000,
             max_output_tokens: 1000,
@@ -382,16 +401,40 @@ mod tests {
             },
             ..Default::default()
         };
-        let chosen = provider(settings, Some(&selected));
+        let chosen = provider(settings, Some(&selected)).unwrap();
         assert_eq!(chosen.name, "gemini");
         assert_eq!(chosen.api_key, "");
         assert_eq!(chosen.base_url, "http://localhost:9000");
     }
 
     #[test]
+    fn named_configuration_uses_its_own_credentials_and_rejects_missing_entries() {
+        let mut selected = Selection {
+            provider: "openai".into(),
+            configuration: Some("openai@work".into()),
+            model: "shared".into(),
+            context_window: 8000,
+            max_output_tokens: 1000,
+        };
+        assert!(selected.validate().is_ok());
+        let settings: LlmSettings = serde_json::from_str(r#"{
+            "openai": {"apiKey":"default-key"},
+            "openai@work": {"name":"Work","apiKey":"work-key","baseURL":"https://work.example/v1"}
+        }"#).unwrap();
+        let chosen = provider(settings, Some(&selected)).unwrap();
+        assert_eq!(chosen.name, "openai");
+        assert_eq!(chosen.api_key, "work-key");
+        assert_eq!(chosen.base_url, "https://work.example/v1");
+        assert!(provider(LlmSettings::default(), Some(&selected)).is_err());
+        selected.configuration = Some("google@work".into());
+        assert!(selected.validate().is_err());
+    }
+
+    #[test]
     fn selection_rejects_unknown_providers_and_invalid_budgets() {
         let mut selected = Selection {
             provider: "unknown".into(),
+            configuration: None,
             model: "custom-model".into(),
             context_window: 8000,
             max_output_tokens: 1000,
