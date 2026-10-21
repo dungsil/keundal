@@ -10,7 +10,7 @@ const props = defineProps<{
 }>()
 
 const { model } = useModels()
-const { webSearch, reasoning } = useChatSettings()
+const { webSearch } = useChatSettings()
 
 // Web search is a provider-defined tool, only available on Anthropic and OpenAI models.
 const supportsWebSearch = computed(() => resolveModel(model.value).provider !== 'google')
@@ -43,16 +43,6 @@ const items = computed<DropdownMenuItem[][]>(() => [
       description: supportsWebSearch.value ? undefined : t('prompt.unsupported'),
       onUpdateChecked: (checked: boolean) => {
         webSearch.value = checked
-      },
-      onSelect: (e: Event) => e.preventDefault()
-    },
-    {
-      label: t('prompt.reasoning'),
-      icon: 'i-lucide-brain',
-      type: 'checkbox',
-      checked: reasoning.value,
-      onUpdateChecked: (checked: boolean) => {
-        reasoning.value = checked
       },
       onSelect: (e: Event) => e.preventDefault()
     }

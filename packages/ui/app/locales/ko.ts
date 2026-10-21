@@ -69,6 +69,8 @@ export default {
   'prompt.search': '웹 검색',
   'prompt.unsupported': '이 모델에서는 지원하지 않습니다.',
   'prompt.reasoning': '심층 사고',
+  'prompt.reasoningOn': '심층 사고 켜짐',
+  'prompt.reasoningOff': '심층 사고 꺼짐',
   'prompt.menu': '입력 옵션 열기',
   'dictation.listening': '듣는 중...',
   'dictation.transcribing': '음성을 텍스트로 변환 중...',
