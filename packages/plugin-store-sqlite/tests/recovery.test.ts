@@ -17,7 +17,7 @@ import {
 } from '@keundal/core'
 import sqliteStorePlugin, { SqliteStore } from '@keundal/plugin-store-sqlite'
 import { Context, type Fiber } from 'cordis'
-import { expect, test, type TestContext } from 'vitest'
+import { expect, test, vi, type TestContext } from 'vitest'
 
 interface Script {
   readonly events: LLMEvent[]
@@ -104,6 +104,34 @@ const request = (runId = 'run'): GenerationRequest => ({
   sessionRevision: 0
 })
 
+test.for([128, 1024])('응답을 %i개로 나누어도 누적 메시지는 종료 시 한 번만 저장한다', async (fragments, t) => {
+  const writes = vi.spyOn(SqliteStore.prototype, 'writeRunMessages')
+  t.onTestFinished(() => writes.mockRestore())
+  const delta = '가'.repeat(65536 / fragments)
+  const events: LLMEvent[] = [
+    { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' },
+    { type: EventType.REASONING_MESSAGE_START, messageId: 'reason', role: 'reasoning' },
+    ...Array.from({ length: fragments }, (): LLMEvent[] => [
+      { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'reply', delta },
+      { type: EventType.REASONING_MESSAGE_CONTENT, messageId: 'reason', delta }
+    ]).flat()
+  ]
+  const { ctx } = await setup(t, { events }, databasePath(t))
+  await collect(ctx.generation.run(request()))
+
+  expect(writes).toHaveBeenCalledTimes(1)
+  const messages = (await ctx.generation.get('run'))?.messages
+  expect(messages).toEqual([
+    { id: 'reply', role: 'assistant', content: delta.repeat(fragments) },
+    { id: 'reason', role: 'reasoning', content: delta.repeat(fragments) }
+  ])
+  const serializedBytes = writes.mock.calls.reduce(
+    (total, [, values]) => total + Buffer.byteLength(JSON.stringify(values)),
+    0
+  )
+  expect(serializedBytes).toBe(Buffer.byteLength(JSON.stringify(messages)))
+})
+
 test('취소 후 next를 다시 호출하지 않아도 get으로 cancelled 상태를 확인한다', async (t) => {
   const { ctx } = await setup(t, { events: reply, holdAfter: 1 }, databasePath(t))
   const controller = new globalThis.AbortController()
@@ -112,6 +140,23 @@ test('취소 후 next를 다시 호출하지 않아도 get으로 cancelled 상�
 
   controller.abort(new Error('cancelled by client'))
   expect((await ctx.generation.get('run'))?.status).toBe('cancelled')
+})
+
+test('이전 스키마의 실행 메시지를 journal로 덮어쓰지 않고 읽는다', async (t) => {
+  const path = databasePath(t)
+  const first = new SqliteStore(path)
+  first.ensureRun('legacy', 'thread', request('legacy'), 'interrupted')
+  first.appendJournal('legacy', { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'reply', delta: 'journal' })
+  first.writeRunMessages('legacy', [{ id: 'reply', role: 'assistant', content: 'snapshot' }])
+  first.database.exec('ALTER TABLE runs DROP COLUMN messages_from_journal')
+  first.release()
+
+  const reopened = new SqliteStore(path)
+  try {
+    expect(reopened.readRun('legacy')?.messages).toEqual([{ id: 'reply', role: 'assistant', content: 'snapshot' }])
+  } finally {
+    reopened.release()
+  }
 })
 
 test('next가 대기 중일 때 return을 호출하면 스트림을 중단하고 interrupted로 확정한다', async (t) => {

@@ -1,12 +1,13 @@
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite'
 
-import type {
-  AGUIEvent,
-  AgentMessage,
-  GenerationJournalEntry,
-  GenerationRequest,
-  GenerationStatus,
-  RunAgentInput
+import {
+  MessageAssembly,
+  type AGUIEvent,
+  type AgentMessage,
+  type GenerationJournalEntry,
+  type GenerationRequest,
+  type GenerationStatus,
+  type RunAgentInput
 } from '@keundal/core'
 
 /** 스레드 하나의 확정된 저장 상태입니다. */
@@ -64,7 +65,8 @@ CREATE TABLE IF NOT EXISTS runs (
   request TEXT NOT NULL,
   status TEXT NOT NULL,
   owner_id TEXT,
-  lease_expires_at INTEGER
+  lease_expires_at INTEGER,
+  messages_from_journal INTEGER NOT NULL DEFAULT 0
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS run_journal (
@@ -99,13 +101,14 @@ const WRITE_THREAD_MESSAGE = `INSERT INTO thread_messages (thread_id, message_id
 SELECT ?, ?, COALESCE(MAX(position) + 1, 0), ? FROM thread_messages WHERE thread_id = ?
 ON CONFLICT (thread_id, message_id) DO UPDATE SET message = excluded.message`
 
-const REGISTER_RUN = `INSERT INTO runs (run_id, thread_id, request, status, owner_id, lease_expires_at)
-VALUES (?, ?, ?, 'running', ?, ?) ON CONFLICT (run_id) DO NOTHING`
+const REGISTER_RUN = `INSERT INTO runs (run_id, thread_id, request, status, owner_id, lease_expires_at, messages_from_journal)
+VALUES (?, ?, ?, 'running', ?, ?, 1) ON CONFLICT (run_id) DO NOTHING`
 const ENSURE_RUN = `INSERT INTO runs (run_id, thread_id, request, status, owner_id, lease_expires_at)
 VALUES (?, ?, ?, ?, NULL, NULL) ON CONFLICT (run_id) DO NOTHING`
-const READ_RUN = 'SELECT run_id, thread_id, request, status FROM runs WHERE run_id = ?'
+const READ_RUN = 'SELECT run_id, thread_id, request, status, messages_from_journal FROM runs WHERE run_id = ?'
 const READ_RUN_HEADER = 'SELECT thread_id, status FROM runs WHERE run_id = ?'
-const READ_RUNS = 'SELECT run_id, thread_id, request, status FROM runs ORDER BY rowid'
+const READ_RUNS = 'SELECT run_id, thread_id, request, status, messages_from_journal FROM runs ORDER BY rowid'
+const MATERIALIZE_RUN_MESSAGES = 'UPDATE runs SET messages_from_journal = 0 WHERE run_id = ?'
 const READ_OWNERSHIPS = 'SELECT run_id, status, owner_id, lease_expires_at FROM runs ORDER BY rowid'
 const READ_RUNNING = `SELECT 1 FROM runs WHERE run_id = ? AND status = 'running'`
 const READ_OWNED = `SELECT 1 FROM runs WHERE run_id = ? AND status = 'running' AND owner_id = ?`
@@ -140,6 +143,7 @@ interface RunRow {
   readonly thread_id: string
   readonly request: string
   readonly status: GenerationStatus
+  readonly messages_from_journal: number
 }
 
 interface RunHeaderRow {
@@ -189,6 +193,12 @@ export class SqliteStore {
     this.database.exec('PRAGMA journal_mode = WAL')
     this.database.exec('PRAGMA synchronous = NORMAL')
     this.database.exec(SCHEMA)
+    // 이전 데이터베이스의 메시지 스냅샷은 그대로 사용하며 새 실행만 journal에서 복원합니다.
+    this.transaction(() => {
+      const columns = this.database.prepare('PRAGMA table_info(runs)').all()
+      if (!columns.some((column) => column.name === 'messages_from_journal'))
+        this.database.exec('ALTER TABLE runs ADD COLUMN messages_from_journal INTEGER NOT NULL DEFAULT 0')
+    })
   }
 
   /** 저장소를 사용하는 서비스가 늘어날 때마다 참조를 추가합니다. */
@@ -358,6 +368,7 @@ export class SqliteStore {
   /** 실행이 생성한 메시지를 id 기준으로 추가하거나 대체합니다. */
   writeRunMessages(runId: string, messages: readonly AgentMessage[]): void {
     this.writeMessages(WRITE_RUN_MESSAGE, runId, messages)
+    this.statement(MATERIALIZE_RUN_MESSAGES).run(runId)
   }
 
   /** 실행을 종료 상태로 확정하고 소유권을 반납합니다. */
@@ -381,18 +392,27 @@ export class SqliteStore {
   }
 
   private toRun(row: RunRow): StoredRun {
+    const journal = this.rows<JournalRow>(READ_JOURNAL, row.run_id).map((entry) => ({
+      sequence: entry.sequence,
+      event: parse<AGUIEvent>(entry.event)
+    }))
+    let messages: AgentMessage[]
+    if (row.messages_from_journal) {
+      const assembly = new MessageAssembly()
+      for (const entry of journal) assembly.apply(entry.event)
+      messages = assembly.messages
+    } else {
+      messages = this.rows<MessageRow>(READ_RUN_MESSAGES, row.run_id).map((message) =>
+        parse<AgentMessage>(message.message)
+      )
+    }
     return {
       runId: row.run_id,
       threadId: row.thread_id,
       request: parse<GenerationRequest>(row.request),
       status: row.status,
-      journal: this.rows<JournalRow>(READ_JOURNAL, row.run_id).map((entry) => ({
-        sequence: entry.sequence,
-        event: parse<AGUIEvent>(entry.event)
-      })),
-      messages: this.rows<MessageRow>(READ_RUN_MESSAGES, row.run_id).map((message) =>
-        parse<AgentMessage>(message.message)
-      )
+      journal,
+      messages
     }
   }
 

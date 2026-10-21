@@ -9,13 +9,12 @@ const JOURNAL_BATCH_INTERVAL_MS = 50
 
 /**
  * 실행 이벤트를 journal과 실행 메시지로 조립합니다. 코어의 조립기가 어시스턴트 텍스트·도구
- * 호출·추론 요약을 하나의 실행 결과로 모으고, 이 클래스는 배치마다 그 결과를 저장소에
- * 기록합니다. 실행이 중단되어도 마지막으로 확정한 지점까지 부분 응답이 남습니다.
+ * 호출·추론 요약을 하나의 실행 결과로 모으고, 이 클래스는 배치마다 이벤트만 저장소에
+ * 기록합니다. 부분 응답은 확정된 journal에서 복원하므로 누적 메시지를 반복해서 쓰지 않습니다.
  */
 export class RunRecorder {
   private readonly assembly = new MessageAssembly()
   private pending: AGUIEvent[] = []
-  private changed = new Map<string, AgentMessage>()
   private deadline?: number
   private stopped = false
 
@@ -32,9 +31,8 @@ export class RunRecorder {
   record(event: AGUIEvent): boolean {
     if (this.stopped) return false
     // 조립이 거부한 이벤트는 journal 대상이 아니므로, 오류 경로의 flush가 남기지 않게 먼저 조립합니다.
-    const message = this.assembly.apply(event)
+    this.assembly.apply(event)
     this.pending.push(event)
-    if (message) this.changed.set(message.id, message)
     if (this.pending.length === 1) this.deadline = Date.now() + JOURNAL_BATCH_INTERVAL_MS
     const due = this.pending.length >= JOURNAL_BATCH_SIZE || Date.now() >= (this.deadline ?? Infinity)
     if (due) return this.flush()
@@ -47,12 +45,10 @@ export class RunRecorder {
     const ok = this.store.transaction(() => {
       if (!this.store.ownsRun(this.runId, this.ownerId)) return false
       for (const event of this.pending) this.store.appendJournal(this.runId, event)
-      if (this.changed.size) this.store.writeRunMessages(this.runId, [...this.changed.values()])
       return true
     })
     if (ok) {
       this.pending = []
-      this.changed.clear()
       this.deadline = undefined
     } else {
       this.stopped = true
