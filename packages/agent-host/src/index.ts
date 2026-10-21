@@ -1,4 +1,4 @@
-import agentPlugin from '@keundal/agent'
+import agentPlugin, { type AgentConfig } from '@keundal/agent'
 import {
   EventType,
   type AGUIEvent,
@@ -34,6 +34,7 @@ export interface AgentHostOptions {
   readonly models?: Readonly<Record<string, Omit<AgentHostModel, 'id' | 'provider'>>>
   readonly sqlitePath: string
   readonly maxOutputTokens?: number
+  readonly tools?: AgentConfig['tools']
   readonly maxToolRounds?: number
   readonly baseURL?: string
   readonly headers?: Readonly<Record<string, string>>
@@ -146,7 +147,9 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
           const signal = execution?.signal
             ? globalThis.AbortSignal.any([execution.signal, mcpLifetime.signal])
             : mcpLifetime.signal
-          const tools = []
+          const tools = [
+            ...(typeof options.tools === 'function' ? await options.tools({ signal }) : (options.tools ?? []))
+          ]
           for (const server of mcpServers) {
             signal.throwIfAborted()
             let pending = mcpClients.get(server.serverName)

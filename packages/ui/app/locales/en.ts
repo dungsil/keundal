@@ -13,6 +13,8 @@ export default {
   'common.value': 'Value',
   'common.unavailable': 'N/A',
   'language.label': 'Language',
+  'settings.appearance': 'Appearance',
+  'settings.colorMode': 'Color mode',
   'chat.new': 'New chat',
   'chat.search': 'Search',
   'chat.searchPlaceholder': 'Search chats...',

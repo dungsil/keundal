@@ -1,10 +1,8 @@
 import { EventType, parseRunAgentInput, prepareReplayMessages, type AgentMessage, type AGUIEvent } from '@keundal/core'
 import agentPlugin, { type ExecutableTool } from '@keundal/agent'
 import type { Context } from 'cordis'
-import { z } from 'zod'
 import { ChatMessageAssembly, type ChatMessage } from './chat-message'
-import { chartTool } from './tools/chart'
-import { weatherTool } from './tools/weather'
+import { createChatTools } from './tools/agent'
 import { resolveModel } from './models'
 
 const randomUUID = () => globalThis.crypto.randomUUID()
@@ -51,12 +49,7 @@ export async function createKeundalChat(context: Context, name: string, options:
     reasoning: options.reasoning === false && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id) ? undefined : options.reasoning,
     maxToolRounds: 4,
     skills: !!context.skills,
-    tools: async execution => [...await (options.tools?.(execution) ?? []), ...Object.entries({ chart: chartTool, weather: weatherTool }).map(([name, tool]) => ({
-      name,
-      description: tool.description,
-      parameters: z.toJSONSchema(tool.inputSchema),
-      execute: async (args: Record<string, unknown>) => JSON.stringify(await tool.execute(tool.inputSchema.parse(args) as never))
-    }))]
+    tools: async execution => [...createChatTools(), ...await (options.tools?.(execution) ?? [])]
   })
   const dispose = async () => {
     await agent.dispose()

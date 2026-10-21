@@ -7,6 +7,7 @@ const returnTo = computed(() => {
 })
 
 const sections = computed(() => [
+  { id: 'appearance', label: t('settings.appearance'), icon: 'i-lucide-palette' },
   { id: 'models', label: t('model.defaultTitle'), icon: 'i-lucide-bot' },
   { id: 'mcp', label: 'MCP', icon: 'i-lucide-network' },
   { id: 'llm', label: 'LLM', icon: 'i-lucide-plug' },
@@ -63,8 +64,21 @@ useHead(() => ({ title: t('settings.title') }))
             />
           </nav>
           <div class="min-w-0 flex-1">
+            <section v-show="activeSection === 'appearance'" class="mb-8 space-y-4" aria-labelledby="appearance-settings-title">
+              <h2 id="appearance-settings-title" class="text-lg font-semibold text-highlighted">
+                {{ t('settings.appearance') }}
+              </h2>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-sm font-medium text-highlighted">{{ t('language.label') }}</span>
+                <LanguageSelect />
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-sm font-medium text-highlighted">{{ t('settings.colorMode') }}</span>
+                <UColorModeSwitch :aria-label="t('settings.colorMode')" />
+              </div>
+            </section>
             <ModelSettings v-show="activeSection === 'models'" />
-            <LLMSettings v-show="activeSection === 'llm'" :return-to="returnTo" />
+            <LLMSettings v-show="activeSection === 'llm'" />
             <ClientOnly>
               <McpSettings v-show="activeSection === 'mcp'" />
               <SkillSettings v-show="activeSection === 'skills'" />
