@@ -11,10 +11,6 @@ const { t } = useLocale()
     <template #right>
       <slot />
 
-      <LanguageSelect />
-
-      <UColorModeButton />
-
       <UButton
         color="neutral"
         variant="ghost"
