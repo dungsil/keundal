@@ -8,9 +8,9 @@ const returnTo = computed(() => {
 
 const sections = computed(() => [
   { id: 'appearance', label: t('settings.appearance'), icon: 'i-lucide-palette' },
+  { id: 'llm', label: 'LLM', icon: 'i-lucide-plug' },
   { id: 'models', label: t('model.defaultTitle'), icon: 'i-lucide-bot' },
   { id: 'mcp', label: 'MCP', icon: 'i-lucide-network' },
-  { id: 'llm', label: 'LLM', icon: 'i-lucide-plug' },
   { id: 'skills', label: t('skill.title'), icon: 'i-lucide-book-open' }
 ])
 const activeSection = computed(() => {
@@ -77,8 +77,8 @@ useHead(() => ({ title: t('settings.title') }))
                 <UColorModeSwitch :aria-label="t('settings.colorMode')" />
               </div>
             </section>
-            <ModelSettings v-show="activeSection === 'models'" />
             <LLMSettings v-show="activeSection === 'llm'" />
+            <ModelSettings v-show="activeSection === 'models'" />
             <ClientOnly>
               <McpSettings v-show="activeSection === 'mcp'" />
               <SkillSettings v-show="activeSection === 'skills'" />
