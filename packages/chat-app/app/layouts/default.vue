@@ -129,40 +129,48 @@ defineShortcuts({
           orientation="vertical"
           :ui="{
             link: 'overflow-hidden pr-14.5',
-            linkTrailing: 'gap-0 translate-x-full group-hover:translate-x-0 group-focus-within:translate-x-0 transition-transform ms-0 absolute inset-e-px'
+            linkTrailing: 'gap-0 ms-0 absolute inset-e-px'
           }"
         >
           <template #chat-trailing="{ item }">
-            <UButton
-              as="div"
-              role="button"
-              icon="i-lucide-pencil"
-              color="neutral"
-              variant="link"
-              size="sm"
-              class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50"
-              :aria-label="t('common.rename')"
-              :title="t('common.rename')"
-              tabindex="0"
-              @click.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
-              @keydown.enter.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
-              @keydown.space.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
-            />
-            <UButton
-              as="div"
-              role="button"
-              icon="i-lucide-trash"
-              color="neutral"
-              variant="link"
-              size="sm"
-              class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50"
-              :aria-label="t('common.delete')"
-              :title="t('common.delete')"
-              tabindex="0"
-              @click.stop.prevent="deleteChat(item.id as string)"
-              @keydown.enter.stop.prevent="deleteChat(item.id as string)"
-              @keydown.space.stop.prevent="deleteChat(item.id as string)"
-            />
+            <span class="inline-flex overflow-hidden">
+              <span class="inline-flex translate-x-full group-hover:translate-x-0 focus-within:translate-x-0 transition-transform">
+                <UButton
+                  as="div"
+                  role="button"
+                  icon="i-lucide-pencil"
+                  color="neutral"
+                  variant="link"
+                  size="sm"
+                  class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50"
+                  :aria-label="t('common.rename')"
+                  :title="t('common.rename')"
+                  tabindex="0"
+                  @click.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
+                  @keydown.enter.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
+                  @keydown.space.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
+                />
+              </span>
+            </span>
+            <span class="inline-flex overflow-hidden">
+              <span class="inline-flex translate-x-full group-hover:translate-x-0 focus-within:translate-x-0 transition-transform">
+                <UButton
+                  as="div"
+                  role="button"
+                  icon="i-lucide-trash"
+                  color="neutral"
+                  variant="link"
+                  size="sm"
+                  class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50"
+                  :aria-label="t('common.delete')"
+                  :title="t('common.delete')"
+                  tabindex="0"
+                  @click.stop.prevent="deleteChat(item.id as string)"
+                  @keydown.enter.stop.prevent="deleteChat(item.id as string)"
+                  @keydown.space.stop.prevent="deleteChat(item.id as string)"
+                />
+              </span>
+            </span>
           </template>
         </UNavigationMenu>
       </template>
