@@ -4,6 +4,8 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+    # 같은 이벤트에서 paths와 paths-ignore를 함께 정의할 수 없다.
+    # 제외 경로는 `!` 패턴으로 적는다. 뒤에 오는 `!` 패턴은 앞선 일치 경로를 제외한다.
     paths:
       - 'apps/web/app/**'
       - 'apps/web/public/**'
@@ -20,17 +22,10 @@ on:
       - 'packages/ui/shared/**'
       - 'packages/ui/nuxt.config.ts'
       - 'packages/ui/package.json'
-    paths-ignore:
-      - 'apps/desktop/**'
-      - '.github/**'
-      - 'ci/**'
-      - 'docs/**'
-      - 'examples/**'
-      - 'tools/store-conformance/**'
-      - '*.md'
-      - 'apps/*/README.md'
-      - 'packages/*/README.md'
-      - 'tools/*/README.md'
+      - '!*.md'
+      - '!apps/*/README.md'
+      - '!packages/*/README.md'
+      - '!tools/*/README.md'
 
 permissions:
   contents: read
