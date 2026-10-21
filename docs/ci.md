@@ -157,3 +157,45 @@ macOS의 DMG 생성은 [실행 39454203709](https://github.com/dungsil/keundal/a
 - [인자 분리를 제거한 실행](https://github.com/dungsil/keundal/actions/runs/39460442472)에서 패키지·예제 23개 작업이 이전 커밋의 캐시에 모두 적중했다. Linux 빌드 훅의 18개 작업도 전부 적중하여 32ms에 끝났다.
 - 검증 중 main의 병합 대상이 바뀌어 웹·네이티브 일부 입력도 변경됐다. 변경 없는 패키지의 재사용과 변경된 입력의 재빌드를 구분했다.
 - 같은 입력의 후속 실행에서는 `build:native`의 캐시 적중, 설치 파일 업로드 및 Windows 포터블 실행 검증을 함께 확인한다. 캐시가 있는 실행과 없는 실행의 빌드 단계 시간을 구분해 비교한다.
+
+## Lighthouse 검사
+
+`PR Lighthouse`는 `pull_request` 이벤트로 실행하므로 워크플로우를 추가한 PR에서도 병합 전에 작동한다.
+기존 프리뷰 배포가 남긴 봇 댓글에서 현재 PR 커밋과 일치하는 배포 URL을 최대 20분간 기다린 뒤,
+그 URL의 홈(`/`)과 설정(`/settings`)을 Unlighthouse 0.19.1로 검사한다. 이전 커밋이나 일반 사용자의
+댓글에 있는 주소는 사용하지 않는다.
+
+모바일 설정으로 두 화면을 각각 3회 검사하고 항목별 중앙값을 PR의 별도 Lighthouse 댓글과 Actions
+작업 요약에 표시한다. 댓글에는 검사한 커밋과 실행 로그 링크를 남기며 재실행 시 같은 댓글을 갱신한다.
+HTML·JSON 보고서는 아티팩트로 업로드하지 않는다. 점수 임계값은 설정하지 않고, 검사 실패도 댓글에
+표시한다. 이전 커밋과의 점수 차이는 자동으로 계산하지 않는다.
+
+프리뷰 조회와 검사 작업은 읽기 권한만 사용하며 배포 인증 정보를 받지 않는다. 댓글 게시 작업에만
+`pull-requests: write` 권한을 부여하고, 해당 작업에서는 저장소 코드를 실행하지 않는다. 게시 직전에
+열린 PR과 최신 커밋을 다시 확인한다. 같은 저장소의 PR만 검사하며, 외부 포크에서는 실행하지 않는다.
+PR별 프리뷰 URL을 재사용하므로 검사 도중 새 배포가 이루어지면 결과가 섞일 수 있다.
+
+저장된 대화가 필요한 `/chat/:id`는 검사하지 않는다. 대화 화면을 추가할 때는 고정된 테스트 데이터를
+먼저 준비한다. 메시지 전송과 스트리밍 반응성은 별도 E2E 테스트 대상이다.
+
+로컬에서는 웹과 의존 패키지를 프로덕션 설정으로 빌드하고 서버를 실행한다.
+
+```sh
+pnpm exec turbo run build --filter=@keundal/web
+pnpm --filter @keundal/web preview
+```
+
+다른 터미널에서 `pnpm lighthouse:local`을 실행하면 Unlighthouse가 로컬 웹을 검사한다.
+다른 주소를 검사하려면 다음처럼 실행한다. Chromium을 직접 지정하려면 `CHROME_PATH`를 설정하고
+저장소의 설정 파일을 전달한다. 기본 실행의 원본 보고서는 `.unlighthouse/`에 저장한다.
+
+```sh
+pnpm dlx --allow-build=esbuild --allow-build=puppeteer --allow-build=vue-demi @unlighthouse/cli@0.19.1 --site https://배포된-프리뷰-주소 --config-file tools/lighthouse/unlighthouse.config.mjs
+```
+
+CI는 `LIGHTHOUSE_RUN=1`, `2`, `3`으로 위 명령을 각각 실행하여 원본을 별도 디렉터리에 보존한다.
+세 실행의 점수 요약은 다음 명령으로 생성한다. `LIGHTHOUSE_BASE_URL`은 검사한 주소와 같아야 한다.
+
+```sh
+LIGHTHOUSE_BASE_URL=https://배포된-프리뷰-주소 LIGHTHOUSE_REPORT_DIR=.unlighthouse node tools/lighthouse/summary.mjs
+```
