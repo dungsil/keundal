@@ -152,7 +152,7 @@ export function providerError(
     for (const value of variants) detail = detail.split(value).join('[redacted]')
   }
   detail = detail
-    // eslint-disable-next-line no-control-regex -- Remove control characters from untrusted provider diagnostics.
+    // oxlint-disable-next-line no-control-regex -- Remove control characters from untrusted provider diagnostics.
     .replace(/[\x00-\x1f\x7f]/g, ' ')
     .trim()
     .slice(0, 1000)

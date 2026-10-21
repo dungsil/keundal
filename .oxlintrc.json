@@ -1,10 +1,9 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": ["apps/web/**", "packages/chat-app/**", "apps/desktop/**"],
   "env": {
     "builtin": true
   },
-  "plugins": ["typescript", "unicorn", "oxc"],
+  "plugins": ["typescript", "unicorn", "oxc", "vue"],
   "categories": {
     "correctness": "error",
     "nursery": "warn"
@@ -25,31 +24,87 @@
       }
     },
     {
-      "files": ["packages/ui/nuxt.config.ts"],
+      "files": ["packages/ui/nuxt.config.ts", "packages/chat-app/nuxt.config.ts", "apps/*/nuxt.config.ts"],
+      "env": {
+        "node": true
+      },
       "globals": {
         "defineNuxtConfig": "readonly"
       }
     },
     {
-      "files": ["packages/ui/app/**"],
+      "files": ["packages/ui/app/**", "packages/chat-app/app/**", "apps/*/app/**"],
       "env": {
         "browser": true
       },
       "globals": {
         "computed": "readonly",
+        "createError": "readonly",
+        "defineAppConfig": "readonly",
+        "defineNuxtPlugin": "readonly",
+        "defineNuxtRouteMiddleware": "readonly",
+        "navigateTo": "readonly",
+        "nextTick": "readonly",
+        "onBeforeRouteLeave": "readonly",
+        "onBeforeUnmount": "readonly",
+        "onMounted": "readonly",
+        "onNuxtReady": "readonly",
+        "onScopeDispose": "readonly",
+        "onUnmounted": "readonly",
         "readonly": "readonly",
         "ref": "readonly",
+        "refreshNuxtData": "readonly",
+        "useAsyncData": "readonly",
         "useCookie": "readonly",
+        "useHead": "readonly",
         "useLocale": "readonly",
+        "useNuxtApp": "readonly",
+        "useNuxtData": "readonly",
         "useRequestHeaders": "readonly",
-        "useState": "readonly"
+        "useRoute": "readonly",
+        "useRuntimeConfig": "readonly",
+        "useSeoMeta": "readonly",
+        "useState": "readonly",
+        "watch": "readonly"
       }
     },
     {
-      "files": ["packages/ui/app/**/*.vue"],
+      "files": ["packages/chat-app/app/**"],
       "globals": {
+        "defineMarkdownComponent": "readonly",
+        "definePageMeta": "readonly",
+        "defineShortcuts": "readonly",
+        "sourceToInlineMdc": "readonly",
+        "useChatActions": "readonly",
+        "useChatSettings": "readonly",
+        "useChats": "readonly",
+        "useColorMode": "readonly",
+        "useDictation": "readonly",
+        "useFileUpload": "readonly",
+        "useFileUploadWithStatus": "readonly",
+        "useKeundalChat": "readonly",
+        "useLLMSettings": "readonly",
+        "useModelCatalog": "readonly",
+        "useModels": "readonly",
+        "useOverlay": "readonly",
+        "useStartupPending": "readonly",
+        "useToast": "readonly"
+      }
+    },
+    {
+      "files": ["packages/ui/app/**/*.vue", "packages/chat-app/app/**/*.vue", "apps/*/app/**/*.vue"],
+      "globals": {
+        "defineEmits": "readonly",
+        "defineModel": "readonly",
+        "defineOptions": "readonly",
         "defineProps": "readonly",
-        "defineEmits": "readonly"
+        "withDefaults": "readonly"
+      }
+    },
+    {
+      "files": ["apps/web/server/**"],
+      "globals": {
+        "defineNitroPlugin": "readonly"
       }
     },
     {
