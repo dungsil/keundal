@@ -92,7 +92,7 @@ Windows 포터블 배포는 이 프로젝트에서 구성한 방식이며, Tauri
 
 ## 로컬 스킬
 
-사이드바의 **Skills**는 앱에 저장한 스킬과 로컬 파일을 함께 표시합니다. 앱에 저장한 스킬과 사용 여부는 WebView의 localStorage에 보관합니다. API 키를 저장하는 OS 보안 저장소와는 별개입니다.
+**설정 → 에이전트 플러그인 → 스킬**에서 앱에 저장한 스킬과 로컬 파일을 함께 표시합니다. 앱에 저장한 스킬과 사용 여부는 WebView의 localStorage에 보관합니다. API 키를 저장하는 OS 보안 저장소와는 별개입니다.
 
 앱은 실행 프로세스의 현재 디렉터리와 OS 홈 디렉터리에서 `.agents/skills/<directory>/SKILL.md`를 찾습니다. 실행 디렉터리는 앱을 시작한 방법에 따라 달라집니다. 없는 루트는 건너뛰며 프로젝트 상위 디렉터리를 탐색하지 않습니다.
 
@@ -118,4 +118,4 @@ rustc --edition=2021 --test apps/desktop/src-tauri/src/skill_files.rs -o /tmp/ke
 
 ## MCP
 
-**Settings → MCP**에서 Streamable HTTP 서버와 로컬 stdio 서버를 등록합니다. 인증 헤더와 환경 변수를 포함한 설정은 OS 보안 저장소에 저장합니다. 설정을 저장하면 진행 중인 응답을 중단하고 로컬 호스트를 다시 시작합니다. [공용 MCP 설정 안내](../../packages/chat-app/README.md#mcp-서버)를 참고합니다.
+**설정 → 에이전트 플러그인 → MCP 서버**에서 Streamable HTTP 서버와 로컬 stdio 서버를 등록합니다. 인증 헤더와 환경 변수를 포함한 설정은 OS 보안 저장소에 저장합니다. 설정을 저장하면 진행 중인 응답을 중단하고 로컬 호스트를 다시 시작합니다. [공용 MCP 설정 안내](../../packages/chat-app/README.md#mcp-서버)를 참고합니다.
