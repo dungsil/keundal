@@ -9,6 +9,7 @@ const returnTo = computed(() => {
 const sections = computed(() => [
   { id: 'appearance', label: t('settings.appearance'), icon: 'i-lucide-palette' },
   { id: 'models', label: t('model.defaultTitle'), icon: 'i-lucide-bot' },
+  { id: 'mcp', label: 'MCP', icon: 'i-lucide-network' },
   { id: 'llm', label: 'LLM', icon: 'i-lucide-plug' },
   { id: 'skills', label: t('skill.title'), icon: 'i-lucide-book-open' }
 ])
@@ -79,6 +80,7 @@ useHead(() => ({ title: t('settings.title') }))
             <ModelSettings v-show="activeSection === 'models'" />
             <LLMSettings v-show="activeSection === 'llm'" />
             <ClientOnly>
+              <McpSettings v-show="activeSection === 'mcp'" />
               <SkillSettings v-show="activeSection === 'skills'" />
             </ClientOnly>
           </div>

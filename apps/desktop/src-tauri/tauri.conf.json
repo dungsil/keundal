@@ -33,7 +33,7 @@
           "identifier": "llm-settings",
           "description": "Allow the local main window to store LLM settings in the OS secret store",
           "windows": ["main"],
-          "permissions": ["allow-load-llm-settings", "allow-save-llm-settings"]
+          "permissions": ["allow-load-llm-settings", "allow-save-llm-settings", "allow-load-mcp-settings", "allow-save-mcp-settings"]
         },
         {
           "identifier": "skill-files",

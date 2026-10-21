@@ -217,5 +217,30 @@ export default {
   'error.secureStorageDescription':
     'LLM 설정을 불러오지 못했습니다. 운영체제 보안 저장소의 잠금을 해제한 뒤 앱을 다시 시작하세요. 브라우저 저장소에는 대신 저장하지 않습니다.',
   'settings.title': '설정',
-  'settings.back': '대화로 돌아가기'
+  'settings.back': '대화로 돌아가기',
+  'mcp.name': '서버 이름',
+  'mcp.transport': '연결 방식',
+  'mcp.command': '실행 명령',
+  'mcp.url': '서버 URL',
+  'mcp.args': '인자(JSON 배열)',
+  'mcp.cwd': '작업 디렉터리(선택 사항)',
+  'mcp.env': '환경 변수(JSON 객체)',
+  'mcp.headers': 'HTTP 헤더(JSON 객체)',
+  'mcp.tools': '허용할 도구',
+  'mcp.resources': '허용할 리소스 URI',
+  'mcp.permissions': '이름이나 URI를 한 줄에 하나씩 입력하세요. *는 전체 허용이며, 비워 두면 접근을 차단합니다.',
+  'mcp.timeout': '요청 제한 시간(ms)',
+  'mcp.edit': '수정',
+  'mcp.remove': '삭제',
+  'mcp.add': '서버 추가',
+  'mcp.save': '변경 사항 저장',
+  'mcp.cancel': '취소',
+  'mcp.saved': 'MCP 설정을 저장했습니다. 다음 응답부터 적용합니다.',
+  'mcp.saveFailed': '저장하거나 연결하지 못했습니다. 서버와 설정, 보안 저장소를 확인하세요.',
+  'mcp.invalidJSON': '인자와 인증 정보를 올바른 JSON 형식으로 입력하세요.',
+  'mcp.hosted': '원격 에이전트를 사용 중입니다. 호스트의 KEUNDAL_MCP_SERVERS에서 MCP를 설정하세요.',
+  'mcp.webDescription':
+    'CORS로 이 브라우저의 origin을 허용한 Streamable HTTP 서버에 연결합니다. 인증 정보를 포함한 설정은 이 브라우저에 저장합니다. 저장하면 진행 중인 응답을 중단합니다.',
+  'mcp.desktopDescription':
+    'HTTP 서버에 연결하거나 신뢰하는 로컬 stdio 서버를 실행합니다. 설정은 OS 보안 저장소에 저장합니다. 저장하면 진행 중인 응답을 중단하고 로컬 호스트를 다시 시작합니다.'
 } satisfies Record<keyof typeof en, string>

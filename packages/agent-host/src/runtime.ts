@@ -41,6 +41,7 @@ export async function createAgentRuntime(
   const host = await createAgentHost({
     tools: options.tools,
     provider,
+    mcpServers: env.KEUNDAL_MCP_SERVERS ? JSON.parse(env.KEUNDAL_MCP_SERVERS) : [],
     apiKey: apiKey ?? '',
     model,
     models: { [model]: { contextWindow, maxOutputTokens } },

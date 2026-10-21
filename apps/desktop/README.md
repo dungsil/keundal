@@ -113,3 +113,7 @@ rustc --edition=2021 --test apps/desktop/src-tauri/src/skill_files.rs -o /tmp/ke
 ```
 
 아이콘은 `packages/chat-app/public/favicon.ico`에서 Tauri CLI의 `icon` 명령으로 생성했습니다.
+
+## MCP
+
+**Settings → MCP**에서 Streamable HTTP 서버와 로컬 stdio 서버를 등록합니다. 인증 헤더와 환경 변수를 포함한 설정은 OS 보안 저장소에 저장합니다. 설정을 저장하면 진행 중인 응답을 중단하고 로컬 호스트를 다시 시작합니다. [공용 MCP 설정 안내](../../packages/chat-app/README.md#mcp-서버)를 참고합니다.
