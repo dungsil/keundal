@@ -234,3 +234,146 @@ test('48kHz 오디오를 24kHz로 줄이고 PCM16 클리핑과 little endian을 
   const bytes = Buffer.from(encodeRealtimeAudio(new Float32Array([-2, 0, 2])), 'base64')
   expect([...bytes]).toEqual([0, 128, 0, 0, 255, 127])
 })
+
+class FixtureSocket extends EventTarget {
+  static current: FixtureSocket
+  closed = false
+  bufferedAmount = 0
+  constructor() {
+    super()
+    FixtureSocket.current = this
+  }
+  send() {}
+  close() {
+    this.closed = true
+  }
+  receive(data: unknown) {
+    this.dispatchEvent(new MessageEvent('message', { data }))
+  }
+}
+
+async function boundedFixture(t: Pick<TestContext, 'onTestFinished'>) {
+  const native = globalThis.WebSocket
+  globalThis.WebSocket = FixtureSocket as unknown as typeof WebSocket
+  const abort = new AbortController()
+  let cancelled = false
+  const audio = new ReadableStream<string>({
+    cancel() {
+      cancelled = true
+    }
+  })
+  const session: TranscriptionSession = {
+    clientSecret: 'fixture',
+    expiresAt: 123456,
+    url: 'ws://fixture',
+    protocols: [],
+    audio: { format: 'pcm16', sampleRate: 24000, channels: 1 }
+  }
+  const result = streamTranscription({ session, audio, signal: abort.signal })
+  t.onTestFinished(() => {
+    abort.abort()
+    globalThis.WebSocket = native
+  })
+  return { result, audio, socket: FixtureSocket.current, cancelled: () => cancelled }
+}
+
+test.each(['x'.repeat(300_000), '한'.repeat(30_000)])(
+  '큰 전사 프레임을 파싱 전에 거부하고 오디오와 소켓을 정리한다 (%#)',
+  async (text) => {
+    const fixture = await boundedFixture({ onTestFinished })
+    // Deliberately invalid JSON: a budget error proves parsing did not run first.
+    fixture.socket.receive(text)
+    await expect(fixture.result.text).rejects.toThrow('resource budget')
+    await expect(fixture.result.fullStream[Symbol.asyncIterator]().next()).rejects.toThrow('resource budget')
+    await expect.poll(fixture.cancelled).toBe(true)
+    await expect.poll(() => fixture.audio.locked).toBe(false)
+    expect(fixture.socket.closed).toBe(true)
+  }
+)
+
+test.each(['events', 'bytes', 'items', 'transcript', 'queue', 'output'])(
+  '전사 세션의 %s 누적 제한을 넘으면 종료한다',
+  async (mode) => {
+    const { result, socket, cancelled } = await boundedFixture({ onTestFinished })
+    const consumed =
+      mode === 'queue'
+        ? undefined
+        : (async () => {
+            try {
+              for await (const _part of result.fullStream) {
+                /* consume */
+              }
+            } catch {
+              /* asserted via text */
+            }
+          })()
+    if (mode === 'queue' || mode === 'output')
+      socket.receive(JSON.stringify({ type: 'input_audio_buffer.committed', item_id: 'one' }))
+    for (let i = 0; i < 4100 && !socket.closed; i++) {
+      const frame =
+        mode === 'events'
+          ? { type: 'session.updated' }
+          : mode === 'bytes'
+            ? { type: 'session.updated', ignored: 'x'.repeat(60_000) }
+            : mode === 'items'
+              ? { type: 'input_audio_buffer.committed', item_id: String(i) }
+              : mode === 'transcript'
+                ? {
+                    type: 'conversation.item.input_audio_transcription.completed',
+                    item_id: String(i),
+                    transcript: '한'.repeat(20_000)
+                  }
+                : { type: 'conversation.item.input_audio_transcription.delta', item_id: 'one', delta: 'x'.repeat(1000) }
+      socket.receive(JSON.stringify(frame))
+      await new Promise<void>((resolve) => queueMicrotask(resolve))
+    }
+    await expect(result.text).rejects.toThrow('resource budget')
+    await consumed
+    await expect.poll(cancelled).toBe(true)
+    expect(socket.closed).toBe(true)
+  }
+)
+
+test.each([
+  new Blob(['{}']),
+  'null',
+  '[]',
+  '{"type":42}',
+  '{"type":"conversation.item.input_audio_transcription.delta","item_id":"one","delta":{}}'
+])('잘못된 전사 프레임을 거부한다 (%#)', async (data) => {
+  const { result, socket } = await boundedFixture({ onTestFinished })
+  socket.receive(data)
+  await expect(result.text).rejects.toThrow('Invalid transcription')
+  expect(socket.closed).toBe(true)
+})
+
+test('이벤트를 소비하지 않아도 짧은 전사 결과를 반환하고 중복 commit을 누적하지 않는다', async (t) => {
+  const { ws, session } = await fixture(t)
+  ws.on('connection', (socket) =>
+    socket.on('message', (data) => {
+      if (JSON.parse(String(data)).type !== 'input_audio_buffer.commit') return
+      const committed = { type: 'input_audio_buffer.committed', item_id: 'one' }
+      const final = {
+        type: 'conversation.item.input_audio_transcription.completed',
+        item_id: 'one',
+        transcript: '짧은 결과'
+      }
+      socket.send(JSON.stringify(committed))
+      socket.send(JSON.stringify(committed))
+      socket.send(JSON.stringify(final))
+    })
+  )
+  const audio = new ReadableStream<string>({
+    start(controller) {
+      controller.enqueue(encodeRealtimeAudio(new Float32Array(2400)))
+      controller.close()
+    }
+  })
+  const result = streamTranscription({ session, audio })
+  expect(await result.text).toBe('짧은 결과')
+  const parts = []
+  for await (const part of result.fullStream) parts.push(part)
+  expect(parts.filter((part) => part.type === 'transcript-final')).toEqual([
+    { type: 'transcript-final', text: '짧은 결과' }
+  ])
+})
