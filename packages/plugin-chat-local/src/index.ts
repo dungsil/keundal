@@ -1,4 +1,5 @@
 import type { ChatMessage } from '@keundal/chat/chat-message'
+import { validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
 import type { AGUIEvent, SessionSnapshot } from '@keundal/core'
 import type { Context } from 'cordis'
@@ -87,8 +88,7 @@ export class ChatStore implements ChatStoreLike {
   }
 
   async rename(id: string, title: string) {
-    title = title.trim()
-    if (!title || title.length > 100) throw new Error('Title must contain 1–100 characters')
+    title = validateChatTitle(title)
     await this.update(id, (chat) => ({ ...chat, title }))
   }
 
@@ -186,7 +186,9 @@ export class ChatStore implements ChatStoreLike {
         try {
           chat = {
             ...chat,
-            title: await runtime.title(chat.messages[0]!, combined, request.titleModel || request.model)
+            title: validateChatTitle(
+              await runtime.title(chat.messages[0]!, combined, request.titleModel || request.model)
+            )
           }
           await this.save(saved, chat)
           request.onTitle?.(chat.title!)

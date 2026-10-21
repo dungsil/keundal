@@ -1,6 +1,7 @@
 import type { AgentConfig } from '@keundal/agent-contract'
 import { ChatMessageAssembly, type ChatMessage } from '@keundal/chat/chat-message'
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
+import { validateChatTitle } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
 import { EventType, type AGUIEvent, type AgentMessage } from '@keundal/core'
 import type { Fiber } from 'cordis'
@@ -69,9 +70,12 @@ export async function createKeundalChat(
         },
         { signal }
       )) {
-        if (event.type === EventType.TEXT_MESSAGE_CONTENT) title += event.delta
+        if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
+          if (title.length + event.delta.length > 1024) throw new Error('Generated title exceeds input limit')
+          title += event.delta
+        }
       }
-      return title.trim()
+      return validateChatTitle(title)
     },
     async *respond(request: {
       threadId: string

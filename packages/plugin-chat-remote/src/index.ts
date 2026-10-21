@@ -1,6 +1,7 @@
 import { ChatMessageAssembly } from '@keundal/chat/chat-message'
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
+import { validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
@@ -139,8 +140,7 @@ export class RemoteChatStore implements ChatStoreLike {
   }
 
   async rename(id: string, title: string) {
-    title = title.trim()
-    if (!title || title.length > 100) throw new Error('Title must contain 1–100 characters')
+    title = validateChatTitle(title)
     await this.update(id, (chat) => ({ ...chat, title }))
   }
 
@@ -254,7 +254,9 @@ export class RemoteChatStore implements ChatStoreLike {
         try {
           chat = {
             ...chat,
-            title: await this.generateTitle(request.titleModel || request.model, chat.messages[0], combined)
+            title: validateChatTitle(
+              await this.generateTitle(request.titleModel || request.model, chat.messages[0], combined)
+            )
           }
           await this.save(saved, chat)
           request.onTitle?.(chat.title!)

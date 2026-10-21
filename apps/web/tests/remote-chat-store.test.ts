@@ -107,6 +107,13 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
   expect(saved.messages[1]!.parts).toContainEqual({ type: 'text', text: '원격 응답' })
   expect((await chats.list())[0]!.id).toBe('chat')
 
+  services.title = async () => 'x'.repeat(101)
+  await chats.create('oversized-title', user, model)
+  const oversized = await collect(chats.respond('oversized-title', { model, messages: [user] }))
+  expect(oversized.at(-1)!.type).toBe(EventType.RUN_FINISHED)
+  expect((await chats.get('oversized-title'))!.title).toBeNull()
+  await chats.delete('oversized-title')
+
   await chats.rename('chat', '바꾼 제목')
   await chats.vote('chat', saved.messages[1]!.id, false)
   expect((await chats.get('chat'))!.votes).toEqual([{ chatId: 'chat', messageId: saved.messages[1]!.id, isUpvoted: false }])

@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { EventType, type LLMEvent } from '@keundal/core'
 import { afterEach, expect, test } from 'vitest'
 
 import { createNodeAgentHost, createNodeComposition, createAgentRuntime } from '../src/index.js'
@@ -308,3 +309,29 @@ test('Agent Plugin 스킬을 호스트에 등록하고 종료하면 사용할 �
   await host.dispose()
   await expect(catalog.load('hello')).rejects.toThrow()
 })
+
+test.each([['x'.repeat(101)], ['x'.repeat(60), 'x'.repeat(41)], [' '.repeat(1025)], ['x'.repeat(100_000)]])(
+  '호스트 제목이 한도를 넘으면 스트림을 정리하고 거부한다',
+  async (...chunks) => {
+    const host = await createAgentHost({
+      provider: 'openai',
+      apiKey: 'test',
+      model: 'small',
+      models: { small: { contextWindow: 8000, maxOutputTokens: 1000 } },
+      sqlitePath: sqlitePath()
+    })
+    hosts.push(host)
+    let closed = false
+    host.ctx.llm.stream = async function* (): AsyncIterable<LLMEvent> {
+      try {
+        for (const delta of chunks) yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'title', delta }
+      } finally {
+        closed = true
+      }
+    }
+    await expect(
+      host.services.title({ model: 'small', message: { id: 'user', role: 'user', content: '질문' } })
+    ).rejects.toThrow(/title|Title/)
+    expect(closed).toBe(true)
+  }
+)

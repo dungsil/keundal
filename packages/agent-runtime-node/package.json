@@ -30,6 +30,7 @@
     "cordis": "catalog:"
   },
   "devDependencies": {
+    "@keundal/core": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",

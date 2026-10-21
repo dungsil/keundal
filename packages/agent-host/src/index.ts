@@ -137,9 +137,14 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
           },
           runOptions
         )) {
-          if (event.type === EventType.TEXT_MESSAGE_CONTENT) title += event.delta
+          if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
+            if (title.length + event.delta.length > 1024) throw new Error('Generated title exceeds input limit')
+            title += event.delta
+          }
         }
-        return title.trim()
+        title = title.trim()
+        if (!title || title.length > 100) throw new Error('Title must contain 1–100 characters')
+        return title
       }
     }
 
