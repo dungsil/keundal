@@ -1,3 +1,4 @@
+import type { Reasoning } from '@keundal/core'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 
 export interface CompactionPolicy {
@@ -16,7 +17,7 @@ export interface AgentConfig {
   readonly model: string
   readonly maxOutputTokens: number
   readonly webSearch?: boolean
-  readonly reasoning?: boolean
+  readonly reasoning?: Reasoning
   readonly compaction?: AgentCompactionConfig
   readonly tools?: readonly ExecutableTool[] | ToolProvider
   readonly skills?: boolean

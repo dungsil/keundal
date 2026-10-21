@@ -1,4 +1,4 @@
-import { parseRunAgentInput, type AgentMessage, type LLMRequest } from '@keundal/core'
+import { parseReasoning, parseRunAgentInput, type AgentMessage, type LLMRequest } from '@keundal/core'
 import type {
   ResponseInput,
   ResponseInputContent,
@@ -103,7 +103,8 @@ function convertMessage(message: AgentMessage): ResponseInput {
 export function createInput(
   request: LLMRequest
 ): Pick<ResponseCreateParamsBase, 'model' | 'input' | 'tools' | 'reasoning'> {
-  for (const key of ['webSearch', 'reasoning'] as const) {
+  parseReasoning(request.reasoning)
+  for (const key of ['webSearch'] as const) {
     if (request[key] !== undefined && typeof request[key] !== 'boolean') throw new Error(`${key} must be a boolean`)
   }
   const parsed = parseRunAgentInput(request.input)
@@ -136,7 +137,9 @@ export function createInput(
             // Original GPT-5 models cannot disable reasoning, and native search
             // does not accept their minimal effort. Later GPT-5 models support none.
             effort: request.reasoning
-              ? 'medium'
+              ? typeof request.reasoning === 'string'
+                ? request.reasoning
+                : 'medium'
               : /^gpt-5(?:-(?:mini|nano))?(?:-\d{4}-\d{2}-\d{2})?$/.test(request.model)
                 ? request.webSearch
                   ? 'low'

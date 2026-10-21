@@ -4,6 +4,7 @@ import type {
   AgentMessage,
   ExecutionOptions,
   GenerationService,
+  Reasoning,
   RunAgentInput,
   SessionService
 } from '@keundal/core'
@@ -21,6 +22,7 @@ export type AgentHostProvider = string
 export interface AgentMountConfig {
   readonly model: string
   readonly maxOutputTokens: number
+  readonly reasoning?: Reasoning
 }
 
 export interface AgentHostOptions {
@@ -33,6 +35,7 @@ export interface AgentHostOptions {
 }
 
 export interface AgentHostRunOptions extends ExecutionOptions {
+  readonly reasoning?: Reasoning
   readonly model?: string
 }
 

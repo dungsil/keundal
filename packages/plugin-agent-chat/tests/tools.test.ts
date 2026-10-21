@@ -145,14 +145,17 @@ test.for([true, false])(
   }
 )
 
-test.each(['webSearch', 'reasoning'] as const)('$0가 boolean이 아니면 에이전트 설정을 거부한다', async (key) => {
-  const result = await AgentConfigSchema['~standard'].validate({
-    model: 'test',
-    maxOutputTokens: 100,
-    [key]: 'true'
-  })
-  expect(result.issues).toBeDefined()
-})
+test.each(['webSearch', 'reasoning'] as const)(
+  '$0에 지원하지 않는 값을 넣으면 에이전트 설정을 거부한다',
+  async (key) => {
+    const result = await AgentConfigSchema['~standard'].validate({
+      model: 'test',
+      maxOutputTokens: 100,
+      [key]: 'true'
+    })
+    expect(result.issues).toBeDefined()
+  }
+)
 
 test('교차 수신한 호출 인자를 모아 순서대로 실행하고 결과와 추론 서명을 후속 생성에 전달한다', async (t) => {
   const executed: { args: Record<string, unknown>; context: ToolExecutionContext }[] = []
@@ -774,5 +777,20 @@ test.for([false, true])(
     expect(requests).toHaveLength(3)
     expect(events.filter((event) => event.type === EventType.TOOL_CALL_RESULT)).toHaveLength(3)
     expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  }
+)
+
+test.for(['low', 'medium', 'high'] as const)(
+  '%s 추론 수준을 도구 실행 전후와 토큰 계산에 보존한다',
+  async (reasoning, t) => {
+    const { ctx, requests, counted } = await setup(t, [call(), answer], {
+      reasoning,
+      tools: [tool(() => 'result')]
+    })
+    await collect(ctx.agent.run(input))
+    expect(requests).toHaveLength(2)
+    expect(counted).toHaveLength(2)
+    for (const request of [...requests, ...counted]) expect(request.reasoning).toBe(reasoning)
+    expect((await ctx.generation.get(input.runId))?.request.reasoning).toBe(reasoning)
   }
 )
