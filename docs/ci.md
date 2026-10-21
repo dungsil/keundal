@@ -152,22 +152,20 @@ macOS의 DMG 생성은 [실행 39454203709](https://github.com/dungsil/keundal/a
 
 ## Lighthouse 검사
 
-프리뷰 배포가 성공하여 URL이 반환되면 별도 작업에서 홈(`/`)과 설정(`/settings`)을 검사한다.
-Lighthouse CI 0.15.1의 모바일 기본 설정으로 화면마다 3회 실행하고, 성능·접근성·권장사항·SEO 점수의
-항목별 중앙값을 PR의 별도 Lighthouse 댓글과 Actions 작업 요약에 표시한다. 댓글에는 검사한 커밋과
-실행 로그 링크를 함께 남기며, 재실행할 때 같은 댓글을 갱신한다. HTML·JSON 보고서는 아티팩트로
-업로드하지 않는다. 로컬 검사에서 생성한 원본 보고서는 `.lighthouseci/`에서 확인할 수 있다.
+`PR Lighthouse`는 `pull_request` 이벤트로 실행하므로 워크플로우를 추가한 PR에서도 병합 전에 작동한다.
+기존 프리뷰 배포가 남긴 봇 댓글에서 현재 PR 커밋과 일치하는 배포 URL을 최대 20분간 기다린 뒤,
+그 URL의 홈(`/`)과 설정(`/settings`)을 Unlighthouse 0.19.1로 검사한다. 이전 커밋이나 일반 사용자의
+댓글에 있는 주소는 사용하지 않는다.
 
-초기에는 점수 임계값을 설정하지 않고 필수 병합 검사에도 포함하지 않는다. 측정 자체가 실패하거나
-다른 화면으로 이동한 경우에는 점수 대신 오류를 표시한다. 점수 변동을 관찰한 뒤 임계값을 정한다.
-이 검사는 이전 커밋과의 점수 차이를 자동으로 계산하지 않는다.
+모바일 설정으로 두 화면을 각각 3회 검사하고 항목별 중앙값을 PR의 별도 Lighthouse 댓글과 Actions
+작업 요약에 표시한다. 댓글에는 검사한 커밋과 실행 로그 링크를 남기며 재실행 시 같은 댓글을 갱신한다.
+HTML·JSON 보고서는 아티팩트로 업로드하지 않는다. 점수 임계값은 설정하지 않고, 검사 실패도 댓글에
+표시한다. 이전 커밋과의 점수 차이는 자동으로 계산하지 않는다.
 
-검사 작업은 기본 브랜치의 설정을 사용하고 읽기 권한만 가진다. Cloudflare 배포 인증 정보나 PR 코드를
-전달하지 않는다. 댓글 게시 작업만 `pull-requests: write` 권한을 가지며 저장소 코드를 실행하지 않는다.
-게시 직전에 열린 PR과 최신 커밋을 다시 확인하여 이전 커밋의 결과로 댓글을 덮어쓰지 않는다.
-측정에 실패해도 댓글에 오류와 실행 로그 링크를 표시한다. 설정 변경은 기본 브랜치에
-반영된 뒤 적용된다. 프리뷰 URL은 검사 러너에서 접근 가능해야 하며, 인증이 필요한 프리뷰는 별도 인증
-설정이 필요하다. PR별 URL을 재사용하므로 검사 도중 새 배포가 이루어지면 결과가 섞일 수 있다.
+프리뷰 조회와 검사 작업은 읽기 권한만 사용하며 배포 인증 정보를 받지 않는다. 댓글 게시 작업에만
+`pull-requests: write` 권한을 부여하고, 해당 작업에서는 저장소 코드를 실행하지 않는다. 게시 직전에
+열린 PR과 최신 커밋을 다시 확인한다. 같은 저장소의 PR만 검사하며, 외부 포크에서는 실행하지 않는다.
+PR별 프리뷰 URL을 재사용하므로 검사 도중 새 배포가 이루어지면 결과가 섞일 수 있다.
 
 저장된 대화가 필요한 `/chat/:id`는 검사하지 않는다. 대화 화면을 추가할 때는 고정된 테스트 데이터를
 먼저 준비한다. 메시지 전송과 스트리밍 반응성은 별도 E2E 테스트 대상이다.
@@ -179,18 +177,17 @@ pnpm exec turbo run build --filter=@keundal/web
 pnpm --filter @keundal/web preview
 ```
 
-다른 터미널에서 다음 명령을 실행하면 Unlighthouse 0.19.1이 로컬 웹을 검사하고 결과 대시보드를 제공한다.
-실행 환경에 Chrome 또는 Chromium이 필요하다.
+다른 터미널에서 `pnpm lighthouse:local`을 실행하면 Unlighthouse가 로컬 웹을 검사한다.
+다른 주소를 검사하려면 다음처럼 실행한다. Chromium을 직접 지정하려면 `CHROME_PATH`를 설정하고
+저장소의 설정 파일을 전달한다. 기본 실행의 원본 보고서는 `.unlighthouse/`에 저장한다.
 
 ```sh
-pnpm lighthouse:local
+pnpm dlx --allow-build=esbuild --allow-build=puppeteer --allow-build=vue-demi @unlighthouse/cli@0.19.1 --site https://배포된-프리뷰-주소 --config-file tools/lighthouse/unlighthouse.config.mjs
 ```
 
-다른 포트를 사용하는 경우에는 `pnpm dlx @unlighthouse/cli@0.19.1 --site http://localhost:포트`로 실행한다.
-CI와 같은 두 경로를 같은 횟수로 측정하려면 다음 명령을 사용한다. `LIGHTHOUSE_BASE_URL`을 생략하면
-`http://localhost:3000`을 사용한다.
+CI는 `LIGHTHOUSE_RUN=1`, `2`, `3`으로 위 명령을 각각 실행하여 원본을 별도 디렉터리에 보존한다.
+세 실행의 점수 요약은 다음 명령으로 생성한다. `LIGHTHOUSE_BASE_URL`은 검사한 주소와 같아야 한다.
 
 ```sh
-pnpm dlx @lhci/cli@0.15.1 collect --config=tools/lighthouse/lighthouserc.cjs
-node tools/lighthouse/summary.mjs
+LIGHTHOUSE_BASE_URL=https://배포된-프리뷰-주소 LIGHTHOUSE_REPORT_DIR=.unlighthouse node tools/lighthouse/summary.mjs
 ```

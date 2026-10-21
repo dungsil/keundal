@@ -15,7 +15,7 @@
     "prepare": "simple-git-hooks",
     "check:boundaries": "node tools/workspace-boundaries/check.mjs",
     "test:boundaries": "node --test tools/workspace-boundaries/tests/*.test.ts",
-    "lighthouse:local": "pnpm dlx @unlighthouse/cli@0.19.1 --site http://localhost:3000"
+    "lighthouse:local": "pnpm dlx --allow-build=esbuild --allow-build=puppeteer --allow-build=vue-demi @unlighthouse/cli@0.19.1 --site http://localhost:3000"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",

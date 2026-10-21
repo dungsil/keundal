@@ -43,10 +43,12 @@ export function summarize(reports, collect = config.ci.collect) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const directory = '.lighthouseci'
-  const files = (await readdir(directory)).filter((file) => /^lhr-.*\.json$/.test(file))
+  const directory = process.env.LIGHTHOUSE_REPORT_DIR || '.lighthouseci'
+  const files = (await readdir(directory, { recursive: true })).filter(
+    (file) => /(^|\/)lhr-.*\.json$/.test(file) || file.endsWith('/lighthouse.json')
+  )
   const reports = await Promise.all(
     files.map(async (file) => JSON.parse(await readFile(`${directory}/${file}`, 'utf8')))
   )
-  console.log(summarize(reports))
+  console.log(summarize(reports.filter((report) => typeof report.requestedUrl === 'string')))
 }
