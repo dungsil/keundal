@@ -32,9 +32,11 @@ async function httpFixture(t: TestContext, capabilities?: ServerCapabilities) {
   const servers = new Set([fixture.server])
   const clients = new Set<McpClient>()
   const headers: string[] = []
+  const methods: string[] = []
   const requests: Record<string, unknown>[] = []
   const http = createServer(async (req, res) => {
     headers.push(req.headers.authorization ?? '')
+    methods.push(req.method ?? '')
     const sessionId = req.headers['mcp-session-id']
     let transport = typeof sessionId === 'string' ? sessions.get(sessionId) : undefined
     if (!transport) {
@@ -119,7 +121,7 @@ async function httpFixture(t: TestContext, capabilities?: ServerCapabilities) {
     clients.add(client)
     return client
   }
-  return { ...fixture, headers, requests, connect, url: `http://127.0.0.1:${address.port}/mcp` }
+  return { ...fixture, headers, methods, requests, connect, url: `http://127.0.0.1:${address.port}/mcp` }
 }
 
 test('stdio로 도구를 실행하고 명시한 환경만 전달하며 종료 후 자식 프로세스를 정리한다', async (t) => {
@@ -674,6 +676,110 @@ test('브라우저 진입점으로 HTTP 도구를 조회하고 실행한다', as
   await expect(BrowserMcpClient.connect({ serverName: 'local', transport: 'stdio', command: 'node' })).rejects.toThrow(
     'Node.js'
   )
+})
+
+async function silentServer(t: TestContext) {
+  const state = { open: 0 }
+  const http = createServer((_req, res) => {
+    state.open++
+    res.on('close', () => state.open--)
+  })
+  await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
+  t.onTestFinished(async () => {
+    http.closeAllConnections()
+    await new Promise<void>((resolve, reject) => http.close((error) => (error ? reject(error) : resolve())))
+  })
+  const address = http.address()
+  if (!address || typeof address === 'string') throw new Error('missing HTTP address')
+  return { state, url: `http://127.0.0.1:${address.port}/mcp` }
+}
+
+test('연결 확인은 허용 권한과 무관하게 도구 이름과 리소스 개수를 반환하고 도구를 호출하지 않으며 연결을 닫는다', async (t) => {
+  const { url, requests, methods } = await httpFixture(t)
+  const result = await BrowserMcpClient.probe({
+    serverName: 'check',
+    transport: 'streamable-http',
+    url,
+    permissions: { tools: ['subtract'] }
+  })
+  expect(result.tools.map((tool) => tool.name)).toEqual([
+    'subtract',
+    'fail',
+    'wait',
+    'environment',
+    'a.b',
+    'a/b',
+    'x'.repeat(100)
+  ])
+  expect(result.tools[0]).toEqual({ name: 'subtract', description: 'subtract' })
+  expect(result.resources).toEqual({ supported: true, count: 2 })
+  expect(JSON.parse(JSON.stringify(result))).toEqual(result)
+  const called = requests.map((request) => request.method)
+  expect(called).toContain('tools/list')
+  expect(called).not.toContain('tools/call')
+  expect(called).not.toContain('resources/read')
+  expect(methods.at(-1)).toBe('DELETE')
+})
+
+test('연결 확인은 서버가 제공하지 않는 도구나 리소스 목록을 요청하지 않는다', async (t) => {
+  const resourcesOnly = await httpFixture(t, { resources: {} })
+  const first = await BrowserMcpClient.probe({
+    serverName: 'check',
+    transport: 'streamable-http',
+    url: resourcesOnly.url
+  })
+  expect(first).toEqual({ tools: [], resources: { supported: true, count: 2 } })
+  expect(resourcesOnly.requests.map((request) => request.method)).not.toContain('tools/list')
+  const toolsOnly = await httpFixture(t, { tools: {} })
+  const second = await BrowserMcpClient.probe({ serverName: 'check', transport: 'streamable-http', url: toolsOnly.url })
+  expect(second.tools).toHaveLength(7)
+  expect(second.resources).toEqual({ supported: false, count: 0 })
+  expect(toolsOnly.requests.map((request) => request.method)).not.toContain('resources/list')
+})
+
+test('연결 확인은 서버가 응답하지 않으면 timeoutMs 뒤에 TimeoutError로 실패하고 연결을 닫는다', async (t) => {
+  const { state, url } = await silentServer(t)
+  const started = Date.now()
+  await expect(
+    BrowserMcpClient.probe({ serverName: 'check', transport: 'streamable-http', url, timeoutMs: 300 })
+  ).rejects.toMatchObject({ name: 'TimeoutError' })
+  expect(Date.now() - started).toBeLessThan(3000)
+  await expect.poll(() => state.open).toBe(0)
+})
+
+test('연결 확인은 호출자가 취소하면 시간 초과를 기다리지 않고 연결을 닫는다', async (t) => {
+  const { state, url } = await silentServer(t)
+  const controller = new AbortController()
+  const started = Date.now()
+  const pending = BrowserMcpClient.probe(
+    { serverName: 'check', transport: 'streamable-http', url, timeoutMs: 30_000 },
+    { signal: controller.signal }
+  )
+  const rejected = expect(pending).rejects.toSatisfy((error: Error) => error.name !== 'TimeoutError')
+  await expect.poll(() => state.open).toBe(1)
+  controller.abort(new Error('cancelled by user'))
+  await rejected
+  expect(Date.now() - started).toBeLessThan(3000)
+  await expect.poll(() => state.open).toBe(0)
+})
+
+test('연결 확인은 이미 취소했거나 timeoutMs가 잘못됐으면 연결하지 않는다', async (t) => {
+  const { state, url } = await silentServer(t)
+  const config = { serverName: 'check', transport: 'streamable-http' as const, url }
+  await expect(BrowserMcpClient.probe(config, { signal: AbortSignal.abort(new Error('cancelled')) })).rejects.toThrow(
+    'cancelled'
+  )
+  await expect(BrowserMcpClient.probe({ ...config, timeoutMs: 0 })).rejects.toThrow('timeoutMs')
+  expect(state.open).toBe(0)
+})
+
+test('연결 확인의 리소스 목록도 maxResultBytes를 지키고 실패해도 연결을 닫는다', async (t) => {
+  const { url, state, methods } = await httpFixture(t)
+  state.listText = 'x'.repeat(5000)
+  await expect(
+    BrowserMcpClient.probe({ serverName: 'check', transport: 'streamable-http', url, maxResultBytes: 2000 })
+  ).rejects.toThrow('exceeds')
+  expect(methods.at(-1)).toBe('DELETE')
 })
 
 test('MCP 설정 검증은 잘못된 권한과 전송 설정을 거부하고 원본을 복사한다', () => {

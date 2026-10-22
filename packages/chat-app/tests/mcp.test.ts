@@ -1,3 +1,4 @@
+import { createServer } from 'node:http'
 import { Context } from 'cordis'
 import { EventType, LLMService, type LLMRequest, type LLMEvent } from '@keundal/core'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
@@ -5,7 +6,7 @@ import { createKeundalChat } from '@keundal/plugin-chat-local/keundal'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import { createChatTools } from '@keundal/plugin-tool-chat'
 import type { invoke } from '@tauri-apps/api/core'
-import { expect, test, vi } from 'vitest'
+import { expect, test, vi, type TestContext } from 'vitest'
 import { McpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-chat-browser/mcp'
 import { createNativeMcpSettingsStorage } from '@keundal/plugin-chat-desktop/mcp'
 
@@ -164,4 +165,102 @@ test('데스크톱 서버별 HTTP 허용을 저장하고 다시 불러와도 다
   await expect(restored.save([config, { ...remote, serverName: 'other', url: config.url }], async () => {})).rejects.toThrow('HTTPS')
   expect(restored.configuration).toEqual([config])
   expect(local.values.size).toBe(0)
+})
+
+async function jsonRpcServer(t: TestContext) {
+  const calls: string[] = []
+  const http = createServer(async (req, res) => {
+    const chunks: Buffer[] = []
+    for await (const chunk of req) chunks.push(Buffer.from(chunk))
+    if (req.method === 'GET') {
+      res.writeHead(405).end()
+      return
+    }
+    if (req.method === 'DELETE') {
+      calls.push('DELETE')
+      res.writeHead(200).end()
+      return
+    }
+    const message = JSON.parse(Buffer.concat(chunks).toString())
+    calls.push(message.method)
+    if (message.id === undefined) {
+      res.writeHead(202).end()
+      return
+    }
+    const result = message.method === 'initialize'
+      ? { protocolVersion: message.params.protocolVersion, capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'docs', version: '1.0.0' } }
+      : message.method === 'tools/list'
+        ? { tools: [{ name: 'search', description: 'Search docs', inputSchema: { type: 'object' } }, { name: 'delete_all', inputSchema: { type: 'object' } }] }
+        : message.method === 'resources/list'
+          ? { resources: [{ name: 'guide', uri: 'docs://guide' }] }
+          : undefined
+    res.writeHead(200, { 'content-type': 'application/json', 'mcp-session-id': 'session' })
+    res.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, ...(result ? { result } : { error: { code: -32601, message: 'Method not found' } }) }))
+  })
+  await new Promise<void>(resolve => http.listen(0, '127.0.0.1', resolve))
+  t.onTestFinished(async () => {
+    http.closeAllConnections()
+    await new Promise<void>(resolve => http.close(() => resolve()))
+  })
+  const address = http.address()
+  if (!address || typeof address === 'string') throw new Error('missing HTTP address')
+  return { calls, url: `http://127.0.0.1:${address.port}/mcp` }
+}
+
+test('저장하지 않은 설정으로 연결을 확인하면 도구 목록을 돌려주고 도구를 호출하지 않으며 저장된 설정을 바꾸지 않는다', async (t) => {
+  const { calls, url } = await jsonRpcServer(t)
+  const local = storage()
+  const manager = new McpManager(createBrowserMcpSettingsStorage(local))
+  await manager.save([remote], async () => {})
+  const saved = [...local.values.entries()]
+  const result = await manager.probe({ serverName: 'draft', transport: 'streamable-http', url, permissions: {} })
+  expect(result.tools).toEqual([{ name: 'search', description: 'Search docs' }, { name: 'delete_all' }])
+  expect(result.resources).toEqual({ supported: true, count: 1 })
+  expect(calls).toContain('tools/list')
+  expect(calls).not.toContain('tools/call')
+  expect(calls.at(-1)).toBe('DELETE')
+  expect(manager.configuration).toEqual([remote])
+  expect([...local.values.entries()]).toEqual(saved)
+})
+
+test('도달할 수 없는 서버는 확인에 실패하고 저장된 설정을 유지한다', async () => {
+  const local = storage()
+  const manager = new McpManager(createBrowserMcpSettingsStorage(local))
+  await manager.save([remote], async () => {})
+  const fetch = vi.fn(async () => {
+    throw new TypeError('Failed to fetch')
+  })
+  vi.stubGlobal('fetch', fetch)
+  try {
+    await expect(manager.probe({ ...remote, serverName: 'draft', permissions: {} })).rejects.toThrow('Failed to fetch')
+    expect(fetch).toHaveBeenCalled()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+  expect(manager.configuration).toEqual([remote])
+})
+
+test('연결 확인은 stdio와 잘못된 설정을 연결하기 전에 거부한다', async () => {
+  const fetch = vi.fn(async () => new Response(null, { status: 500 }))
+  vi.stubGlobal('fetch', fetch)
+  try {
+    const web = new McpManager(createBrowserMcpSettingsStorage(storage()))
+    await expect(web.probe({ serverName: 'local', transport: 'stdio', command: 'node' })).rejects.toThrow('Streamable HTTP')
+    const desktop = new McpManager(createNativeMcpSettingsStorage(vi.fn() as unknown as typeof invoke), { allowStdio: true })
+    await expect(desktop.probe({ serverName: 'local', transport: 'stdio', command: 'node' })).rejects.toThrow('Streamable HTTP')
+    await expect(web.probe({ serverName: 'draft', transport: 'streamable-http', url: 'http://example.com/mcp' })).rejects.toThrow('HTTPS')
+    await expect(web.probe({ serverName: 'bad name', transport: 'streamable-http', url: 'https://example.com/mcp' })).rejects.toThrow('name')
+    expect(fetch).not.toHaveBeenCalled()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test('이미 취소한 연결 확인은 서버에 요청하지 않는다', async (t) => {
+  const { calls, url } = await jsonRpcServer(t)
+  const manager = new McpManager(createBrowserMcpSettingsStorage(storage()))
+  const controller = new AbortController()
+  controller.abort(new Error('cancelled'))
+  await expect(manager.probe({ serverName: 'draft', transport: 'streamable-http', url }, { signal: controller.signal })).rejects.toThrow('cancelled')
+  expect(calls).toEqual([])
 })

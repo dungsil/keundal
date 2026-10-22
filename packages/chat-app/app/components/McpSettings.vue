@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMounted } from '@vueuse/core'
-import type { McpClientConfig } from '@keundal/mcp'
+import type { McpClientConfig, McpProbeResult } from '@keundal/mcp'
 
 const { t } = useLocale()
 const { $mcpManager, $saveMcpSettings, $remoteAgent } = useNuxtApp()
@@ -27,7 +27,27 @@ const success = ref(false)
 const timeoutMs = ref<number>(60000)
 const transportItems = computed(() => desktop ? ['streamable-http', 'stdio'] : ['streamable-http'])
 
+const checking = ref(false)
+const checkResult = ref<McpProbeResult | null>(null)
+const checkError = ref('')
+const checkDetail = ref('')
+let checkAbort: AbortController | undefined
+// The manager exists only in the browser, so the button stays disabled until the component is mounted.
+const canCheck = computed(() => mounted.value && typeof $mcpManager.probe === 'function' && transport.value !== 'stdio')
+
+function cancelCheck() {
+  checkAbort?.abort()
+  checkAbort = undefined
+  checking.value = false
+}
+function clearCheck() {
+  cancelCheck()
+  checkResult.value = null
+  checkError.value = ''
+  checkDetail.value = ''
+}
 function reset() {
+  clearCheck()
   editing.value = null
   name.value = ''
   address.value = ''
@@ -40,6 +60,7 @@ function reset() {
   timeoutMs.value = 60000
 }
 function edit(server: McpClientConfig, index: number) {
+  clearCheck()
   editing.value = index
   name.value = server.serverName
   transport.value = server.transport
@@ -56,6 +77,9 @@ watch(transport, () => {
   credentials.value = '{}'
   allowInsecureHttp.value = false
 }, { flush: 'sync' })
+// A result describes the connection values it was made with, so any change to them discards it.
+watch([transport, address, credentials, allowInsecureHttp, args, cwd, timeoutMs], clearCheck)
+onBeforeUnmount(cancelCheck)
 const scope = (value: string) => value.trim() === '*' ? '*' as const : value.split('\n').map(item => item.trim()).filter(Boolean)
 async function apply(next: unknown) {
   saving.value = true
@@ -72,15 +96,18 @@ async function apply(next: unknown) {
     saving.value = false
   }
 }
+function buildServer(serverName: string) {
+  return {
+    serverName, transport: transport.value, timeoutMs: timeoutMs.value,
+    permissions: { tools: scope(tools.value), resources: scope(resources.value) },
+    ...(transport.value === 'stdio'
+      ? { command: address.value, args: JSON.parse(args.value), env: JSON.parse(credentials.value), ...(cwd.value ? { cwd: cwd.value } : {}) }
+      : { url: address.value, headers: JSON.parse(credentials.value), ...(allowInsecureHttp.value ? { allowInsecureHttp: true } : {}) })
+  }
+}
 async function save() {
   try {
-    const server = {
-      serverName: name.value.trim(), transport: transport.value, timeoutMs: timeoutMs.value,
-      permissions: { tools: scope(tools.value), resources: scope(resources.value) },
-      ...(transport.value === 'stdio'
-        ? { command: address.value, args: JSON.parse(args.value), env: JSON.parse(credentials.value), ...(cwd.value ? { cwd: cwd.value } : {}) }
-        : { url: address.value, headers: JSON.parse(credentials.value), ...(allowInsecureHttp.value ? { allowInsecureHttp: true } : {}) })
-    }
+    const server = buildServer(name.value.trim())
     const next = [...servers.value]
     if (editing.value === null) next.push(server as McpClientConfig)
     else next[editing.value] = server as McpClientConfig
@@ -89,6 +116,50 @@ async function save() {
     error.value = t('mcp.invalidJSON')
   }
 }
+async function check() {
+  cancelCheck()
+  checkResult.value = null
+  checkError.value = ''
+  checkDetail.value = ''
+  let server: unknown
+  try {
+    server = buildServer(name.value.trim() || 'check')
+  } catch {
+    checkError.value = t('mcp.invalidJSON')
+    return
+  }
+  const controller = new AbortController()
+  checkAbort = controller
+  checking.value = true
+  try {
+    const result = await $mcpManager.probe!(server, { signal: controller.signal })
+    if (!controller.signal.aborted) checkResult.value = result
+  } catch (cause) {
+    if (controller.signal.aborted) return
+    if (cause instanceof DOMException && cause.name === 'TimeoutError') {
+      checkError.value = t('mcp.checkTimeout', { ms: timeoutMs.value })
+    } else {
+      checkError.value = t('mcp.checkFailed')
+      checkDetail.value = cause instanceof Error ? cause.message.slice(0, 200) : ''
+    }
+  } finally {
+    if (checkAbort === controller) cancelCheck()
+  }
+}
+const allowedTools = computed(() => scope(tools.value))
+const isAllowed = (toolName: string) => allowedTools.value === '*' || allowedTools.value.includes(toolName)
+function toggleTool(toolName: string, on: boolean) {
+  const current = allowedTools.value
+  const names = current === '*' ? (checkResult.value?.tools ?? []).map(tool => tool.name) : [...current]
+  const next = on ? (names.includes(toolName) ? names : [...names, toolName]) : names.filter(item => item !== toolName)
+  tools.value = next.join('\n')
+}
+const unknownAllowed = computed(() => {
+  const current = allowedTools.value
+  if (current === '*' || !checkResult.value) return []
+  const known = new Set(checkResult.value.tools.map(tool => tool.name))
+  return current.filter(item => !known.has(item))
+})
 </script>
 
 <template>
@@ -180,6 +251,71 @@ async function save() {
             :disabled="saving"
           />
         </UFormField>
+        <div class="space-y-3" aria-live="polite">
+          <p class="text-sm text-muted">
+            {{ t('mcp.checkDescription') }}
+          </p>
+          <p v-if="desktop" class="text-sm text-muted">
+            {{ t('mcp.checkDesktopLimit') }}
+          </p>
+          <p v-if="transport === 'stdio'" class="text-sm text-muted">
+            {{ t('mcp.checkStdioUnsupported') }}
+          </p>
+          <div class="flex gap-2">
+            <UButton
+              :label="t('mcp.check')"
+              color="neutral"
+              variant="soft"
+              :loading="checking"
+              :disabled="!canCheck || saving"
+              @click="check"
+            />
+            <UButton
+              v-if="checking"
+              :label="t('mcp.checkCancel')"
+              color="neutral"
+              variant="ghost"
+              @click="cancelCheck"
+            />
+          </div>
+          <UAlert
+            v-if="checkError"
+            color="warning"
+            :title="checkError"
+            :description="checkDetail ? t('mcp.checkDetail', { message: checkDetail }) : undefined"
+            role="alert"
+          />
+          <div v-if="checkResult" class="space-y-2">
+            <p class="text-sm text-muted">
+              {{ t(checkResult.resources.supported ? 'mcp.checkResources' : 'mcp.checkNoResources', { count: checkResult.resources.count }) }}
+            </p>
+            <p v-if="!checkResult.tools.length" class="text-sm">
+              {{ t('mcp.checkNoTools') }}
+            </p>
+            <fieldset v-else class="space-y-2">
+              <legend class="text-sm font-medium">
+                {{ t('mcp.checkTools', { count: checkResult.tools.length }) }}
+              </legend>
+              <p class="text-sm text-muted">
+                {{ t(allowedTools === '*' ? 'mcp.checkAllowAll' : 'mcp.checkPick') }}
+              </p>
+              <ul class="max-h-64 space-y-2 overflow-y-auto">
+                <li v-for="tool in checkResult.tools" :key="tool.name">
+                  <UCheckbox
+                    :model-value="isAllowed(tool.name)"
+                    :label="tool.name"
+                    :description="tool.description?.slice(0, 160)"
+                    :disabled="saving"
+                    @update:model-value="toggleTool(tool.name, $event === true)"
+                  />
+                </li>
+              </ul>
+            </fieldset>
+            <p v-if="unknownAllowed.length" class="text-sm text-warning">
+              {{ t('mcp.checkUnknown', { names: unknownAllowed.join(', ') }) }}
+            </p>
+          </div>
+        </div>
         <UAlert v-if="error" color="error" :title="error" role="alert" />
         <UAlert v-if="success" color="success" :title="t('mcp.saved')" role="status" />
         <div class="flex gap-2">

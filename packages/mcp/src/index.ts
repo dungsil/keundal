@@ -29,6 +29,18 @@ export interface McpRequestOptions {
   readonly signal?: AbortSignal
 }
 
+/** A tool the server reports; listing it never grants permission to run it. */
+export interface McpToolSummary {
+  readonly name: string
+  readonly description?: string
+}
+
+/** What a connection check learned from the server without executing any tool. */
+export interface McpProbeResult {
+  readonly tools: readonly McpToolSummary[]
+  readonly resources: { readonly supported: boolean; readonly count: number }
+}
+
 export interface McpSettingsStorage {
   load(): Promise<string | null>
   save(settings: string | null): Promise<void>
