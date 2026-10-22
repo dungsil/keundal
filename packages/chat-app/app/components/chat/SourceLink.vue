@@ -23,7 +23,7 @@ const destination = computed(() => getCitationUrl(props.url))
     size="xs"
     color="neutral"
     variant="outline"
-    class="rounded-full align-middle"
+    class="max-w-full rounded-full align-middle"
   />
-  <span v-else>{{ label }}</span>
+  <span v-else class="break-words">{{ label }}</span>
 </template>
