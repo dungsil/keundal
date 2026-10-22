@@ -45,8 +45,10 @@ function preview(message: ChatMessage) {
     </p>
     <ol class="mt-2 flex flex-col gap-1">
       <li v-for="(message, index) in queue" :key="message.id" class="flex items-center gap-2">
-        <span class="text-dimmed tabular-nums">{{ index + 1 }}.</span>
-        <span class="min-w-0 flex-1 truncate">{{ preview(message) }}</span>
+        <span class="text-muted tabular-nums">{{ index + 1 }}.</span>
+        <UTooltip :text="preview(message)" :content="{ side: 'top' }">
+          <span class="min-w-0 flex-1 truncate">{{ preview(message) }}</span>
+        </UTooltip>
         <UButton
           icon="i-lucide-x"
           size="xs"
@@ -57,7 +59,7 @@ function preview(message: ChatMessage) {
         />
       </li>
     </ol>
-    <p v-if="browserOnly" class="mt-2 text-xs text-dimmed">
+    <p v-if="browserOnly" class="mt-2 text-xs text-muted">
       {{ t('chat.queueBrowserOnly') }}
     </p>
   </section>

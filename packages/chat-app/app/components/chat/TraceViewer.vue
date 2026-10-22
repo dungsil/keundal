@@ -226,8 +226,8 @@ function* journalEvents(journal: GenerationSnapshot['journal'], start = 0): Iter
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
         <span class="text-xs text-muted">{{ t(`trace.status.${live || snapshot || spans.length ? runStatus : 'unknown'}`) }}</span>
         <div class="flex gap-1" role="group" :aria-label="t('trace.detailLevel')">
-          <UButton size="xs" :variant="mode === 'simple' ? 'solid' : 'ghost'" @click="mode = 'simple'">{{ t('trace.simple') }}</UButton>
-          <UButton size="xs" :variant="mode === 'full' ? 'solid' : 'ghost'" @click="mode = 'full'">{{ t('trace.full') }}</UButton>
+          <UButton size="xs" :variant="mode === 'simple' ? 'solid' : 'ghost'" :aria-pressed="mode === 'simple'" @click="mode = 'simple'">{{ t('trace.simple') }}</UButton>
+          <UButton size="xs" :variant="mode === 'full' ? 'solid' : 'ghost'" :aria-pressed="mode === 'full'" @click="mode = 'full'">{{ t('trace.full') }}</UButton>
         </div>
       </div>
 
@@ -236,12 +236,12 @@ function* journalEvents(journal: GenerationSnapshot['journal'], start = 0): Iter
       <template v-else-if="snapshot || spans.length">
         <p v-if="view.truncated" class="mb-2 text-xs text-warning">{{ t('trace.limited', { count: MAX_SPANS }) }}</p>
         <div v-if="spans.length" class="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2 sm:grid-cols-4">
-          <div><div class="text-xs text-muted">{{ t('trace.input') }}</div><div>{{ usageNumber('inputTokens') }}</div></div>
-          <div><div class="text-xs text-muted">{{ t('trace.output') }}</div><div>{{ usageNumber('outputTokens') }}</div></div>
-          <div><div class="text-xs text-muted">{{ t('trace.cacheRead') }}</div><div>{{ usageNumber('cacheReadTokens') }}</div></div>
-          <div><div class="text-xs text-muted">{{ t('trace.cacheWrite') }}</div><div>{{ usageNumber('cacheWriteTokens') }}</div></div>
-          <div><div class="text-xs text-muted">{{ t('trace.cost') }}</div><div>{{ cost(summary.cost) }}<span v-if="summary.cost" class="ml-1 text-xs text-muted">{{ t(`trace.source.${summary.cost.source}`) }}</span></div></div>
-          <div><div class="text-xs text-muted">{{ t('trace.duration') }}</div><div>{{ runDuration === undefined ? t('trace.unknown') : formatDuration(runDuration) }}</div></div>
+          <div><div class="text-xs text-muted">{{ t('trace.input') }}</div><div class="tabular-nums">{{ usageNumber('inputTokens') }}</div></div>
+          <div><div class="text-xs text-muted">{{ t('trace.output') }}</div><div class="tabular-nums">{{ usageNumber('outputTokens') }}</div></div>
+          <div><div class="text-xs text-muted">{{ t('trace.cacheRead') }}</div><div class="tabular-nums">{{ usageNumber('cacheReadTokens') }}</div></div>
+          <div><div class="text-xs text-muted">{{ t('trace.cacheWrite') }}</div><div class="tabular-nums">{{ usageNumber('cacheWriteTokens') }}</div></div>
+          <div><div class="text-xs text-muted">{{ t('trace.cost') }}</div><div class="tabular-nums">{{ cost(summary.cost) }}<span v-if="summary.cost" class="ml-1 text-xs text-muted">{{ t(`trace.source.${summary.cost.source}`) }}</span></div></div>
+          <div><div class="text-xs text-muted">{{ t('trace.duration') }}</div><div class="tabular-nums">{{ runDuration === undefined ? t('trace.unknown') : formatDuration(runDuration) }}</div></div>
           <div><div class="text-xs text-muted">{{ t('trace.usageSource') }}</div><div>{{ t(`trace.source.${summary.usageSource}`) }}</div></div>
         </div>
 
@@ -258,7 +258,7 @@ function* journalEvents(journal: GenerationSnapshot['journal'], start = 0): Iter
               <span class="relative hidden h-3 w-28 shrink-0 overflow-hidden rounded bg-muted/40 sm:block" :title="`${t('trace.started')}: +${formatDuration(span.startedAt - timeline.start)}`">
                 <span data-trace-bar class="absolute inset-y-0 min-w-px rounded" :class="span.kind === 'model' ? 'bg-primary' : span.kind === 'tool' ? 'bg-info' : span.kind === 'compaction' ? 'bg-warning' : 'bg-neutral'" :style="barStyle(span)" />
               </span>
-              <span class="shrink-0 text-xs text-muted">{{ duration(span) }}</span>
+              <span class="shrink-0 text-xs text-muted tabular-nums">{{ duration(span) }}</span>
             </summary>
             <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 px-2 py-2 text-xs text-muted">
               <template v-if="mode === 'full'">

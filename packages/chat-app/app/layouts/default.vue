@@ -31,18 +31,6 @@ const localizedChats = computed(() => chats.value?.map(chat => ({
 })))
 const { groups } = useChats(localizedChats)
 
-const items = computed(() => groups.value?.flatMap((group) => {
-  return [{
-    label: group.label,
-    type: 'label' as const
-  }, ...group.items.map(item => ({
-    ...item,
-    slot: 'chat' as const,
-    icon: undefined,
-    class: item.untitled ? 'text-muted' : ''
-  }))]
-}))
-
 defineShortcuts({
   meta_o: () => {
     navigateTo('/')
@@ -93,7 +81,7 @@ defineShortcuts({
           orientation="vertical"
         >
           <template #item-trailing="{ item }">
-            <div v-if="item.kbds?.length" class="flex items-center gap-px opacity-0 group-hover:opacity-100 transition-opacity">
+            <div v-if="item.kbds?.length" class="flex items-center gap-px opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
               <UKbd
                 v-for="kbd in item.kbds"
                 :key="kbd"
@@ -123,57 +111,47 @@ defineShortcuts({
           </div>
         </div>
 
-        <UNavigationMenu
-          v-else-if="!collapsed"
-          :items="items"
-          :collapsed="collapsed"
-          orientation="vertical"
-          :ui="{
-            link: 'overflow-hidden pe-14.5',
-            linkTrailing: 'gap-0 ms-0 absolute inset-e-px'
-          }"
-        >
-          <template #chat-trailing="{ item }">
-            <span class="inline-flex overflow-hidden">
-              <span class="inline-flex translate-x-full rtl:translate-x-[-100%] group-hover:translate-x-0 focus-within:translate-x-0 transition-transform">
+        <ul v-else-if="!collapsed && groups" class="flex flex-col">
+          <template v-for="group in groups" :key="group.label">
+            <li class="w-full flex items-center gap-1.5 font-semibold text-xs/5 text-highlighted px-2.5 py-1.5">
+              {{ group.label }}
+            </li>
+            <li
+              v-for="item in group.items"
+              :key="item.id"
+              class="group relative min-w-0"
+            >
+              <NuxtLink
+                :to="`/chat/${item.id}`"
+                class="group relative w-full flex items-center gap-1.5 font-medium text-sm before:absolute before:z-[-1] before:rounded-md focus:outline-none focus-visible:outline-none focus-visible:before:outline-3 before:outline-primary/25 flex-row px-2.5 py-1.5 before:inset-y-px before:inset-x-0 text-default hover:before:bg-elevated/50 focus-visible:before:bg-elevated/50 [&.router-link-exact-active]:text-primary [&.router-link-exact-active]:before:bg-elevated overflow-hidden pe-14.5"
+              >
+                <span class="truncate" :class="item.untitled ? 'text-muted' : ''">{{ item.label }}</span>
+              </NuxtLink>
+              <div class="absolute end-0 inset-y-0 flex items-center gap-0.5 pe-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                 <UButton
-                  as="div"
-                  role="button"
                   icon="i-lucide-pencil"
                   color="neutral"
-                  variant="link"
+                  variant="ghost"
                   size="sm"
-                  class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50"
+                  class="rounded-[5px]"
                   :aria-label="t('common.rename')"
                   :title="t('common.rename')"
-                  tabindex="0"
-                  @click.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
-                  @keydown.enter.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
-                  @keydown.space.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
+                  @click="renameChat(item.id, item.untitled ? '' : item.label)"
                 />
-              </span>
-            </span>
-            <span class="inline-flex overflow-hidden">
-              <span class="inline-flex translate-x-full rtl:translate-x-[-100%] group-hover:translate-x-0 focus-within:translate-x-0 transition-transform">
                 <UButton
-                  as="div"
-                  role="button"
                   icon="i-lucide-trash"
                   color="neutral"
-                  variant="link"
+                  variant="ghost"
                   size="sm"
-                  class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50"
+                  class="rounded-[5px]"
                   :aria-label="t('common.delete')"
                   :title="t('common.delete')"
-                  tabindex="0"
-                  @click.stop.prevent="deleteChat(item.id as string)"
-                  @keydown.enter.stop.prevent="deleteChat(item.id as string)"
-                  @keydown.space.stop.prevent="deleteChat(item.id as string)"
+                  @click="deleteChat(item.id)"
                 />
-              </span>
-            </span>
+              </div>
+            </li>
           </template>
-        </UNavigationMenu>
+        </ul>
       </template>
 
       <template #footer="{ collapsed }">

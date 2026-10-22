@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { usePreferredReducedMotion } from '@vueuse/core'
+
 const size = 4
 const gap = 2
 const totalDots = size * size
@@ -39,14 +41,25 @@ function nextStep() {
 }
 
 let matrixInterval: ReturnType<typeof setInterval> | undefined
+const reducedMotion = usePreferredReducedMotion()
 
-onMounted(() => {
+function startPattern() {
+  clearInterval(matrixInterval)
+  matrixInterval = undefined
+  // 감축 모션을 선호하면 움직이지 않는 상태로 둔다.
+  if (reducedMotion.value) return
+
   nextStep()
   matrixInterval = setInterval(nextStep, 120)
-})
+}
 
+onMounted(startPattern)
 onUnmounted(() => {
   clearInterval(matrixInterval)
+})
+
+watch(reducedMotion, () => {
+  startPattern()
 })
 </script>
 
@@ -57,11 +70,12 @@ onUnmounted(() => {
       gridTemplateColumns: `repeat(${size}, 1fr)`,
       gap: `${gap}px`
     }"
+    aria-hidden="true"
   >
     <span
       v-for="i in totalDots"
       :key="i"
-      class="rounded-sm bg-current transition-opacity duration-100"
+      class="rounded-sm bg-current transition-opacity duration-100 motion-reduce:transition-none"
       :class="activeDots.has(i - 1) ? 'opacity-100' : 'opacity-20'"
     />
   </div>

@@ -25,6 +25,7 @@ const editingText = ref(props.text)
       :rows="1"
       size="xl"
       variant="none"
+      :aria-label="t('chat.editMessage')"
       :ui="{ base: 'p-0' }"
     />
 

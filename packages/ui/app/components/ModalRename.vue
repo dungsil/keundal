@@ -32,6 +32,7 @@ function submit() {
         autofocus
         size="lg"
         :placeholder="t('chat.titlePlaceholder')"
+        :aria-label="t('chat.titlePlaceholder')"
         class="w-full"
         :ui="{ root: 'w-full' }"
         @keydown.enter.prevent="submit"
