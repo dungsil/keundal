@@ -42,6 +42,7 @@ function save() {
       :aria-describedby="invalid ? `${inputId}-error` : undefined"
       :id="inputId"
       name="message"
+      dir="auto"
       v-model="editingText"
       autofocus
       autoresize
