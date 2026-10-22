@@ -73,8 +73,9 @@ function copy() {
         :color="vote === true ? 'success' : 'neutral'"
         :variant="vote === true ? 'soft' : 'ghost'"
         icon="i-lucide-thumbs-up"
-        :aria-pressed="vote === true"
         :aria-label="t('chat.good')"
+        :aria-pressed="vote === true"
+        :class="{ 'ring-1 ring-current': vote === true }"
         @click="emit('vote', message, true)"
       />
     </UTooltip>
@@ -85,8 +86,9 @@ function copy() {
         :color="vote === false ? 'error' : 'neutral'"
         :variant="vote === false ? 'soft' : 'ghost'"
         icon="i-lucide-thumbs-down"
-        :aria-pressed="vote === false"
         :aria-label="t('chat.bad')"
+        :aria-pressed="vote === false"
+        :class="{ 'ring-1 ring-current': vote === false }"
         @click="emit('vote', message, false)"
       />
     </UTooltip>
@@ -117,6 +119,7 @@ function copy() {
         variant="ghost"
         icon="i-lucide-pencil"
         :aria-label="t('chat.editMessage')"
+        :data-message-edit="message.id"
         @click="emit('edit', message)"
       />
     </UTooltip>

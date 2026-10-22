@@ -2,7 +2,6 @@
 import { getFileIcon, removeRandomSuffix } from '@keundal/chat/file'
 
 import type { AvatarProps } from '@nuxt/ui'
-import { AnimatePresence, Motion } from 'motion-v'
 
 const { t } = useLocale()
 
@@ -26,65 +25,41 @@ const emit = defineEmits<{
   remove: []
 }>()
 
-const open = ref(false)
-
 const isZoomable = computed(() => props.type.startsWith('image/') && props.previewUrl)
-
-function openZoom() {
-  if (isZoomable.value) {
-    open.value = true
-  }
-}
-
-function closeZoom() {
-  open.value = false
-}
-
-defineShortcuts({
-  escape: closeZoom
-})
-
-onMounted(() => {
-  window.addEventListener('scroll', closeZoom, true)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('scroll', closeZoom, true)
-})
 </script>
 
 <template>
   <div class="relative group">
-    <UTooltip :text="removeRandomSuffix(name)">
-      <UButton
-        v-if="isZoomable"
-        variant="ghost"
-        :aria-label="t('file.zoom')"
-        class="cursor-zoom-in rounded-lg p-0"
-        @click="openZoom"
-      >
+    <UModal v-if="isZoomable" :title="removeRandomSuffix(name)" :transition="false" :ui="{ content: 'max-w-[95vw]', body: 'flex justify-center' }">
+      <button type="button" class="cursor-zoom-in rounded-lg" :aria-label="`${t('file.zoom')}: ${removeRandomSuffix(name)}`">
         <UAvatar
           :size="size"
           :src="previewUrl"
           alt=""
           class="rounded-lg"
+          :class="{ 'opacity-50': status === 'uploading' }"
         />
-      </UButton>
+      </button>
+      <template #body>
+        <img :src="previewUrl" :alt="removeRandomSuffix(name)" class="max-w-full max-h-[75dvh] object-contain rounded-md">
+      </template>
+    </UModal>
+    <UTooltip v-else :text="removeRandomSuffix(name)">
       <UAvatar
-        v-else
         :size="size"
         :icon="getFileIcon(type, name)"
+        :alt="removeRandomSuffix(name)"
         class="rounded-lg"
         :class="{ 'opacity-50': status === 'uploading' }"
       />
     </UTooltip>
 
-    <div v-if="status === 'uploading'" class="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
+    <div v-if="status === 'uploading'" class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
       <UIcon name="i-lucide-loader-2" class="size-6 animate-spin motion-reduce:animate-none text-white" />
     </div>
 
     <UTooltip v-if="status === 'error'" :text="error">
-      <div class="absolute inset-0 flex items-center justify-center bg-error/50 rounded-lg">
+      <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-error/50 rounded-lg">
         <UIcon name="i-lucide-alert-circle" class="size-6 text-white" />
       </div>
     </UTooltip>
@@ -94,37 +69,9 @@ onUnmounted(() => {
       icon="i-lucide-x"
       size="xs"
       color="neutral"
-      class="absolute p-0 -top-1 -right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity rounded-full ring ring-bg"
-      :aria-label="t('file.remove')"
+      class="absolute size-6 p-0 -top-1 -right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity rounded-full ring ring-bg"
+      :aria-label="`${t('file.remove')}: ${removeRandomSuffix(name)}`"
       @click="emit('remove')"
     />
-
-    <Teleport to="body">
-      <AnimatePresence>
-        <div v-if="open" class="fixed inset-0 z-50">
-          <Motion
-            :initial="{ opacity: 0 }"
-            :animate="{ opacity: 1 }"
-            :exit="{ opacity: 0 }"
-            class="absolute inset-0 bg-default/75 backdrop-blur-sm"
-          />
-
-          <Motion
-            :initial="{ opacity: 0, scale: 0.9 }"
-            :animate="{ opacity: 1, scale: 1 }"
-            :exit="{ opacity: 0, scale: 0.9 }"
-            :transition="{ type: 'spring', bounce: 0.15, duration: 0.5, ease: 'easeInOut' }"
-            class="absolute inset-0 flex items-center justify-center cursor-zoom-out"
-            @click="closeZoom"
-          >
-            <img
-              :src="previewUrl"
-              :alt="removeRandomSuffix(name)"
-              class="max-w-[95vw] max-h-[95vh] object-contain rounded-md"
-            >
-          </Motion>
-        </div>
-      </AnimatePresence>
-    </Teleport>
   </div>
 </template>

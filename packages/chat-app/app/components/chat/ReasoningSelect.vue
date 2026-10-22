@@ -17,6 +17,6 @@ const items = computed(() => reasoningLevels.value.map(value => ({ label: value,
     variant="ghost"
     value-key="value"
     class="data-[state=open]:bg-elevated"
-    :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
+    :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 motion-safe:transition-transform duration-200' }"
   />
 </template>

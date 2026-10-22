@@ -19,7 +19,7 @@ const { selectedModel, models, loading, switching, error, refresh } = useModels(
     class="data-[state=open]:bg-elevated"
     :ui="{
       content: 'w-80 max-w-[calc(100vw-2rem)]',
-      trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200'
+      trailingIcon: 'group-data-[state=open]:rotate-180 motion-safe:transition-transform duration-200'
     }"
     @update:open="
       (value) => {

@@ -46,7 +46,8 @@ export function useFileUploadWithStatus() {
           title: t('file.failed'),
           description: errorMessage,
           icon: 'i-lucide-alert-circle',
-          color: 'error'
+          color: 'error',
+          duration: 0
         })
         files.value[index] = {
           ...files.value[index]!,

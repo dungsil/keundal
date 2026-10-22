@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@keundal/chat/chat-message'
+import { useElementSize } from '@vueuse/core'
 import type { DeliveryMode } from '../../composables/useKeundalChat'
 import { EventType, TRACE_EVENT, readTraceSpans } from '@keundal/core'
 import type { TraceSpan } from '@keundal/core'
 import { shallowRef } from 'vue'
 
 const { t } = useLocale()
+const chatPrompt = useTemplateRef('chatPrompt')
+const { height: promptHeight } = useElementSize(() => chatPrompt.value?.$el)
 
 const route = useRoute()
 const toast = useToast()
@@ -23,6 +26,7 @@ useStartupPending('chat', loadStatus)
 const isOwner = computed(() => data.value?.isOwner ?? false)
 const visibility = ref<'public' | 'private'>(data.value?.visibility ?? 'private')
 const title = ref<string | null>(data.value?.title ?? null)
+useHead(() => ({ title: title.value || t('chat.untitled') }))
 
 watch(() => data.value?.title, (next) => {
   title.value = next ?? null
@@ -134,6 +138,11 @@ async function removeQueuedMessage(messageId: string) {
 const running = computed(() => status.value === 'submitted' || status.value === 'streaming')
 
 const editingMessageId = ref<string | null>(null)
+watch(editingMessageId, async (current, previous) => {
+  if (current || !previous) return
+  await nextTick()
+  document.querySelector<HTMLButtonElement>(`[data-message-edit="${CSS.escape(previous)}"]`)?.focus()
+})
 
 function startEdit(message: ChatMessage) {
   if (editingMessageId.value) return
@@ -145,7 +154,7 @@ async function saveEdit(message: ChatMessage, text: string) {
   try {
     await $chatStore.truncate(data.value!.id, message.id, 'edit')
   } catch {
-    toast.add({ description: t('chat.editFailed'), icon: 'i-lucide-alert-circle', color: 'error' })
+    toast.add({ description: t('chat.editFailed'), icon: 'i-lucide-alert-circle', color: 'error', duration: 0 })
     return
   }
 
@@ -157,7 +166,7 @@ async function regenerateMessage(message: ChatMessage) {
   try {
     await $chatStore.truncate(data.value!.id, message.id, 'regenerate')
   } catch {
-    toast.add({ description: t('chat.regenerateFailed'), icon: 'i-lucide-alert-circle', color: 'error' })
+    toast.add({ description: t('chat.regenerateFailed'), icon: 'i-lucide-alert-circle', color: 'error', duration: 0 })
     return
   }
 
@@ -189,7 +198,8 @@ async function vote(message: ChatMessage, isUpvoted: boolean) {
     toast.add({
       description: t('chat.voteFailed'),
       icon: 'i-lucide-alert-circle',
-      color: 'error'
+      color: 'error',
+      duration: 0
     })
   }
 }
@@ -217,7 +227,8 @@ onBeforeUnmount(() => {
     v-else-if="data?.id"
     id="chat"
     class="relative min-h-0"
-    :ui="{ body: 'p-0 sm:p-0 overscroll-none' }"
+    :style="{ '--chat-prompt-height': `${promptHeight}px` }"
+    :ui="{ body: 'p-0 sm:p-0 overscroll-none scroll-pt-(--ui-header-height) scroll-pb-(--chat-prompt-height)' }"
   >
     <template #header>
       <Navbar>
@@ -245,6 +256,9 @@ onBeforeUnmount(() => {
 
         <UContainer class="flex-1 flex flex-col gap-4 sm:gap-6">
           <UChatMessages
+            role="log"
+            :aria-label="t('chat.messages')"
+            :aria-busy="status === 'submitted' || status === 'streaming'"
             should-auto-scroll
             :messages="messages"
             :status="status"
@@ -308,6 +322,7 @@ onBeforeUnmount(() => {
               @resume="resumeQueue()"
             />
             <ChatPrompt
+              ref="chatPrompt"
               v-model="input"
               v-model:delivery="delivery"
               :status="status"

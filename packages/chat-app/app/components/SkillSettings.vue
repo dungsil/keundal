@@ -11,6 +11,7 @@ const settings = ref<SkillSettings>({ skills: [], disabledFiles: [], loadLocal: 
 const files = ref<LocalSkillFile[]>([])
 const roots = ref<string[]>([])
 const error = ref('')
+const errorField = ref('')
 const fileError = ref('')
 const loading = ref(false)
 const editing = ref(false)
@@ -19,10 +20,26 @@ const selectedFile = ref<LocalSkillFile | null>(null)
 const deleting = ref(false)
 const importInput = ref<HTMLInputElement | null>(null)
 const blank = (): ManagedSkill => ({ name: '', description: '', content: '', enabled: true })
-function backToSkills() {
+async function backToSkills() {
   editing.value = false
   error.value = ''
+  errorField.value = ''
+  await nextTick()
+  document.getElementById('skill-settings-title')?.focus()
 }
+
+async function requestDelete() {
+  deleting.value = true
+  await nextTick()
+  document.getElementById('skill-confirm-delete')?.focus()
+}
+
+async function cancelDelete() {
+  deleting.value = false
+  await nextTick()
+  document.getElementById('skill-delete-button')?.focus()
+}
+
 const draft = ref(blank())
 
 async function refreshFiles() {
@@ -62,9 +79,9 @@ function persist(next: SkillSettings) {
   }
 }
 
-function edit(skill?: ManagedSkill, file?: LocalSkillFile) {
+async function edit(skill?: ManagedSkill, file?: LocalSkillFile) {
   error.value = ''
-  deleting.value = false
+  errorField.value = ''
   originalName.value = skill?.name ?? null
   selectedFile.value = file ?? null
   draft.value = skill
@@ -73,30 +90,42 @@ function edit(skill?: ManagedSkill, file?: LocalSkillFile) {
       ? { ...file.definition, enabled: !settings.value.disabledFiles.includes(file.path) }
       : blank()
   editing.value = true
+  await nextTick()
+  document.getElementById('skill-name')?.focus()
 }
 
-function save() {
+async function save() {
   if (selectedFile.value) return
   const parsed = managedSkillSchema.safeParse(draft.value)
   if (!parsed.success) {
     const field = parsed.error.issues[0]!.path[0]
+    errorField.value = String(field)
     error.value = t(field === 'name' ? 'skill.invalidName' : field === 'description' ? 'skill.descriptionRequired' : 'skill.instructionsRequired')
+    const inputId = field === 'name' ? 'skill-name' : field === 'description' ? 'skill-description' : 'skill-instructions'
+    document.getElementById(inputId)?.focus()
     return
   }
+  errorField.value = ''
   if (settings.value.skills.some(skill => skill.name === parsed.data.name && skill.name !== originalName.value)) {
+    errorField.value = 'name'
     error.value = t('skill.duplicate', { name: parsed.data.name })
+    document.getElementById('skill-name')?.focus()
     return
   }
   const skills = settings.value.skills.filter(skill => skill.name !== originalName.value)
-  if (persist({ ...settings.value, skills: [...skills, parsed.data].sort((a, b) => a.name.localeCompare(b.name)) }))
+  if (persist({ ...settings.value, skills: [...skills, parsed.data].sort((a, b) => a.name.localeCompare(b.name)) })) {
     editing.value = false
+    await nextTick()
+    document.getElementById('skill-settings-title')?.focus()
+  }
 }
 
-function remove() {
-  if (
-    persist({ ...settings.value, skills: settings.value.skills.filter(skill => skill.name !== originalName.value) })
-  )
+async function remove() {
+  if (persist({ ...settings.value, skills: settings.value.skills.filter(skill => skill.name !== originalName.value) })) {
     editing.value = false
+    await nextTick()
+    document.getElementById('skill-settings-title')?.focus()
+  }
 }
 
 async function importFile(event: Event) {
@@ -124,7 +153,7 @@ function toggleFile(path: string, enabled: boolean) {
 <template>
   <section class="space-y-6" aria-labelledby="skill-settings-title">
     <div class="space-y-2">
-      <h2 id="skill-settings-title" class="text-lg font-semibold text-highlighted">
+      <h2 id="skill-settings-title" tabindex="-1" class="text-lg font-semibold text-highlighted">
         {{ t('skill.title') }}
       </h2>
       <p class="text-sm text-muted">
@@ -161,11 +190,16 @@ function toggleFile(path: string, enabled: boolean) {
           {{ selectedFile.path }}
         </p>
         <form id="skill-editor" class="space-y-4" @submit.prevent="save">
-          <UFormField :label="t('common.name')" name="skill-name" :description="t('skill.nameDescription')">
+          <UFormField
+            :label="t('common.name')"
+            name="skill-name"
+            :description="t('skill.nameDescription')"
+            :error="errorField === 'name' ? error : undefined"
+          >
             <UInput
               id="skill-name"
+              name="skill-name"
               v-model="draft.name"
-              :aria-label="t('skill.nameLabel')"
               placeholder="code-review"
               class="w-full"
               :readonly="!!selectedFile"
@@ -175,10 +209,12 @@ function toggleFile(path: string, enabled: boolean) {
             :label="t('common.description')"
             name="skill-description"
             :description="t('skill.descriptionHelp')"
+            :error="errorField === 'description' ? error : undefined"
           >
             <UTextarea
+              id="skill-description"
+              name="skill-description"
               v-model="draft.description"
-              :aria-label="t('skill.descriptionLabel')"
               :placeholder="t('skill.descriptionPlaceholder')"
               :rows="2"
               class="w-full"
@@ -189,10 +225,12 @@ function toggleFile(path: string, enabled: boolean) {
             :label="t('common.instructions')"
             name="skill-instructions"
             :description="t('skill.instructionsHelp')"
+            :error="errorField === 'content' ? error : undefined"
           >
             <UTextarea
+              id="skill-instructions"
+              name="skill-instructions"
               v-model="draft.content"
-              :aria-label="t('skill.instructionsLabel')"
               :placeholder="t('skill.instructionsPlaceholder')"
               :rows="8"
               class="w-full font-mono"
@@ -213,9 +251,9 @@ function toggleFile(path: string, enabled: boolean) {
               :label="t('skill.keep')"
               color="neutral"
               variant="ghost"
-              @click="deleting = false"
+              @click="cancelDelete"
             />
-            <UButton :label="t('skill.confirmDelete')" color="error" @click="remove" />
+            <UButton id="skill-confirm-delete" :label="t('skill.confirmDelete')" color="error" @click="remove" />
           </div>
         </div>
       </template>
@@ -321,6 +359,7 @@ function toggleFile(path: string, enabled: boolean) {
             color="error"
             :title="t('skill.localFailed')"
             :description="fileError"
+            role="alert"
           />
           <p v-else-if="!loading && !files.length" class="text-sm text-muted">
             {{ t('skill.localEmpty') }}
@@ -362,7 +401,7 @@ function toggleFile(path: string, enabled: boolean) {
           </ul>
         </div>
       </template>
-      <p v-if="error" role="alert" class="text-sm text-error">
+      <p v-if="error && !errorField" id="skill-editor-error" role="alert" class="text-sm text-error">
         {{ error }}
       </p>
     </div>
@@ -370,11 +409,12 @@ function toggleFile(path: string, enabled: boolean) {
     <div class="flex flex-wrap items-center justify-between gap-3 w-full">
       <UButton
         v-if="editing && originalName && !selectedFile"
+        id="skill-delete-button"
         :label="t('skill.delete')"
         icon="i-lucide-trash-2"
         color="error"
         variant="ghost"
-        @click="deleting = true"
+        @click="requestDelete"
       />
       <span v-else class="text-xs text-muted">{{
         editing && selectedFile

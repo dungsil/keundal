@@ -100,11 +100,15 @@ async function save(forget = false) {
       if (rows.some(row => !row.key)) {
         provider.value = item.id
         error.value = t('llm.headerKeyRequired')
+        await nextTick()
+        document.getElementById(headerRows.value[item.id]!.find(row => !row.key.trim())!.id)?.focus()
         return
       }
       if (new Set(rows.map(row => row.key.toLowerCase())).size !== rows.length) {
         provider.value = item.id
         error.value = t('llm.duplicateHeaders')
+        await nextTick()
+        document.getElementById(headerRows.value[item.id]!.find(row => row.key.trim())!.id)?.focus()
         return
       }
       draft.value[item.id]!.headers = Object.fromEntries(rows.map(row => [row.key, row.value]))
@@ -121,6 +125,16 @@ async function save(forget = false) {
                 ? 'llm.invalidURL'
                 : 'llm.invalidHeaders'
         )
+        await nextTick()
+        const inputId = field === 'name'
+          ? 'llm-provider-name'
+          : field === 'apiKey'
+            ? 'llm-api-key'
+            : field === 'baseURL'
+              ? 'llm-base-url'
+              : undefined
+        const target = inputId ?? headerRows.value[item.id]![0]?.id
+        if (target) document.getElementById(target)?.focus()
         return
       }
       next[item.id] = parsed.data
@@ -191,6 +205,7 @@ async function save(forget = false) {
           >
             <UFormField :label="t('llm.providerName')" name="providerName">
               <UInput
+                id="llm-provider-name"
                 v-model="currentDraft.name"
                 :placeholder="current.label"
                 :maxlength="100"
@@ -203,6 +218,7 @@ async function save(forget = false) {
             </p>
             <UFormField :label="t('llm.apiKey')" name="apiKey">
               <UInput
+                id="llm-api-key"
                 v-model="currentDraft.apiKey"
                 type="password"
                 autocomplete="off"
@@ -215,6 +231,7 @@ async function save(forget = false) {
             </UFormField>
             <UFormField :label="t('llm.baseURL')" name="baseURL" :description="t('llm.baseURLDescription')">
               <UInput
+                id="llm-base-url"
                 v-model="currentDraft.baseURL"
                 :placeholder="current.baseURL"
                 type="url"

@@ -39,6 +39,16 @@ async function importDirectory(event: Event) {
   await run(async () => manager!.import(await importPluginDirectory(Array.from(target.files!)), stop))
   target.value = ''
 }
+async function requestDelete(name: string) {
+  deleting.value = name
+  await nextTick()
+  document.getElementById(`plugin-confirm-delete-${encodeURIComponent(name)}`)?.focus()
+}
+async function cancelDelete(name: string) {
+  deleting.value = null
+  await nextTick()
+  document.getElementById(`plugin-delete-${encodeURIComponent(name)}`)?.focus()
+}
 function edit(plugin: AgentPluginInfo) {
   selected.value = plugin
   scopes.value = Object.fromEntries(plugin.servers.map(server => [server.name, {
@@ -137,6 +147,7 @@ async function savePermissions() {
             </p>
             <UButton
               :label="t('plugin.permissions')"
+              :aria-label="`${t('plugin.permissions')} ${plugin.name}`"
               color="neutral"
               variant="outline"
               :disabled="busy"
@@ -160,10 +171,12 @@ async function savePermissions() {
               color="neutral"
               variant="ghost"
               :disabled="busy"
-              @click="deleting = null"
+              @click="cancelDelete(plugin.name)"
             />
             <UButton
+              :id="`plugin-confirm-delete-${encodeURIComponent(plugin.name)}`"
               :label="t('common.delete')"
+              :aria-label="`${t('common.delete')} ${plugin.name}`"
               color="error"
               :disabled="busy"
               @click="run(async () => { await manager!.remove(plugin.name, stop); deleting = null })"
@@ -171,12 +184,14 @@ async function savePermissions() {
           </div>
           <UButton
             v-else
+            :id="`plugin-delete-${encodeURIComponent(plugin.name)}`"
             :label="t('common.delete')"
+            :aria-label="`${t('common.delete')} ${plugin.name}`"
             icon="i-lucide-trash-2"
             color="error"
             variant="ghost"
             :disabled="busy"
-            @click="deleting = plugin.name"
+            @click="requestDelete(plugin.name)"
           />
         </li>
       </ul>
@@ -191,10 +206,10 @@ async function savePermissions() {
           <legend class="mb-2 text-sm font-medium">
             {{ server.name }}
           </legend>
-          <UFormField :label="t('mcp.tools')">
+          <UFormField :label="t('mcp.tools')" :name="`${server.name}-tools`">
             <UTextarea v-model="scopes[server.name]!.tools" class="w-full" :disabled="busy" />
           </UFormField>
-          <UFormField :label="t('mcp.resources')">
+          <UFormField :label="t('mcp.resources')" :name="`${server.name}-resources`">
             <UTextarea v-model="scopes[server.name]!.resources" class="w-full" :disabled="busy" />
           </UFormField>
         </fieldset>

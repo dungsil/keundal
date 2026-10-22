@@ -46,6 +46,7 @@ const container = useTemplateRef('container')
 const { top: promptTop } = useElementBounding(container)
 const prompt = useTemplateRef('prompt')
 const listId = useId()
+const inputId = useId()
 const cursor = ref(0)
 const focused = ref(false)
 const dismissed = ref<string>()
@@ -156,6 +157,8 @@ function appendTranscript(text: string) {
     @keydown.capture="onCommandKeydown"
     @focusout="onFocusOut"
   >
+    <label :for="inputId" class="sr-only">{{ t('chat.prompt') }}</label>
+    <span role="status" class="sr-only">{{ commandsOpen && (loadingCommands || commandsFailed || !matches.length) ? t(loadingCommands ? 'prompt.commandsLoading' : commandsFailed ? 'prompt.commandsFailed' : 'prompt.commandsEmpty') : '' }}</span>
     <div
       v-if="commandsOpen"
       class="absolute inset-x-0 bottom-full z-20 mb-2 flex flex-col overflow-hidden rounded-lg border border-default bg-default p-1 shadow-lg"
@@ -164,7 +167,7 @@ function appendTranscript(text: string) {
       <div class="shrink-0 px-3 py-2 text-xs font-medium text-muted">
         {{ t('prompt.commands') }}
       </div>
-      <div v-if="loadingCommands || commandsFailed || !matches.length" role="status" class="px-3 py-3 text-sm text-muted">
+      <div v-if="loadingCommands || commandsFailed || !matches.length" aria-hidden="true" class="px-3 py-3 text-sm text-muted">
         {{ t(loadingCommands ? 'prompt.commandsLoading' : commandsFailed ? 'prompt.commandsFailed' : 'prompt.commandsEmpty') }}
       </div>
       <div
@@ -199,6 +202,9 @@ function appendTranscript(text: string) {
     <!-- Keep the native textbox role: a combobox role is invalid on textarea and hides the input from Windows UI Automation. -->
     <UChatPrompt
       ref="prompt"
+      :id="inputId"
+      name="prompt"
+      :autofocus="false"
       v-model="input"
       :status="status"
       :error="error"

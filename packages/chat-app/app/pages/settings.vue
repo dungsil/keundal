@@ -18,14 +18,17 @@ const pluginSections = computed(() => [
   { id: 'mcp', label: t('plugin.servers'), icon: 'i-lucide-network' }
 ])
 
-useHead(() => ({ title: t('settings.title') }))
+useHead(() => {
+  const current = [...sections.value, ...pluginSections.value].find(section => route.path === `/settings/${section.id}`)
+  return { title: current ? `${current.label} - ${t('settings.title')}` : t('settings.title') }
+})
 </script>
 
 <template>
   <UDashboardPanel
     id="settings"
     class="min-h-0"
-    :ui="{ body: '[scrollbar-gutter:stable]' }"
+    :ui="{ body: '[scrollbar-gutter:stable] [scroll-padding-top:var(--ui-header-height)]' }"
   >
     <template #header>
       <Navbar>
@@ -40,7 +43,7 @@ useHead(() => ({ title: t('settings.title') }))
     </template>
 
     <template #body>
-      <UContainer class="w-full max-w-6xl pt-(--ui-header-height) pb-6 sm:pb-8">
+      <UContainer class="w-full max-w-6xl pt-[calc(var(--ui-header-height)+1.5rem)] pb-6 sm:pt-[calc(var(--ui-header-height)+2rem)] sm:pb-8">
         <UButton
           :label="t('settings.back')"
           :to="returnTo"
@@ -54,7 +57,7 @@ useHead(() => ({ title: t('settings.title') }))
             :aria-label="t('settings.title')"
             class="flex shrink-0 flex-col gap-4 border-b border-default pb-4 md:sticky md:top-(--ui-header-height) md:w-48 md:self-start md:border-0 md:pb-0"
           >
-            <div class="flex gap-1 overflow-x-auto md:flex-col">
+            <div class="flex flex-wrap gap-1 md:flex-col">
               <UButton
                 v-for="section in sections"
                 :key="section.id"

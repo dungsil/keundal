@@ -66,11 +66,11 @@ watch(reducedMotion, () => {
 <template>
   <div
     class="shrink-0 grid size-4"
+    aria-hidden="true"
     :style="{
       gridTemplateColumns: `repeat(${size}, 1fr)`,
       gap: `${gap}px`
     }"
-    aria-hidden="true"
   >
     <span
       v-for="i in totalDots"

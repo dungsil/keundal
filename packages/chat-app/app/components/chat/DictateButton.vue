@@ -55,7 +55,8 @@ function fail(cause: Error) {
     title: t('dictation.failed'),
     description: cause.message,
     icon: 'i-lucide-alert-circle',
-    color: 'error'
+    color: 'error',
+    duration: 0
   })
 }
 
@@ -95,11 +96,11 @@ onBeforeUnmount(() => {
 <template>
   <div class="flex items-center gap-1">
     <template v-if="recording || finalizing">
-      <div v-if="recording" class="flex items-center gap-0.75 h-7 px-2" aria-hidden="true">
+      <div v-if="recording" class="flex items-center gap-0.75 h-7 px-2 motion-reduce:hidden" aria-hidden="true">
         <span
           v-for="(bar, index) in bars"
           :key="index"
-          class="w-0.5 rounded-full bg-inverted/80 transition-[height] duration-75"
+          class="w-0.5 rounded-full bg-inverted/80 motion-safe:transition-[height] duration-75"
           :style="{ height: `${Math.max(2, Math.round(bar * 18))}px` }"
         />
       </div>

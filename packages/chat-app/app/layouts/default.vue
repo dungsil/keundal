@@ -8,6 +8,13 @@ const isSettings = computed(() => route.path === '/settings' || route.path.start
 const sidebarOpen = ref(false)
 const searchOpen = ref(false)
 const { $chatStore } = useNuxtApp()
+const mainContent = useTemplateRef('mainContent')
+const removePageHook = useNuxtApp().hook('page:finish', async () => {
+  sidebarOpen.value = false
+  await nextTick()
+  mainContent.value?.focus()
+})
+onUnmounted(removePageHook)
 
 const { data: chats, status: chatsStatus } = await useAsyncData('chats', () => $chatStore.list(), {
   server: false,
@@ -39,9 +46,14 @@ defineShortcuts({
 </script>
 
 <template>
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-default focus:p-3" @click.prevent="mainContent?.focus()">
+    {{ t('navigation.skipToContent') }}
+  </a>
   <UDashboardGroup unit="rem">
     <UDashboardSidebar
       id="default"
+      role="complementary"
+      :aria-label="t('navigation.chats')"
       v-model:open="sidebarOpen"
       :min-size="12"
       collapsible
@@ -55,13 +67,16 @@ defineShortcuts({
 
       <template #default="{ collapsed }">
         <UNavigationMenu
+          :aria-label="t('chat.actions')"
           :items="[{
             label: t('chat.new'),
+            'aria-label': collapsed ? t('chat.new') : undefined,
             to: '/',
             kbds: ['meta', 'o'],
             icon: 'i-lucide-circle-plus'
           }, {
             label: t('chat.search'),
+            'aria-label': collapsed ? t('chat.search') : undefined,
             icon: 'i-lucide-search',
             kbds: ['meta', 'k'],
             onSelect: () => {
@@ -114,7 +129,7 @@ defineShortcuts({
             >
               <NuxtLink
                 :to="`/chat/${item.id}`"
-                class="group relative w-full flex items-center gap-1.5 font-medium text-sm before:absolute before:z-[-1] before:rounded-md focus:outline-none focus-visible:outline-none focus-visible:before:outline-3 before:outline-primary/25 flex-row px-2.5 py-1.5 before:inset-y-px before:inset-x-0 text-default hover:before:bg-elevated/50 focus-visible:before:bg-elevated/50 [&.router-link-exact-active]:text-primary [&.router-link-exact-active]:before:bg-elevated overflow-hidden pe-14.5"
+                class="group relative w-full flex items-center gap-1.5 font-medium text-sm before:absolute before:z-[-1] before:rounded-md flex-row px-2.5 py-1.5 before:inset-y-px before:inset-x-0 text-default hover:before:bg-elevated/50 focus-visible:before:bg-elevated/50 [&.router-link-exact-active]:text-primary [&.router-link-exact-active]:before:bg-elevated overflow-hidden pe-14.5"
               >
                 <span class="truncate" :class="item.untitled ? 'text-muted' : ''">{{ item.label }}</span>
               </NuxtLink>
@@ -125,7 +140,7 @@ defineShortcuts({
                   variant="ghost"
                   size="sm"
                   class="rounded-[5px]"
-                  :aria-label="t('common.rename')"
+                  :aria-label="`${t('common.rename')}: ${item.label}`"
                   :title="t('common.rename')"
                   @click="renameChat(item.id, item.untitled ? '' : item.label)"
                 />
@@ -135,7 +150,7 @@ defineShortcuts({
                   variant="ghost"
                   size="sm"
                   class="rounded-[5px]"
-                  :aria-label="t('common.delete')"
+                  :aria-label="`${t('common.delete')}: ${item.label}`"
                   :title="t('common.delete')"
                   @click="deleteChat(item.id)"
                 />
@@ -175,8 +190,8 @@ defineShortcuts({
       }, ...groups]"
     />
 
-    <div class="flex-1 flex mt-4 ms-4 lg:ms-0 rounded-ss-lg ring ring-default bg-default/75 shadow-sm min-w-0 overflow-hidden">
+    <main id="main-content" ref="mainContent" tabindex="-1" class="flex-1 flex mt-4 ms-4 lg:ms-0 rounded-ss-lg ring ring-default bg-default/75 shadow-sm min-w-0 overflow-hidden">
       <slot />
-    </div>
+    </main>
   </UDashboardGroup>
 </template>

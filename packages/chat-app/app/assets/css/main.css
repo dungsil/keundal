@@ -55,3 +55,18 @@ html.dark .shiki span {
   font-weight: var(--shiki-dark-font-weight) !important;
   text-decoration: var(--shiki-dark-text-decoration) !important;
 }
+
+body :where(a, button, input, textarea, select, [tabindex="0"]):focus-visible {
+  outline: auto;
+  outline-color: revert;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  ::view-transition-old(chat-prompt),
+  ::view-transition-new(chat-prompt) {
+    animation: none;
+  }
+}

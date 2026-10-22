@@ -45,7 +45,7 @@ export function useModels() {
     canSelectDefault: value => !remoteModels || remoteModels.value.some(item => item.value === value),
     onError: () => {
       selectionError.value = t('model.switchFailed')
-      toast.add({ description: selectionError.value, icon: 'i-lucide-alert-circle', color: 'error' })
+      toast.add({ description: selectionError.value, icon: 'i-lucide-alert-circle', color: 'error', duration: 0 })
     }
   })
 

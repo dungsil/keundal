@@ -42,7 +42,8 @@ export function useChatActions() {
       toast.add({
         description: t('chat.renameFailed'),
         icon: 'i-lucide-alert-circle',
-        color: 'error'
+        color: 'error',
+        duration: 0
       })
 
       return null
@@ -82,7 +83,8 @@ export function useChatActions() {
       toast.add({
         description: t('chat.deleteFailed'),
         icon: 'i-lucide-alert-circle',
-        color: 'error'
+        color: 'error',
+        duration: 0
       })
 
       return false

@@ -14,20 +14,43 @@ const emit = defineEmits<{
 }>()
 
 const editingText = ref(props.text)
+const inputId = useId()
+const editor = useTemplateRef('editor')
+const invalid = ref(false)
+watch(editingText, () => { invalid.value = false })
+
+function save() {
+  invalid.value = !editingText.value.trim()
+  if (invalid.value) {
+    editor.value?.textareaRef?.focus()
+    return
+  }
+  if (editingText.value === props.text) {
+    emit('cancel')
+    return
+  }
+  emit('save', props.message, editingText.value)
+}
 </script>
 
 <template>
-  <div class="flex flex-col gap-2 w-full">
+  <form class="flex flex-col gap-2 w-full" @submit.prevent="save">
+    <label :for="inputId" class="sr-only">{{ t('chat.editMessage') }}</label>
     <UTextarea
+      ref="editor"
+      :aria-invalid="invalid || undefined"
+      :aria-describedby="invalid ? `${inputId}-error` : undefined"
+      :id="inputId"
+      name="message"
       v-model="editingText"
       autofocus
       autoresize
       :rows="1"
       size="xl"
       variant="none"
-      :aria-label="t('chat.editMessage')"
-      :ui="{ base: 'p-0' }"
+      :ui="{ base: 'p-0 focus-visible:outline-auto' }"
     />
+    <p v-if="invalid" :id="`${inputId}-error`" class="text-sm text-error">{{ t('chat.messageRequired') }}</p>
 
     <div class="flex gap-1.5 justify-end">
       <UButton
@@ -38,11 +61,10 @@ const editingText = ref(props.text)
         @click="emit('cancel')"
       />
       <UButton
+        type="submit"
         size="sm"
         :label="t('common.save')"
-        :disabled="!editingText.trim() || editingText === text"
-        @click="emit('save', message, editingText)"
       />
     </div>
-  </div>
+  </form>
 </template>
