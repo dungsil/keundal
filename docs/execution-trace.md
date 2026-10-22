@@ -77,23 +77,6 @@ Generation Snapshot의 `status`가 종료 상태를 결정합니다. 저장소�
 
 검색은 이름과 설명의 대소문자를 구분하지 않는 부분 문자열 비교입니다. 공백으로 나눈 검색어 가운데 하나 이상이 일치한 도구를 목록 순서대로 반환합니다. 의미 기반 검색이나 외부 검색 서비스는 사용하지 않습니다.
 
-## 입력 토큰 비교
-
-`packages/plugin-agent-chat/tests/fixtures/deferred-mcp-catalog.ts`는 서비스별 Schema 12종과 동작 10종으로 합성 도구 120개를 만듭니다. GitHub, Drive, Calendar, Linear, AWS, Datadog, OpenWeatherMap, Slack과 Jira 형식을 참고한 중첩 필터·페이지·열거형·필수 필드를 포함합니다. 실제 MCP 서버에서 수집한 목록은 아닙니다.
-
-같은 질문, 검색 대상 목록과 상시 도구 `local_status`를 사용했습니다. 입력 토큰 추정식은 모델에 실제 전달한 `RunAgentInput` 전체를 대상으로 한 `ceil(UTF-8 JSON bytes / 4)`입니다. 후속 대화와 도구 검색 결과도 포함합니다.
-
-| 항목                       | 직접 노출 | Deferred Tools |
-| -------------------------- | --------: | -------------: |
-| 첫 요청의 도구 Schema 수   |       121 |              2 |
-| 첫 요청의 입력 토큰 추정치 |    17,806 |            150 |
-| 모델 요청 수               |         2 |              3 |
-| 전체 입력 토큰 추정치      |    35,693 |          1,050 |
-
-추가 검색 요청을 포함해 전체 입력 토큰 추정치가 97.06% 감소했습니다. 이는 합성 목록의 텍스트 추정치이며 실제 공급자 토큰이나 청구액을 측정한 결과가 아닙니다. 출력 토큰, 도구 검색 지연과 모델별 가격까지 포함한 비용 절감률로 해석하지 않습니다.
-
-검증 명령은 `pnpm --filter @keundal/plugin-agent-chat test`입니다. 테스트는 실행한 모델 요청을 수집하여 첫 요청과 전체 실행의 값을 출력합니다.
-
 ## 관측 범위와 제한
 
 가격표가 없는 기본 공급자는 토큰만 기록하며 비용은 미확정으로 표시합니다. 공급자가 실제 비용을 제공하는 구현은 `llmUsageEvent()`의 `cost`에 통화와 출처를 전달합니다. 토큰과 비용을 추정해서 전달할 때는 반드시 `source: 'estimate'`를 사용합니다.
@@ -103,33 +86,3 @@ Generation Snapshot의 `status`가 종료 상태를 결정합니다. 저장소�
 실행과 분리된 배경 축약은 관측을 종료한 뒤에도 계속 진행할 수 있습니다. 이 경우 마지막으로 확인한 사용량만 보관하며 최종 종료 시각이나 비용을 확정하지 않습니다. 작업을 기다리거나 취소하여 기존 실행 수명을 바꾸지 않습니다.
 
 열린 패널의 `getRun()`은 실행 하나의 전체 Snapshot을 읽습니다. 추가 이벤트만 해석하는 최적화는 원격 전송량이나 저장소 읽기 양을 줄이지 않습니다. 한 패널의 중복 조회를 막고 실행 중에만 갱신하지만, 대형 Journal의 증분 조회 API는 제공하지 않습니다.
-
-## 검증 결과
-
-| 검사        | 실행 명령                          | 결과                                                                             |
-| ----------- | ---------------------------------- | -------------------------------------------------------------------------------- |
-| 빌드        | `pnpm build`                       | 통과했습니다.                                                                    |
-| 타입        | `pnpm typecheck --continue=always` | 통과했습니다.                                                                    |
-| 린트        | `pnpm lint`                        | 통과했습니다. 변경하지 않은 `Prompt.vue`의 자동 import 경고 3건은 남아 있습니다. |
-| 패키지 경계 | `pnpm check:boundaries`            | 통과했습니다. 린트에서도 같은 검사를 실행했습니다.                               |
-| 전체 테스트 | `pnpm test --continue=always`      | Windows 권한 오류가 있어 전체 통과로 판정하지 않습니다.                          |
-
-`@keundal/agent-plugins`의 기존 심볼릭 링크 검사 4건에서 `EPERM`이 발생했습니다. 파일 링크 생성 권한이 필요한 환경 문제이며, 이 작업에서는 OS 설정이나 해당 테스트를 바꾸지 않았습니다.
-
-해당 패키지를 제외한 워크스페이스 재검증은 `pnpm exec turbo run test --filter=!@keundal/agent-plugins --continue=always`로 통과했습니다. 이후 변경한 공용 UI는 `pnpm --filter @keundal/chat-app test`로 198개 테스트를 다시 통과했습니다.
-
-자동 테스트는 실제 Agent와 Journal에서 부모·자식 관계, 시작 순서, 원본 이벤트 순서와 토큰·캐시·비용 중복 배제를 확인합니다. 검색 전 호출 차단, 권한 취소, 같은 응답에서의 호출 차단, 최신 실행 함수, 연결 해제와 실행별 격리도 확인합니다. 공급자의 실패 응답 사용량, Compaction 하위 모델과 분리된 배경 작업도 검증합니다.
-
-실제 브라우저에서는 SQLite 호스트, stdio MCP와 로컬 OpenAI 형식 공급자를 연결했습니다. 첫 공급자 응답 전 모델 Span, Simple·Full과 상세 정보, 완료 상태, 새로고침 후 Journal과 Trace가 없는 이전 실행을 확인했습니다. Trace에는 인자와 인증 값이 없으며, 검색 다음 요청에만 MCP Schema를 노출했습니다.
-
-브라우저 검증에는 합성 응답을 사용했습니다. 실제 공급자 호출이나 청구액을 측정한 검증은 아닙니다. 검증용 서버와 브라우저를 종료하고 임시 실행 파일을 제거했습니다.
-
-## 참고한 LibreChat 구현
-
-비교 기준은 LibreChat의 `e081b566a42d3a83b8102157bd7806cf4ff63b17`입니다. 코드와 구조를 비교했으며 React, LangChain과 Langfuse를 Keundal에 추가하지 않았습니다.
-
-1. [Trace Viewer](https://github.com/LibreChat-AI/LibreChat/blob/e081b566a42d3a83b8102157bd7806cf4ff63b17/client/src/components/Chat/Trace/Viewer.tsx)는 Simple·Full 보기와 지연 조회를 제공합니다.
-2. [Trace 모델](https://github.com/LibreChat-AI/LibreChat/blob/e081b566a42d3a83b8102157bd7806cf4ff63b17/client/src/components/Chat/Trace/model.ts)은 모든 모델 호출의 비용을 알 때만 전체 비용을 확정합니다.
-3. [도구 분류](https://github.com/LibreChat-AI/LibreChat/blob/e081b566a42d3a83b8102157bd7806cf4ff63b17/packages/api/src/tools/classification.ts)는 MCP 레지스트리와 Approval 연결을 유지하면서 검색 도구를 등록합니다.
-4. [Deferred Tools 검증](https://github.com/LibreChat-AI/LibreChat/blob/e081b566a42d3a83b8102157bd7806cf4ff63b17/e2e/specs/mock/deferred-tools-hitl.spec.ts)은 검색한 Schema만 후속 요청에 바인딩하는지 검사합니다.
-5. [저장된 Context Usage 검증](https://github.com/LibreChat-AI/LibreChat/blob/e081b566a42d3a83b8102157bd7806cf4ff63b17/e2e/specs/mock/scenarios/persisted-context-usage.spec.ts)은 현재 턴과 누적 캐시 사용량을 구분합니다.

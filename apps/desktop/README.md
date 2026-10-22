@@ -60,7 +60,7 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 
 다운로드에는 GitHub 로그인이 필요하며, 배포 파일은 업로드 후 7일간 보관합니다. Windows는 다운로드한 압축 파일을 모두 푼 뒤 `keundal-desktop.exe`를 실행합니다. `keundal-host.exe`와 `sidecar` 폴더도 함께 유지해야 합니다. 설정과 대화 데이터는 OS 사용자 프로필에 저장합니다. 코드 서명 인증서와 공증은 사용하지 않습니다. macOS 빌드에는 임시 서명(ad-hoc)을 적용하며, OS 보안 경고가 표시될 수 있습니다.
 
-Windows 포터블 배포는 이 프로젝트에서 구성한 방식이며, Tauri가 공식 지원하는 포터블 모드는 아닙니다. Windows CI는 배포 폴더를 ZIP으로 압축하고 저장소 밖의 공백이 있는 경로에 풀어 검증합니다. 앱의 네이티브 창 생성과 응답 여부를 확인하고, 동봉된 Node.js 호스트를 별도로 실행하여 인증·모델 조회·SQLite 저장 및 재시작을 확인한 뒤 업로드합니다. 실제 공급자 API 호출과 앱 UI를 통한 호스트 연동은 별도 확인이 필요합니다.
+Windows 포터블 배포는 이 프로젝트에서 구성한 방식이며, Tauri가 공식 지원하는 포터블 모드는 아닙니다.
 
 웹과 데스크톱 빌드가 모두 성공하면 웹 프리뷰를 배포하고 댓글에 데스크톱 다운로드 링크를 표시합니다. 빌드가 실패하면 CI 실행 로그에서 원인을 확인합니다.
 
@@ -111,8 +111,6 @@ GUI 라이브러리 없이 파일 탐색과 경로 제한만 검증하려면 저
 rustc --edition=2021 --test apps/desktop/src-tauri/src/skill_files.rs -o /tmp/keundal-skill-files-tests
 /tmp/keundal-skill-files-tests
 ```
-
-아이콘은 `packages/chat-app/public/favicon.ico`에서 Tauri CLI의 `icon` 명령으로 생성했습니다.
 
 LLM·저장소·에이전트·도구는 앱 데이터 디렉터리의 `keundal.plugins.json`으로 교체합니다. `KEUNDAL_PLUGIN_CONFIG`를 지정하면 해당 파일을 우선합니다. 외부 ESM 파일이나 설치된 패키지를 선택할 수 있으며 앱을 다시 빌드할 필요가 없습니다. 설정 변경 후 앱을 다시 시작하면 sidecar가 새 구성을 읽습니다. 형식과 신뢰 경계는 [플러그인 조립 문서](../../docs/plugin-composition.md#런타임-설정)를 참고합니다.
 

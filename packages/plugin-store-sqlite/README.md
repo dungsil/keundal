@@ -25,4 +25,6 @@ const recovered = await ctx.generation.recover()
 - 데이터베이스는 WAL과 `synchronous = NORMAL`을 사용합니다. 커밋된 트랜잭션은 프로세스가 비정상 종료해도 남지만, 운영체제 자체가 중단되면 마지막 커밋 몇 개가 유실될 수 있습니다.
 - 한 실행은 시작한 서비스가 확정합니다. 다른 등록이 같은 `runId`로 실행을 시작하면 거부하고, 같은 실행의 종료 기록을 두 번 커밋해도 메시지와 revision은 한 번만 반영합니다.
 
-`pnpm test --filter=@keundal/plugin-store-sqlite`는 실제 SQLite 파일과 가짜 `llm` 서비스를 사용해 커밋 순서, revision 충돌, 실행 중 journal과 부분 응답의 내구성, 임차와 재등록 복구, 취소·중단·실패 확정을 검증합니다.
+```sh
+pnpm test --filter=@keundal/plugin-store-sqlite
+```

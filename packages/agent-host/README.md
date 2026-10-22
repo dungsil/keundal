@@ -37,4 +37,4 @@ const host = await createAgentHost({
 
 SSE 프레임의 `id`는 journal `sequence`입니다. 스트림을 연 뒤 연결이 끊겨도 실행은 계속됩니다. 실행을 멈추려면 `cancel`을 호출합니다. 자세한 보장 범위는 [실행 제어 문서](../../docs/run-control.md)를 참고합니다.
 
-환경 변수 처리와 기본 LLM·SQLite 구성은 [`@keundal/agent-runtime-node`](../agent-runtime-node/README.md)로 분리했습니다. 기존 `@keundal/agent-host/runtime`을 사용하는 코드는 해당 패키지로 가져오기를 바꾸고 `compose: createNodeComposition`을 전달해야 합니다.
+환경 변수 처리와 기본 LLM·SQLite 구성은 [`@keundal/agent-runtime-node`](../agent-runtime-node/README.md)로 분리했습니다.

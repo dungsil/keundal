@@ -83,7 +83,9 @@ try {
 
 ## 검증
 
-`pnpm test --filter=@keundal/plugin-llm-gemini`는 실제 `@google/genai` SDK와 로컬 HTTP 서버를 사용합니다. 요청 본문, 토큰 계산, SSE 변환, thought 서명 보존, 오류, 취소와 플러그인 해제를 검증하며, 실제 Google 계정의 인증·모델 접근 권한은 검증하지 않습니다.
+```sh
+pnpm test --filter=@keundal/plugin-llm-gemini
+```
 
 모델 목록 조회는 응답 한 페이지를 1 MiB, 전체 응답을 8 MiB와 32페이지로 제한합니다.
 중복되거나 필터에서 제외되는 항목을 포함하여 최대 4,096개를 처리하며, 모델 식별자와 표시 이름은

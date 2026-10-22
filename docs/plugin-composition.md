@@ -101,7 +101,3 @@ web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도�
 ## 경계 검증
 
 `pnpm check:boundaries`는 앱 간 의존성과 함께 공통 UI·계약 패키지의 구현 의존성을 검사합니다. 통합 테스트의 개발 의존성은 허용하지만, 실행 의존성과 `src`, `app`, `shared`의 구현 직접 참조는 거부합니다.
-
-## 참고
-
-[DeepSeek Harness의 패키지 구성](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/README.md)과 [프로필별 조립](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/apps/cli/composition.md)을 참고했습니다. 서비스 계약, 구현 공급자, 앱별 조립을 나누는 원칙을 적용했습니다. TypeScript 조립 API와 런타임 JSON 로더를 함께 제공합니다. YAML 로더와 실행 중 패키지 설치 기능은 제공하지 않습니다.

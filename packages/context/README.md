@@ -8,16 +8,4 @@
 
 세션 멘션 함수 `encodeSessionReferenceUri`, `decodeSessionReferenceUri`, `formatSessionReferenceMention`, `parseSessionReferenceText`는 Node.js 없이 동작합니다. `SESSION_REFERENCE_SCHEME`, `SessionReferenceError`, `SessionReferenceErrorCode`, `SessionReferenceInput`, `SessionReferenceCandidate`, `ParsedSessionReferenceText`도 이 패키지에서 가져옵니다.
 
-## 기존 import 변경
-
-기존 `@keundal/context`의 공개 항목은 다음과 같이 나눕니다.
-
-- `RequestContextService`는 이 패키지의 추상 계약입니다. 기존 생성자 대신 `@keundal/plugin-context`의 `OrderedRequestContextService`를 사용합니다.
-- `contextPlugin`, 기본 내보내기, `RequestContextConfig`는 `@keundal/plugin-context`로 옮깁니다.
-- `createFileReferenceContext`, `FILE_REFERENCE_PROMPT`, `SessionReferenceResolver`, `SessionReferenceConfig`, `sessionReferencePlugin`, `createSessionReferenceContext`는 `@keundal/plugin-context`로 옮깁니다.
-- `MAX_REFERENCES`, `DEFAULT_CANDIDATE_LIMIT`, `DEFAULT_MAX_REFERENCE_BYTES`, `createTimeContext`, `TimeContextConfig`, `createHarnessDevContext`, `HarnessDevContextConfig`는 `@keundal/plugin-context`로 옮깁니다.
-- `createAgentInstructionsContext`, `AgentInstructionsConfig`, `createTmuxContext`, `TmuxContextConfig`는 `@keundal/plugin-context-node`로 옮깁니다.
-- `LocalFileReferenceService`, `LocalFileReferenceConfig`, `localFileReferencePlugin`과 `DEFAULT_FILE_SEARCH_*` 상수는 `@keundal/plugin-context-node`로 옮깁니다.
-- 나머지 기존 계약, 타입, 메시지 함수와 멘션 함수는 이 패키지에 남습니다.
-
 순서대로 준비하고 결과를 검사하는 구현은 [plugin-context](../plugin-context/README.md)에 있습니다. 로컬 파일과 프로세스를 사용하는 공급자는 [plugin-context-node](../plugin-context-node/README.md)에 있습니다. 참조 코드의 MIT 라이선스는 [LICENSE](./LICENSE)에 보존합니다.

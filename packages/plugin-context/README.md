@@ -4,9 +4,7 @@
 
 이 패키지는 `@keundal/context`의 계약을 구현합니다. `OrderedRequestContextService`는 공급자를 순서대로 실행하고 기존 메시지, 실행 ID와 예약 메시지를 검사합니다. 다른 구현은 계약 패키지의 `RequestContextService`를 상속하여 같은 Cordis 서비스를 제공할 수 있습니다.
 
-기존 import의 전체 대응 목록은 [context 문서](../context/README.md)에 있습니다. Node.js 공급자는 [plugin-context-node](../plugin-context-node/README.md)에서 가져옵니다.
-
-[DeepSeek Harness의 context 패키지 그룹](https://github.com/deepseek-ai/deepseek-harness/tree/687f282e8625c6b8d11ff58211a90524be2e4317/packages/context)을 현재 저장소의 Cordis·AG-UI 계약에 맞게 구현했습니다. 참조 코드의 MIT 라이선스는 [LICENSE](./LICENSE)에 보존합니다.
+Node.js 공급자는 [plugin-context-node](../plugin-context-node/README.md)에서 가져옵니다. 참조 코드의 MIT 라이선스는 [LICENSE](./LICENSE)에 보존합니다.
 
 ## 에이전트에 연결하기
 

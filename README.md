@@ -57,7 +57,7 @@ Node.js 공급자 대신 Tauri IPC나 원격 서버 공급자를 연결할 수 �
 
 공통 에이전트 루프는 모델 호출, 도구 실행, Compaction을 같은 실행의 Trace로 연결합니다. 공용 Chat UI에서 실행 단계, 타임라인, 토큰·캐시·시간과 알려진 비용을 조회합니다. Trace는 기존 Generation Journal의 버전이 있는 메타데이터로 저장합니다.
 
-MCP 도구가 많으면 Deferred Tools를 선택하여 검색한 도구의 Schema만 후속 모델 요청에 노출합니다. 직접 등록한 기본 도구와 MCP 권한은 유지합니다. 데이터 계약, 검색 한도, 사용 방법과 검증 결과는 [실행 관측 문서](docs/execution-trace.md)를 참고합니다.
+MCP 도구가 많으면 Deferred Tools를 선택하여 검색한 도구의 Schema만 후속 모델 요청에 노출합니다. 직접 등록한 기본 도구와 MCP 권한은 유지합니다. 데이터 계약, 검색 한도와 사용 방법은 [실행 관측 문서](docs/execution-trace.md)를 참고합니다.
 
 ## 시작하기
 
@@ -102,6 +102,14 @@ pnpm --filter @keundal/desktop dev
 pnpm --filter @keundal/desktop bundle
 ```
 
+## 문서
+
+- [플러그인 조립과 의존성 경계](docs/plugin-composition.md)
+- [실행 제어: Queue, Steer, 재구독](docs/run-control.md)
+- [Execution Trace와 Deferred Tools](docs/execution-trace.md)
+- [생성 스트림의 자원 한도](docs/stream-limits.md)
+- [아키텍처 결정 기록](docs/adr/)
+
 ## 라이선스
 
 이 프로젝트는 [MIT License](./LICENSE)에 따라 배포됩니다.
@@ -115,5 +123,3 @@ pnpm --filter @keundal/desktop bundle
 
 [Cordis]: https://github.com/cordiverse/cordis
 [AG-UI]: https://github.com/ag-ui-protocol/ag-ui
-
-플랫폼별 구현 선택과 계약 패키지의 경계는 [플러그인 조립 문서](docs/plugin-composition.md)를 따릅니다. 공통 UI와 계약 패키지는 구현 플러그인에 실행 의존성을 추가하지 않습니다.
