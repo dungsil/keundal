@@ -1,4 +1,10 @@
-import { parseMcpServers, type McpClientConfig, type McpRequestOptions, type McpSettingsStorage } from '@keundal/mcp'
+import {
+  parseMcpServers,
+  type McpClientConfig,
+  type McpProbeResult,
+  type McpRequestOptions,
+  type McpSettingsStorage
+} from '@keundal/mcp'
 import { McpClient } from '@keundal/plugin-mcp-client/browser'
 
 const storageKey = 'keundal:mcp-servers'
@@ -79,6 +85,16 @@ export class McpManager {
       }
     }
     return result
+  }
+
+  /**
+   * Checks a configuration that is not saved yet. It opens a temporary connection that is closed before returning,
+   * never reads or changes the saved servers, and never calls a tool. Only Streamable HTTP can be checked here.
+   */
+  async probe(value: unknown, options: McpRequestOptions = {}): Promise<McpProbeResult> {
+    const [server] = parseMcpServers([value], this.options.allowStdio ?? false)
+    if (server?.transport !== 'streamable-http') throw new Error('The connection check supports Streamable HTTP only')
+    return McpClient.probe(server, options)
   }
 
   async close() {

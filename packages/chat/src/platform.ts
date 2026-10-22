@@ -1,5 +1,6 @@
 import type { ExecutionOptions, SkillProvider, SkillSummary } from '@keundal/core'
 import type { LLMSettings } from '@keundal/llm-settings'
+import type { McpProbeResult, McpRequestOptions } from '@keundal/mcp'
 
 import type { ChatStoreLike } from './chat-store'
 import type { ModelOption } from './models'
@@ -66,6 +67,8 @@ export interface ChatPlatform {
     readonly configuration: import('@keundal/mcp').McpClientConfig[]
     load(): Promise<void>
     save(value: unknown, restart: () => Promise<void>): Promise<void>
+    /** Checks an unsaved configuration over a temporary connection; absent when the platform cannot do it. */
+    probe?(value: unknown, options?: McpRequestOptions): Promise<McpProbeResult>
     close(): Promise<void>
   }
   settings: SettingsStorage

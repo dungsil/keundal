@@ -103,6 +103,12 @@ SDK의 자동 협상으로 지원하는 프로토콜 버전을 선택합니다. 
 
 원격 작업의 취소와 정리 완료 여부는 서버 구현에 달려 있습니다. 취소는 이미 발생한 부작용을 되돌리지 않습니다. 연결이 끊기면 새 클라이언트를 생성합니다. 자동 재접속, 도구 재실행, 서버 지시문 삽입, MCP prompts, sampling, elicitation, task 실행, 레거시 SSE 전송은 지원하지 않습니다.
 
+## 연결 확인
+
+`McpClient.probe(config, { signal })`는 설정으로 연결해 서버가 알려 주는 도구 이름과 설명, 리소스 지원 여부와 개수를 `McpProbeResult`로 반환하고 연결을 닫습니다. 설정의 `permissions`는 무시하며 실행 함수를 만들지 않습니다. 도구 목록과 리소스 목록만 요청하고 `tools/call`과 `resources/read`는 요청하지 않습니다. 서버가 해당 기능을 알리지 않으면 목록을 요청하지 않습니다.
+
+`timeoutMs`는 연결과 조회를 합친 전체 시간 제한이며, 넘으면 `TimeoutError`로 실패합니다. `signal`이 중단되면 시간 제한을 기다리지 않고 실패합니다. 성공, 실패, 취소, 시간 초과 어느 경우에도 연결을 닫습니다. 응답하지 않는 서버의 세션 종료 요청은 3초까지만 기다립니다. 도구 목록은 `maxResultBytes`와 도구 수 한도를 따르고, 리소스 목록은 `maxResultBytes`를 따릅니다. 인스턴스 메서드 `inspect()`는 이미 연결한 클라이언트에서 같은 조회를 수행합니다. Node.js 진입점은 stdio 설정도 확인하며, 이때 설정한 명령을 실행합니다. 브라우저 진입점은 stdio를 거부합니다.
+
 ## 브라우저에서 사용
 
 `@keundal/plugin-mcp-client/browser`에서 `McpClient`를 가져오면 Node.js 전용 모듈 없이 Streamable HTTP에 연결할 수 있습니다. 이 진입점은 stdio를 거부합니다. 브라우저의 CORS와 보안 컨텍스트 정책을 따르며, 서버는 앱 origin과 MCP 요청 헤더를 허용해야 합니다. 도구 이름과 권한, 취소 계약은 Node.js 진입점과 같습니다.

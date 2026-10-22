@@ -1,6 +1,6 @@
 export { parseMcpServers } from '@keundal/mcp'
 import { parseMcpHttpUrl } from '@keundal/mcp'
-import type { McpPermissions, McpClientConfig, McpRequestOptions } from '@keundal/mcp'
+import type { McpPermissions, McpClientConfig, McpProbeResult, McpRequestOptions, McpToolSummary } from '@keundal/mcp'
 import type { ExecutableTool } from '@keundal/tools'
 import { Client, StreamableHTTPClientTransport, type RequestOptions } from '@modelcontextprotocol/client'
 import type { Transport } from '@modelcontextprotocol/client'
@@ -8,10 +8,23 @@ import type { Transport } from '@modelcontextprotocol/client'
 import { CatalogDiscovery } from './catalog-budget.js'
 import { createHttpTransport } from './http-transport.js'
 import { boundedMcpPages, DEFAULT_MAX_RESULT_BYTES, McpResultBudget, resultBytes } from './result-budget.js'
-export type { McpPermissions, McpClientConfig, McpRequestOptions } from '@keundal/mcp'
+export type { McpPermissions, McpClientConfig, McpProbeResult, McpRequestOptions, McpToolSummary } from '@keundal/mcp'
 
 function allows(scope: '*' | readonly string[] | undefined, name: string): boolean {
   return scope === '*' || (scope?.includes(name) ?? false)
+}
+
+const PROBE_REQUEST_MARGIN_MS = 1000
+const PROBE_CLOSE_GRACE_MS = 3000
+
+async function closeWithin(client: { close(): Promise<void> }, ms: number): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>()
+  const timer = globalThis.setTimeout(resolve, ms)
+  try {
+    await Promise.race([client.close().catch(() => {}), promise])
+  } finally {
+    globalThis.clearTimeout(timer)
+  }
 }
 
 async function publicName(server: string, kind: 'tool' | 'resource', name: string): Promise<string> {
@@ -94,6 +107,32 @@ export class McpClient {
       throw error
     } finally {
       options.signal?.removeEventListener('abort', abort)
+    }
+  }
+
+  /**
+   * Connects with the given configuration, reports what the server offers, and always closes the connection.
+   * The whole check, including the connection, ends after `timeoutMs` and when `options.signal` aborts.
+   */
+  static async probe(config: McpClientConfig, options: McpRequestOptions = {}): Promise<McpProbeResult> {
+    const timeoutMs = config.timeoutMs ?? 60_000
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw new Error('timeoutMs must be a positive integer')
+    const deadline = globalThis.AbortSignal.timeout(timeoutMs)
+    const signal = options.signal ? globalThis.AbortSignal.any([options.signal, deadline]) : deadline
+    let client: McpClient | undefined
+    try {
+      // The deadline bounds the whole check, so each request gets a little longer and the deadline reports first.
+      client = await this.connect(
+        { ...config, timeoutMs: timeoutMs + PROBE_REQUEST_MARGIN_MS, permissions: {} },
+        { signal }
+      )
+      return await client.inspect({ signal })
+    } catch (error) {
+      if (deadline.aborted && !options.signal?.aborted) throw deadline.reason
+      throw error
+    } finally {
+      // A server that stopped answering must not keep the check pending while the session is terminated.
+      if (client) await closeWithin(client, PROBE_CLOSE_GRACE_MS)
     }
   }
 
@@ -183,6 +222,40 @@ export class McpClient {
     }
     request.signal?.throwIfAborted()
     return tools
+  }
+
+  /**
+   * Lists the tool names and resource availability the server reports, ignoring the configured permissions.
+   * It builds no executable tool, so nothing listed here can be called through this method.
+   */
+  async inspect(options: McpRequestOptions = {}): Promise<McpProbeResult> {
+    const request = this.requestOptions(options)
+    const capabilities = this.client.getServerCapabilities()
+    const tools: McpToolSummary[] = []
+    if (capabilities?.tools) {
+      const discovered = await this.catalog.run((_meta) =>
+        this.client.listTools({ _meta }, { ...request, cacheMode: 'bypass' })
+      )
+      for (const { name, description } of discovered.tools)
+        tools.push({ name, ...(description ? { description } : {}) })
+    }
+    let count = 0
+    if (capabilities?.resources) {
+      const pages = await boundedMcpPages(
+        (cursor) =>
+          this.resultBudget.run((_meta) =>
+            this.client.request(
+              { method: 'resources/list', params: { _meta, ...(cursor === undefined ? {} : { cursor }) } },
+              request
+            )
+          ),
+        (page) => page.resources,
+        this.maxResultBytes
+      )
+      count = pages.items.length
+    }
+    request.signal?.throwIfAborted()
+    return { tools, resources: { supported: Boolean(capabilities?.resources), count } }
   }
 
   async listResources(options: McpRequestOptions = {}) {
