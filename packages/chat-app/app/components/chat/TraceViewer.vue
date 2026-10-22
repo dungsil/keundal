@@ -226,7 +226,7 @@ function* journalEvents(journal: GenerationSnapshot['journal'], start = 0): Iter
     >
       <span class="flex min-w-0 items-center gap-2">
         <UIcon name="i-lucide-chart-no-axes-column-increasing" class="size-4 shrink-0" />
-        <span class="font-medium">{{ t('trace.title') }}</span>
+        <span class="shrink-0 whitespace-nowrap font-medium">{{ t('trace.title') }}</span>
         <span class="truncate text-xs text-muted">{{ runId }}</span>
       </span>
       <UIcon :name="expanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" class="size-4 shrink-0" />
@@ -245,7 +245,7 @@ function* journalEvents(journal: GenerationSnapshot['journal'], start = 0): Iter
       <p v-else-if="failed && !spans.length" class="text-error">{{ t('trace.loadFailed') }}</p>
       <template v-else-if="snapshot || spans.length">
         <p v-if="view.truncated" class="mb-2 text-xs text-warning">{{ t('trace.limited', { count: MAX_SPANS }) }}</p>
-        <div v-if="spans.length" class="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2 sm:grid-cols-4">
+        <div v-if="spans.length" class="grid grid-cols-[repeat(auto-fill,minmax(max(6rem,calc((100%-1.5rem)/4)),1fr))] gap-2 rounded-md bg-muted/30 p-2">
           <div><div class="text-xs text-muted">{{ t('trace.input') }}</div><div class="tabular-nums">{{ usageNumber('inputTokens') }}</div></div>
           <div><div class="text-xs text-muted">{{ t('trace.output') }}</div><div class="tabular-nums">{{ usageNumber('outputTokens') }}</div></div>
           <div><div class="text-xs text-muted">{{ t('trace.cacheRead') }}</div><div class="tabular-nums">{{ usageNumber('cacheReadTokens') }}</div></div>
@@ -260,18 +260,20 @@ function* journalEvents(journal: GenerationSnapshot['journal'], start = 0): Iter
             <span>{{ t('trace.timeline') }}</span>
             <span>0 ms – {{ formatDuration(timeline.end - timeline.start) }}</span>
           </div>
+          <p v-if="!rowSpans.length" class="px-2 py-1 text-muted" role="listitem">{{ t('trace.noSteps') }}</p>
           <details v-for="{ span, depth } in rowSpans" :key="span.spanId" class="border-l border-default py-1 pl-2" :style="{ marginLeft: `${Math.min(depth, 8) * 12}px` }">
             <summary class="flex cursor-pointer list-none items-center gap-2 rounded px-2 py-1 hover:bg-muted/40">
               <UIcon :name="STATUS_ICONS[traceDisplayStatus(span, runStatus)].name" class="size-3.5 shrink-0" :class="STATUS_ICONS[traceDisplayStatus(span, runStatus)].color" aria-hidden="true" />
               <span class="sr-only">{{ t(`trace.status.${traceDisplayStatus(span, runStatus)}`) }}</span>
-              <span class="text-xs text-muted">{{ spanLabel(span.kind) }}</span>
-              <span class="min-w-0 flex-1 truncate">{{ span.name }}</span>
-              <span class="relative hidden h-3 w-28 shrink-0 overflow-hidden rounded bg-muted/40 sm:block" :title="`${t('trace.started')}: +${formatDuration(span.startedAt - timeline.start)}`">
+              <span class="shrink-0 whitespace-nowrap text-xs text-muted">{{ spanLabel(span.kind) }}</span>
+              <span class="min-w-12 flex-1 truncate">{{ span.name }}</span>
+              <span class="relative hidden h-3 w-28 overflow-hidden rounded bg-muted/40 sm:block" :title="`${t('trace.started')}: +${formatDuration(span.startedAt - timeline.start)}`">
                 <span data-trace-bar class="absolute inset-y-0 min-w-px rounded bg-primary" :style="barStyle(span)" />
               </span>
               <span class="shrink-0 text-xs text-muted tabular-nums">{{ duration(span) }}</span>
             </summary>
-            <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 px-2 py-2 text-xs text-muted">
+            <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 px-2 py-2 text-xs text-muted wrap-anywhere">
+              <dt v-if="span.name">{{ t('trace.name') }}</dt><dd v-if="span.name">{{ span.name }}</dd>
               <template v-if="mode === 'full'">
                 <dt>{{ t('trace.traceId') }}</dt><dd class="break-all">{{ span.traceId }}</dd>
                 <dt>{{ t('trace.spanId') }}</dt><dd class="break-all">{{ span.spanId }}</dd>
