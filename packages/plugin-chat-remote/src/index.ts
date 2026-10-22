@@ -1,7 +1,7 @@
 import { ChatMessageAssembly } from '@keundal/chat/chat-message'
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
-import { validateChatTitle } from '@keundal/chat/chat-store'
+import { branchChat, validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
@@ -212,6 +212,20 @@ export class RemoteChatStore implements ChatStoreLike {
   async rename(id: string, title: string) {
     title = validateChatTitle(title)
     await this.update(id, (chat) => ({ ...chat, title }))
+  }
+
+  /** 기존 `GET`·`PUT /threads/:id`만 사용합니다. 원래 대화는 읽기만 하고 새 대화는 한 번의 `PUT`으로 저장합니다. */
+  async branch(sourceId: string, messageId: string, newId: string): Promise<LocalChat> {
+    const source = await this.get(sourceId)
+    if (!source) throw new Error('Chat not found')
+    const existing = await this.raw(`/threads/${encodeURIComponent(newId)}`)
+    if (existing.status !== 404) {
+      if (existing.ok) throw new Error('Chat already exists')
+      throw new Error(`Keundal host request failed (HTTP ${existing.status})`)
+    }
+    const chat = branchChat(source, messageId, newId, new Date().toISOString())
+    await this.save(undefined, chat)
+    return chat
   }
 
   async truncate(id: string, messageId: string, type: 'edit' | 'regenerate') {

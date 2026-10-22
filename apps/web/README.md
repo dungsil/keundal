@@ -89,6 +89,7 @@ pnpm --filter @keundal/web preview
 - `session.commit()`은 기본적으로 메시지를 병합합니다. 편집·재생성처럼 뒤의 메시지를 제거할 때는 `mode: 'replace'`로 전체 배열(빈 배열 포함)을 교체합니다. revision 검사는 동일합니다.
 - `session.delete(threadId, expectedRevision)`는 스레드·관련 실행·journal을 원자적으로 삭제합니다. 실행 중이면 거부하므로 호출자가 먼저 중단해야 합니다. 영구 tombstone은 남기지 않습니다.
 - 신규 저장소 구현도 위 계약을 구현해야 합니다. 기존 `commit()` 호출의 병합 동작은 달라지지 않습니다.
+- 대화 분기는 `session.get()`으로 원래 대화를 읽고 새 `threadId`에 `session.commit()` 한 번으로 저장합니다. 새 호스트 라우트나 스키마 변경은 없으며 원격 호스트에서는 기존 `GET`·`PUT /threads/:id`를 씁니다. 복사 규칙은 [대화 분기](../../docs/chat-branch.md)를 따릅니다.
 
 ## 표시 언어
 

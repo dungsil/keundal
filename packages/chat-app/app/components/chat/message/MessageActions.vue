@@ -27,6 +27,7 @@ const formattedDate = computed(() => {
 const emit = defineEmits<{
   edit: [message: ChatMessage]
   regenerate: [message: ChatMessage]
+  branch: [message: ChatMessage]
   vote: [message: ChatMessage, isUpvoted: boolean]
 }>()
 
@@ -103,6 +104,18 @@ function copy() {
         @click="emit('regenerate', message)"
       />
     </UTooltip>
+
+    <UTooltip :text="t('chat.branch')">
+      <UButton
+        size="sm"
+        color="neutral"
+        variant="ghost"
+        icon="i-lucide-git-branch"
+        :aria-label="t('chat.branch')"
+        :data-message-branch="message.id"
+        @click="emit('branch', message)"
+      />
+    </UTooltip>
   </template>
 
   <template v-if="message.role === 'user' && !streaming && !editing">
@@ -121,6 +134,18 @@ function copy() {
         :aria-label="t('chat.editMessage')"
         :data-message-edit="message.id"
         @click="emit('edit', message)"
+      />
+    </UTooltip>
+
+    <UTooltip :text="t('chat.branch')">
+      <UButton
+        size="sm"
+        color="neutral"
+        variant="ghost"
+        icon="i-lucide-git-branch"
+        :aria-label="t('chat.branch')"
+        :data-message-branch="message.id"
+        @click="emit('branch', message)"
       />
     </UTooltip>
   </template>

@@ -7,6 +7,11 @@ export interface ChatStoreLike {
   create(id: string, message: ChatMessage, model: string): Promise<LocalChat>
   rename(id: string, title: string): Promise<void>
   truncate(id: string, messageId: string, type: 'edit' | 'regenerate'): Promise<void>
+  /**
+   * 선택한 사용자·어시스턴트 메시지까지 복사한 새 대화를 `newId`로 만들고 돌려줍니다. 원래 대화는
+   * 바꾸지 않으며 실행 중에도 호출할 수 있습니다. 복사 규칙은 `branchChat()`을 따릅니다.
+   */
+  branch(sourceId: string, messageId: string, newId: string): Promise<LocalChat>
   vote(id: string, messageId: string, isUpvoted?: boolean): Promise<void>
   delete(id: string): Promise<void>
   getRun(runId: string, options?: ExecutionOptions): Promise<GenerationSnapshot | undefined>
@@ -57,6 +62,46 @@ export interface LocalChat {
   queue?: ChatMessage[]
   isOwner: true
   visibility: 'private'
+}
+
+/**
+ * 대화를 `messageId`까지 복사한 새 대화를 만듭니다. 원래 대화는 읽기만 하며 두 저장소 구현이 같은
+ * 규칙을 쓰도록 이 함수 하나에 둡니다.
+ *
+ * - 메시지: 선택한 메시지를 포함해 앞쪽을 깊은 복사합니다. 선택한 메시지 바로 뒤에 이어지는 지시
+ *   메시지(`metadata.steeredRunId`)는 앞선 어시스턴트 응답에 속하므로 함께 복사합니다. 어시스턴트 기록에
+ *   이미 그 지시가 들어 있어 떼어 놓으면 화면과 모델 입력이 어긋납니다.
+ * - 어시스턴트 메시지 `id`: 그대로 둡니다. 이 `id`가 원래 실행의 `runId`이므로 실행 추적 패널은
+ *   원래 대화가 남아 있는 동안 원래 실행의 기록을 보여 주고, 원래 대화를 지운 뒤에는 `getRun()`이
+ *   `undefined`를 돌려주어 기록 없음으로 표시합니다. journal은 복제하지 않습니다.
+ * - 투표: 복사한 메시지에 달린 투표만 `chatId`를 새 대화로 바꿔 유지합니다.
+ * - `pendingRunId`와 `queue`: 복사하지 않습니다. 진행 중인 실행과 대기 메시지는 원래 대화의 것입니다.
+ * - 제목: 그대로 복사합니다. 제목이 없으면 첫 응답 때 새로 만듭니다.
+ * - `createdAt`: 분기한 시각입니다. 목록은 최신 대화를 앞에 두므로 분기한 대화가 맨 위에 옵니다.
+ * - `started`: 항상 `true`입니다. 대화를 열 때 응답이 자동으로 시작되지 않게 합니다.
+ *
+ * 선택한 메시지가 없거나 사용자·어시스턴트 메시지가 아니면 거부합니다.
+ */
+export function branchChat(source: LocalChat, messageId: string, id: string, createdAt: string): LocalChat {
+  const index = source.messages.findIndex((message) => message.id === messageId)
+  const chosen = source.messages[index]
+  if (!chosen || (chosen.role !== 'user' && chosen.role !== 'assistant')) throw new Error('Invalid message')
+  let end = index + 1
+  while (source.messages[end]?.metadata?.steeredRunId) end++
+  const messages = structuredClone(source.messages.slice(0, end))
+  return {
+    id,
+    title: source.title,
+    createdAt,
+    messages,
+    votes: source.votes
+      .filter((vote) => messages.some((message) => message.id === vote.messageId))
+      .map((vote) => ({ ...vote, chatId: id })),
+    model: source.model,
+    started: true,
+    isOwner: true,
+    visibility: 'private'
+  }
 }
 
 /** Manual and generated titles share the same durable display contract. */
