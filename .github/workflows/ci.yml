@@ -36,6 +36,9 @@ jobs:
       source: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.source == 'true' }}
       web: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.web == 'true' }}
       desktop: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.desktop == 'true' }}
+      # 설치 파일은 PR 프리뷰와 수동 실행에만 쓰이므로 push에서는 만들지 않는다.
+      # 운영 배포는 웹 아티팩트만 사용하고, push 실행은 게시할 설치 파일이 없다.
+      installers: ${{ github.event_name != 'push' && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.desktop == 'true') }}
     steps:
       - name: 저장소 가져오기
         if: github.event_name != 'pull_request' && github.event_name != 'workflow_dispatch'
@@ -100,7 +103,7 @@ jobs:
         uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: ${{ needs.changes.outputs.web != 'true' && (needs.changes.outputs.desktop != 'true' && 'build-web,build-platforms' || 'build-web') || (needs.changes.outputs.desktop != 'true' && 'build-platforms' || '') }}
+          allowed-skips: ${{ needs.changes.outputs.web != 'true' && (needs.changes.outputs.installers != 'true' && 'build-web,build-platforms' || 'build-web') || (needs.changes.outputs.installers != 'true' && 'build-platforms' || '') }}
 
   build-web:
     needs: changes
@@ -166,7 +169,7 @@ jobs:
 
   build-platforms:
     needs: changes
-    if: needs.changes.outputs.desktop == 'true'
+    if: needs.changes.outputs.installers == 'true'
     name: 빌드 (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -272,7 +275,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Portable smoke test failed' }
 
       - name: 데스크톱 배포 파일 업로드
-        if: github.event_name != 'push'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-${{ matrix.name }}
