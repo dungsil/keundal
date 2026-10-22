@@ -16,8 +16,29 @@ function report(score, overrides = {}) {
   }
 }
 
-test('낮은 점수도 실패하지 않고 세 측정값의 중앙값을 표시한다', () => {
-  assert.match(summarize([report(0.9), report(0.1), report(0.2)], collect), /\| \/settings \| 20 \| 20 \| 20 \| 20 \|/)
+test('세 측정값의 중앙값을 표시하고 70점 이하인 항목을 병합 차단 사유로 반환한다', () => {
+  const { markdown, failures } = summarize([report(0.9), report(0.1), report(0.2)], collect)
+  assert.match(markdown, /\| \/settings \| 20 \| 20 \| 20 \| 20 \|/)
+  assert.match(markdown, /병합을 차단합니다/)
+  assert.deepEqual(failures, [
+    '/settings의 성능 20점',
+    '/settings의 접근성 20점',
+    '/settings의 권장사항 20점',
+    '/settings의 SEO 20점'
+  ])
+})
+
+test('중앙값이 70점이면 차단하고 71점이면 통과한다', () => {
+  const scores = (performance) => ({
+    performance: { score: performance },
+    accessibility: { score: 1 },
+    'best-practices': { score: 1 },
+    seo: { score: 1 }
+  })
+  const atLimit = [0.7, 0.7, 0.7].map((score) => report(1, { categories: scores(score) }))
+  assert.deepEqual(summarize(atLimit, collect).failures, ['/settings의 성능 70점'])
+  const aboveLimit = [0.71, 0.71, 0.71].map((score) => report(1, { categories: scores(score) }))
+  assert.deepEqual(summarize(aboveLimit, collect).failures, [])
 })
 
 test('측정 누락과 점수 누락을 성공한 결과로 표시하지 않는다', () => {

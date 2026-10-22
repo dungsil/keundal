@@ -159,12 +159,19 @@ async function save(forget = false) {
         {{ t('llm.noProviders') }}
       </p>
       <ul v-else class="space-y-2" :aria-label="t('llm.registeredProviders')">
-        <li v-for="item in providers" :key="item.id">
+        <li
+          v-for="item in providers"
+          :key="item.id"
+          class="rounded-lg border"
+          :class="provider === item.id ? 'border-primary' : 'border-default'"
+        >
           <button
+            :id="`llm-provider-${item.id}`"
             type="button"
-            class="flex w-full items-center justify-between rounded-lg border p-4 text-left"
-            :class="provider === item.id ? 'border-primary bg-primary/5' : 'border-default'"
+            class="flex w-full items-center justify-between rounded-lg p-4 text-left"
+            :class="provider === item.id ? 'rounded-b-none bg-primary/5' : ''"
             :aria-expanded="provider === item.id"
+            :aria-controls="provider === item.id ? 'llm-settings' : undefined"
             :disabled="!mounted || saving"
             @click="provider = provider === item.id ? '' : item.id"
           >
@@ -174,6 +181,129 @@ async function save(forget = false) {
             </span>
             <UIcon name="i-lucide-chevron-down" :class="provider === item.id ? 'rotate-180' : ''" />
           </button>
+          <form
+            v-if="provider === item.id && current"
+            id="llm-settings"
+            class="flex flex-col gap-5 border-t border-default p-4"
+            :aria-labelledby="`llm-provider-${item.id}`"
+            @submit.prevent="save()"
+          >
+            <UFormField :label="t('llm.providerName')" name="providerName">
+              <UInput
+                v-model="currentDraft.name"
+                :placeholder="current.label"
+                :maxlength="100"
+                :disabled="!mounted || saving"
+                class="w-full"
+              />
+            </UFormField>
+            <p class="text-sm text-muted">
+              {{ t('llm.modelsDescription') }}
+            </p>
+            <UFormField :label="t('llm.apiKey')" name="apiKey">
+              <UInput
+                v-model="currentDraft.apiKey"
+                type="password"
+                autocomplete="off"
+                autocapitalize="off"
+                :spellcheck="false"
+                :placeholder="t('llm.apiKeyPlaceholder')"
+                class="w-full"
+                :disabled="!mounted || saving"
+              />
+            </UFormField>
+            <UFormField :label="t('llm.baseURL')" name="baseURL" :description="t('llm.baseURLDescription')">
+              <UInput
+                v-model="currentDraft.baseURL"
+                :placeholder="current.baseURL"
+                type="url"
+                autocomplete="off"
+                class="w-full"
+                :disabled="!mounted || saving"
+              />
+            </UFormField>
+            <fieldset class="space-y-3">
+              <legend class="text-sm font-medium text-highlighted">
+                {{ t('llm.headers') }}
+              </legend>
+              <p class="text-sm text-muted">
+                {{ t('llm.headersDescription') }}
+              </p>
+              <div v-for="(row, index) in currentHeaders" :key="row.id" class="flex items-start gap-2">
+                <UInput
+                  :id="row.id"
+                  v-model="row.key"
+                  :aria-label="t('llm.headerKey', { index: index + 1 })"
+                  :placeholder="t('common.key')"
+                  autocomplete="off"
+                  autocapitalize="off"
+                  :spellcheck="false"
+                  class="min-w-0 flex-1"
+                  :disabled="!mounted || saving"
+                />
+                <UInput
+                  v-model="row.value"
+                  :aria-label="t('llm.headerValue', { index: index + 1 })"
+                  :placeholder="t('common.value')"
+                  autocomplete="off"
+                  autocapitalize="off"
+                  :spellcheck="false"
+                  class="min-w-0 flex-1"
+                  :disabled="!mounted || saving"
+                />
+                <UButton
+                  type="button"
+                  icon="i-lucide-trash-2"
+                  :aria-label="t('llm.removeHeader', { index: index + 1 })"
+                  color="neutral"
+                  variant="ghost"
+                  :disabled="!mounted || saving"
+                  @click="currentHeaders.splice(index, 1)"
+                />
+              </div>
+              <UButton
+                type="button"
+                :label="t('llm.addHeader')"
+                icon="i-lucide-plus"
+                color="neutral"
+                variant="outline"
+                :disabled="!mounted || saving"
+                @click="addHeader"
+              />
+            </fieldset>
+            <UAlert
+              :icon="secureSettings ? 'i-lucide-shield-check' : 'i-lucide-shield-alert'"
+              color="neutral"
+              variant="subtle"
+              :title="secureSettings ? t('llm.protectedOS') : t('llm.browserWarning')"
+              :description="secureSettings ? t('llm.storageOS') : t('llm.storageBrowser')"
+            />
+            <div class="flex flex-wrap items-center justify-between gap-3 w-full">
+              <p v-if="error" role="alert" class="w-full text-sm text-error">
+                {{ error }}
+              </p>
+              <UButton
+                type="button"
+                :label="t('llm.forget')"
+                color="error"
+                variant="ghost"
+                :disabled="
+                  saving
+                    || (!provider.includes('@')
+                      && !settings[provider]?.name
+                      && !settings[provider]?.apiKey
+                      && !settings[provider]?.baseURL
+                      && !Object.keys(settings[provider]?.headers ?? {}).length)
+                "
+                @click="save(true)"
+              />
+              <UButton
+                :label="secureSettings ? t('llm.saveOS') : t('llm.saveBrowser')"
+                type="submit"
+                :loading="saving"
+              />
+            </div>
+          </form>
         </li>
       </ul>
       <UButton
@@ -217,132 +347,5 @@ async function save(forget = false) {
         </form>
       </template>
     </UModal>
-    <form
-      v-if="current"
-      id="llm-settings"
-      class="flex flex-col gap-5"
-      @submit.prevent="save()"
-    >
-      <h3 class="font-semibold text-highlighted">
-        {{ current.label }}
-      </h3>
-      <UFormField :label="t('llm.providerName')" name="providerName">
-        <UInput
-          v-model="currentDraft.name"
-          :placeholder="current.label"
-          :maxlength="100"
-          :disabled="!mounted || saving"
-          class="w-full"
-        />
-      </UFormField>
-      <p class="text-sm text-muted">
-        {{ t('llm.modelsDescription') }}
-      </p>
-      <UFormField :label="t('llm.apiKey')" name="apiKey">
-        <UInput
-          v-model="currentDraft.apiKey"
-          type="password"
-          autocomplete="off"
-          autocapitalize="off"
-          :spellcheck="false"
-          :placeholder="t('llm.apiKeyPlaceholder')"
-          class="w-full"
-          :disabled="!mounted || saving"
-        />
-      </UFormField>
-      <UFormField :label="t('llm.baseURL')" name="baseURL" :description="t('llm.baseURLDescription')">
-        <UInput
-          v-model="currentDraft.baseURL"
-          :placeholder="current.baseURL"
-          type="url"
-          autocomplete="off"
-          class="w-full"
-          :disabled="!mounted || saving"
-        />
-      </UFormField>
-      <fieldset class="space-y-3">
-        <legend class="text-sm font-medium text-highlighted">
-          {{ t('llm.headers') }}
-        </legend>
-        <p class="text-sm text-muted">
-          {{ t('llm.headersDescription') }}
-        </p>
-        <div v-for="(row, index) in currentHeaders" :key="row.id" class="flex items-start gap-2">
-          <UInput
-            :id="row.id"
-            v-model="row.key"
-            :aria-label="t('llm.headerKey', { index: index + 1 })"
-            :placeholder="t('common.key')"
-            autocomplete="off"
-            autocapitalize="off"
-            :spellcheck="false"
-            class="min-w-0 flex-1"
-            :disabled="!mounted || saving"
-          />
-          <UInput
-            v-model="row.value"
-            :aria-label="t('llm.headerValue', { index: index + 1 })"
-            :placeholder="t('common.value')"
-            autocomplete="off"
-            autocapitalize="off"
-            :spellcheck="false"
-            class="min-w-0 flex-1"
-            :disabled="!mounted || saving"
-          />
-          <UButton
-            type="button"
-            icon="i-lucide-trash-2"
-            :aria-label="t('llm.removeHeader', { index: index + 1 })"
-            color="neutral"
-            variant="ghost"
-            :disabled="!mounted || saving"
-            @click="currentHeaders.splice(index, 1)"
-          />
-        </div>
-        <UButton
-          type="button"
-          :label="t('llm.addHeader')"
-          icon="i-lucide-plus"
-          color="neutral"
-          variant="outline"
-          :disabled="!mounted || saving"
-          @click="addHeader"
-        />
-      </fieldset>
-      <UAlert
-        :icon="secureSettings ? 'i-lucide-shield-check' : 'i-lucide-shield-alert'"
-        color="neutral"
-        variant="subtle"
-        :title="secureSettings ? t('llm.protectedOS') : t('llm.browserWarning')"
-        :description="secureSettings ? t('llm.storageOS') : t('llm.storageBrowser')"
-      />
-    </form>
-    <div class="flex flex-wrap items-center justify-between gap-3 w-full">
-      <p v-if="error" role="alert" class="w-full text-sm text-error">
-        {{ error }}
-      </p>
-      <UButton
-        v-if="current"
-        :label="t('llm.forget')"
-        color="error"
-        variant="ghost"
-        :disabled="
-          saving
-            || (!provider.includes('@')
-              && !settings[provider]?.name
-              && !settings[provider]?.apiKey
-              && !settings[provider]?.baseURL
-              && !Object.keys(settings[provider]?.headers ?? {}).length)
-        "
-        @click="save(true)"
-      />
-      <UButton
-        v-if="current"
-        :label="secureSettings ? t('llm.saveOS') : t('llm.saveBrowser')"
-        type="submit"
-        form="llm-settings"
-        :loading="saving"
-      />
-    </div>
   </section>
 </template>
