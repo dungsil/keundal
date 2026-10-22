@@ -65,7 +65,7 @@ const formatValue = (value: string | number | undefined): string => {
     <div v-if="invocation.output.title" class="flex items-center gap-2 mb-2">
       <UIcon name="i-lucide-line-chart" class="size-5 text-primary shrink-0" />
       <div class="min-w-0">
-        <h3 class="text-lg font-semibold truncate">
+        <h3 class="text-lg font-semibold leading-normal [overflow-wrap:anywhere]">
           {{ invocation.output.title }}
         </h3>
       </div>

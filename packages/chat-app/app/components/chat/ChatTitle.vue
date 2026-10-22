@@ -16,6 +16,7 @@ const emit = defineEmits<{
 const { renameChat, deleteChat } = useChatActions()
 
 const displayTitle = computed(() => props.title || t('chat.untitled'))
+const popoverContent = computed(() => ({ align: 'start' as const, 'aria-label': displayTitle.value }))
 
 async function rename() {
   const newTitle = await renameChat(props.chatId, props.title)
@@ -42,9 +43,24 @@ const items = computed<DropdownMenuItem[][]>(() => [
 </script>
 
 <template>
-  <span v-if="!isOwner" class="text-sm font-medium text-highlighted truncate min-w-0 max-w-3xs">
-    {{ displayTitle }}
-  </span>
+  <UPopover
+    v-if="!isOwner"
+    :content="popoverContent"
+    :ui="{ content: 'max-w-[min(24rem,calc(100vw-2rem))] p-3' }"
+  >
+    <UButton
+      color="neutral"
+      variant="ghost"
+      trailing-icon="i-lucide-chevron-down"
+      :label="displayTitle"
+      class="min-w-0 max-w-3xs"
+      :ui="{ label: 'truncate' }"
+    />
+
+    <template #content>
+      <p class="text-sm leading-normal whitespace-pre-wrap [overflow-wrap:anywhere]">{{ displayTitle }}</p>
+    </template>
+  </UPopover>
 
   <UDropdownMenu
     v-else
