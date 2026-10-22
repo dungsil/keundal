@@ -34,6 +34,12 @@
 }
 
 :root {
+  /* UI 전체를 1.25배로 확대한다. Tailwind v4와 Nuxt UI v4의 크기 토큰이 모두 rem 기반이라
+     루트 글꼴 크기만 키우면 글자 크기와 여백, 아이콘, 컨트롤 높이가 함께 1.25배가 된다.
+     브라우저 기본 글꼴 크기에 대한 비율이라 사용자의 기본 글꼴 크기 설정도 그대로 반영된다. */
+  --ui-scale: 1.25;
+  font-size: calc(100% * var(--ui-scale));
+
   --ui-primary: var(--ui-color-primary-600);
   --ui-container: var(--container-3xl);
 }
