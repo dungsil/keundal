@@ -101,7 +101,7 @@ const quickChats = computed(() => [
       <div ref="dropzoneRef" class="flex flex-1">
         <DragDropOverlay :show="dragging" />
 
-        <UContainer class="flex-1 flex flex-col justify-center gap-4 sm:gap-6 py-8">
+        <UContainer class="flex-1 flex flex-col justify-center gap-4 sm:gap-6 pt-(--ui-header-height) pb-8">
           <h1 class="text-3xl sm:text-4xl text-highlighted font-bold">
             <span data-greeting="morning">{{ t('greeting.morning') }}</span>
             <span data-greeting="afternoon">{{ t('greeting.afternoon') }}</span>

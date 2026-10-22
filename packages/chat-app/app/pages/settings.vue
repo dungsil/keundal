@@ -30,15 +30,17 @@ useHead(() => ({ title: t('settings.title') }))
     <template #header>
       <Navbar>
         <template #title>
-          <h1 class="text-lg font-semibold text-highlighted">
-            {{ t('settings.title') }}
-          </h1>
+          <div class="w-full max-w-6xl">
+            <h1 class="text-lg font-semibold text-highlighted">
+              {{ t('settings.title') }}
+            </h1>
+          </div>
         </template>
       </Navbar>
     </template>
 
     <template #body>
-      <UContainer class="w-full max-w-6xl py-6 sm:py-8">
+      <UContainer class="w-full max-w-6xl pt-(--ui-header-height) pb-6 sm:pb-8">
         <UButton
           :label="t('settings.back')"
           :to="returnTo"
@@ -50,7 +52,7 @@ useHead(() => ({ title: t('settings.title') }))
         <div class="flex flex-col gap-8 md:flex-row md:gap-10 lg:gap-14">
           <nav
             :aria-label="t('settings.title')"
-            class="flex shrink-0 flex-col gap-4 border-b border-default pb-4 md:sticky md:top-0 md:w-48 md:self-start md:border-0 md:pb-0"
+            class="flex shrink-0 flex-col gap-4 border-b border-default pb-4 md:sticky md:top-(--ui-header-height) md:w-48 md:self-start md:border-0 md:pb-0"
           >
             <div class="flex gap-1 overflow-x-auto md:flex-col">
               <UButton

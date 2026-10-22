@@ -201,7 +201,7 @@ function appendTranscript(text: string) {
       aria-autocomplete="list"
       color="neutral"
       variant="subtle"
-      :ui="{ base: ['px-1.5', dictation !== 'idle' && 'placeholder:italic'], footer: 'flex-wrap gap-y-2' }"
+      :ui="{ base: ['px-1.5', dictation !== 'idle' && 'placeholder:italic'], footer: 'gap-y-2' }"
       @focus="focused = true; updateCursor()"
       @click="updateCursor"
       @keyup="updateCursor"
@@ -215,7 +215,7 @@ function appendTranscript(text: string) {
       <template #footer>
         <ChatPromptMenu :open="open" />
 
-        <div class="flex min-w-0 flex-wrap items-center justify-end gap-1 ml-auto">
+        <div class="flex min-w-0 items-center justify-end gap-1 ms-auto">
           <ModelSelect />
           <ChatReasoningSelect />
 
