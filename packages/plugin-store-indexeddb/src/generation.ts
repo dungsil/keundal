@@ -2,6 +2,8 @@ import {
   EventType,
   StreamBudget,
   GenerationService,
+  JournalHub,
+  followJournal,
   type AGUIEvent,
   type ExecutionOptions,
   type GenerationJournalEntry,
@@ -9,6 +11,7 @@ import {
   type GenerationRequest,
   type GenerationSnapshot,
   type GenerationStatus,
+  type GenerationSubscriptionOptions,
   type TerminalGeneration
 } from '@keundal/core'
 import type { Context } from 'cordis'
@@ -40,6 +43,7 @@ export class IndexedDBGenerationService extends GenerationService {
   private readonly controllers = new Set<AbortController>()
   private readonly active = new Map<string, ActiveRun>()
   private readonly inFlight = new Set<Promise<unknown>>()
+  private readonly hub = new JournalHub()
   private closed = false
 
   constructor(
@@ -116,6 +120,26 @@ export class IndexedDBGenerationService extends GenerationService {
     return this.store.listRuns()
   }
 
+  subscribe(runId: string, options: GenerationSubscriptionOptions = {}): AsyncIterable<GenerationJournalEntry> {
+    this.assertOpen()
+    return followJournal(
+      {
+        read: async () => {
+          const snapshot = await this.store.getRun(runId)
+          if (!snapshot) throw new Error(`generation run not found: ${runId}`)
+          const active = this.active.get(runId)
+          return {
+            journal: active ? [...snapshot.journal, ...active.journal] : snapshot.journal,
+            done: snapshot.status !== 'running' && !active
+          }
+        },
+        listen: (listener) => this.hub.listen(runId, listener)
+      },
+      options.afterSequence ?? -1,
+      options.signal
+    )
+  }
+
   async recover(options?: ExecutionOptions): Promise<GenerationSnapshot[]> {
     this.assertOpen()
     const signal = options?.signal ?? new globalThis.AbortController().signal
@@ -127,6 +151,7 @@ export class IndexedDBGenerationService extends GenerationService {
         const latest = await this.store.getRun(run.request.input.runId)
         if (latest?.status === 'running') await this.store.markInterrupted(run.request.input.runId)
       })
+      this.hub.end(run.request.input.runId)
     }
     return this.store.listRuns()
   }
@@ -160,10 +185,12 @@ export class IndexedDBGenerationService extends GenerationService {
 
       // startRun이 nextSequence 0으로 등록하므로 0부터 부여합니다.
       let nextSequence = 0
-      const appendJournal = (event: AGUIEvent): void => {
+      const appendJournal = (event: AGUIEvent): GenerationJournalEntry => {
         if (!active) throw new Error('journal buffer requires an active run')
-        active.journal.push({ sequence: nextSequence++, event })
+        const entry = { sequence: nextSequence++, event }
+        active.journal.push(entry)
         active.journalDeadline ??= Date.now() + JOURNAL_BATCH_INTERVAL_MS
+        return entry
       }
       const shouldFlush = (): boolean =>
         active !== undefined &&
@@ -171,7 +198,7 @@ export class IndexedDBGenerationService extends GenerationService {
           (active.journalDeadline !== undefined && Date.now() >= active.journalDeadline))
 
       const started: AGUIEvent = { type: EventType.RUN_STARTED, threadId, runId }
-      recorder.record(started)
+      this.hub.publish(runId, recorder.record(started))
       appendJournal(started)
       await this.flush(active) // RUN_STARTED는 스트리밍 시작 전에 확정한다 (실행당 1회).
       if (this.closed) return
@@ -185,7 +212,7 @@ export class IndexedDBGenerationService extends GenerationService {
         signal.throwIfAborted()
         budget.accept(event)
         if (!this.isCurrent(runId, token)) return
-        recorder.record(event)
+        this.hub.publish(runId, recorder.record(event))
         appendJournal(event)
         if (shouldFlush()) await this.flush(active)
         if (this.closed || !this.isCurrent(runId, token)) return
@@ -201,6 +228,9 @@ export class IndexedDBGenerationService extends GenerationService {
         signal.throwIfAborted()
         return
       }
+      const snapshot = await this.track(this.store.getRun(runId))
+      const last = snapshot?.journal.at(-1)
+      if (last) this.hub.publish(runId, last)
       await this.releaseActive(runId, token)
       yield finished
     } catch (error) {
@@ -229,14 +259,12 @@ export class IndexedDBGenerationService extends GenerationService {
   private async flush(active: ActiveRun): Promise<void> {
     if (!active.journal.length) return
     if (active.journalFlush) return active.journalFlush
-    const entries = active.journal
-    active.journal = []
+    // 확정이 성공할 때까지 버퍼에 남겨 두어, 진행 중인 쓰기 동안에도 journal이 끊기지 않게 합니다.
+    const entries = [...active.journal]
     active.journalDeadline = undefined
     const flush = this.track(
-      this.store.appendEvents(active.request.input.runId, entries).catch((error) => {
-        // 실패한 배치를 버퍼 맨 앞에 되돌려 다음 확정에서 재시도합니다. 되돌리지 않으면 journal에 구멍이 생깁니다.
-        active.journal.unshift(...entries)
-        throw error
+      this.store.appendEvents(active.request.input.runId, entries).then(() => {
+        active.journal.splice(0, entries.length)
       })
     ).finally(() => {
       active.journalFlush = undefined
@@ -293,15 +321,16 @@ export class IndexedDBGenerationService extends GenerationService {
     this.closed = true
     for (const controller of this.controllers) controller.abort(new Error('indexeddb generation service disposed'))
     await Promise.all([...this.inFlight].map((operation) => operation.catch(() => {})))
-    const active = [...this.active.values()]
+    const active = [...this.active.entries()]
     await Promise.all(
-      active.map(async (run) => {
+      active.map(async ([runId, run]) => {
         // 저장소가 닫히기 전에 대기 항목을 확정하려 하되, 이미 닫혔다면 기존 해제 태도대로 무시합니다.
         await this.drain(run).catch(() => {})
         await run.finalizing?.catch(() => {})
         try {
           await run.release()
         } finally {
+          this.hub.end(runId)
           run.cleanup()
         }
       })
@@ -317,6 +346,7 @@ export class IndexedDBGenerationService extends GenerationService {
     const active = this.active.get(runId)
     if (!active || active.token !== token) return
     this.active.delete(runId)
+    this.hub.end(runId)
     try {
       await active.release()
     } finally {

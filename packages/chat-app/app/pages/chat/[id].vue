@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@keundal/chat/chat-message'
+import type { DeliveryMode } from '../../composables/useKeundalChat'
 
 const { t } = useLocale()
 
@@ -38,9 +39,11 @@ const {
 const votes = ref<NonNullable<typeof data.value>['votes']>([])
 
 const input = useState(`chat-input-${route.params.id}`, () => '')
+const delivery = ref<DeliveryMode>('queue')
+const chatId = route.params.id as string
 
-const { messages, status, error, sendMessage, regenerate, stop } = useKeundalChat({
-  respond: (messages, onMessage, signal) => $chatStore.respond(route.params.id as string, {
+const { messages, queue, status, error, sendMessage, regenerate, stop, resumeQueue, removeQueued } = useKeundalChat({
+  respond: (messages, onMessage, signal) => $chatStore.respond(chatId, {
     messages, model: model.value, titleModel: titleModel.value || undefined, webSearch: webSearch.value, reasoning: reasoning.value,
     onMessage,
     onTitle: (value) => {
@@ -48,6 +51,10 @@ const { messages, status, error, sendMessage, regenerate, stop } = useKeundalCha
       void refreshNuxtData('chats')
     }
   }, signal),
+  steer: message => $chatStore.steer(chatId, message),
+  enqueue: message => $chatStore.enqueue(chatId, message),
+  dequeue: messageId => $chatStore.dequeue(chatId, messageId),
+  load: () => $chatStore.get(chatId),
   onFinish: async () => {
     await refreshNuxtData('chats')
   },
@@ -75,14 +82,27 @@ async function handleSubmit(e: Event) {
   e.preventDefault()
   if (input.value.trim() && !uploading.value) {
     if (!ensureConfigured(model.value)) return
-    sendMessage({
-      text: input.value,
-      files: uploadedFiles.value.length > 0 ? uploadedFiles.value : undefined
-    })
+    const text = input.value
+    const attachments = uploadedFiles.value.length > 0 ? uploadedFiles.value : undefined
     input.value = ''
     clearFiles()
+    try {
+      await sendMessage({ text, files: attachments, mode: delivery.value })
+    } catch {
+      toast.add({ description: t('chat.queueFailed'), icon: 'i-lucide-alert-circle', color: 'error' })
+    }
   }
 }
+
+async function removeQueuedMessage(messageId: string) {
+  try {
+    await removeQueued(messageId)
+  } catch {
+    toast.add({ description: t('chat.queueFailed'), icon: 'i-lucide-alert-circle', color: 'error' })
+  }
+}
+
+const running = computed(() => status.value === 'submitted' || status.value === 'streaming')
 
 const editingMessageId = ref<string | null>(null)
 
@@ -151,6 +171,7 @@ watch(data, async (chat) => {
   initialized = true
   visibility.value = chat.visibility
   messages.value = chat.messages
+  queue.value = chat.queue ?? []
   votes.value = chat.votes
   if (!chat.started && chat.messages.length === 1) await regenerate()
 }, { immediate: true })
@@ -242,20 +263,29 @@ onBeforeUnmount(() => {
             </template>
           </UChatMessages>
 
-          <ChatPrompt
-            v-if="isOwner"
-            v-model="input"
-            :status="status"
-            :error="error"
-            :files="files"
-            :uploading="uploading"
-            :open="open"
-            class="sticky bottom-0 [view-transition-name:chat-prompt] rounded-b-none z-10"
-            @submit="handleSubmit"
-            @stop="stop()"
-            @reload="regenerate()"
-            @remove="removeFile"
-          />
+          <div v-if="isOwner" class="sticky bottom-0 z-10 flex flex-col gap-2 [view-transition-name:chat-prompt]">
+            <ChatQueue
+              :queue="queue"
+              :paused="!running"
+              :browser-only="$chatStore.execution === 'browser'"
+              @remove="removeQueuedMessage"
+              @resume="resumeQueue()"
+            />
+            <ChatPrompt
+              v-model="input"
+              v-model:delivery="delivery"
+              :status="status"
+              :error="error"
+              :files="files"
+              :uploading="uploading"
+              :open="open"
+              class="rounded-b-none"
+              @submit="handleSubmit"
+              @stop="stop()"
+              @reload="regenerate()"
+              @remove="removeFile"
+            />
+          </div>
         </UContainer>
       </div>
     </template>

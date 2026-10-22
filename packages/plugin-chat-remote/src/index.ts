@@ -5,7 +5,15 @@ import { validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
-import { type Reasoning, EventType, type AGUIEvent, type GenerationSnapshot, type SessionSnapshot } from '@keundal/core'
+import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
+import {
+  type Reasoning,
+  EventType,
+  parseAGUIEvent,
+  type AGUIEvent,
+  type GenerationSnapshot,
+  type SessionSnapshot
+} from '@keundal/core'
 
 type ChatState = { web: LocalChat }
 
@@ -23,6 +31,15 @@ interface RemoteModel {
 
 const randomUUID = () => globalThis.crypto.randomUUID()
 
+/** 스트림이 끊긴 뒤 같은 실행을 다시 구독하는 최대 연속 시도 수입니다. */
+const MAX_RECONNECT_ATTEMPTS = 3
+
+/** SSE 프레임입니다. journal 이벤트는 sequence를 id로 가지며, 종료 오류는 id가 없습니다. */
+interface StreamFrame {
+  readonly id?: number
+  readonly event: AGUIEvent
+}
+
 const instructions = (
   webSearch: boolean
 ) => `You are a knowledgeable and helpful AI assistant. Be clear, accurate and concise.
@@ -31,7 +48,20 @@ ${webSearch ? 'Use native web search when current information is needed and cite
 
 /** Keundal HTTP 호스트에 대화·실행을 맡기는 클라이언트 저장소입니다. */
 export class RemoteChatStore implements ChatStoreLike {
-  private readonly active = new Map<string, { abort: AbortController; done: Promise<void> }>()
+  /** 실행은 호스트가 소유하므로 연결이 끊겨도 계속되고, journal 커서로 다시 구독합니다. */
+  readonly execution = 'host'
+  private readonly runs = new ChatRuns({
+    read: (id) => this.get(id),
+    write: async (id, change) => {
+      const snapshot = this.snapshot(await (await this.call(`/threads/${encodeURIComponent(id)}`)).json())
+      const chat = this.chat(snapshot)
+      if (!chat) throw new Error('Chat not found')
+      const next = change(chat)
+      await this.save(snapshot, next)
+      return next
+    }
+  })
+  private readonly active = this.runs.active
   private modelsCache: RemoteModel[] | undefined
 
   constructor(
@@ -103,11 +133,36 @@ export class RemoteChatStore implements ChatStoreLike {
     return this.snapshot(await response.json())
   }
 
-  private async complete(id: string, runId: string, message: ChatMessage) {
+  private async complete(
+    id: string,
+    runId: string,
+    message: ChatMessage,
+    steered: ChatMessageAssembly['steered'],
+    active?: ActiveChatRun
+  ) {
     const snapshot = this.snapshot(await (await this.call(`/threads/${encodeURIComponent(id)}`)).json())
     const chat = this.chat(snapshot)
     if (!chat || chat.pendingRunId !== runId) throw new Error('Chat changed while the response was running')
-    await this.save(snapshot, { ...chat, messages: [...chat.messages, message], pendingRunId: undefined })
+    await this.save(snapshot, settleChatRun(chat, { runId, message, steered }, active))
+  }
+
+  enqueue(id: string, message: ChatMessage) {
+    return this.runs.enqueue(id, message)
+  }
+
+  dequeue(id: string, messageId: string) {
+    return this.runs.dequeue(id, messageId)
+  }
+
+  steer(id: string, message: ChatMessage) {
+    return this.runs.steer(id, message, async (run) => {
+      const chat = await this.get(id)
+      const response = await this.raw(`/runs/${encodeURIComponent(run.runId!)}/steer`, {
+        method: 'POST',
+        body: JSON.stringify({ messages: toMessages([message], chat?.model ?? '') })
+      })
+      return response.status === 202
+    })
   }
 
   async create(id: string, message: ChatMessage, model: string): Promise<LocalChat> {
@@ -241,14 +296,26 @@ export class RemoteChatStore implements ChatStoreLike {
     const combined = signal ? AbortSignal.any([signal, abort.signal]) : abort.signal
     let release!: () => void
     const done = new Promise<void>((resolve) => (release = resolve))
-    this.active.set(id, { abort, done })
+    const run = createActiveChatRun(abort, done)
+    this.active.set(id, run)
+    let settled = false
     try {
       combined.throwIfAborted()
       const snapshot = this.snapshot(await (await this.call(`/threads/${encodeURIComponent(id)}`)).json())
       const current = this.chat(snapshot)
       if (!current) throw new Error('Chat not found')
       const runId = randomUUID()
-      let chat = { ...current, messages: request.messages, model: request.model, started: true, pendingRunId: runId }
+      // 대기열에서 꺼낸 메시지는 대화에 넣는 같은 커밋에서 대기열에서 지워 중복 실행을 막습니다.
+      const sent = new Set(request.messages.map((message) => message.id))
+      const queue = (current.queue ?? []).filter((message) => !sent.has(message.id))
+      let chat: LocalChat = {
+        ...current,
+        messages: request.messages,
+        model: request.model,
+        started: true,
+        pendingRunId: runId,
+        queue: queue.length ? queue : undefined
+      }
       const saved = await this.save(snapshot, chat)
       if (!chat.title && chat.messages[0]) {
         try {
@@ -270,8 +337,17 @@ export class RemoteChatStore implements ChatStoreLike {
       const publisher = new ChatMessagePublisher(request.onMessage)
       let finished: Extract<AGUIEvent, { type: 'RUN_FINISHED' }> | undefined
       let failed = false
+      // 연결 종료는 호스트 실행을 멈추지 않으므로, 사용자의 중단은 명시적인 취소 요청으로 보냅니다.
+      let cancelled: Promise<unknown> | undefined
+      const cancel = () => {
+        cancelled = this.raw(`/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST' }).catch(() => {})
+      }
+      combined.addEventListener('abort', cancel, { once: true })
+      run.runId = runId
+      // 마지막으로 적용한 journal sequence입니다. 재연결은 이 커서 다음부터 받고, 이미 적용한 id는 건너뜁니다.
+      let cursor = -1
       try {
-        const response = await this.call('/runs', {
+        let response = await this.call('/runs', {
           method: 'POST',
           headers: {
             'x-keundal-model': selected.id,
@@ -290,39 +366,79 @@ export class RemoteChatStore implements ChatStoreLike {
             ]
           })
         })
-        for await (const event of this.events(response, combined)) {
-          projection.apply(event)
-          publisher.update(event, projection.message)
-          if (event.type === EventType.RUN_FINISHED) finished = event
-          else {
-            if (event.type === EventType.RUN_ERROR) failed = true
-            yield event
+        let attempts = 0
+        for (;;) {
+          try {
+            for await (const frame of this.frames(response, combined)) {
+              if (frame.id !== undefined) {
+                if (frame.id <= cursor) continue
+                cursor = frame.id
+              }
+              attempts = 0
+              const event = frame.event
+              projection.apply(event)
+              publisher.update(event, projection.message)
+              if (event.type === EventType.RUN_FINISHED) finished = event
+              else {
+                if (event.type === EventType.RUN_ERROR) failed = true
+                yield event
+              }
+            }
+          } catch (error) {
+            // 사용자의 중단과 달리 네트워크 오류는 같은 실행을 다시 구독해 이어받습니다.
+            if (combined.aborted) throw error
           }
+          if (finished || failed) break
+          combined.throwIfAborted()
+          if (++attempts > MAX_RECONNECT_ATTEMPTS) throw new Error('Keundal generation did not finish')
+          const backoff = Promise.withResolvers<void>()
+          globalThis.setTimeout(backoff.resolve, 100 * 2 ** attempts)
+          await backoff.promise
+          combined.throwIfAborted()
+          response = await this.call(`/runs/${encodeURIComponent(runId)}/events?afterSequence=${cursor}`, {
+            signal: combined
+          })
         }
-        if (!finished && !failed) throw new Error('Keundal generation did not finish')
       } catch (error) {
         if (!combined.aborted && !failed) {
           yield { type: EventType.RUN_ERROR, message: error instanceof Error ? error.message : String(error) }
         }
       } finally {
-        try {
-          projection.finish(request.model)
-          await this.complete(id, runId, projection.message)
-          publisher.finish(projection.message)
-        } finally {
-          this.active.delete(id)
-          release()
+        combined.removeEventListener('abort', cancel)
+        if (cancelled) {
+          await cancelled
+          // 취소 전에 호스트가 기록한 부분 응답까지 저장하도록 종료된 journal의 나머지를 읽습니다.
+          // 호스트가 실행을 끝냈으므로 구독은 마지막 기록에서 끝납니다.
+          try {
+            const rest = await this.call(`/runs/${encodeURIComponent(runId)}/events?afterSequence=${cursor}`)
+            for await (const frame of this.frames(rest, new AbortController().signal)) {
+              if (frame.id === undefined || frame.id <= cursor) continue
+              cursor = frame.id
+              projection.apply(frame.event)
+              publisher.update(frame.event, projection.message)
+            }
+          } catch {
+            // 호스트에 연결할 수 없으면 받은 지점까지만 저장합니다. 호스트의 journal에는 전체 기록이 남습니다.
+          }
         }
+        run.closing = true
+        projection.finish(request.model)
+        await this.complete(id, runId, projection.message, projection.steered, run)
+        settled = true
+        publisher.finish(projection.message)
       }
       if (finished) yield finished
-    } catch (error) {
-      this.active.delete(id)
-      release()
-      throw error
+    } finally {
+      try {
+        await this.runs.release(id, run, settled)
+      } finally {
+        release()
+      }
     }
   }
 
-  private async *events(response: Response, signal: AbortSignal): AsyncGenerator<AGUIEvent> {
+  /** SSE 응답을 프레임으로 읽습니다. id 줄은 journal sequence이며 재연결 커서로 사용합니다. */
+  private async *frames(response: Response, signal: AbortSignal): AsyncGenerator<StreamFrame> {
     if (!response.body) throw new Error('Keundal host returned an empty stream')
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
@@ -337,8 +453,15 @@ export class RemoteChatStore implements ChatStoreLike {
         while (boundary >= 0) {
           const chunk = buffer.slice(0, boundary)
           buffer = buffer.slice(boundary + 2)
+          let id: number | undefined
+          let data: string | undefined
           for (const line of chunk.split('\n')) {
-            if (line.startsWith('data: ')) yield JSON.parse(line.slice(6)) as AGUIEvent
+            if (line.startsWith('id: ')) id = Number(line.slice(4))
+            else if (line.startsWith('data: ')) data = line.slice(6)
+          }
+          if (data !== undefined) {
+            const event = parseAGUIEvent(JSON.parse(data))
+            yield Number.isSafeInteger(id) ? { id, event } : { event }
           }
           boundary = buffer.indexOf('\n\n')
         }
@@ -361,7 +484,7 @@ export class RemoteChatStore implements ChatStoreLike {
       const projection = new ChatMessageAssembly(run.request.input.runId)
       for (const entry of run.journal) projection.apply(entry.event)
       projection.finish(chat.model)
-      await this.complete(id, run.request.input.runId, projection.message)
+      await this.complete(id, run.request.input.runId, projection.message, projection.steered)
     }
   }
 

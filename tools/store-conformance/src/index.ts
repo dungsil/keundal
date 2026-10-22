@@ -31,6 +31,10 @@ export interface ConformanceStore {
     ): AsyncIterable<AGUIEvent>
     get(runId: string): Promise<GenerationSnapshot | undefined>
     list(): Promise<GenerationSnapshot[]>
+    subscribe(
+      runId: string,
+      options?: { afterSequence?: number; signal?: AbortSignal }
+    ): AsyncIterable<{ sequence: number; event: AGUIEvent }>
   }
   disposeAll(): Promise<void>
 }
@@ -218,6 +222,73 @@ const duplicateTerminalScenario = async (store: ConformanceStore): Promise<unkno
   return { revision: repeated.revision, threadRevision: (await store.session.get('thread'))?.revision }
 }
 
+const streamScenario = async (store: ConformanceStore): Promise<unknown> => {
+  const gate = Promise.withResolvers<void>()
+  const first = Promise.withResolvers<void>()
+  const sequences: number[] = []
+  const types: string[] = []
+  let streamCalls = 0
+  const run = store.generation.run(request('r-stream'), {
+    stream: async function* () {
+      streamCalls++
+      yield text('one')
+      first.resolve()
+      await gate.promise
+      yield text('two')
+    }
+  })
+  const pump = (async () => {
+    for await (const _event of run) {
+      /* 실행은 소비자와 분리해 끝까지 진행합니다. */
+    }
+  })()
+  await first.promise
+  // 실행 중에 구독을 붙이면 지난 기록을 재생한 뒤 실시간 기록을 이어서 받습니다.
+  for await (const entry of store.generation.subscribe('r-stream', { afterSequence: -1 })) {
+    sequences.push(entry.sequence)
+    types.push(entry.event.type)
+    if (types.length === 2) gate.resolve()
+  }
+  await pump
+  const replay: number[] = []
+  for await (const entry of store.generation.subscribe('r-stream', { afterSequence: 1 })) replay.push(entry.sequence)
+  return {
+    sequences,
+    types,
+    replay,
+    streamCalls,
+    status: (await store.generation.get('r-stream'))?.status
+  }
+}
+
+const streamFailureScenario = async (store: ConformanceStore): Promise<unknown> => {
+  const types: string[] = []
+  const started = Promise.withResolvers<void>()
+  let error = ''
+  const run = store.generation.run(request('r-stream-fail'), {
+    stream: async function* () {
+      yield text('partial')
+      throw new Error('stream boom')
+    }
+  })
+  const pump = (async () => {
+    let received = 0
+    try {
+      for await (const _event of run) {
+        if (received++ === 0) started.resolve()
+      }
+    } catch (cause) {
+      error = String((cause as Error)?.message ?? cause)
+    }
+  })()
+  await started.promise
+  for await (const entry of store.generation.subscribe('r-stream-fail', { afterSequence: -1 })) {
+    types.push(entry.event.type)
+  }
+  await pump
+  return { types, error, status: (await store.generation.get('r-stream-fail'))?.status }
+}
+
 const listScenario = async (store: ConformanceStore): Promise<unknown> => {
   await collect(store.generation.run(request('z-run'), { stream: defaultStream }))
   const sessions = await store.session.list()
@@ -332,6 +403,8 @@ const scenarios: ReadonlyArray<{ name: string; run: (store: ConformanceStore) =>
   { name: 'durableContext', run: contextScenario },
   { name: 'failedPartial', run: failedPartialScenario },
   { name: 'cancelled', run: cancelledScenario },
+  { name: 'followStream', run: streamScenario },
+  { name: 'followStreamFailure', run: streamFailureScenario },
   { name: 'firstTerminalCommit', run: firstTerminalCommitScenario },
   { name: 'prepareMerge', run: prepareMergeScenario },
   { name: 'duplicateTerminalCommit', run: duplicateTerminalScenario },
@@ -380,6 +453,18 @@ export const expectedConformanceReport: ConformanceReport = {
   cancelled: {
     status: 'cancelled',
     journal: ['RUN_STARTED', 'TEXT_MESSAGE_START']
+  },
+  followStream: {
+    sequences: [0, 1, 2, 3],
+    types: ['RUN_STARTED', 'TEXT_MESSAGE_CONTENT', 'TEXT_MESSAGE_CONTENT', 'RUN_FINISHED'],
+    replay: [2, 3],
+    streamCalls: 1,
+    status: 'completed'
+  },
+  followStreamFailure: {
+    types: ['RUN_STARTED', 'TEXT_MESSAGE_CONTENT'],
+    error: 'stream boom',
+    status: 'failed'
   },
   firstTerminalCommit: {
     revision: 1,

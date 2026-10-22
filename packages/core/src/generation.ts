@@ -23,6 +23,11 @@ export interface GenerationJournalEntry {
   readonly event: AGUIEvent
 }
 
+export interface GenerationSubscriptionOptions extends ExecutionOptions {
+  /** 이 sequence 다음에 기록된 이벤트만 전달합니다. 기본값은 -1로 journal 전체를 재생합니다. */
+  readonly afterSequence?: number
+}
+
 export interface GenerationSnapshot {
   readonly request: GenerationRequest
   readonly status: GenerationStatus
@@ -46,6 +51,13 @@ export abstract class GenerationService extends Service {
   abstract run(request: GenerationRequest, options?: GenerationOptions): AsyncIterable<AGUIEvent>
 
   abstract get(runId: string, options?: ExecutionOptions): Promise<GenerationSnapshot | undefined>
+
+  /**
+   * 저장된 journal을 afterSequence 다음부터 순서대로 전달하고, 실행이 진행 중이면 새 기록을
+   * 이어서 전달합니다. 실행을 다시 시작하거나 모델을 다시 호출하지 않으며, 종료된 실행은 마지막
+   * 이벤트 뒤에 끝납니다. 기록이 없는 실행은 예외로 알립니다.
+   */
+  abstract subscribe(runId: string, options?: GenerationSubscriptionOptions): AsyncIterable<GenerationJournalEntry>
 
   /** 저장된 모든 실행의 스냅숏을 저장소가 정한 안정적인 순서로 돌려줍니다. 상태는 바꾸지 않습니다. */
   abstract list(options?: ExecutionOptions): Promise<GenerationSnapshot[]>

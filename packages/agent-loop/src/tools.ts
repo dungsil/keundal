@@ -1,11 +1,13 @@
 import {
   CONTEXT_MESSAGE_EVENT,
   CONTEXT_MESSAGE_PREFIX,
+  STEER_MESSAGE_EVENT,
   EventType,
   MessageAssembly,
   type LLMEvent,
   type LLMRequest,
   type LLMService,
+  type AgentMessage,
   type RunAgentInput
 } from '@keundal/core'
 import type { ExecutableTool, ToolExecutionContext } from '@keundal/tools'
@@ -59,7 +61,12 @@ export async function* streamWithTools(
   maxToolRounds: number,
   prepareInput: (input: RunAgentInput) => Promise<RunAgentInput>,
   signal: AbortSignal,
-  options: { parallel?: boolean; stream?: LLMService['stream']; maxToolCalls?: number } = {}
+  options: {
+    parallel?: boolean
+    stream?: LLMService['stream']
+    maxToolCalls?: number
+    steer?: () => AgentMessage[]
+  } = {}
 ): AsyncGenerator<LLMEvent> {
   const registered = new Map(tools.map((tool) => [tool.name, tool]))
   const usedIds = new Set(
@@ -73,6 +80,39 @@ export async function* streamWithTools(
   const maxToolCalls = options.maxToolCalls ?? 32
   if (!Number.isSafeInteger(maxToolCalls) || maxToolCalls <= 0) {
     throw new Error('maxToolCalls must be a positive integer')
+  }
+  /**
+   * 다음 요청 입력을 준비하고, 준비 과정에서 새로 추가된 컨텍스트 메시지를 이벤트로 전달합니다.
+   * 지시와 도구 결과가 같은 경로로 입력 예산과 축약 정책을 거치게 합니다.
+   */
+  const advance = async function* (messages: AgentMessage[]): AsyncGenerator<LLMEvent, RunAgentInput> {
+    const next = { ...current.input, messages: [...current.input.messages, ...messages] }
+    const prepared = await prepareInput(next)
+    signal.throwIfAborted()
+    const previousIds = new Set(next.messages.map((message) => message.id))
+    for (const message of prepared.messages) {
+      if (message.id.startsWith(CONTEXT_MESSAGE_PREFIX) && !previousIds.has(message.id)) {
+        yield { type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value: message }
+        signal.throwIfAborted()
+      }
+    }
+    return prepared
+  }
+  /**
+   * 대기 중인 지시를 꺼내 journal에 남깁니다. 이미 대화에 있는 id의 지시는 다시 넣지 않아, 같은
+   * 지시를 재전송해도 한 번만 반영합니다.
+   */
+  const takeSteer = async function* (produced: readonly AgentMessage[]): AsyncGenerator<LLMEvent, AgentMessage[]> {
+    const known = new Set([...current.input.messages, ...produced].map((message) => message.id))
+    const accepted: AgentMessage[] = []
+    for (const message of options.steer?.() ?? []) {
+      if (known.has(message.id)) continue
+      known.add(message.id)
+      accepted.push(message)
+      yield { type: EventType.CUSTOM, name: STEER_MESSAGE_EVENT, value: message }
+      signal.throwIfAborted()
+    }
+    return accepted
   }
   while (true) {
     signal.throwIfAborted()
@@ -101,7 +141,16 @@ export async function* streamWithTools(
       yield event
     }
     signal.throwIfAborted()
-    if (!calls.size) return
+    if (!calls.size) {
+      // 도구 호출이 없는 응답 뒤에도 지시를 확인해, 실행을 끝내기 전에 다음 요청으로 반영합니다.
+      // 반복 한도에 도달했으면 지시를 꺼내지 않고 남겨 호출자가 후속 실행으로 넘기게 합니다.
+      if (rounds >= maxToolRounds) return
+      const steered = yield* takeSteer(assembly.messages)
+      if (!steered.length) return
+      rounds++
+      current = { ...current, input: yield* advance([...assembly.messages, ...steered]) }
+      continue
+    }
     if (rounds >= maxToolRounds) throw new Error(`maximum tool rounds exceeded: ${maxToolRounds}`)
 
     // 같은 응답의 모든 호출을 먼저 확인하여 잘못된 호출이 있으면 실행을 시작하지 않습니다.
@@ -168,17 +217,9 @@ export async function* streamWithTools(
     }
     rounds++
     signal.throwIfAborted()
-    const next = { ...current.input, messages: [...current.input.messages, ...assembly.messages] }
-    const prepared = await prepareInput(next)
-    signal.throwIfAborted()
-    const previousIds = new Set(next.messages.map((message) => message.id))
-    for (const message of prepared.messages) {
-      if (message.id.startsWith(CONTEXT_MESSAGE_PREFIX) && !previousIds.has(message.id)) {
-        yield { type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value: message }
-        signal.throwIfAborted()
-      }
-    }
-    current = { ...current, input: prepared }
+    // 지시는 진행 중인 요청이나 도구를 중단하지 않고, 완료된 도구 결과 뒤의 경계에서만 반영합니다.
+    const steered = yield* takeSteer(assembly.messages)
+    current = { ...current, input: yield* advance([...assembly.messages, ...steered]) }
   }
 }
 

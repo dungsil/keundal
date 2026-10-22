@@ -113,6 +113,7 @@ const READ_OWNERSHIPS = 'SELECT run_id, status, owner_id, lease_expires_at FROM 
 const READ_RUNNING = `SELECT 1 FROM runs WHERE run_id = ? AND status = 'running'`
 const READ_OWNED = `SELECT 1 FROM runs WHERE run_id = ? AND status = 'running' AND owner_id = ?`
 const READ_JOURNAL = 'SELECT sequence, event FROM run_journal WHERE run_id = ? ORDER BY sequence'
+const READ_JOURNAL_LENGTH = 'SELECT COALESCE(MAX(sequence) + 1, 0) AS next FROM run_journal WHERE run_id = ?'
 const READ_RUN_MESSAGES = 'SELECT message FROM run_messages WHERE run_id = ? ORDER BY position'
 const APPEND_JOURNAL = `INSERT INTO run_journal (run_id, sequence, event)
 SELECT ?, COALESCE(MAX(sequence) + 1, 0), ? FROM run_journal WHERE run_id = ?`
@@ -357,6 +358,24 @@ export class SqliteStore {
   /** journal 항목을 마지막 순서 뒤에 추가합니다. */
   appendJournal(runId: string, event: AGUIEvent): void {
     this.statement(APPEND_JOURNAL).run(runId, JSON.stringify(event), runId)
+  }
+
+  /** 이 실행의 journal에 다음으로 붙을 sequence입니다. */
+  journalLength(runId: string): number {
+    return this.row<{ next: number }>(READ_JOURNAL_LENGTH, runId)?.next ?? 0
+  }
+
+  /** 메시지 조립 없이 실행 journal과 상태만 읽습니다. 실시간 구독이 사용합니다. */
+  readJournal(runId: string): { journal: GenerationJournalEntry[]; status: GenerationStatus } | undefined {
+    const header = this.readRunHeader(runId)
+    if (!header) return undefined
+    return {
+      status: header.status,
+      journal: this.rows<JournalRow>(READ_JOURNAL, runId).map((entry) => ({
+        sequence: entry.sequence,
+        event: parse<AGUIEvent>(entry.event)
+      }))
+    }
   }
 
   /** journal 항목을 순서대로 기록하고 같은 순서의 기존 항목을 대체합니다. */

@@ -53,6 +53,10 @@
     "./chat-message-publisher": {
       "types": "./dist/chat-message-publisher.d.ts",
       "import": "./dist/chat-message-publisher.js"
+    },
+    "./run-queue": {
+      "types": "./dist/run-queue.d.ts",
+      "import": "./dist/run-queue.js"
     }
   },
   "scripts": {

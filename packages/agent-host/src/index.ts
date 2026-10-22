@@ -1,8 +1,22 @@
-import { parseReasoning, type Reasoning, EventType, type AgentMessage, type RunAgentInput } from '@keundal/core'
+import {
+  parseReasoning,
+  SteerQueue,
+  type Reasoning,
+  EventType,
+  type AgentMessage,
+  type RunAgentInput
+} from '@keundal/core'
 import { Context, type Fiber } from 'cordis'
 
 import type { AgentHostOptions, AgentHost, AgentHostModel, AgentHostServices } from './contracts.js'
 export * from './contracts.js'
+
+/** 호스트가 관리하는 실행 중 실행입니다. */
+interface ActiveHostRun {
+  readonly runId: string
+  readonly abort: AbortController
+  readonly steer: SteerQueue
+}
 
 const input = (messages: AgentMessage[]): RunAgentInput => ({
   threadId: globalThis.crypto.randomUUID(),
@@ -33,10 +47,16 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
   let closed = false
   type MountedAgent = { ctx: Context; dispose(): Promise<void> }
   const agents = new Map<string, Promise<MountedAgent>>()
+  const runs = new Map<string, ActiveHostRun>()
+  const threads = new Map<string, string>()
 
   const dispose = async () => {
     if (closed) return
     closed = true
+    // 진행 중인 실행을 먼저 취소해 종료 커밋이 저장소가 닫히기 전에 확정되게 합니다.
+    for (const run of runs.values()) run.abort.abort(new Error('agent host disposed'))
+    runs.clear()
+    threads.clear()
     const created = await Promise.allSettled(agents.values())
     agents.clear()
     const disposed = await Promise.allSettled(
@@ -103,13 +123,41 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
     const services: AgentHostServices = {
       run(input, runOptions = {}) {
         const selected = model(runOptions.model)
-        const { model: _model, reasoning: rawReasoning, ...execution } = runOptions
+        const { model: _model, reasoning: rawReasoning, steer: _steer, ...execution } = runOptions
         const reasoning = parseReasoning(rawReasoning)
+        if (runs.has(input.runId)) throw new Error(`generation run is already active: ${input.runId}`)
+        const activeThread = threads.get(input.threadId)
+        if (activeThread) throw new Error(`thread already has an active run: ${input.threadId}`)
+        const abort = new AbortController()
+        const steer = new SteerQueue()
+        const active: ActiveHostRun = { runId: input.runId, abort, steer }
+        runs.set(input.runId, active)
+        threads.set(input.threadId, input.runId)
+        const signal = execution.signal ? AbortSignal.any([execution.signal, abort.signal]) : abort.signal
         const iterator = (async function* () {
-          const fiber = await agent(selected.id, reasoning)
-          yield* fiber.ctx.agent.run(input, execution)
+          try {
+            const fiber = await agent(selected.id, reasoning)
+            yield* fiber.ctx.agent.run(input, { ...execution, signal, steer })
+          } finally {
+            // 남은 지시는 실행이 끝난 뒤 반영할 수 없으므로 대기열을 닫습니다.
+            steer.close()
+            if (runs.get(active.runId) === active) runs.delete(active.runId)
+            if (threads.get(input.threadId) === active.runId) threads.delete(input.threadId)
+          }
         })()
         return iterator
+      },
+      steer(runId, messages) {
+        return runs.get(runId)?.steer.push(messages) ?? 0
+      },
+      cancel(runId) {
+        const active = runs.get(runId)
+        if (!active) return false
+        active.abort.abort(new Error('run cancelled'))
+        return true
+      },
+      subscribe(runId, subscriptionOptions) {
+        return servicesContext.generation.subscribe(runId, subscriptionOptions)
       },
       session: {
         get: (threadId, runOptions) => servicesContext.session.get(threadId, runOptions),

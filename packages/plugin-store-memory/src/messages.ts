@@ -16,8 +16,11 @@ export class GenerationRecorder {
     return this.assembly.messages
   }
 
-  record(event: AGUIEvent): void {
+  /** 이벤트를 journal에 기록하고 추가한 항목을 돌려줍니다. */
+  record(event: AGUIEvent): GenerationJournalEntry {
     this.assembly.apply(event)
-    this.journal.push({ sequence: this.journal.length, event })
+    const entry = { sequence: this.journal.length, event }
+    this.journal.push(entry)
+    return entry
   }
 }

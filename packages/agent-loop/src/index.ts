@@ -13,7 +13,8 @@ import {
   type ExecutionOptions,
   type LLMRequest,
   type LLMEvent,
-  type RunAgentInput
+  type RunAgentInput,
+  type SteerQueue
 } from '@keundal/core'
 import type { ToolProvider } from '@keundal/tools'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
@@ -162,7 +163,7 @@ export class Agent extends AgentService {
       if (!controller.signal.aborted) controller.abort(new Error('agent run stopped'))
       cleanup()
     }
-    const iterator = this.execute(input, controller.signal, stop)
+    const iterator = this.execute(input, controller.signal, stop, options.steer)
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -182,7 +183,8 @@ export class Agent extends AgentService {
   private async *execute(
     input: RunAgentInput,
     signal: AbortSignal,
-    cleanup: () => void
+    cleanup: () => void,
+    steer?: SteerQueue
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     try {
       signal.throwIfAborted()
@@ -294,7 +296,7 @@ export class Agent extends AgentService {
                   maxToolRounds,
                   (next) => prepareNext(next, generationSignal),
                   generationSignal,
-                  { parallel, stream, maxToolCalls }
+                  { parallel, stream, maxToolCalls, ...(steer ? { steer: () => steer.take() } : {}) }
                 )
               : stream(generationRequest, { signal: generationSignal })
           }

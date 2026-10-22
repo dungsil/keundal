@@ -65,7 +65,20 @@ const readBody = async (request: IncomingMessage, maxBytes: number): Promise<str
   return Buffer.concat(chunks).toString('utf8')
 }
 
-const sseEvent = (event: AGUIEvent): string => `data: ${JSON.stringify(event)}\n\n`
+const sseFrame = (sequence: number, event: AGUIEvent): string => `id: ${sequence}\ndata: ${JSON.stringify(event)}\n\n`
+
+const steerBody = (value: unknown): AgentMessage[] => {
+  if (typeof value !== 'object' || value === null) throw new Error('invalid steer request')
+  const body = value as Record<string, unknown>
+  return parseRunAgentInput({
+    threadId: 'steer',
+    runId: 'steer',
+    state: {},
+    tools: [],
+    context: [],
+    messages: body.messages
+  }).messages
+}
 
 const commitBody = (threadId: string, value: unknown): SessionCommit => {
   if (typeof value !== 'object' || value === null) throw new Error('invalid commit')
@@ -124,6 +137,73 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
   }
   const allowedOrigins = new Set(options.allowedOrigins ?? [])
   const models = (): readonly AgentHostModel[] => services.models()
+  // 실행이 실패한 이유는 journal에 남지 않으므로, 연결된 소비자에게 마지막으로 한 번 전달합니다.
+  const terminalErrors = new Map<string, string>()
+
+  const writeEvent = async (
+    response: ServerResponse,
+    sequence: number | undefined,
+    event: AGUIEvent,
+    signal: AbortSignal
+  ): Promise<void> => {
+    signal.throwIfAborted()
+    const frame = sequence === undefined ? `data: ${JSON.stringify(event)}\n\n` : sseFrame(sequence, event)
+    if (!response.write(frame)) await once(response, 'drain', { signal })
+  }
+
+  /**
+   * 실행 journal을 afterSequence 다음부터 SSE로 전달합니다. journal 이벤트는 sequence를 SSE id로
+   * 붙여 재연결 커서로 쓰게 합니다. 실행이 성공하지 못하고 끝났으면 journal에 남지 않는 RUN_ERROR를
+   * id 없이 마지막에 한 번 붙입니다. pending은 같은 요청이 소유한 실행의 소비가 끝나기를 기다립니다.
+   */
+  const streamRun = async (
+    response: ServerResponse,
+    runId: string,
+    afterSequence: number,
+    signal: AbortSignal,
+    pending?: Promise<void>
+  ): Promise<void> => {
+    const budget = new StreamBudget()
+    let terminal = false
+    try {
+      for await (const entry of services.subscribe(runId, { afterSequence, signal })) {
+        signal.throwIfAborted()
+        const event = parseAGUIEvent(entry.event)
+        budget.accept(event)
+        await writeEvent(response, entry.sequence, event, signal)
+        if (event.type === EventType.RUN_FINISHED || event.type === EventType.RUN_ERROR) terminal = true
+      }
+      signal.throwIfAborted()
+      if (terminal) return
+      await pending
+      const run = await services.generation.get(runId)
+      if (!run || run.status === 'completed' || run.status === 'running') return
+      const message = terminalErrors.get(runId) ?? `run ${run.status}`
+      await writeEvent(response, undefined, { type: EventType.RUN_ERROR, message }, signal)
+    } catch (error) {
+      // SSE로 응답이 시작된 뒤에는 상태 코드를 바꿀 수 없으므로 오류 이벤트로 마칩니다.
+      if (response.writableEnded || response.destroyed || signal.aborted) return
+      const message = String((error as Error)?.message ?? error).slice(0, 4096)
+      await writeEvent(response, undefined, { type: EventType.RUN_ERROR, message }, signal).catch(() => {})
+    }
+  }
+
+  const openStream = (response: ServerResponse) => {
+    const subscription = new AbortController()
+    // 연결 종료는 구독만 끊습니다. 실행은 계속되고, 재연결이 afterSequence로 journal을 이어받습니다.
+    const disconnect = () => subscription.abort()
+    response.once('close', disconnect)
+    response.writeHead(200, SSE_HEADERS)
+    // 재구독은 다음 이벤트까지 보낼 데이터가 없을 수 있으므로 헤더를 먼저 보내 연결을 확정합니다.
+    response.flushHeaders()
+    return {
+      signal: subscription.signal,
+      close() {
+        response.off('close', disconnect)
+        response.end()
+      }
+    }
+  }
 
   async function requestListener(request: IncomingMessage, response: ServerResponse) {
     try {
@@ -170,35 +250,79 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
           rawReasoning === 'true' ? true : rawReasoning === 'false' ? false : rawReasoning
         )
         const input = parseRunAgentInput(JSON.parse(await readBody(request, maxRequestBodyBytes)))
-        const abort = new AbortController()
-        const disconnect = () => abort.abort()
-        response.once('close', disconnect)
-        response.writeHead(200, SSE_HEADERS)
-        const budget = new StreamBudget()
-        const write = async (event: AGUIEvent) => {
-          abort.signal.throwIfAborted()
-          if (!response.write(sseEvent(event))) await once(response, 'drain', { signal: abort.signal })
-        }
+        let iterator: AsyncIterator<AGUIEvent>
         try {
-          for await (const raw of services.run(input, { model: requested, reasoning, signal: abort.signal })) {
-            budget.accept(raw)
-            const event = parseAGUIEvent(raw)
-            await write(event)
-            if (event.type === EventType.RUN_FINISHED || event.type === EventType.RUN_ERROR) break
-          }
+          iterator = services.run(input, { model: requested, reasoning })[Symbol.asyncIterator]()
         } catch (error) {
-          // SSE로 응답이 시작된 뒤에는 상태 코드를 바꿀 수 없으므로 오류 이벤트로 마칩니다.
-          if (!response.writableEnded && !response.destroyed && !abort.signal.aborted) {
-            await write({
-              type: EventType.RUN_ERROR,
-              message: String((error as Error)?.message ?? error).slice(0, 4096)
-            })
-          }
+          // 같은 대화나 runId에 실행이 이미 있으면 새 실행을 시작하지 않습니다.
+          return sendJson(response, 409, { error: String((error as Error)?.message ?? error).slice(0, 4096) })
+        }
+        let started: IteratorResult<AGUIEvent> | undefined
+        let startError: unknown
+        // 스트림을 열기 전에 연결이 끊기면 클라이언트가 실행 시작을 확인하지 못했으므로 실행을 취소합니다.
+        const abandon = () => services.cancel(input.runId)
+        response.once('close', abandon)
+        try {
+          // 첫 이벤트를 받으면 실행이 journal에 등록된 상태이므로 구독을 시작할 수 있습니다.
+          started = await iterator.next()
+        } catch (error) {
+          startError = error
         } finally {
-          response.off('close', disconnect)
-          response.end()
+          response.off('close', abandon)
+        }
+        const stream = openStream(response)
+        try {
+          if (!started || started.done) {
+            const message = String((startError as Error)?.message ?? startError ?? 'run did not start').slice(0, 4096)
+            await writeEvent(response, undefined, { type: EventType.RUN_ERROR, message }, stream.signal)
+            return
+          }
+          const pump = (async () => {
+            try {
+              while (!(await iterator.next()).done) {
+                // 실행은 journal에 기록되므로 응답과 무관하게 끝까지 소비합니다.
+              }
+            } catch (error) {
+              terminalErrors.set(input.runId, String((error as Error)?.message ?? error).slice(0, 4096))
+              if (terminalErrors.size > 64) terminalErrors.delete(terminalErrors.keys().next().value!)
+            }
+          })()
+          await streamRun(response, input.runId, -1, stream.signal, pump)
+        } finally {
+          stream.close()
         }
         return
+      }
+
+      if (request.method === 'GET' && segments[0] === 'runs' && segments[2] === 'events' && segments[1]) {
+        const runId = segments[1]
+        if (!(await services.generation.get(runId))) {
+          return sendJson(response, 404, { error: `run not found: ${runId}` })
+        }
+        const raw = url.searchParams.get('afterSequence')
+        const afterSequence = raw === null ? -1 : Number(raw)
+        if (!Number.isSafeInteger(afterSequence) || afterSequence < -1) {
+          return sendJson(response, 400, { error: 'invalid afterSequence' })
+        }
+        const stream = openStream(response)
+        try {
+          await streamRun(response, runId, afterSequence, stream.signal)
+        } finally {
+          stream.close()
+        }
+        return
+      }
+
+      if (request.method === 'POST' && segments[0] === 'runs' && segments[2] === 'cancel' && segments[1]) {
+        return sendJson(response, 200, { cancelled: services.cancel(segments[1]) })
+      }
+
+      if (request.method === 'POST' && segments[0] === 'runs' && segments[2] === 'steer' && segments[1]) {
+        const messages = steerBody(JSON.parse(await readBody(request, maxRequestBodyBytes)))
+        const queued = services.steer(segments[1], messages)
+        return queued
+          ? sendJson(response, 202, { queued })
+          : sendJson(response, 409, { error: 'run is not active', queued: 0 })
       }
 
       if (request.method === 'POST' && segments.join('/') === 'title') {
