@@ -47,7 +47,6 @@ const options = computed(() => [
           type="button"
           role="radio"
           :aria-checked="option.value === visibility"
-          :tabindex="option.value === visibility ? 0 : -1"
           :disabled="option.value === 'public'"
           :data-selected="option.value === visibility"
           class="flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-elevated/50 disabled:opacity-50 data-[selected=true]:bg-elevated/50"
