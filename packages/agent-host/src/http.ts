@@ -34,6 +34,12 @@ export interface AgentAppOptions {
 
 class RequestBodyTooLargeError extends Error {}
 
+const errorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  return 'unknown error'
+}
+
 const SSE_HEADERS = {
   'content-type': 'text/event-stream',
   'cache-control': 'no-cache',
@@ -183,7 +189,7 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
     } catch (error) {
       // SSE로 응답이 시작된 뒤에는 상태 코드를 바꿀 수 없으므로 오류 이벤트로 마칩니다.
       if (response.writableEnded || response.destroyed || signal.aborted) return
-      const message = String((error as Error)?.message ?? error).slice(0, 4096)
+      const message = errorMessage(error).slice(0, 4096)
       await writeEvent(response, undefined, { type: EventType.RUN_ERROR, message }, signal).catch(() => {})
     }
   }
@@ -270,7 +276,7 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
           iterator = services.run(input, { model: requested, reasoning })[Symbol.asyncIterator]()
         } catch (error) {
           // 같은 대화나 runId에 실행이 이미 있으면 새 실행을 시작하지 않습니다.
-          return sendJson(response, 409, { error: String((error as Error)?.message ?? error).slice(0, 4096) })
+          return sendJson(response, 409, { error: errorMessage(error).slice(0, 4096) })
         }
         let started: IteratorResult<AGUIEvent> | undefined
         let startError: unknown
@@ -288,7 +294,9 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
         const stream = openStream(response)
         try {
           if (!started || started.done) {
-            const message = String((startError as Error)?.message ?? startError ?? 'run did not start').slice(0, 4096)
+            const message = (
+              startError === undefined ? 'run did not start' : errorMessage(startError) || 'run did not start'
+            ).slice(0, 4096)
             await writeEvent(response, undefined, { type: EventType.RUN_ERROR, message }, stream.signal)
             return
           }
@@ -298,7 +306,7 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
                 // 실행은 journal에 기록되므로 응답과 무관하게 끝까지 소비합니다.
               }
             } catch (error) {
-              terminalErrors.set(input.runId, String((error as Error)?.message ?? error).slice(0, 4096))
+              terminalErrors.set(input.runId, errorMessage(error).slice(0, 4096))
               if (terminalErrors.size > 64) terminalErrors.delete(terminalErrors.keys().next().value!)
             }
           })()
