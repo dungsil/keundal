@@ -13,6 +13,20 @@ export interface AgentCompactionConfig extends CompactionPolicy {
   readonly models?: Readonly<Record<string, CompactionPolicy>>
 }
 
+/** 100만 토큰당 가격입니다. 캐시 가격을 생략하면 해당 토큰에 입력 가격을 적용합니다. */
+export interface ModelPrice {
+  readonly inputPerMillion: number
+  readonly outputPerMillion: number
+  readonly cacheReadPerMillion?: number
+  readonly cacheWritePerMillion?: number
+}
+
+/** 모델 ID별 가격표입니다. 한 표는 하나의 통화만 사용합니다. */
+export interface AgentPricing {
+  readonly currency: string
+  readonly models: Readonly<Record<string, ModelPrice>>
+}
+
 export interface AgentConfig {
   readonly model: string
   readonly maxOutputTokens: number
@@ -36,4 +50,9 @@ export interface AgentConfig {
   readonly maxToolCalls?: number
   /** 같은 응답의 도구를 병렬로 실행합니다. 기본값은 false입니다. */
   readonly parallelTools?: boolean
+  /**
+   * 공급자가 비용을 주지 않는 모델 호출의 비용을 `source: 'estimate'`로 추정합니다.
+   * 가격표에 없는 모델은 비용을 미확정으로 둡니다.
+   */
+  readonly pricing?: AgentPricing
 }

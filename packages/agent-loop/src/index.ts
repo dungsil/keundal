@@ -29,8 +29,8 @@ import { createDeferredToolSession, parseDeferredToolsConfig, type ToolProvider 
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { type Context } from 'cordis'
 
-import type { AgentConfig } from './config.js'
-export type { AgentConfig, AgentCompactionConfig, CompactionPolicy } from './config.js'
+import type { AgentConfig, AgentPricing } from './config.js'
+export type { AgentConfig, AgentCompactionConfig, AgentPricing, CompactionPolicy, ModelPrice } from './config.js'
 export type { ToolProvider } from '@keundal/tools'
 
 import {
@@ -40,6 +40,7 @@ import {
   waitForPreparation,
   type PreparedCompaction
 } from './compaction.js'
+import { estimateCost, parsePricing } from './pricing.js'
 import { SYSTEM_PROMPT_ID, withSystemPrompt } from './prompt.js'
 import { SKILL_CATALOG_ID, skillTool, withSkillCatalog } from './skills.js'
 import { subagentTool, SUBAGENT_TOOL_NAME } from './subagents.js'
@@ -60,10 +61,16 @@ class TraceRecorder {
 
   constructor(
     readonly runId: string,
-    parent?: TraceParent
+    parent?: TraceParent,
+    private readonly pricing?: AgentPricing
   ) {
     this.traceId = parent?.traceId ?? globalThis.crypto.randomUUID()
     this.root = this.start('agent', 'agent', parent?.parentSpanId)
+  }
+
+  /** 공급자 비용이 없을 때 가격표로 모델 호출의 비용을 추정합니다. */
+  estimateCost(model: string, usage: TraceUsage): TraceCost | undefined {
+    return estimateCost(this.pricing, model, usage)
   }
 
   start(
@@ -126,7 +133,9 @@ class TraceRecorder {
   updateUsage(span: TraceSpan, usage: TraceUsage, cost?: TraceCost): void {
     const active = this.active.get(span.spanId)
     if (!active) return
-    const updated = { ...active, usage, ...(cost ? { cost } : {}) }
+    // 새 사용량으로 비용을 다시 계산하므로 이전 사용량의 비용을 남기지 않습니다.
+    const { cost: _previous, ...rest } = active
+    const updated = { ...rest, usage, ...(cost ? { cost } : {}) }
     this.active.set(span.spanId, updated)
     this.pending.push(traceEvent(updated))
   }
@@ -186,6 +195,7 @@ async function* tracedModelStream(
   if (publishTraceEvents) trace.lastModelSpanId = span.spanId
   if (publishTraceEvents) yield* trace.drain()
   let usage: TraceUsage | undefined
+  let providerCost: TraceCost | undefined
   let cost: TraceCost | undefined
   let ttftMs: number | undefined
   try {
@@ -194,7 +204,9 @@ async function* tracedModelStream(
         const parsed = usageFromEvent(event.value)
         if (parsed) {
           usage = parsed.usage
-          cost = parsed.cost ?? cost
+          // 공급자가 준 비용이 있으면 가격표 추정으로 덮어쓰지 않습니다.
+          providerCost = parsed.cost ?? providerCost
+          cost = providerCost ?? trace.estimateCost(model, usage)
           trace.updateUsage(span, usage, cost)
         }
       } else if (
@@ -310,6 +322,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
   }
   const parallelTools = 'parallelTools' in value ? value.parallelTools : false
   if (typeof parallelTools !== 'boolean') throw new Error('parallelTools must be a boolean')
+  const pricing = 'pricing' in value && value.pricing !== undefined ? parsePricing(value.pricing) : undefined
   return {
     model: value.model,
     maxOutputTokens: value.maxOutputTokens,
@@ -326,7 +339,8 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     ...(systemPrompt === undefined ? {} : { systemPrompt }),
     maxToolRounds,
     maxToolCalls,
-    parallelTools
+    parallelTools,
+    ...(pricing === undefined ? {} : { pricing })
   }
 }
 
@@ -439,7 +453,7 @@ export class Agent extends AgentService {
     try {
       signal.throwIfAborted()
       const request = parseRunAgentInput(input)
-      const trace = new TraceRecorder(request.runId, traceParent)
+      const trace = new TraceRecorder(request.runId, traceParent, this.config.pricing)
       failedTrace = trace
       for (const reserved of [SKILL_CATALOG_ID, SYSTEM_PROMPT_ID]) {
         if (request.messages.some((message) => message.id === reserved)) {

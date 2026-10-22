@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { EventType, type LLMEvent } from '@keundal/core'
+import { EventType, readTraceSpans, summarizeTrace, type AGUIEvent, type LLMEvent } from '@keundal/core'
 import { afterEach, expect, test } from 'vitest'
 
 import { createNodeAgentHost, createNodeComposition, createAgentRuntime } from '../src/index.js'
@@ -110,6 +110,99 @@ test('외부 매니페스트가 파일과 import 전용 패키지를 불러오�
   expect((await runtime.services.session.get('manifest-thread'))?.messages).toContainEqual(
     expect.objectContaining({ role: 'assistant', content: 'external-package: runtime-tool-result' })
   )
+})
+
+function pricingManifest(directory: string, pricing: unknown) {
+  const pluginDirectory = join(directory, 'plugins')
+  mkdirSync(pluginDirectory, { recursive: true })
+  writeFileSync(
+    join(pluginDirectory, 'llm.mjs'),
+    `export default ctx => {
+    ctx.provide('llm', {
+      async getModel() { return { contextWindow: 128000, maxOutputTokens: 4096 } },
+      async countTokens() { return 10 },
+      async *stream() {
+        yield { type: 'TEXT_MESSAGE_START', messageId: 'priced-answer', role: 'assistant' }
+        yield { type: 'TEXT_MESSAGE_CONTENT', messageId: 'priced-answer', delta: 'done' }
+        yield { type: 'TEXT_MESSAGE_END', messageId: 'priced-answer' }
+        yield { type: 'CUSTOM', name: 'keundal.llm.usage', value: { source: 'provider', inputTokens: 1000, outputTokens: 200, cacheReadTokens: 400 } }
+      }
+    })
+  }`
+  )
+  const manifestPath = join(directory, 'keundal.plugins.json')
+  writeFileSync(
+    manifestPath,
+    JSON.stringify({
+      plugins: [
+        { module: './plugins/llm.mjs' },
+        { module: 'builtin:store', config: { path: join(directory, 'store.sqlite') } }
+      ],
+      agent: { module: 'builtin:agent', config: { subagents: false, pricing } }
+    })
+  )
+  return {
+    KEUNDAL_PROVIDER: 'external-provider',
+    KEUNDAL_MODEL: 'custom-model',
+    KEUNDAL_API_TOKEN: 'runtime-test-token',
+    KEUNDAL_PLUGIN_CONFIG: manifestPath
+  }
+}
+
+test('매니페스트의 agent.config.pricing으로 공급자가 비용을 주지 않는 모델의 추정 비용을 Trace에 기록한다', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-pricing-'))
+  directories.push(directory)
+  const runtime = await createAgentRuntime(
+    pricingManifest(directory, {
+      currency: 'USD',
+      models: { 'custom-model': { inputPerMillion: 3, outputPerMillion: 15, cacheReadPerMillion: 0.3 } }
+    }),
+    { compose: createNodeComposition }
+  )
+  hosts.push(runtime)
+  const events: AGUIEvent[] = []
+  for await (const event of runtime.services.run({
+    threadId: 'pricing-thread',
+    runId: 'pricing-run',
+    state: {},
+    tools: [],
+    context: [],
+    messages: [{ id: 'user', role: 'user', content: 'Price this run' }]
+  }))
+    events.push(event)
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  const cost = summarizeTrace(readTraceSpans(events, 'pricing-run')).cost
+  // 일반 입력 600 × 3 + 캐시 읽기 400 × 0.3 + 출력 200 × 15 (100만 토큰 기준)
+  expect(cost).toMatchObject({ currency: 'USD', complete: true, source: 'estimate' })
+  expect(cost?.amount).toBeCloseTo(0.00492, 9)
+})
+
+test('매니페스트의 잘못된 가격표는 기본 가격으로 대체하지 않고 첫 실행을 거부한다', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-pricing-invalid-'))
+  directories.push(directory)
+  const runtime = await createAgentRuntime(
+    pricingManifest(directory, {
+      currency: 'USD',
+      models: { 'custom-model': { inputPerMillion: -1, outputPerMillion: 1 } }
+    }),
+    { compose: createNodeComposition }
+  )
+  hosts.push(runtime)
+  const events: AGUIEvent[] = []
+  await expect(
+    (async () => {
+      for await (const event of runtime.services.run({
+        threadId: 'invalid-pricing-thread',
+        runId: 'invalid-pricing-run',
+        state: {},
+        tools: [],
+        context: [],
+        messages: [{ id: 'user', role: 'user', content: 'Price this run' }]
+      }))
+        events.push(event)
+    })()
+  ).rejects.toThrow('pricing.models.custom-model.inputPerMillion must be a non-negative number')
+  expect(events).toEqual([])
 })
 
 test('매니페스트에 tools가 없으면 defaultTools와 options.tools를 함께 제공한다', async () => {
