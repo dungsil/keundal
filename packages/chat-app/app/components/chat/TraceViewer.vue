@@ -200,6 +200,16 @@ function cost(value: typeof summary.value.cost) {
 function spanLabel(kind: TraceSpan['kind']) {
   return t(`trace.kind.${kind}`)
 }
+
+// 색만으로 상태를 구분하지 않도록 상태마다 모양이 다른 아이콘을 쓴다.
+const STATUS_ICONS: Record<ReturnType<typeof traceDisplayStatus>, { name: string; color: string }> = {
+  running: { name: 'i-lucide-loader-circle', color: 'text-info' },
+  completed: { name: 'i-lucide-circle-check', color: 'text-success' },
+  failed: { name: 'i-lucide-circle-x', color: 'text-error' },
+  interrupted: { name: 'i-lucide-circle-alert', color: 'text-warning' },
+  cancelled: { name: 'i-lucide-circle-minus', color: 'text-muted' },
+  unknown: { name: 'i-lucide-circle-help', color: 'text-muted' }
+}
 function* journalEvents(journal: GenerationSnapshot['journal'], start = 0): IterableIterator<AGUIEvent> {
   for (let index = start; index < journal.length; index++) yield journal[index]!.event
 }
@@ -246,17 +256,18 @@ function* journalEvents(journal: GenerationSnapshot['journal'], start = 0): Iter
         </div>
 
         <div v-if="spans.length" class="mt-3 max-h-96 overflow-auto" role="list" :aria-label="t('trace.timeline')">
-          <div class="sticky top-0 z-10 mb-2 flex items-center justify-between bg-elevated px-2 py-1 text-xs text-muted">
+          <div class="sticky top-0 z-10 mb-2 flex items-center justify-between bg-elevated px-2 py-1 text-xs text-toned">
             <span>{{ t('trace.timeline') }}</span>
             <span>0 ms – {{ formatDuration(timeline.end - timeline.start) }}</span>
           </div>
           <details v-for="{ span, depth } in rowSpans" :key="span.spanId" class="border-l border-default py-1 pl-2" :style="{ marginLeft: `${Math.min(depth, 8) * 12}px` }">
             <summary class="flex cursor-pointer list-none items-center gap-2 rounded px-2 py-1 hover:bg-muted/40">
-              <span class="size-2 shrink-0 rounded-full" :class="traceDisplayStatus(span, runStatus) === 'failed' ? 'bg-error' : traceDisplayStatus(span, runStatus) === 'running' ? 'bg-warning' : traceDisplayStatus(span, runStatus) === 'unknown' ? 'bg-neutral' : 'bg-success'" />
+              <UIcon :name="STATUS_ICONS[traceDisplayStatus(span, runStatus)].name" class="size-3.5 shrink-0" :class="STATUS_ICONS[traceDisplayStatus(span, runStatus)].color" aria-hidden="true" />
+              <span class="sr-only">{{ t(`trace.status.${traceDisplayStatus(span, runStatus)}`) }}</span>
               <span class="text-xs text-muted">{{ spanLabel(span.kind) }}</span>
               <span class="min-w-0 flex-1 truncate">{{ span.name }}</span>
               <span class="relative hidden h-3 w-28 shrink-0 overflow-hidden rounded bg-muted/40 sm:block" :title="`${t('trace.started')}: +${formatDuration(span.startedAt - timeline.start)}`">
-                <span data-trace-bar class="absolute inset-y-0 min-w-px rounded" :class="span.kind === 'model' ? 'bg-primary' : span.kind === 'tool' ? 'bg-info' : span.kind === 'compaction' ? 'bg-warning' : 'bg-neutral'" :style="barStyle(span)" />
+                <span data-trace-bar class="absolute inset-y-0 min-w-px rounded bg-primary" :style="barStyle(span)" />
               </span>
               <span class="shrink-0 text-xs text-muted tabular-nums">{{ duration(span) }}</span>
             </summary>
