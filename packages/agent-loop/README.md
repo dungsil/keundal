@@ -78,6 +78,38 @@ for await (const event of ctx.agent.run({
 
 `tools`에는 배열 대신 `(options: ExecutionOptions) => ExecutableTool[] | Promise<ExecutableTool[]>` 공급자를 지정할 수 있습니다. 공급자는 실행 시작마다 취소 신호를 받으며, 반환한 도구 목록은 해당 실행의 후속 생성까지 고정합니다. 조회 실패나 중복 이름은 생성을 시작하기 전에 거부합니다. 외부 MCP 서버 연결은 [`@keundal/mcp`](../mcp/README.md)를 참고합니다.
 
+### 도구 검색으로 원격 목록 지연 노출
+
+`deferredToolProvider`에는 검색이 허용된 MCP 도구 공급자만 지정합니다. `deferredTools`를 설정하면 모델은 처음에 `search_tool`과 `tools`의 기존 도구만 봅니다. 이름이나 설명으로 검색한 도구의 스키마는 다음 요청에서만 추가합니다.
+
+```ts
+import { McpClient } from '@keundal/plugin-mcp-client'
+
+const mcp = await McpClient.connect({
+  serverName: 'documents',
+  transport: 'stdio',
+  command: 'node',
+  args: ['/absolute/path/to/mcp-server.js'],
+  permissions: { tools: ['search'] }
+})
+ctx.fiber.effect(() => () => mcp.close())
+
+await ctx.plugin(agentPlugin, {
+  model: 'your-model',
+  maxOutputTokens: 1024,
+  tools: [],
+  deferredTools: {
+    maxSearchResults: 8,
+    maxActiveTools: 16,
+    maxSchemaBytes: 16_384,
+    maxTotalSchemaBytes: 65_536
+  },
+  deferredToolProvider: (options) => mcp.tools(options)
+})
+```
+
+한 실행에서 검색된 도구만 실행할 수 있습니다. 실행 직전에 공급자를 다시 조회하며, 현재 권한에서 사라졌거나 도구 정의가 바뀌면 실행을 거부합니다. 기본 한도는 검색 결과 8개, 활성 도구 16개, 도구 스키마 16 KiB, 전체 스키마 64 KiB입니다.
+
 ## 스킬 사용
 
 `skills: true`를 설정하면 `skills` 서비스를 추가로 주입받습니다. 서비스가 사라지면 진행 중 실행을 취소하고, 서비스가 돌아오면 에이전트를 다시 구성합니다. 기본값은 비활성화이며 기존 세 서비스만 필요합니다.
@@ -164,6 +196,22 @@ await ctx.plugin(agentPlugin, {
 
 세부 동작과 요약 과정은 [축약 문서](../compaction/README.md)를 참고합니다.
 
+## 실행 추적과 모델 사용량
+
+`Agent`는 `keundal.trace` CUSTOM 이벤트에 버전 1 추적 span을 기록합니다. Span은 실행, 모델 요청, 실제 도구 실행, 축약을 연결합니다. Span은 시작 순서를 보존합니다.
+
+오류에는 안전한 범주만 기록합니다. 도구 인자와 결과는 기록하지 않습니다. 공급자의 원문 오류도 기록하지 않습니다.
+
+실행 종료 때 계속 진행 중인 백그라운드 축약 Span에는 `detached: true`를 표시하고 마지막 관측 상태를 유지합니다. 실제 종료 시각을 만들지 않으며 실행 성공 여부는 generation의 최종 상태로 판단합니다.
+
+OpenAI, Anthropic, Gemini 공급자는 확인한 토큰 사용량을 `keundal.llm.usage` 이벤트로 전달합니다. 확인한 캐시 토큰도 별도 필드로 기록합니다. 명시된 가격 정보가 없으면 비용을 계산하지 않습니다. 누락된 사용량은 알 수 없는 값으로 유지합니다. 집계기는 모델 Span만 합산하며 실행과 축약 Span의 토큰은 다시 더하지 않습니다.
+
+## 지연 도구
+
+`deferredTools`를 설정하면 `deferredToolProvider`도 설정합니다. 에이전트는 실행마다 검색 도구만 먼저 노출합니다. 검색 결과에는 도구 이름과 설명만 포함합니다. 선택한 도구 스키마는 다음 모델 요청에 노출합니다.
+
+기존 `tools` 설정은 첫 요청에 계속 노출됩니다. 에이전트는 요청마다 지연 도구 카탈로그를 다시 확인합니다. 검색한 도구만 실행할 수 있습니다. `deferredTools`로 검색 결과 수, 선택 가능한 도구 수, 스키마 크기를 제한합니다.
+
 ## 실행과 종료
 
 - `AgentConfig.webSearch?: boolean`과 `reasoning?: boolean | 'low' | 'medium' | 'high'`은 입력 토큰 계산, generation 요청, 모든 도구 후속 요청에 그대로 전달됩니다. 생략하면 기존 공급자 기본값을 유지하며 정의되지 않은 추론 수준은 거부합니다. 축약 후에도 이 옵션을 포함한 입력 비용을 다시 확인합니다. 요약 자체는 검색 도구 없이 수행합니다.
@@ -185,3 +233,34 @@ await ctx.plugin(agentPlugin, {
 ## 사용자 정의 저장소
 
 `GenerationService.run()`의 `GenerationOptions.stream`은 한 실행 안에서 사용할 이벤트 공급자입니다. 지정되면 기본 `llm.stream` 대신 호출하고, 저장소가 관리하는 취소 신호를 전달해야 합니다. 이벤트를 저장하고 최종 세션 커밋을 수행하는 책임은 계속 `generation`에 있습니다. 이 함수는 직렬화 대상인 `GenerationRequest`에 포함하지 않으며 복구 시 재실행하지 않습니다.
+
+## 서브에이전트
+
+`subagents: true`를 설정하면 모델에 `delegate_task` 도구를 제공합니다. 기본값은 비활성화입니다.
+모델은 `{ "task": "작업 지침과 필요한 문맥", "label": "작업 이름" }`으로 위임합니다.
+`label`은 선택 사항이며 1~80자의 이름을 상태 표시와 자식 기록에 사용합니다.
+
+자식은 같은 모델, 시스템 지침, 등록된 도구, 스킬과 축약 정책을 사용합니다.
+부모의 대화 기록, 요청 도구, 상태와 문맥은 복사하지 않으므로 필요한 정보는 `task`에 넣어야 합니다.
+자식의 대화와 실행 기록은 별도 ID로 저장하며, 상태의 `subagent`에 부모의 `threadId`, `runId`와
+위임한 `toolCallId`를 기록합니다. 부모에게는 자식의 응답 스트림 대신 실행 상태와 도구 결과를 전달합니다.
+실행 상태는 `keundal.tool.progress` 사용자 지정 이벤트로 전달하며, 병렬 작업도 완료되는 즉시 상태를 알립니다.
+
+자식은 다시 위임할 수 없습니다. 부모와 자식 각각에 기존 `maxToolRounds`와 `maxToolCalls` 제한을
+적용합니다. `parallelTools: true`이면 같은 응답에서 요청한 여러 위임도 병렬로 실행합니다.
+`maxActiveSubagents`는 부모 실행 하나에서 동시에 실행할 자식 수를 제한하며 기본값은 8입니다.
+준비를 시작하기 전에 자리를 확보하고 정리가 끝나면 반환합니다. 한도를 넘는 요청은 대기열에 넣지 않고
+`ACTIVE_LIMIT_REACHED` 오류를 결과로 반환하므로, 부모는 다음 도구 실행 차례에 다시 요청할 수 있습니다.
+
+도구 결과는 다음과 같은 JSON 문자열입니다.
+
+- 성공: `{ status: "completed", threadId, runId, content }`
+- 자식 실행 실패: `{ status: "failed", threadId, runId, content, error: { code, message } }`
+- 한도 초과: `{ status: "rejected", error: { code: "ACTIVE_LIMIT_REACHED", message } }`
+
+`content`는 마지막 비어 있지 않은 어시스턴트 답변입니다. 실패 결과에는 부분 응답이 포함될 수 있지만
+성공을 뜻하지 않습니다. 자식 하나가 실패해도 형제와 부모는 계속 실행하며, 부모 모델이 결과를 보고
+후속 작업을 결정합니다. 부모 취소, 순회 중단 또는 플러그인 해제는 자식 실행도 중단합니다.
+취소는 복구 가능한 도구 결과로 변환하지 않습니다.
+
+설계 참고 자료와 적용 범위는 [서브에이전트 구현 비교](../../docs/subagents.md)에 기록했습니다.

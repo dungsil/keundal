@@ -288,6 +288,12 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
     if let Ok(data) = app.path().app_data_dir() {
         std::fs::create_dir_all(&data).ok();
         command.env("KEUNDAL_SQLITE_PATH", data.join("keundal.sqlite"));
+        if std::env::var_os("KEUNDAL_PLUGIN_CONFIG").is_none() {
+            let config = data.join("keundal.plugins.json");
+            if config.exists() {
+                command.env("KEUNDAL_PLUGIN_CONFIG", config);
+            }
+        }
     }
 
     let mut child = command

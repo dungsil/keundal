@@ -1,4 +1,11 @@
-import { EventType, LLMService, type LLMEvent, type LLMRequest, type RunAgentInput } from '@keundal/core'
+import {
+  EventType,
+  LLMService,
+  readTraceSpans,
+  type LLMEvent,
+  type LLMRequest,
+  type RunAgentInput
+} from '@keundal/core'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStore from '@keundal/plugin-store-memory'
 import { expect, test } from 'vitest'
@@ -144,10 +151,16 @@ test('cancel은 실행을 cancelled로 확정하고 구독은 마지막 기록�
     expect(await running).toBeInstanceOf(Error)
     expect(aborted).toBe(true)
     await expect.poll(async () => (await agentHost.services.generation.get('run'))?.status).toBe('cancelled')
-    expect((await subscription).map((entry) => entry.event.type)).toEqual([
-      EventType.RUN_STARTED,
-      EventType.TEXT_MESSAGE_START
-    ])
+    const entries = await subscription
+    const stored = (await agentHost.services.generation.get('run'))!
+    expect(entries.map((entry) => entry.sequence)).toEqual(stored.journal.map((entry) => entry.sequence))
+    expect(
+      entries.some((entry) => entry.event.type === EventType.TEXT_MESSAGE_START && entry.event.messageId === 'partial')
+    ).toBe(true)
+    expect(entries.some((entry) => entry.event.type === EventType.RUN_FINISHED)).toBe(false)
+    expect(
+      readTraceSpans(stored.journal.map((entry) => entry.event)).find((span) => span.kind === 'agent')?.status
+    ).toBe('cancelled')
     expect(agentHost.services.cancel('run')).toBe(false)
   } finally {
     await agentHost.dispose()

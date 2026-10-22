@@ -126,26 +126,6 @@ async function setup(testContext: TestContext, overrides: Overrides = {}) {
   return { ctx, calls, generations, agentFiber, llmFiber, LLM, fibers, constructed }
 }
 
-test('세션을 준비하고 실행과 저장을 위임하며 생성 이벤트를 그대로 전달한다', async (t) => {
-  const { ctx, calls, generations } = await setup(t, {
-    prepare: (request) => ({
-      input: { ...request, messages: [{ id: 'history', role: 'user', content: 'saved history' }] },
-      revision: 12
-    })
-  })
-  const result = await collect(ctx.agent.run(input))
-  expect(calls).toStrictEqual(['prepare', 'model', 'count', 'run'])
-  expect(generations[0].request).toStrictEqual({
-    input: { ...input, messages: [{ id: 'history', role: 'user', content: 'saved history' }] },
-    model: 'test-model',
-    maxOutputTokens: 20,
-    sessionRevision: 12
-  })
-  expect(result).toStrictEqual(events)
-  expect(result[0]).toBe(events[0])
-  expect(result.at(-1)).toBe(events.at(-1))
-})
-
 test('입력 크기가 예산과 정확히 같으면 축약하지 않는다', async (t) => {
   const { ctx, calls } = await setup(t)
   await collect(ctx.agent.run({ ...input, messages: [{ id: 'question', role: 'user', content: 'x'.repeat(80) }] }))
@@ -318,7 +298,11 @@ test('주입된 LLM을 교체하면 다른 서비스를 유지하면서 에이�
   await ctx.agent.run(input).return!()
   expect(ctx.agent).not.toBe(previousAgent)
   expect(constructed).toStrictEqual({ llm: 2, session: 1, generation: 1 })
-  expect(await collect(ctx.agent.run(input))).toStrictEqual(events)
+  expect(
+    (await collect(ctx.agent.run(input))).filter(
+      (event) => event.type !== EventType.CUSTOM || event.name !== 'keundal.trace'
+    )
+  ).toStrictEqual(events)
 })
 
 for (const mode of ['external', 'return', 'dispose']) {

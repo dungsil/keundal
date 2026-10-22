@@ -178,7 +178,9 @@ pnpm --filter @keundal/web lint
 
 웹 테스트는 빌드한 Node.js 프로덕션 서버를 실행하여 홈·대화 경로의 HTTP 200 응답도 확인합니다. 루트 `pnpm test`는 필요한 빌드를 먼저 실행합니다. Zod는 pnpm 저장소의 locale 파일 경로가 런타임 외부 참조로 남지 않도록 Nitro에 번들링합니다.
 
-원본 UI의 ESLint 설정을 사용하며 루트 Oxfmt로 웹 소스를 재포맷하지 않습니다.
+웹·데스크톱·공유 채팅 소스는 루트 Oxlint 설정으로 검사하며, 각 패키지의 `lint` 명령도 같은 설정을 사용합니다.
+루트 Oxfmt는 기존처럼 이 소스를 재포맷하지 않습니다. Vue 템플릿과 템플릿 내부 Tailwind 클래스는 검사하지 않습니다.
+검사 범위와 실행 환경은 [CI 문서](../../docs/ci.md#린터의-실행-환경)를 참고합니다.
 
 
 ## 선제적 축약
@@ -187,7 +189,7 @@ pnpm --filter @keundal/web lint
 
 대화 삭제와 전체 중단 시 에이전트와 준비 작업을 해제합니다. 모델·생성 설정이 바뀌면 해당 대화의 에이전트를 교체하며, 대기 중인 에이전트가 누적되지 않도록 최대 8개를 기준으로 오래된 유휴 에이전트부터 해제합니다. 실행 중인 다른 대화는 중단하지 않습니다. `createKeundalChat()`을 직접 사용하는 호출자는 작업을 마친 뒤 `dispose()`를 호출해야 합니다.
 
-앱별 플러그인은 `app/platform.ts`에서 조립합니다. [계약과 구현의 경계](../../docs/plugin-composition.md)를 참고합니다.
+브라우저는 `/keundal.plugins.json`에서 LLM·저장소·에이전트·도구 구성을 읽습니다. 배포한 JSON과 외부 ESM 파일을 수정하면 앱을 다시 빌드하지 않고 구현을 교체할 수 있습니다. `NUXT_PUBLIC_PLUGIN_CONFIG`로 설정 URL을 변경합니다. Node.js 호스트는 `KEUNDAL_PLUGIN_CONFIG`로 로컬 설정 파일을 선택합니다. 변경 후 브라우저는 새로고침하고 호스트는 다시 시작합니다. 형식과 신뢰 경계는 [플러그인 조립 문서](../../docs/plugin-composition.md#런타임-설정)를 참고합니다.
 
 ## MCP
 

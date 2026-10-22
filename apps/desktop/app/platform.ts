@@ -26,6 +26,7 @@ export function createDesktopPlatform(storage: Storage, invoke: NativeInvoke): C
           remoteAgent: true,
           selectedModel: store.selectedModel,
           selectModel: value => store.selectModel(value),
+          catalog: execution => store.catalog(execution),
           mcpChanged: () => store.reloadSettings(),
           settingsChanged: async (next) => {
             if (!next[resolveModel(store.selectedModel).configuration]) await store.selectModel(FALLBACK_MODEL, true)

@@ -4,6 +4,7 @@ import {
   GenerationService,
   JournalHub,
   followJournal,
+  reconcileTerminalTraceJournal,
   type AGUIEvent,
   type ExecutionOptions,
   type GenerationJournalEntry,
@@ -37,6 +38,11 @@ interface ActiveRun {
   /** 진행 중인 플러시로, 재진입 방지에 씁니다. */
   journalFlush?: Promise<void>
 }
+
+const reconcileSnapshot = (snapshot: GenerationSnapshot): GenerationSnapshot => ({
+  ...snapshot,
+  journal: reconcileTerminalTraceJournal(snapshot.journal, snapshot.status)
+})
 
 /** 실행 journal과 종료 상태를 IndexedDB에 저장합니다. */
 export class IndexedDBGenerationService extends GenerationService {
@@ -111,13 +117,14 @@ export class IndexedDBGenerationService extends GenerationService {
   async get(runId: string, options?: ExecutionOptions): Promise<GenerationSnapshot | undefined> {
     this.assertOpen()
     options?.signal?.throwIfAborted()
-    return this.store.getRun(runId)
+    const snapshot = await this.store.getRun(runId)
+    return snapshot && reconcileSnapshot(snapshot)
   }
 
   async list(options?: ExecutionOptions): Promise<GenerationSnapshot[]> {
     this.assertOpen()
     options?.signal?.throwIfAborted()
-    return this.store.listRuns()
+    return (await this.store.listRuns()).map(reconcileSnapshot)
   }
 
   subscribe(runId: string, options: GenerationSubscriptionOptions = {}): AsyncIterable<GenerationJournalEntry> {
@@ -128,8 +135,9 @@ export class IndexedDBGenerationService extends GenerationService {
           const snapshot = await this.store.getRun(runId)
           if (!snapshot) throw new Error(`generation run not found: ${runId}`)
           const active = this.active.get(runId)
+          const journal = active ? [...snapshot.journal, ...active.journal] : snapshot.journal
           return {
-            journal: active ? [...snapshot.journal, ...active.journal] : snapshot.journal,
+            journal: reconcileTerminalTraceJournal(journal, snapshot.status),
             done: snapshot.status !== 'running' && !active
           }
         },
@@ -153,7 +161,7 @@ export class IndexedDBGenerationService extends GenerationService {
       })
       this.hub.end(run.request.input.runId)
     }
-    return this.store.listRuns()
+    return (await this.store.listRuns()).map(reconcileSnapshot)
   }
 
   private async *execute(

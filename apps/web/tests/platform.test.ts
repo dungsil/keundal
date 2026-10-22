@@ -1,4 +1,6 @@
 import 'fake-indexeddb/auto'
+import { createServer } from 'node:http'
+import { Server, WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/server'
 import { expect, test } from 'vitest'
 import { createWebPlatform } from '../app/platform'
 import { defaultLLMSettings } from '@keundal/llm-settings'
@@ -37,4 +39,112 @@ test('웹 조립은 네이티브 IPC 없이 IndexedDB 대화를 저장하고 재
   } finally {
     await second.dispose()
   }
+})
+
+test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도구와 스킬을 실행하고 Journal을 저장한다', async (deferred, t) => {
+  const requests: Record<string, unknown>[] = []
+  const calls: string[] = []
+  let generations = 0
+  const mcp = new Server({ name: 'reports', version: '1' }, { capabilities: { tools: {} } })
+  mcp.setRequestHandler('tools/list', () => ({ tools: [
+    { name: 'search', description: 'Search reports', inputSchema: { type: 'object' } },
+    { name: 'delete', description: 'Delete reports', inputSchema: { type: 'object' } }
+  ] }))
+  mcp.setRequestHandler('tools/call', (request) => {
+    calls.push(request.params.name)
+    return { content: [{ type: 'text', text: 'Total: 37' }] }
+  })
+  const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true, sessionIdGenerator: () => crypto.randomUUID() })
+  await mcp.connect(transport)
+  const server = createServer(async (request, response) => {
+    const chunks = []
+    for await (const chunk of request) chunks.push(Buffer.from(chunk))
+    if (request.url === '/keundal.plugins.json') {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
+        plugins: [{ module: 'builtin:llm' }, { module: 'builtin:store' }, { module: 'builtin:skills' }],
+        agent: { module: 'builtin:agent', config: { deferredTools: {} } },
+        tools: [{ module: 'builtin:chat-tools' }]
+      }))
+      return
+    }
+    if (request.url === '/mcp') {
+      if (request.method !== 'POST') {
+        response.writeHead(405).end()
+        return
+      }
+      const result = await transport.handleRequest(new Request('http://localhost/mcp', {
+        method: request.method, headers: request.headers as Record<string, string>, body: Buffer.concat(chunks)
+      }))
+      response.writeHead(result.status, Object.fromEntries(result.headers)).end(Buffer.from(await result.arrayBuffer()))
+      return
+    }
+    const body = JSON.parse(Buffer.concat(chunks).toString())
+    if (request.url?.endsWith('/input_tokens')) {
+      response.writeHead(200, { 'content-type': 'application/json' }).end('{"input_tokens":40}')
+      return
+    }
+    const title = JSON.stringify(body.input).includes('Generate a chat title')
+    if (!title) requests.push(body)
+    const tool = body.tools?.find((tool: { name: string }) => tool.name?.startsWith('mcp__plugin_') && tool.name.endsWith('__search'))
+    const round = title ? -1 : generations++
+    const outputs = !title && deferred && round === 0
+      ? [{ type: 'function_call', id: 'fc_search', call_id: 'search_call', name: 'search_tool', arguments: '{"query":"search reports"}' }]
+      : !title && round === (deferred ? 1 : 0)
+        ? [
+            { type: 'function_call', id: 'fc_skill', call_id: 'skill_call', name: 'skill', arguments: '{"name":"review"}' },
+            { type: 'function_call', id: 'fc_mcp', call_id: 'mcp_call', name: tool?.name ?? 'missing-plugin-tool', arguments: '{}' }
+          ]
+        : [{ type: 'message', id: 'answer', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: 'Checked: 37', annotations: [] }] }]
+    const frames: Record<string, unknown>[] = outputs.flatMap((item, output_index) => [
+      { type: 'response.output_item.added', output_index, item },
+      { type: 'response.output_item.done', output_index, item }
+    ])
+    frames.push({ type: 'response.completed', response: { id: 'response', status: 'completed' } })
+    response.writeHead(200, { 'content-type': 'text/event-stream' }).end(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(''))
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.onTestFinished(async () => {
+    await mcp.close()
+    server.closeAllConnections()
+    await new Promise<void>(resolve => server.close(() => resolve()))
+  })
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('No port')
+  const endpoint = `http://127.0.0.1:${address.port}`
+  const platform = createWebPlatform(storage(), deferred ? { pluginConfig: `${endpoint}/keundal.plugins.json` } : {})
+  const markdown = '---\nname: review\ndescription: Review totals\n---\nCompare totals independently.'
+  await platform.plugins!.import({
+    'plugin.json': JSON.stringify({ $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json', name: 'reports' }),
+    'skills/review/SKILL.md': markdown,
+    'mcp.json': JSON.stringify({ $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json', mcpServers: {
+      reports: { type: 'streamable-http', url: `${endpoint}/mcp` }
+    } })
+  }, async () => {})
+  await platform.plugins!.configure('reports', { enabled: true, permissions: { reports: { tools: ['search'] } } }, async () => {})
+  const settings = defaultLLMSettings()
+  settings.openai = { apiKey: 'test-key', baseURL: `${endpoint}/v1` }
+  const connection = await platform.connect({ getSettings: () => settings, getModels: () => [], skills: [] })
+  t.onTestFinished(() => connection.dispose())
+  const id = crypto.randomUUID()
+  const user = { id: 'user', role: 'user' as const, parts: [{ type: 'text' as const, text: 'Review report' }] }
+  await connection.store.create(id, user, 'openai/test')
+  const events = []
+  for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user] })) events.push(event)
+  expect(events.at(-1), JSON.stringify(events)).toMatchObject({ type: 'RUN_FINISHED' })
+  expect(calls, JSON.stringify({ requests, events })).toEqual(['search'])
+  expect(JSON.stringify(requests.map(request => request.tools))).not.toContain('__delete')
+  if (deferred) {
+    expect(JSON.stringify(requests[0]!.tools)).toContain('search_tool')
+    expect(JSON.stringify(requests[0]!.tools)).not.toContain('mcp__')
+    expect(JSON.stringify(requests[1]!.tools)).toContain('__search')
+  }
+  const followup = requests[deferred ? 2 : 1]!
+  expect(JSON.stringify(followup.input)).toContain('Compare totals independently.')
+  expect(JSON.stringify(followup.input)).toContain('Total: 37')
+  const answer = (await connection.store.get(id))!.messages[1]!
+  expect(answer.parts).toContainEqual({ type: 'text', text: 'Checked: 37' })
+  const run = await connection.store.getRun?.(answer.id)
+  expect(run?.status).toBe('completed')
+  expect(run?.journal.map(entry => entry.event)).toContainEqual(expect.objectContaining({ type: 'CUSTOM', name: 'keundal.trace' }))
+  await connection.store.delete(id)
 })

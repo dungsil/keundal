@@ -67,6 +67,16 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(response.headers.get('content-type')).toContain('text/html')
     expect(html).toContain('id="__nuxt"')
     if (path === '/') {
+      const document = parseDocument(html)
+      const stylesheet = DomUtils.findOne(node => node.name === 'link' && node.attribs.rel === 'stylesheet', document.children)
+      expect(stylesheet, '공통 CSS를 HTML마다 반복하지 않고 별도 파일로 제공해야 한다').not.toBeNull()
+      for (const encoding of ['br', 'gzip']) {
+        const css = await fetch(new URL(stylesheet!.attribs.href!, origin), { headers: { 'accept-encoding': encoding } })
+        expect(css.status).toBe(200)
+        expect(css.headers.get('content-encoding')).toBe(encoding)
+        expect(css.headers.get('cache-control')).toContain('immutable')
+        expect(await css.text()).toContain('@layer')
+      }
       const script = readHeadScripts(html)
         .find(content => content?.includes('dataset.greetingTime'))
       expect(script, '앱 스크립트 실행 전에 인사말을 선택해야 한다').toBeDefined()

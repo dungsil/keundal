@@ -8,7 +8,7 @@ const { selectedModel, models, loading, switching, error, refresh } = useModels(
   <USelectMenu
     v-model="selectedModel"
     :items="models"
-    :aria-label="t('model.select')"
+    :aria-label="`${t('model.select')}: ${models.find(m => m.value === selectedModel)?.label || selectedModel}`"
     :loading="loading"
     :disabled="switching"
     size="sm"

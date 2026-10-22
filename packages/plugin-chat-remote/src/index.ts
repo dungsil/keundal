@@ -12,7 +12,8 @@ import {
   parseAGUIEvent,
   type AGUIEvent,
   type GenerationSnapshot,
-  type SessionSnapshot
+  type SessionSnapshot,
+  type ExecutionOptions
 } from '@keundal/core'
 
 type ChatState = { web: LocalChat }
@@ -94,6 +95,13 @@ export class RemoteChatStore implements ChatStoreLike {
     return response
   }
 
+  async catalog(options: import('@keundal/core').ExecutionOptions = {}): Promise<{
+    skills: readonly import('@keundal/core').SkillSummary[]
+    tools: readonly import('@keundal/core').SkillSummary[]
+  }> {
+    return (await this.call('/catalog', { signal: options.signal })).json()
+  }
+
   private snapshot(value: unknown): SessionSnapshot {
     return value as SessionSnapshot
   }
@@ -118,6 +126,13 @@ export class RemoteChatStore implements ChatStoreLike {
     if (response.status === 404) return undefined
     if (!response.ok) throw new Error(`Keundal host request failed (HTTP ${response.status})`)
     return this.chat(this.snapshot(await response.json()))
+  }
+
+  async getRun(runId: string, options: ExecutionOptions = {}): Promise<GenerationSnapshot | undefined> {
+    const response = await this.raw(`/runs/${encodeURIComponent(runId)}`, { signal: options.signal })
+    if (response.status === 404) return undefined
+    if (!response.ok) throw new Error(`Keundal host request failed (HTTP ${response.status})`)
+    return (await response.json()) as GenerationSnapshot
   }
 
   private async save(snapshot: SessionSnapshot | undefined, chat: LocalChat) {

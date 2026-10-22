@@ -59,8 +59,9 @@ PR 프리뷰는 `preview-build.yml`에서 Workers와 의존 패키지만 별도�
 프리뷰 배포도 PR의 전체 변경 파일을 확인하여 같은 경로만 바뀌었으면 배포와 댓글 생성을 생략한다.
 배포 입력이 함께 바뀐 PR은 프리뷰를 생성한다. `tools/tsdown`과 `tools/tsconfig`는 실제 앱 빌드에
 사용하므로 README를 제외한 변경은 프리뷰 대상에 포함한다. 앱이 사용하는 Markdown도 포함한다.
-제외 경로를 바꿀 때는 `ci.yml`의 `source`·`web`·`desktop` 필터, `preview-build.yml`과 `lighthouse.yml`의 `paths-ignore`,
-`preview.yml`의 배포 대상 검사를 함께 수정한다. 경로 확인과 빌드 결과 집계, 린트, CodeQL은 계속 실행한다.
+제외 경로를 바꿀 때는 `ci.yml`의 `source`·`web`·`desktop` 필터, `preview-build.yml`의 `paths-ignore`,
+`lighthouse.yml`의 `paths` 제외 패턴, `preview.yml`의 배포 대상 검사를 함께 수정한다.
+경로 확인과 빌드 결과 집계, 린트, CodeQL은 계속 실행한다.
 
 전체 CI 성공은 별도 데스크톱 프리뷰 댓글의 다운로드 링크만 갱신한다. 웹은 `PR 프리뷰 빌드` 성공 시 배포한다. 네이티브 빌드가 실패하거나
 생략되어도 별도 웹 빌드가 성공하면 웹 프리뷰는 배포된다. 별도 빌드와 CI의 웹 빌드는 기존 Turbo 캐시를
@@ -159,6 +160,20 @@ Windows와 macOS 로그에는 Rust 의존성 캐시 미적중과 전체 컴파�
 캐시 분리만으로 이 컴파일 비용이 사라지지는 않는다. 이번 변경은 검사 범위나 빌드 의존성을 바꾸지 않는다.
 변경 후 실제 캐시 크기와 소요 시간은 GitHub에서 새 저장 영역이 채워진 후 비교해야 한다.
 
+## 데스크톱 환경 준비 재시도
+
+[실행 39632965381](https://github.com/dungsil/keundal/actions/runs/39632965381/job/119336392017)에서
+Linux 작업은 pnpm 다운로드 중 `ECONNRESET`으로 실패했다. 패키지 설치와 빌드는 시작하지 못했다.
+같은 커밋의 웹·패키지 빌드, Windows·macOS 빌드, 타입 검사와 테스트는 통과했다.
+
+데스크톱 행렬은 첫 환경 준비가 실패하면 같은 `pnpm/setup`을 한 번 더 실행한다.
+첫 단계의 `outcome`으로 재시도를 결정하며, 재시도도 실패하면 작업은 실패한다. 취소한 작업은 재시도하지 않는다.
+액션 SHA, Node·pnpm 버전, 캐시 설정과 `require-lockfile: true`는 유지한다.
+
+고정한 액션을 임시 경로에서 실행하여 다운로드에 `ECONNRESET`을 주입했을 때 종료 코드 1을 확인했다.
+오류 주입 없이 다시 실행한 액션은 종료 코드 0으로 pnpm 12.4.2와 Node 24.21.0을 준비했다.
+이 로컬 검증은 의존성 설치와 GitHub 캐시를 생략했으며, 실제 행렬 빌드는 GitHub CI에서 확인한다.
+
 ## 검증 방법
 
 macOS의 DMG 생성은 [실행 39454203709](https://github.com/dungsil/keundal/actions/runs/39454203709)에서
@@ -208,12 +223,21 @@ macOS의 DMG 생성은 [실행 39454203709](https://github.com/dungsil/keundal/a
 각 패키지의 `nuxt.config.ts`, `package.json`이다. PR 전체 변경 파일을 기준으로 판단한다.
 문서, 서버, 데스크톱 전용 코드, 검사 설정 또는 루트 잠금 파일만 바뀐 PR에서는 실행하지 않는다.
 따라서 UI 변경이 없는 PR에서는 프리뷰 배포 대기와 Lighthouse 결과 댓글 갱신도 생략한다.
-기존 프리뷰 배포가 남긴 봇 댓글에서 현재 PR 커밋과 일치하는 배포 URL을 최대 20분간 기다린 뒤,
-그 URL의 홈(`/`)과 설정(`/settings`)을 Unlighthouse 0.19.1로 검사한다. 이전 커밋이나 일반 사용자의
-댓글에 있는 주소는 사용하지 않는다.
 
-모바일 설정으로 두 화면을 각각 3회 검사하고 항목별 중앙값을 PR의 별도 Lighthouse 댓글과 Actions
+GitHub Actions는 같은 이벤트에서 `paths`와 `paths-ignore`를 함께 정의할 수 없다.
+둘 중 하나만 쓸 수 있으므로 제외 경로는 `paths`의 `!` 패턴으로 적는다. 뒤에 오는 `!` 패턴은 앞선 일치 경로를 제외한다.
+루트 Markdown 문서와 앱·패키지·도구의 README을 제외하는 규칙은 `preview-build.yml`의 `paths-ignore`와 같은 경로를 쓴다.
+
+기존 프리뷰 배포가 남긴 봇 댓글에서 현재 PR 커밋과 일치하는 배포 URL을 최대 20분간 기다린 뒤,
+그 URL의 홈(`/`)과 설정 하위 화면 다섯 개를 Unlighthouse 0.19.1로 검사한다.
+설정 경로는 `/settings/appearance`, `/settings/llm`, `/settings/models`, `/settings/mcp`, `/settings/skills`다.
+`/settings`는 하위 화면으로 이동하므로 검사 대상에서 제외한다. 이전 커밋이나 일반 사용자의 댓글에 있는 주소는 사용하지 않는다.
+
+모바일 화면과 느린 4G 네트워크, 4배 CPU 감속 설정으로 여섯 화면을 각각 3회 검사한다.
+속도 제한이 없는 로컬 실행의 100점과 구분하며, 실제 기기의 측정값과 같다는 뜻은 아니다.
+항목별 중앙값을 PR의 별도 Lighthouse 댓글과 Actions
 작업 요약에 표시한다. 댓글에는 검사한 커밋과 실행 로그 링크를 남기며 재실행 시 같은 댓글을 갱신한다.
+
 HTML·JSON 보고서는 아티팩트로 업로드하지 않는다. 점수 임계값은 설정하지 않고, 검사 실패도 댓글에
 표시한다. 이전 커밋과의 점수 차이는 자동으로 계산하지 않는다.
 
@@ -233,6 +257,7 @@ pnpm --filter @keundal/web preview
 ```
 
 다른 터미널에서 `pnpm lighthouse:local`을 실행하면 Unlighthouse가 로컬 웹을 검사한다.
+로컬 명령도 CI와 같은 설정 파일을 사용하여 경로와 속도 제한을 유지한다.
 다른 주소를 검사하려면 다음처럼 실행한다. Chromium을 직접 지정하려면 `CHROME_PATH`를 설정하고
 저장소의 설정 파일을 전달한다. 기본 실행의 원본 보고서는 `.unlighthouse/`에 저장한다.
 
@@ -247,11 +272,45 @@ CI는 `LIGHTHOUSE_RUN=1`, `2`, `3`으로 위 명령을 각각 실행하여 원�
 LIGHTHOUSE_BASE_URL=https://배포된-프리뷰-주소 LIGHTHOUSE_REPORT_DIR=.unlighthouse node tools/lighthouse/summary.mjs
 ```
 
+### 로컬 성능 측정 전후 비교
+
+2026년 10월 21일에 같은 `main` 기준 코드의 변경 전후를 로컬 Node 프로덕션 서버에서 측정했다.
+위 모바일 속도 제한을 적용했으며, 아래 값은 화면별 3회 측정의 중앙값이다.
+Cloudflare 배포 환경의 점수는 아니며, 실행 중인 다른 프로세스와 서버 환경에 따라 달라질 수 있다.
+
+| 경로                   | 변경 전 성능 | 변경 후 성능 | LCP 변경         |
+| ---------------------- | ------------ | ------------ | ---------------- |
+| `/`                    | 59           | 63           | 6.98초 → 4.90초  |
+| `/settings/appearance` | 62           | 81           | 5.85초 → 3.75초  |
+| `/settings/llm`        | 60           | 87           | 6.83초 → 3.31초  |
+| `/settings/models`     | 62           | 80           | 6.68초 → 3.30초  |
+| `/settings/mcp`        | 58           | 69           | 13.88초 → 6.88초 |
+| `/settings/skills`     | 60           | 63           | 13.50초 → 6.47초 |
+
+접근성, 권장사항, SEO는 여섯 화면 모두 100점을 유지했다.
+공통 CSS를 별도 파일로 제공하고 정적 자산에 Brotli·gzip 압축을 적용했다.
+294,485바이트의 공통 CSS는 Brotli로 35,589바이트가 되며, 브라우저가 화면 간에 재사용할 수 있다.
+스킬 Markdown 파서는 파일을 읽거나 가져올 때 불러오며, 시작 스플래시는 유지한다.
+필수 모듈의 사전 로딩을 켜는 실험에서는 첫 표시가 늦어져 기존 사전 로딩 제한을 유지했다.
+여섯 화면의 성능 점수는 아직 90점 미만이다.
+
 ## 린터의 실행 환경
+
+루트 `pnpm lint`는 앱 의존성 경계 검사, Oxlint, Oxfmt 검사를 차례로 실행한다.
+`pnpm lintfix`는 Oxlint 자동 수정과 Oxfmt를 실행한다. 커밋 전 검사에도 Vue 파일을 포함한다.
+웹·데스크톱·공유 채팅 패키지의 `lint` 명령은 같은 루트 Oxlint 설정으로 해당 패키지를 검사한다.
+ESLint 실행·설정·의존성과 Nuxt 모듈은 제거했다.
+`.pnpmfile.cjs`는 Nuxt가 사용하는 `vite-plugin-checker`의 선택적 ESLint peer도 제거하여 ESLint 재설치를 방지한다.
 
 Oxlint의 Node 환경은 `packages/agent-host/src/**`에도 적용한다. Node가 제공하는 `AbortController`를
 미정의 변수로 처리하지 않으며, 다른 패키지에 Node 전역을 일괄 허용하지 않는다.
 
-`packages/ui/nuxt.config.ts`에는 `defineNuxtConfig`를, UI 앱 파일에는 사용하는 Nuxt·Vue 자동 import를
-읽기 전용 전역으로 등록한다. 브라우저 환경은 UI 앱 파일에만 적용하고 `defineProps`, `defineEmits`는
-Vue 파일에만 허용한다. UI 파일을 린트 대상에서 제외하거나 미정의 변수 검사를 끄지는 않는다.
+Nuxt 설정 파일에는 Node 환경과 `defineNuxtConfig`를 적용한다. UI 앱 파일에는 사용하는 Nuxt·Vue 자동 import를
+읽기 전용 전역으로 등록한다. 공유 채팅 전용 자동 import와 서버의 `defineNitroPlugin`은 해당 경로에서만 허용한다.
+브라우저 환경은 UI 앱 파일에 적용하고 Vue 컴파일러 매크로는 Vue 파일에만 허용한다.
+UI 파일을 린트 대상에서 제외하거나 미정의 변수 검사를 끄지는 않는다.
+
+Oxlint의 기본 검사와 내장 Vue 플러그인은 JavaScript·TypeScript와 Vue 스크립트를 검사한다.
+[Oxlint는 아직 Vue 템플릿 검사를 지원하지 않는다](https://oxc.rs/compatibility.html).
+기존 템플릿 속성 배치 규칙과 템플릿 내부 Tailwind 클래스 검사는 이전하지 않았다.
+웹·데스크톱·공유 채팅 소스의 Oxfmt 제외 설정은 유지하여 일괄 재포맷하지 않는다.

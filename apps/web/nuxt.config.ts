@@ -6,11 +6,13 @@ const wrangler = { name: 'keundal-web', preview_urls: true, previews: {} }
 export default defineNuxtConfig({
   extends: ['@keundal/chat-app'],
   devtools: { enabled: true },
+  runtimeConfig: { public: { pluginConfig: '/keundal.plugins.json' } },
   alias: {
     '#agent-host-runtime': fileURLToPath(new URL('./server/agent/runtime-node.ts', import.meta.url))
   },
-  features: { inlineStyles: true },
+  features: { inlineStyles: false },
   nitro: {
+    compressPublicAssets: true,
     externals: { inline: ['zod'] },
     cloudflare: { nodeCompat: true, deployConfig: true, wrangler },
     experimental: { openAPI: true }
@@ -20,7 +22,7 @@ export default defineNuxtConfig({
       // Load optional provider SDKs through their dynamic imports when needed.
       for (const entry of Object.values(manifest)) {
         entry.prefetch = false
-        // Let the inline page and fonts render before importing the remaining modules.
+        // 나머지 모듈보다 스타일시트와 글꼴을 먼저 불러온다.
         if (entry.resourceType === 'script' && !entry.isEntry) entry.preload = false
       }
     },

@@ -1,6 +1,3 @@
-import { validateHeaderName, validateHeaderValue } from 'node:http'
-import process from 'node:process'
-
 export const PLUGIN_SCHEMA = 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json'
 export const MCP_SCHEMA = 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json'
 export interface PluginManifest {
@@ -28,6 +25,16 @@ export function strings(value: unknown): value is Record<string, string> {
 }
 function only(value: Record<string, unknown>, keys: string[]) {
   if (Object.keys(value).some((key) => !keys.includes(key))) throw new Error('unknown configuration field')
+}
+export function mcpServers(value: unknown): Record<string, unknown> {
+  if (
+    !object(value) ||
+    value.$schema !== MCP_SCHEMA ||
+    !object(value.mcpServers) ||
+    Object.keys(value).some((key) => !['$schema', 'mcpServers'].includes(key))
+  )
+    throw new Error('invalid or unsupported mcp.json')
+  return value.mcpServers
 }
 export function manifest(value: unknown, report: Report): PluginManifest {
   if (!object(value)) throw new Error('plugin.json must be an object')
@@ -71,7 +78,7 @@ export function manifest(value: unknown, report: Report): PluginManifest {
 export type Server =
   | { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; cwd?: string }
   | { type: 'streamable-http' | 'sse'; url: string; headers?: Record<string, string> }
-export function server(value: unknown): Server {
+export function server(value: unknown, windows = false): Server {
   if (!object(value)) throw new Error('server must be an object')
   if (value.type === 'stdio') {
     only(value, ['type', 'command', 'args', 'env', 'cwd'])
@@ -84,9 +91,7 @@ export function server(value: unknown): Server {
     if ('env' in value) {
       if (!strings(value.env)) throw new Error('invalid env')
       if (
-        Object.keys(value.env).some((key) =>
-          ['PLUGIN_ROOT', 'PLUGIN_DATA'].includes(process.platform === 'win32' ? key.toUpperCase() : key)
-        )
+        Object.keys(value.env).some((key) => ['PLUGIN_ROOT', 'PLUGIN_DATA'].includes(windows ? key.toUpperCase() : key))
       )
         throw new Error('reserved plugin environment variable')
     }
@@ -112,8 +117,8 @@ export function server(value: unknown): Server {
       if (!strings(value.headers)) throw new Error('invalid headers')
       const names = new Set<string>()
       for (const [key, header] of Object.entries(value.headers)) {
-        validateHeaderName(key)
-        validateHeaderValue(key, header)
+        if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(key) || /[^\t\x20-\x7e\x80-\xff]/.test(header))
+          throw new Error('invalid HTTP header')
         if (names.has(key.toLowerCase())) throw new Error('duplicate HTTP header')
         names.add(key.toLowerCase())
       }

@@ -45,7 +45,13 @@ const input = (
 export async function createKeundalChat(
   context: Context,
   name: string,
-  options: { webSearch?: boolean; reasoning?: Reasoning; maxOutputTokens?: number },
+  options: {
+    maxActiveSubagents?: number
+    subagents?: boolean
+    webSearch?: boolean
+    reasoning?: Reasoning
+    maxOutputTokens?: number
+  },
   mountAgent: MountAgent
 ): Promise<KeundalChatRuntime> {
   const config = resolveModel(name)
@@ -61,6 +67,9 @@ export async function createKeundalChat(
           ? undefined
           : options.reasoning,
       maxToolRounds: 4,
+      subagents: options.subagents ?? true,
+      maxActiveSubagents: options.maxActiveSubagents,
+      parallelTools: true,
       skills: !!context.skills
     })
   })

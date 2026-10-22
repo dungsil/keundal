@@ -4,6 +4,7 @@ import {
   GenerationService,
   JournalHub,
   followJournal,
+  reconcileTerminalTraceJournal,
   type AGUIEvent,
   type ExecutionOptions,
   type GenerationJournalEntry,
@@ -21,7 +22,7 @@ import type { MemoryStore, StoredRun } from './store.js'
 const snapshot = (r: StoredRun): GenerationSnapshot => ({
   request: r.request,
   status: r.status,
-  journal: [...r.journal],
+  journal: reconcileTerminalTraceJournal(r.journal, r.status),
   messages: [...r.messages]
 })
 export class MemoryGenerationService extends GenerationService {
@@ -147,8 +148,9 @@ export class MemoryGenerationService extends GenerationService {
       {
         read: () => {
           const record = this.store.runs.get(runId)
+          const journal = record?.journal ?? []
           return {
-            journal: record?.journal ?? [],
+            journal: reconcileTerminalTraceJournal(journal, record?.status ?? 'running'),
             done: !record || record.status !== 'running' || !this.active.has(runId)
           }
         },

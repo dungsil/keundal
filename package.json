@@ -10,12 +10,12 @@
     "build:preview": "turbo run build:preview",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "lint": "pnpm check:boundaries && oxlint && oxfmt --check && pnpm --filter @keundal/chat-app lint && pnpm --filter @keundal/web lint && pnpm --filter @keundal/desktop lint",
-    "lintfix": "oxlint --fix && oxfmt && pnpm --filter @keundal/chat-app exec eslint . --fix && pnpm --filter @keundal/web exec eslint . --fix && pnpm --filter @keundal/desktop exec eslint . --fix",
+    "lint": "pnpm check:boundaries && oxlint && oxfmt --check",
+    "lintfix": "oxlint --fix && oxfmt",
     "prepare": "simple-git-hooks",
     "check:boundaries": "node tools/workspace-boundaries/check.mjs",
     "test:boundaries": "node --test tools/workspace-boundaries/tests/*.test.ts",
-    "lighthouse:local": "pnpm dlx --allow-build=esbuild --allow-build=puppeteer --allow-build=vue-demi @unlighthouse/cli@0.19.1 --site http://localhost:3000"
+    "lighthouse:local": "pnpm dlx --allow-build=esbuild --allow-build=puppeteer --allow-build=vue-demi @unlighthouse/cli@0.19.1 --site http://localhost:3000 --config-file tools/lighthouse/unlighthouse.config.mjs"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",
@@ -31,7 +31,7 @@
     "pre-commit": "pnpm exec lint-staged"
   },
   "lint-staged": {
-    "**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}": [
+    "**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue}": [
       "oxlint --fix --no-error-on-unmatched-pattern",
       "oxfmt"
     ],

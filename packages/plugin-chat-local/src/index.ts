@@ -2,7 +2,7 @@ import type { ChatMessage, ChatMessageAssembly } from '@keundal/chat/chat-messag
 import { validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
 import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
-import { SteerQueue, type Reasoning, type AGUIEvent, type SessionSnapshot } from '@keundal/core'
+import { SteerQueue, type Reasoning, type AGUIEvent, type SessionSnapshot, type ExecutionOptions } from '@keundal/core'
 import type { Context } from 'cordis'
 
 import { createKeundalChat, toMessages, type KeundalChatRuntime, type MountAgent } from './keundal'
@@ -59,6 +59,10 @@ export class ChatStore implements ChatStoreLike {
 
   async get(id: string): Promise<LocalChat | undefined> {
     return this.chat(await this.ctx.session.get(id))
+  }
+
+  async getRun(runId: string, options: ExecutionOptions = {}) {
+    return this.ctx.generation.get(runId, options)
   }
 
   private async save(snapshot: SessionSnapshot | undefined, chat: LocalChat) {

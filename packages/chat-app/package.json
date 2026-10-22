@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "postinstall": "nuxt prepare",
-    "lint": "eslint .",
+    "lint": "oxlint .",
     "test": "vitest run",
     "typecheck": "nuxt typecheck && tsc -p tsconfig.test.json"
   },
@@ -35,13 +35,11 @@
     "@keundal/skill-markdown": "workspace:*"
   },
   "devDependencies": {
+    "@comark/vue": "^0.7.0",
     "@keundal/plugin-chat-browser": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/plugin-store-sqlite": "workspace:*",
-    "@nuxt/eslint": "^1.17.0",
     "@types/node": "^24.19.2",
-    "eslint": "^10.12.0",
-    "eslint-plugin-better-tailwindcss": "^4.9.0",
     "fake-indexeddb": "6.2.6",
     "typescript": "^6.0.3",
     "vitest": "catalog:",

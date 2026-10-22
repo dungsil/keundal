@@ -7,6 +7,7 @@ import {
   GenerationService,
   JournalHub,
   followJournal,
+  reconcileTerminalTraceJournal,
   type AGUIEvent,
   type ExecutionOptions,
   type GenerationJournalEntry,
@@ -43,7 +44,7 @@ interface ActiveRun {
 const snapshot = (run: StoredRun): GenerationSnapshot => ({
   request: run.request,
   status: run.status,
-  journal: run.journal,
+  journal: reconcileTerminalTraceJournal(run.journal, run.status),
   messages: run.messages
 })
 
@@ -156,8 +157,9 @@ export class SqliteGenerationService extends GenerationService {
           const stored = this.store.readJournal(runId)
           if (!stored) throw new Error(`generation run not found: ${runId}`)
           const active = this.active.get(runId)
+          const journal = active ? [...stored.journal, ...active.recorder.buffered] : stored.journal
           return {
-            journal: active ? [...stored.journal, ...active.recorder.buffered] : stored.journal,
+            journal: reconcileTerminalTraceJournal(journal, stored.status),
             done: stored.status !== 'running' && !active
           }
         },

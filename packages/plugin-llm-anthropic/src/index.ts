@@ -3,6 +3,7 @@ import {
   fetchWithStreamLimit,
   StreamBudget,
   LLMService,
+  llmUsageEvent,
   type ExecutionOptions,
   type LLMEvent,
   type LLMModel,
@@ -99,8 +100,11 @@ export class AnthropicLLMService extends LLMService {
     signal: AbortSignal,
     cleanup: () => void
   ): AsyncGenerator<LLMEvent, void, unknown> {
+    let inputTokens: number | undefined
+    let outputTokens: number | undefined
+    let cacheReadTokens: number | undefined
+    let cacheWriteTokens: number | undefined
     try {
-      signal.throwIfAborted()
       this.validateRequest(request)
       const stream = await this.client.messages.create(
         {
@@ -116,6 +120,32 @@ export class AnthropicLLMService extends LLMService {
         for await (const event of stream) {
           signal.throwIfAborted()
           budget.accept(event)
+          if (event.type === 'message_start') {
+            const usage = event.message.usage
+            inputTokens = safeTokenCount(usage?.input_tokens)
+            cacheReadTokens = safeTokenCount(usage?.cache_read_input_tokens)
+            cacheWriteTokens = safeTokenCount(usage?.cache_creation_input_tokens)
+          } else if (event.type === 'message_delta') {
+            outputTokens = safeTokenCount(event.usage?.output_tokens)
+          }
+          if (event.type === 'message_start' || event.type === 'message_delta') {
+            const inputTotal =
+              inputTokens === undefined ? undefined : inputTokens + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0)
+            if (
+              inputTotal !== undefined ||
+              outputTokens !== undefined ||
+              cacheReadTokens !== undefined ||
+              cacheWriteTokens !== undefined
+            ) {
+              yield llmUsageEvent({
+                source: 'provider',
+                ...(inputTotal === undefined ? {} : { inputTokens: inputTotal }),
+                ...(outputTokens === undefined ? {} : { outputTokens }),
+                ...(cacheReadTokens === undefined ? {} : { cacheReadTokens }),
+                ...(cacheWriteTokens === undefined ? {} : { cacheWriteTokens })
+              })
+            }
+          }
           for (const mapped of events.convert(event)) {
             signal.throwIfAborted()
             yield mapped
@@ -185,3 +215,7 @@ export const anthropicLLMPlugin = Object.assign(
 )
 
 export default anthropicLLMPlugin
+
+function safeTokenCount(value: unknown): number | undefined {
+  return Number.isSafeInteger(value) && (value as number) >= 0 ? (value as number) : undefined
+}

@@ -1,4 +1,4 @@
-import type { Reasoning, AGUIEvent } from '@keundal/core'
+import type { ExecutionOptions, GenerationSnapshot, Reasoning, AGUIEvent } from '@keundal/core'
 
 import type { ChatMessage } from './chat-message'
 export interface ChatStoreLike {
@@ -9,6 +9,7 @@ export interface ChatStoreLike {
   truncate(id: string, messageId: string, type: 'edit' | 'regenerate'): Promise<void>
   vote(id: string, messageId: string, isUpvoted?: boolean): Promise<void>
   delete(id: string): Promise<void>
+  getRun(runId: string, options?: ExecutionOptions): Promise<GenerationSnapshot | undefined>
   respond(
     id: string,
     request: {

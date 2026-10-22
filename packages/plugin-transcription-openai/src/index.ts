@@ -2,6 +2,7 @@ import type { ExecutionOptions } from '@keundal/core'
 import type { Context } from 'cordis'
 import OpenAI from 'openai'
 
+import { fetchCredentials } from './fetch.js'
 import { TranscriptionService, type TranscriptionRequest, type TranscriptionSession } from './service.js'
 
 export * from './service.js'
@@ -24,7 +25,7 @@ export class OpenAITranscriptionService extends TranscriptionService {
     if (!config.apiKey?.trim()) throw new Error('OpenAI API key is required')
     if (config.dangerouslyAllowBrowser !== undefined && typeof config.dangerouslyAllowBrowser !== 'boolean')
       throw new Error('dangerouslyAllowBrowser must be a boolean')
-    this.client = new OpenAI({ ...config, defaultHeaders: config.headers, maxRetries: 0 })
+    this.client = new OpenAI({ ...config, defaultHeaders: config.headers, fetch: fetchCredentials, maxRetries: 0 })
     const url = new globalThis.URL(`${(config.baseURL ?? 'https://api.openai.com/v1').replace(/\/$/, '')}/realtime`)
     url.protocol = url.protocol === 'http:' ? 'ws:' : 'wss:'
     url.searchParams.set('intent', 'transcription')

@@ -4,13 +4,19 @@ import {
   STEER_MESSAGE_EVENT,
   EventType,
   MessageAssembly,
+  readTraceSpans,
+  traceEvent,
+  type AGUIEvent,
   type LLMEvent,
   type LLMRequest,
   type LLMService,
   type AgentMessage,
-  type RunAgentInput
+  type RunAgentInput,
+  type TraceSpan
 } from '@keundal/core'
+import { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 import type { ExecutableTool, ToolExecutionContext } from '@keundal/tools'
+export { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 export type { ExecutableTool, ToolExecutionContext } from '@keundal/tools'
 export function parseTools(value: unknown): ExecutableTool[] {
   if (value === undefined) return []
@@ -66,15 +72,46 @@ export async function* streamWithTools(
     stream?: LLMService['stream']
     maxToolCalls?: number
     steer?: () => AgentMessage[]
+    resolveTools?: () => readonly ExecutableTool[] | Promise<readonly ExecutableTool[]>
+    traceContext?: (call: { id: string; name: string }) => { traceId: string; parentSpanId: string }
+    trace?: {
+      onToolStart(call: { id: string; name: string }): AGUIEvent | undefined
+      onToolEnd(call: { id: string; name: string; status: 'completed' | 'failed' | 'cancelled' }): AGUIEvent | undefined
+    }
   } = {}
 ): AsyncGenerator<LLMEvent> {
-  const registered = new Map(tools.map((tool) => [tool.name, tool]))
+  let registered = new Map(tools.map((tool) => [tool.name, tool]))
   const usedIds = new Set(
     request.input.messages.flatMap((message) =>
       message.role === 'assistant' ? (message.toolCalls ?? []).map((call) => call.id) : []
     )
   )
   let current = request
+  const configuredNames = new Set(tools.map((tool) => tool.name))
+  const initialInputNames = new Set(request.input.tools.map((tool) => tool.name))
+  let previousResolvedNames = new Set<string>()
+  let resolvedToolsPrepared = false
+  const refreshResolvedTools = async (input: RunAgentInput): Promise<RunAgentInput> => {
+    const resolvedTools = await options.resolveTools!()
+    const allTools = [...tools, ...resolvedTools]
+    registered = new Map(allTools.map((tool) => [tool.name, tool]))
+    if (registered.size !== allTools.length) throw new Error('duplicate tool name in resolved tool catalog')
+    for (const tool of resolvedTools) {
+      if (initialInputNames.has(tool.name) && !configuredNames.has(tool.name)) {
+        throw new Error(`deferred tool is defined in both input and deferred catalog: ${tool.name}`)
+      }
+    }
+    const managedNames = new Set([...configuredNames, ...previousResolvedNames])
+    const retainedTools = input.tools.filter((tool) => !managedNames.has(tool.name))
+    const definitions = allTools.map(({ name, description, parameters }) => ({ name, description, parameters }))
+    const retainedNames = new Set(retainedTools.map((tool) => tool.name))
+    for (const definition of definitions) {
+      if (retainedNames.has(definition.name))
+        throw new Error(`tool is defined in both input and agent config: ${definition.name}`)
+    }
+    previousResolvedNames = new Set(resolvedTools.map((tool) => tool.name))
+    return { ...input, tools: [...retainedTools, ...definitions] }
+  }
   let rounds = 0
   let totalCalls = 0
   const maxToolCalls = options.maxToolCalls ?? 32
@@ -86,7 +123,11 @@ export async function* streamWithTools(
    * 지시와 도구 결과가 같은 경로로 입력 예산과 축약 정책을 거치게 합니다.
    */
   const advance = async function* (messages: AgentMessage[]): AsyncGenerator<LLMEvent, RunAgentInput> {
-    const next = { ...current.input, messages: [...current.input.messages, ...messages] }
+    let next = { ...current.input, messages: [...current.input.messages, ...messages] }
+    if (options.resolveTools) {
+      next = await refreshResolvedTools(next)
+      resolvedToolsPrepared = true
+    }
     const prepared = await prepareInput(next)
     signal.throwIfAborted()
     const previousIds = new Set(next.messages.map((message) => message.id))
@@ -116,6 +157,10 @@ export async function* streamWithTools(
   }
   while (true) {
     signal.throwIfAborted()
+    if (options.resolveTools && !resolvedToolsPrepared) {
+      current = { ...current, input: await refreshResolvedTools(current.input) }
+    }
+    resolvedToolsPrepared = false
     const assembly = new MessageAssembly()
     const calls = new Map<string, PendingCall>()
     for await (const event of options.stream ? options.stream(current, { signal }) : llm.stream(current, { signal })) {
@@ -173,44 +218,9 @@ export async function* streamWithTools(
       toolCallId: call.id,
       signal
     })
-    if (options.parallel) {
-      // 실행을 겹쳐 시작하고 결과는 호출 순서대로 전달합니다. 순서가 되기 전에 실패한 실행이
-      // 있으면 그 오류를 전달하고, 아직 전달하지 않은 나머지 실행의 결과는 기록하지 않습니다.
-      // 감싼 거부는 순서가 될 때까지 처리되지 않으므로 원래 오류를 보존하려 상자로 받습니다.
-      const pending = executions.map(({ call, tool, args }) => ({
-        call,
-        tool,
-        task: Promise.resolve(tool.execute(args, executionContext(call))).catch((error: unknown) => error)
-      }))
-      for (const { call, tool, task } of pending) {
-        signal.throwIfAborted()
-        const content = await task
-        signal.throwIfAborted()
-        if (content instanceof Error) throw content
-        if (typeof content !== 'string') throw new Error(`tool result must be a string: ${tool.name}`)
-        const event: LLMEvent = {
-          type: EventType.TOOL_CALL_RESULT,
-          messageId: globalThis.crypto.randomUUID(),
-          toolCallId: call.id,
-          role: 'tool',
-          content
-        }
-        assembly.apply(event)
-        yield event
-      }
-    } else {
-      for (const { call, tool, args } of executions) {
-        signal.throwIfAborted()
-        const content = await tool.execute(args, executionContext(call))
-        signal.throwIfAborted()
-        if (typeof content !== 'string') throw new Error(`tool result must be a string: ${tool.name}`)
-        const event: LLMEvent = {
-          type: EventType.TOOL_CALL_RESULT,
-          messageId: globalThis.crypto.randomUUID(),
-          toolCallId: call.id,
-          role: 'tool',
-          content
-        }
+    const batches = options.parallel ? [executions] : executions.map((execution) => [execution])
+    for (const batch of batches) {
+      for await (const event of executeBatch(batch, executionContext, signal, options.trace, options.traceContext)) {
         assembly.apply(event)
         yield event
       }
@@ -220,6 +230,168 @@ export async function* streamWithTools(
     // 지시는 진행 중인 요청이나 도구를 중단하지 않고, 완료된 도구 결과 뒤의 경계에서만 반영합니다.
     const steered = yield* takeSteer(assembly.messages)
     current = { ...current, input: yield* advance([...assembly.messages, ...steered]) }
+  }
+}
+
+async function* executeBatch(
+  executions: { call: PendingCall; tool: ExecutableTool; args: Record<string, unknown> }[],
+  context: (call: PendingCall) => ToolExecutionContext,
+  signal: AbortSignal,
+  trace?: {
+    onToolStart(call: { id: string; name: string }): AGUIEvent | undefined
+    onToolEnd(call: { id: string; name: string; status: 'completed' | 'failed' | 'cancelled' }): AGUIEvent | undefined
+  },
+  traceContext?: (call: { id: string; name: string }) => { traceId: string; parentSpanId: string }
+): AsyncGenerator<LLMEvent> {
+  const progress: LLMEvent[] = []
+  let wake: (() => void) | undefined
+  let closed = false
+  let onAbort: (() => void) | undefined
+  const notify = () => wake?.()
+  signal.addEventListener('abort', notify, { once: true })
+  try {
+    signal.throwIfAborted()
+    const pending = executions.map(({ call, tool, args }) => {
+      let settled = false
+      let started = false
+      let ended = false
+      const finish = (status: 'completed' | 'failed' | 'cancelled') => {
+        if (!started || ended) return
+        ended = true
+        const event = trace?.onToolEnd({ id: call.id, name: call.name, status })
+        if (!event) return
+        if (event.type !== EventType.CUSTOM) throw new Error('tool trace hooks must return CUSTOM events')
+        progress.push(event)
+        notify()
+      }
+      const task = Promise.resolve()
+        .then(async () => {
+          try {
+            signal.throwIfAborted()
+            const callInfo = { id: call.id, name: call.name }
+            const toolTraceContext = traceContext?.(callInfo)
+            const event = trace?.onToolStart(callInfo)
+            if (event) {
+              if (event.type !== EventType.CUSTOM) throw new Error('tool trace hooks must return CUSTOM events')
+              progress.push(event)
+              notify()
+            }
+            started = true
+            const value = await tool.execute(args, {
+              ...context(call),
+              ...toolTraceContext,
+              reportTrace(span: TraceSpan) {
+                if (closed || signal.aborted || !toolTraceContext) return
+                const validated = readTraceSpans([traceEvent(span)], undefined, 1)[0]
+                if (!validated || validated.traceId !== toolTraceContext.traceId) return
+                const safeSpan: TraceSpan = {
+                  version: 1,
+                  traceId: validated.traceId,
+                  spanId: validated.spanId,
+                  ...(validated.parentSpanId ? { parentSpanId: validated.parentSpanId } : {}),
+                  runId: validated.runId,
+                  ...(validated.toolCallId ? { toolCallId: validated.toolCallId } : {}),
+                  kind: validated.kind,
+                  name: validated.name,
+                  sequence: validated.sequence,
+                  startedAt: validated.startedAt,
+                  ...(validated.endedAt === undefined ? {} : { endedAt: validated.endedAt }),
+                  status: validated.status,
+                  ...(validated.model ? { model: validated.model } : {}),
+                  ...(validated.usage
+                    ? {
+                        usage: {
+                          source: validated.usage.source,
+                          ...(validated.usage.inputTokens === undefined
+                            ? {}
+                            : { inputTokens: validated.usage.inputTokens }),
+                          ...(validated.usage.outputTokens === undefined
+                            ? {}
+                            : { outputTokens: validated.usage.outputTokens }),
+                          ...(validated.usage.cacheReadTokens === undefined
+                            ? {}
+                            : { cacheReadTokens: validated.usage.cacheReadTokens }),
+                          ...(validated.usage.cacheWriteTokens === undefined
+                            ? {}
+                            : { cacheWriteTokens: validated.usage.cacheWriteTokens })
+                        }
+                      }
+                    : {}),
+                  ...(validated.cost
+                    ? {
+                        cost: {
+                          currency: validated.cost.currency,
+                          amount: validated.cost.amount,
+                          source: validated.cost.source
+                        }
+                      }
+                    : {}),
+                  ...(validated.ttftMs === undefined ? {} : { ttftMs: validated.ttftMs }),
+                  ...(validated.error ? { error: validated.error } : {}),
+                  ...(validated.detached ? { detached: true } : {})
+                }
+                progress.push(traceEvent(safeSpan))
+                notify()
+              },
+              reportProgress(value) {
+                if (closed || signal.aborted) return
+                progress.push({
+                  type: EventType.CUSTOM,
+                  name: TOOL_PROGRESS_EVENT,
+                  value: { toolCallId: call.id, value }
+                })
+                notify()
+              }
+            })
+            if (typeof value !== 'string') throw new Error(`tool result must be a string: ${tool.name}`)
+            finish(signal.aborted ? 'cancelled' : 'completed')
+            return { ok: true as const, value }
+          } catch (error: unknown) {
+            finish(signal.aborted ? 'cancelled' : 'failed')
+            return { ok: false as const, error }
+          }
+        })
+        .finally(() => {
+          settled = true
+          notify()
+        })
+      return { call, tool, task, settled: () => settled, started: () => started, finish }
+    })
+    onAbort = () => {
+      for (const entry of pending) {
+        if (entry.started()) entry.finish('cancelled')
+      }
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    for (const entry of pending) {
+      while (true) {
+        signal.throwIfAborted()
+        const event = progress.shift()
+        if (event) {
+          yield event
+          continue
+        }
+        if (entry.settled()) break
+        const waiting = Promise.withResolvers<void>()
+        wake = waiting.resolve
+        await waiting.promise
+      }
+      const result = await entry.task
+      signal.throwIfAborted()
+      if (!result.ok) throw result.error
+      if (typeof result.value !== 'string') throw new Error(`tool result must be a string: ${entry.tool.name}`)
+      yield {
+        type: EventType.TOOL_CALL_RESULT,
+        messageId: globalThis.crypto.randomUUID(),
+        toolCallId: entry.call.id,
+        role: 'tool',
+        content: result.value
+      }
+    }
+  } finally {
+    closed = true
+    if (onAbort) signal.removeEventListener('abort', onAbort)
+    signal.removeEventListener('abort', notify)
   }
 }
 

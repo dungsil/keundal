@@ -10,7 +10,7 @@
     "dev": "nuxt dev",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "lint": "eslint .",
+    "lint": "oxlint .",
     "test": "vitest run",
     "typecheck": "nuxt typecheck && tsc -p tsconfig.test.json"
   },
@@ -21,6 +21,8 @@
     "h3": "2.0.3",
     "@keundal/agent-runtime-node": "workspace:*",
     "@keundal/chat": "workspace:*",
+    "@keundal/plugin-runtime": "workspace:*",
+    "@keundal/tools": "workspace:*",
     "@keundal/plugin-agent-chat": "workspace:*",
     "@keundal/plugin-tool-chat": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
@@ -34,9 +36,8 @@
     "@keundal/plugin-transcription-browser": "workspace:*"
   },
   "devDependencies": {
-    "@nuxt/eslint": "^1.17.0",
+    "@modelcontextprotocol/server": "2.3.1",
     "@types/node": "^24.19.2",
-    "eslint": "^10.12.0",
     "htmlparser2": "12.0.0",
     "typescript": "^6.0.3",
     "vitest": "catalog:",

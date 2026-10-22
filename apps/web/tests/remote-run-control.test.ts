@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http'
 import { createAgentHost, type AgentHost } from '@keundal/agent-host'
 import { createAgentApp } from '@keundal/agent-host/http'
 import type { ChatMessage } from '@keundal/chat/chat-message'
-import { EventType, LLMService, type LLMEvent, type LLMRequest } from '@keundal/core'
+import { EventType, LLMService, parseAGUIEvent, type LLMEvent, type LLMRequest } from '@keundal/core'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import { RemoteChatStore } from '@keundal/plugin-chat-remote'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
@@ -61,29 +61,40 @@ async function start(script: Script, tools: Parameters<typeof agentPlugin>[1]['t
 
 const text = (messageId: string, delta: string): LLMEvent => ({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta })
 
-/** 첫 실행 스트림을 SSE 프레임 수만큼 전달한 뒤 네트워크 오류로 끊습니다. */
-function droppingFetch(frames: number, onResume: (url: string) => void): typeof fetch {
+/** 첫 응답 본문을 전달한 뒤 연결을 끊고, 재연결 커서를 마지막으로 전달한 id와 비교합니다. */
+function droppingFetch(onResume: (value: { url: string, cursor: number }) => void): typeof fetch {
   let dropped = false
+  let cursor = -1
   return async (input, init) => {
     const url = String(input)
     const response = await fetch(input, init)
-    if (url.includes('/events?')) onResume(url)
+    if (url.includes('/events?')) onResume({ url, cursor })
     if (dropped || !url.endsWith('/runs') || init?.method !== 'POST' || !response.body) return response
     dropped = true
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
-    let forwarded = 0
+    let received = ''
+    let forwardedText = false
     const body = new ReadableStream<Uint8Array>({
       async pull(controller) {
-        // 이미 전달한 프레임을 소비자가 읽은 뒤에 끊어야 마지막 커서가 확정됩니다.
-        if (forwarded >= frames) {
+        if (forwardedText) {
           void reader.cancel().catch(() => {})
           controller.error(new TypeError('network connection lost'))
           return
         }
         const { done, value } = await reader.read()
         if (done) return controller.close()
-        forwarded += decoder.decode(value, { stream: true }).split('\n\n').length - 1
+        received += decoder.decode(value, { stream: true })
+        let boundary = received.indexOf('\n\n')
+        while (boundary >= 0) {
+          const frame = received.slice(0, boundary).split('\n')
+          received = received.slice(boundary + 2)
+          const id = frame.find(line => line.startsWith('id: '))
+          const data = frame.find(line => line.startsWith('data: '))
+          if (id) cursor = Number(id.slice(4))
+          if (data && parseAGUIEvent(JSON.parse(data.slice(6))).type === EventType.TEXT_MESSAGE_CONTENT) forwardedText = true
+          boundary = received.indexOf('\n\n')
+        }
         controller.enqueue(value)
       }
     })
@@ -92,7 +103,7 @@ function droppingFetch(frames: number, onResume: (url: string) => void): typeof 
 }
 
 test('원격 스트림이 끊기면 afterSequence로 다시 구독해 누락·중복 없이 응답을 이어받고 모델을 다시 호출하지 않는다', async () => {
-  const resumed = Promise.withResolvers<string>()
+  const resumed = Promise.withResolvers<{ url: string, cursor: number }>()
   const { requests, endpoint } = await start(async function* () {
     yield { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' }
     yield text('reply', '앞부분 ')
@@ -101,13 +112,14 @@ test('원격 스트림이 끊기면 afterSequence로 다시 구독해 누락·�
     yield text('reply', '뒷부분')
     yield { type: EventType.TEXT_MESSAGE_END, messageId: 'reply' }
   })
-  const store = new RemoteChatStore({ endpoint, token }, droppingFetch(3, url => resumed.resolve(url)))
+  const store = new RemoteChatStore({ endpoint, token }, droppingFetch(value => resumed.resolve(value)))
   await store.create('chat', user, model)
   const deltas: string[] = []
   for await (const event of store.respond('chat', { model, messages: [user] })) {
     if (event.type === EventType.TEXT_MESSAGE_CONTENT) deltas.push(event.delta)
   }
-  expect(await resumed.promise).toContain('afterSequence=2')
+  const reconnect = await resumed.promise
+  expect(new URL(reconnect.url).searchParams.get('afterSequence')).toBe(String(reconnect.cursor))
   expect(deltas).toEqual(['앞부분 ', '뒷부분'])
   expect(requests).toHaveLength(1)
   const saved = (await store.get('chat'))!

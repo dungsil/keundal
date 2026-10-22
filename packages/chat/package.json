@@ -67,6 +67,7 @@
     "@keundal/core": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
     "@keundal/mcp": "workspace:*",
+    "@keundal/tools": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

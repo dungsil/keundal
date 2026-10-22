@@ -1,5 +1,5 @@
 import type { Reasoning } from '@keundal/core'
-import type { ExecutableTool, ToolProvider } from '@keundal/tools'
+import type { DeferredToolsConfig, ExecutableTool, ToolProvider } from '@keundal/tools'
 
 export interface CompactionPolicy {
   readonly keepRecentMessages?: number
@@ -20,6 +20,12 @@ export interface AgentConfig {
   readonly reasoning?: Reasoning
   readonly compaction?: AgentCompactionConfig
   readonly tools?: readonly ExecutableTool[] | ToolProvider
+  /** 도구를 검색한 뒤 다음 모델 요청에서만 노출합니다. */
+  readonly deferredTools?: DeferredToolsConfig
+  /** 지연 도구만 공급합니다. 기존 tools 공급자와 별도로 조회합니다. */
+  readonly deferredToolProvider?: ToolProvider
+  readonly subagents?: boolean
+  readonly maxActiveSubagents?: number
   readonly skills?: boolean
   readonly context?: boolean
   /** 모든 실행에 앞서 모델에 전달할 시스템 지침입니다. */

@@ -1,8 +1,8 @@
 import { EventType } from '@keundal/core'
+import type { AGUIEvent } from '@keundal/core'
 import { shallowRef } from 'vue'
 
 import type { ChatMessage, ChatStatus, FilePart } from '@keundal/chat/chat-message'
-import type { ChatStoreLike } from '@keundal/chat/chat-store'
 
 /** 실행 중에 보낸 메시지를 처리하는 방법입니다. */
 export type DeliveryMode = 'queue' | 'steer'
@@ -12,7 +12,7 @@ export function useKeundalChat(options: {
     messages: ChatMessage[],
     onMessage: (message: ChatMessage) => void,
     signal: AbortSignal
-  ) => ReturnType<ChatStoreLike['respond']>
+  ) => AsyncGenerator<AGUIEvent>
   /** 실행 중인 대화에 지시를 보냅니다. 받아들이지 않으면 대기열에 넣습니다. */
   steer?: (message: ChatMessage) => Promise<boolean>
   enqueue?: (message: ChatMessage) => Promise<ChatMessage[]>
@@ -21,6 +21,7 @@ export function useKeundalChat(options: {
   load?: () => Promise<{ messages: ChatMessage[], queue?: ChatMessage[] } | undefined>
   onFinish?: () => Promise<void>
   onError?: (error: Error) => void
+  onEvent?: (event: AGUIEvent) => void
 }) {
   const messages = shallowRef<ChatMessage[]>([])
   const queue = shallowRef<ChatMessage[]>([])
@@ -49,6 +50,7 @@ export function useKeundalChat(options: {
           },
           abort.signal
         )) {
+          options.onEvent?.(event)
           if (event.type === EventType.RUN_ERROR && !abort.signal.aborted) {
             // Drain the iterator before reporting the error so partial output is saved.
             error.value = new Error(event.message)

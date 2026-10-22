@@ -7,6 +7,9 @@ import {
   EventType,
   LLMService,
   parseAGUIEvent,
+  readTraceSpans,
+  TRACE_EVENT,
+  type GenerationSnapshot,
   type AGUIEvent,
   type ExecutionOptions,
   type LLMEvent,
@@ -188,6 +191,7 @@ test('모든 경로는 인증 누락과 잘못된 인증을 401로 거부하고 
     ['GET', '/threads/thread'],
     ['GET', '/runs'],
     ['GET', '/runs/r1'],
+    ['GET', '/catalog'],
     ['POST', '/runs'],
     ['POST', '/recover'],
     ['GET', '/nope']
@@ -224,7 +228,9 @@ test('POST /runs는 AG-UI 이벤트를 SSE로 스트리밍하고 저장소에 �
   expect(response.status).toBe(200)
   expect(response.contentType).toContain('text/event-stream')
   const events = parseSse(response.text)
-  expect(events.map((event) => event.type)).toEqual([
+  expect(
+    events.filter((event) => event.type !== EventType.CUSTOM || event.name !== TRACE_EVENT).map((event) => event.type)
+  ).toEqual([
     EventType.RUN_STARTED,
     EventType.TEXT_MESSAGE_START,
     EventType.TEXT_MESSAGE_CONTENT,
@@ -235,8 +241,22 @@ test('POST /runs는 AG-UI 이벤트를 SSE로 스트리밍하고 저장소에 �
   const thread = (await requestJson('GET', '/threads/thread')).json as { revision: number; messages: { id: string }[] }
   expect(thread.revision).toBe(1)
   expect(thread.messages.map((message) => message.id)).toEqual(['reply:r1'])
-  const run = (await requestJson('GET', '/runs/r1')).json as { status: string }
+  const run = (await requestJson('GET', '/runs/r1')).json as GenerationSnapshot
   expect(run.status).toBe('completed')
+  expect(run.journal.map((entry) => entry.event)).toEqual(events)
+  expect(readTraceSpans(events, input.runId).map((span) => span.kind)).toEqual(['agent', 'model'])
+})
+
+test('GET /catalog는 등록 목록을 반환하며 생성과 대화 저장을 시작하지 않는다', async (t) => {
+  const server = await setup(t)
+  const catalog = {
+    skills: [{ name: 'review', description: 'Review code' }],
+    tools: [{ name: 'mcp__docs__tool__search', description: 'Search docs' }]
+  }
+  server.services.catalog = async () => catalog
+  expect(await server.requestJson('GET', '/catalog')).toEqual({ status: 200, json: catalog })
+  expect(server.agentCalls).toBe(0)
+  expect((await server.requestJson('GET', '/threads')).json).toEqual([])
 })
 
 test('POST /runs는 잘못된 입력을 400으로 거부한다', async (t) => {
@@ -523,7 +543,7 @@ const runStatus = async (base: string, runId: string): Promise<unknown> => {
 test('SSE 연결을 끊어도 실행을 취소하지 않고 afterSequence 재구독이 누락·중복 없이 이어받는다', async (t) => {
   const release = Promise.withResolvers<void>()
   let calls = 0
-  const { base } = await setup(t, {}, async function* (request) {
+  const { base, services } = await setup(t, {}, async function* (request) {
     calls++
     const messageId = `reply:${request.input.runId}`
     yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' }
@@ -542,7 +562,9 @@ test('SSE 연결을 끊어도 실행을 취소하지 않고 afterSequence 재구
   const reader = response.body!.getReader()
   const decoder = new TextDecoder()
   let received = ''
-  while (parseFrames(received).length < 3) received += decoder.decode((await reader.read()).value, { stream: true })
+  while (!parseFrames(received).some((frame) => frame.event.type === EventType.TEXT_MESSAGE_CONTENT)) {
+    received += decoder.decode((await reader.read()).value, { stream: true })
+  }
   const first = parseFrames(received.slice(0, received.lastIndexOf('\n\n') + 2))
   abort.abort()
   await reader.cancel().catch(() => {})
@@ -553,15 +575,21 @@ test('SSE 연결을 끊어도 실행을 취소하지 않고 afterSequence 재구
     headers: { authorization: `Bearer ${token}` }
   })
   const rest = parseFrames(await resumed.text())
-  const ids = [...first, ...rest].map((frame) => frame.id)
-  expect(ids).toEqual([0, 1, 2, 3, 4, 5])
+  const delivered = [...first, ...rest]
+  const journal = (await services.generation.get('r1'))!.journal
+  expect(delivered.map((frame) => frame.id)).toEqual(journal.map((entry) => entry.sequence))
+  expect(delivered.map((frame) => frame.event)).toEqual(journal.map((entry) => entry.event))
+  expect(
+    delivered.flatMap((frame) => (frame.event.type === EventType.TEXT_MESSAGE_CONTENT ? [frame.event.delta] : []))
+  ).toEqual(['before', 'after'])
   expect(rest.at(-1)?.event.type).toBe(EventType.RUN_FINISHED)
   expect(calls).toBe(1)
   expect(await runStatus(base, 'r1')).toBe('completed')
   const replay = parseFrames(
     await (await fetch(`${base}/runs/r1/events`, { headers: { authorization: `Bearer ${token}` } })).text()
   )
-  expect(replay.map((frame) => frame.id)).toEqual([0, 1, 2, 3, 4, 5])
+  expect(replay.map((frame) => frame.id)).toEqual(journal.map((entry) => entry.sequence))
+  expect(replay.map((frame) => frame.event)).toEqual(journal.map((entry) => entry.event))
   expect(calls).toBe(1)
 })
 
@@ -650,7 +678,7 @@ test('큰 이벤트는 직렬화 전에 거부하고 실패를 RUN_ERROR로 전�
   })
   const events = parseSse((await requestText('POST', '/runs', input)).text)
   expect(events.at(-1)).toEqual({ type: EventType.RUN_ERROR, message: 'stream byte limit exceeded' })
-  expect(events.some((event) => event.type === EventType.CUSTOM)).toBe(false)
+  expect(events.some((event) => event.type === EventType.CUSTOM && event.name === 'large')).toBe(false)
   expect(await runStatus(base, 'r1')).toBe('failed')
 })
 
