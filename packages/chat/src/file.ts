@@ -20,7 +20,3 @@ export function getFileIcon(mimeType: string, fileName?: string): string {
   if (mimeType === 'text/csv' || fileName?.endsWith('.csv')) return 'i-lucide-file-spreadsheet'
   return 'i-lucide-file'
 }
-
-export function removeRandomSuffix(filename: string): string {
-  return filename.replace(/^(.+)-[a-zA-Z0-9]+(\.[^.]+)$/, '$1$2')
-}

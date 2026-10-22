@@ -133,6 +133,7 @@ export default {
   'file.imagesOnly': '현재 큰달AI는 이미지 첨부만 지원합니다.',
   'file.tooLarge': '파일 크기가 8MB를 초과합니다.',
   'file.failed': '파일 첨부 실패',
+  'file.uploading': '업로드 중',
   'model.select': '모델 선택',
   'model.defaultTitle': '모델 설정',
   'model.defaultLabel': '채팅 모델',
