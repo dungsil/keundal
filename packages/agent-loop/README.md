@@ -215,6 +215,7 @@ OpenAI, Anthropic, Gemini 공급자는 확인한 토큰 사용량을 `keundal.ll
 ## 실행과 종료
 
 - `AgentConfig.webSearch?: boolean`과 `reasoning?: boolean | 'low' | 'medium' | 'high'`은 입력 토큰 계산, generation 요청, 모든 도구 후속 요청에 그대로 전달됩니다. 생략하면 기존 공급자 기본값을 유지하며 정의되지 않은 추론 수준은 거부합니다. 축약 후에도 이 옵션을 포함한 입력 비용을 다시 확인합니다. 요약 자체는 검색 도구 없이 수행합니다.
+- `AgentConfig.pricing?: { currency, models }`는 모델 ID별 100만 토큰당 가격입니다. 공급자가 비용을 주지 않은 모델 호출에 `source: 'estimate'` 비용을 기록하고, 공급자 비용은 덮어쓰지 않습니다. 본 응답, 축약 호출, 서브에이전트가 같은 경로를 사용합니다. 가격이 없거나 사용량이 모자라면 비용을 미확정으로 둡니다. 형식과 계산식은 [실행 관측 문서](../../docs/execution-trace.md#모델-가격표)를 참고합니다.
 - OpenAI·Anthropic 네이티브 검색은 공급자에서 수행하므로 `tools`에 검색 실행 함수를 등록하지 않습니다. 검색 출처는 코어의 `LLM_SOURCE_EVENT`(`'keundal.source'`) CUSTOM 이벤트로 전달됩니다. 검색·인용의 공급자 메타데이터는 어시스턴트 메시지와 함께 후속 요청·세션에 보존됩니다. 자세한 메타데이터 형식과 모델 지원 제한은 각 공급자의 README를 참고합니다. Gemini는 `webSearch: true`를 명시적으로 거부합니다.
 - 모델 응답의 스트림이 끝나고 모든 도구 호출이 완료되면 호출 순서대로 실행합니다. 같은 응답에 잘못된 JSON, 미완료 호출, 미등록 도구가 있으면 실행을 시작하지 않습니다.
 - 실행 결과는 `TOOL_CALL_RESULT` 이벤트와 `role: 'tool'` 메시지로 기록하며, 호출 ID로 원래 도구 호출과 연결합니다. 호출·결과·추론 서명을 포함한 대화를 후속 요청에 전달합니다.

@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto'
 import { createServer } from 'node:http'
 import { Server, WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/server'
 import { expect, test } from 'vitest'
+import { readTraceSpans, summarizeTrace } from '@keundal/core'
 import { createWebPlatform } from '../app/platform'
 import { defaultLLMSettings } from '@keundal/llm-settings'
 
@@ -146,5 +147,73 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   const run = await connection.store.getRun?.(answer.id)
   expect(run?.status).toBe('completed')
   expect(run?.journal.map(entry => entry.event)).toContainEqual(expect.objectContaining({ type: 'CUSTOM', name: 'keundal.trace' }))
+  await connection.store.delete(id)
+})
+
+test('웹 조립은 배포한 매니페스트의 가격표로 공급자가 비용을 주지 않은 실행의 추정 비용을 Trace에 저장한다', async (t) => {
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) void chunk
+    if (request.url === '/keundal.plugins.json') {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
+        plugins: [{ module: 'builtin:llm' }, { module: 'builtin:store' }, { module: 'builtin:skills' }],
+        agent: {
+          module: 'builtin:agent',
+          config: {
+            pricing: {
+              currency: 'USD',
+              models: { 'openai/test': { inputPerMillion: 3, outputPerMillion: 15, cacheReadPerMillion: 0.3 } }
+            }
+          }
+        },
+        tools: [{ module: 'builtin:chat-tools' }]
+      }))
+      return
+    }
+    if (request.url?.endsWith('/input_tokens')) {
+      response.writeHead(200, { 'content-type': 'application/json' }).end('{"input_tokens":40}')
+      return
+    }
+    const item = { type: 'message', id: 'answer', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: 'Priced', annotations: [] }] }
+    const frames = [
+      { type: 'response.output_item.added', output_index: 0, item },
+      { type: 'response.output_item.done', output_index: 0, item },
+      {
+        type: 'response.completed',
+        response: {
+          id: 'response',
+          status: 'completed',
+          usage: { input_tokens: 1000, output_tokens: 200, input_tokens_details: { cached_tokens: 400 } }
+        }
+      }
+    ]
+    response.writeHead(200, { 'content-type': 'text/event-stream' }).end(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(''))
+  })
+  const listening = Promise.withResolvers<void>()
+  server.listen(0, '127.0.0.1', listening.resolve)
+  await listening.promise
+  t.onTestFinished(async () => {
+    server.closeAllConnections()
+    const closed = Promise.withResolvers<void>()
+    server.close(() => closed.resolve())
+    await closed.promise
+  })
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('No port')
+  const endpoint = `http://127.0.0.1:${address.port}`
+  const platform = createWebPlatform(storage(), { pluginConfig: `${endpoint}/keundal.plugins.json` })
+  const settings = defaultLLMSettings()
+  settings.openai = { apiKey: 'test-key', baseURL: `${endpoint}/v1` }
+  const connection = await platform.connect({ getSettings: () => settings, getModels: () => [], skills: [] })
+  t.onTestFinished(() => connection.dispose())
+  const id = crypto.randomUUID()
+  const user = { id: 'user', role: 'user' as const, parts: [{ type: 'text' as const, text: 'Price this run' }] }
+  await connection.store.create(id, user, 'openai/test')
+  for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user] })) void event
+  const answer = (await connection.store.get(id))!.messages[1]!
+  const run = await connection.store.getRun?.(answer.id)
+  const cost = summarizeTrace(readTraceSpans(run!.journal.map(entry => entry.event), answer.id)).cost
+  // 일반 입력 600 × 3 + 캐시 읽기 400 × 0.3 + 출력 200 × 15 (100만 토큰 기준)
+  expect(cost).toMatchObject({ currency: 'USD', complete: true, source: 'estimate' })
+  expect(cost?.amount).toBeCloseTo(0.00492, 9)
   await connection.store.delete(id)
 })
