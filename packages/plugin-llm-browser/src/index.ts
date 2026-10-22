@@ -5,6 +5,7 @@ import { Context, type Fiber } from 'cordis'
 
 const plugins = {
   openai: () => import('@keundal/plugin-llm-openai').then((module) => module.default),
+  'openai-chat': () => import('@keundal/plugin-llm-openai-chat').then((module) => module.default),
   anthropic: () => import('@keundal/plugin-llm-anthropic').then((module) => module.default),
   google: () => import('@keundal/plugin-llm-gemini').then((module) => module.default)
 }

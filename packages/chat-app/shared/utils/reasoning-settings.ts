@@ -3,7 +3,7 @@ import { resolveModel } from '@keundal/chat/models'
 
 export function reasoningLevels(model: string): ReasoningLevel[] {
   const { provider, id } = resolveModel(model)
-  if (provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(id)) return []
+  if ((provider === 'openai' || provider === 'openai-chat') && !/^(gpt-5|o\d)(?:[-.]|$)/.test(id)) return []
   if (provider === 'google' && id.startsWith('gemini-3') && !id.includes('flash')) return ['low', 'high']
   return ['low', 'medium', 'high']
 }

@@ -65,7 +65,6 @@ useSeoMeta({
   description,
   ogTitle: title,
   ogDescription: description,
-  ogImage: 'https://ui.nuxt.com/assets/templates/nuxt/chat-light.png',
   twitterCard: 'summary_large_image'
 })
 </script>

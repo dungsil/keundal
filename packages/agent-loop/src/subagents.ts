@@ -1,11 +1,21 @@
-import { EventType, MessageAssembly, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
+import {
+  EventType,
+  MessageAssembly,
+  readTraceSpans,
+  type AGUIEvent,
+  type ExecutionOptions,
+  type RunAgentInput
+} from '@keundal/core'
 
 import type { ExecutableTool } from './tools.js'
 
 export const SUBAGENT_TOOL_NAME = 'delegate_task'
 
 export function subagentTool(
-  run: (input: RunAgentInput, options: ExecutionOptions) => AsyncIterable<AGUIEvent>,
+  run: (
+    input: RunAgentInput,
+    options: ExecutionOptions & { traceId?: string; parentSpanId?: string }
+  ) => AsyncIterable<AGUIEvent>,
   maxActive: number
 ): ExecutableTool {
   // One tool instance belongs to one parent run. Reserve before any async work.
@@ -82,8 +92,22 @@ export function subagentTool(
               tools: [],
               messages: [{ id: globalThis.crypto.randomUUID(), role: 'user', content: args.task }]
             },
-            { signal: context.signal }
+            {
+              signal: context.signal,
+              ...(context.traceId ? { traceId: context.traceId } : {}),
+              ...(context.parentSpanId ? { parentSpanId: context.parentSpanId } : {})
+            }
           )) {
+            if (event.type === EventType.CUSTOM) {
+              const span = readTraceSpans([event], undefined, 1)[0]
+              if (
+                span &&
+                span.runId === runId &&
+                span.traceId === context.traceId &&
+                (span.kind !== 'agent' || span.parentSpanId === context.parentSpanId)
+              )
+                context.reportTrace?.(span)
+            }
             context.signal.throwIfAborted()
             if (event.type === EventType.RUN_ERROR) throw new Error(`subagent failed: ${event.message}`)
             if (event.type === EventType.RUN_FINISHED) {

@@ -263,7 +263,7 @@ function toggleFile(path: string, enabled: boolean) {
           <h3 class="text-sm font-semibold">
             {{ t(localSkills ? 'skill.savedApp' : 'skill.savedBrowser') }}
           </h3>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
             <input
               ref="importInput"
               type="file"

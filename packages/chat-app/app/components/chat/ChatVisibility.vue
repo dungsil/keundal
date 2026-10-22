@@ -6,7 +6,7 @@ const props = defineProps<{
   visibility: 'public' | 'private'
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   'update:visibility': [visibility: 'public' | 'private']
 }>()
 
@@ -40,13 +40,18 @@ const options = computed(() => [
     </UTooltip>
 
     <template #body>
-      <div class="flex flex-col gap-0.5 rounded-lg ring ring-default p-1">
+      <div role="radiogroup" :aria-label="t('chat.share')" class="flex flex-col gap-0.5 rounded-lg ring ring-default p-1">
         <button
           v-for="option in options"
           :key="option.value"
+          type="button"
+          role="radio"
+          :aria-checked="option.value === visibility"
+          :tabindex="option.value === visibility ? 0 : -1"
           :disabled="option.value === 'public'"
           :data-selected="option.value === visibility"
           class="flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-elevated/50 disabled:opacity-50 data-[selected=true]:bg-elevated/50"
+          @click="option.value !== 'public' && emit('update:visibility', option.value)"
         >
           <UIcon :name="option.icon" class="size-5 text-muted shrink-0" />
 

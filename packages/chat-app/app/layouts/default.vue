@@ -61,16 +61,7 @@ defineShortcuts({
       :menu="{ inset: true }"
       class="border-r-0 py-4 dark:[--ui-bg-elevated:var(--ui-color-neutral-900)]"
     >
-      <template #header="{ collapsed }">
-        <NuxtLink
-          v-if="!collapsed"
-          to="/"
-          class="flex items-end gap-0.5 outline-primary/25 focus-visible:outline-3 rounded-md"
-        >
-          <Logo class="h-8 w-auto shrink-0" />
-          <span class="text-xl font-bold text-highlighted">Chat</span>
-        </NuxtLink>
-
+      <template #header>
         <UDashboardSidebarCollapse class="ms-auto" />
       </template>
 
@@ -96,7 +87,7 @@ defineShortcuts({
           orientation="vertical"
         >
           <template #item-trailing="{ item }">
-            <div v-if="item.kbds?.length" class="flex items-center gap-px opacity-0 group-hover:opacity-100 transition-opacity">
+            <div v-if="item.kbds?.length" class="flex items-center gap-px opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
               <UKbd
                 v-for="kbd in item.kbds"
                 :key="kbd"
@@ -126,43 +117,47 @@ defineShortcuts({
           </div>
         </div>
 
-        <nav v-else-if="!collapsed" :aria-label="t('navigation.chats')" class="space-y-1.5">
-          <div v-for="group in groups" :key="group.id">
-            <h2 class="px-2.5 py-1.5 text-xs font-semibold text-highlighted">{{ group.label }}</h2>
-            <ul class="space-y-1">
-              <li v-for="item in group.items" :key="item.id" class="group flex min-w-0 items-center rounded-md hover:bg-elevated/50 focus-within:bg-elevated/50">
-                <NuxtLink
-                  :to="`/chat/${item.id}`"
-                  class="min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 text-sm"
-                  :class="item.untitled ? 'text-muted' : 'text-default'"
-                  active-class="bg-elevated text-highlighted"
-                >{{ item.label }}</NuxtLink>
-                <div class="flex shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
-                  <UButton
-                    icon="i-lucide-pencil"
-                    color="neutral"
-                    variant="link"
-                    size="sm"
-                    class="rounded-[5px] hover:bg-accented/50"
-                    :aria-label="`${t('common.rename')}: ${item.label}`"
-                    :title="t('common.rename')"
-                    @click="renameChat(item.id, item.untitled ? '' : item.label)"
-                  />
-                  <UButton
-                    icon="i-lucide-trash"
-                    color="neutral"
-                    variant="link"
-                    size="sm"
-                    class="rounded-[5px] hover:bg-accented/50"
-                    :aria-label="`${t('common.delete')}: ${item.label}`"
-                    :title="t('common.delete')"
-                    @click="deleteChat(item.id)"
-                  />
-                </div>
-              </li>
-            </ul>
-          </div>
-        </nav>
+        <ul v-else-if="!collapsed && groups" class="flex flex-col">
+          <template v-for="group in groups" :key="group.label">
+            <li class="w-full flex items-center gap-1.5 font-semibold text-xs/5 text-highlighted px-2.5 py-1.5">
+              {{ group.label }}
+            </li>
+            <li
+              v-for="item in group.items"
+              :key="item.id"
+              class="group relative min-w-0"
+            >
+              <NuxtLink
+                :to="`/chat/${item.id}`"
+                class="group relative w-full flex items-center gap-1.5 font-medium text-sm before:absolute before:z-[-1] before:rounded-md flex-row px-2.5 py-1.5 before:inset-y-px before:inset-x-0 text-default hover:before:bg-elevated/50 focus-visible:before:bg-elevated/50 [&.router-link-exact-active]:text-primary [&.router-link-exact-active]:before:bg-elevated overflow-hidden pe-14.5"
+              >
+                <span class="truncate" :class="item.untitled ? 'text-muted' : ''">{{ item.label }}</span>
+              </NuxtLink>
+              <div class="absolute end-0 inset-y-0 flex items-center gap-0.5 pe-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                <UButton
+                  icon="i-lucide-pencil"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  class="rounded-[5px]"
+                  :aria-label="`${t('common.rename')}: ${item.label}`"
+                  :title="t('common.rename')"
+                  @click="renameChat(item.id, item.untitled ? '' : item.label)"
+                />
+                <UButton
+                  icon="i-lucide-trash"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  class="rounded-[5px]"
+                  :aria-label="`${t('common.delete')}: ${item.label}`"
+                  :title="t('common.delete')"
+                  @click="deleteChat(item.id)"
+                />
+              </div>
+            </li>
+          </template>
+        </ul>
       </template>
 
       <template #footer="{ collapsed }">
@@ -195,7 +190,7 @@ defineShortcuts({
       }, ...groups]"
     />
 
-    <main id="main-content" ref="mainContent" tabindex="-1" class="flex-1 flex mt-4 ml-4 lg:ml-0 rounded-tl-lg ring ring-default bg-default/75 shadow-sm min-w-0 overflow-hidden">
+    <main id="main-content" ref="mainContent" tabindex="-1" class="flex-1 flex mt-4 ms-4 lg:ms-0 rounded-ss-lg ring ring-default bg-default/75 shadow-sm min-w-0 overflow-hidden">
       <slot />
     </main>
   </UDashboardGroup>

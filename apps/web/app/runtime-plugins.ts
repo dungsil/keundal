@@ -11,7 +11,8 @@ import defaultManifest from '../public/keundal.plugins.json'
 export async function loadWebRuntimePlugins(
   configURL: string | undefined,
   builtins: RuntimeModuleRegistry,
-  tools: ToolProvider
+  tools: ToolProvider | undefined,
+  deferredToolProvider?: ToolProvider
 ) {
   let manifest: RuntimePluginManifest = defaultManifest
   let baseURL: URL | undefined
@@ -26,6 +27,7 @@ export async function loadWebRuntimePlugins(
   return loadRuntimePlugins(manifest, {
     builtins,
     tools,
+    deferredToolProvider,
     async importModule(specifier) {
       if (!baseURL) throw new Error('External plugins require a plugin configuration URL')
       if (!/^(?:https?:\/\/|\.{0,2}\/)/.test(specifier)) {

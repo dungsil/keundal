@@ -49,6 +49,7 @@
     "@keundal/plugin-llm-anthropic": "workspace:*",
     "@keundal/plugin-llm-gemini": "workspace:*",
     "@keundal/plugin-llm-openai": "workspace:*",
+    "@keundal/plugin-llm-openai-chat": "workspace:*",
     "@keundal/plugin-skill": "workspace:*",
     "@keundal/plugin-skill-filesystem": "workspace:*",
     "@keundal/plugin-store-indexeddb": "workspace:*",

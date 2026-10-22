@@ -1,22 +1,37 @@
-import type { ChatMessage } from '@keundal/chat/chat-message'
+import type { ChatMessage, ChatMessageAssembly } from '@keundal/chat/chat-message'
 import { validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
-import type { Reasoning, AGUIEvent, SessionSnapshot } from '@keundal/core'
+import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
+import { SteerQueue, type Reasoning, type AGUIEvent, type SessionSnapshot, type ExecutionOptions } from '@keundal/core'
 import type { Context } from 'cordis'
 
-import { createKeundalChat, toMessages } from './keundal'
+import { createKeundalChat, toMessages, type KeundalChatRuntime, type MountAgent } from './keundal'
 export type { MountAgent } from './keundal'
 
 type ChatState = { web: LocalChat }
+type LocalRun = ActiveChatRun & { steer: SteerQueue; model: string }
 
 /** Uses only Keundal service contracts: swapping the store plugin needs no UI/agent changes. */
 export class ChatStore implements ChatStoreLike {
-  private readonly runtimes = new Map<string, { key: string; runtime: Awaited<ReturnType<typeof createKeundalChat>> }>()
-  private readonly active = new Map<string, { abort: AbortController; done: Promise<void> }>()
+  /** 실행은 브라우저 탭 안에서 진행되므로 탭을 닫으면 실행과 메모리의 대기열이 함께 끝납니다. */
+  readonly execution = 'browser'
+  private readonly runtimes = new Map<string, { key: string; runtime: KeundalChatRuntime }>()
+  private readonly runs = new ChatRuns<LocalRun>({
+    read: (id) => this.get(id),
+    write: async (id, change) => {
+      const snapshot = await this.ctx.session.get(id)
+      const chat = this.chat(snapshot)
+      if (!chat) throw new Error('Chat not found')
+      const next = change(chat)
+      await this.save(snapshot, next)
+      return next
+    }
+  })
+  private readonly active = this.runs.active
 
   constructor(
     private readonly ctx: Context,
-    private readonly mountAgent: Parameters<typeof createKeundalChat>[3]
+    private readonly mountAgent: MountAgent
   ) {}
 
   private async trimRuntimes(limit: number) {
@@ -46,6 +61,10 @@ export class ChatStore implements ChatStoreLike {
     return this.chat(await this.ctx.session.get(id))
   }
 
+  async getRun(runId: string, options: ExecutionOptions = {}) {
+    return this.ctx.generation.get(runId, options)
+  }
+
   private async save(snapshot: SessionSnapshot | undefined, chat: LocalChat) {
     return this.ctx.session.commit({
       threadId: chat.id,
@@ -56,11 +75,32 @@ export class ChatStore implements ChatStoreLike {
     })
   }
 
-  private async complete(id: string, runId: string, message: ChatMessage) {
+  private async complete(
+    id: string,
+    runId: string,
+    message: ChatMessage,
+    steered: ChatMessageAssembly['steered'],
+    active?: ActiveChatRun
+  ) {
     const snapshot = await this.ctx.session.get(id)
     const chat = this.chat(snapshot)
     if (!chat || chat.pendingRunId !== runId) throw new Error('Chat changed while the response was running')
-    await this.save(snapshot, { ...chat, messages: [...chat.messages, message], pendingRunId: undefined })
+    await this.save(snapshot, settleChatRun(chat, { runId, message, steered }, active))
+  }
+
+  enqueue(id: string, message: ChatMessage) {
+    return this.runs.enqueue(id, message)
+  }
+
+  dequeue(id: string, messageId: string) {
+    return this.runs.dequeue(id, messageId)
+  }
+
+  steer(id: string, message: ChatMessage) {
+    return this.runs.steer(id, message, async (run) => {
+      const [instruction] = toMessages([message], run.model)
+      return !!instruction && run.steer.push([instruction]) > 0
+    })
   }
 
   async create(id: string, message: ChatMessage, model: string): Promise<LocalChat> {
@@ -148,8 +188,10 @@ export class ChatStore implements ChatStoreLike {
     const combined = signal ? AbortSignal.any([signal, abort.signal]) : abort.signal
     let release!: () => void
     const done = new Promise<void>((resolve) => (release = resolve))
-    this.active.set(id, { abort, done })
-    let runtime: Awaited<ReturnType<typeof createKeundalChat>> | undefined
+    const run: LocalRun = { ...createActiveChatRun(abort, done), steer: new SteerQueue(), model: request.model }
+    this.active.set(id, run)
+    let runtime: KeundalChatRuntime | undefined
+    let settled = false
     try {
       combined.throwIfAborted()
       const snapshot = await this.ctx.session.get(id)
@@ -157,8 +199,19 @@ export class ChatStore implements ChatStoreLike {
       if (!current) throw new Error('Chat not found')
       const limits = await this.ctx.llm.getModel(request.model, { signal: combined })
       const runId = crypto.randomUUID()
-      let chat = { ...current, messages: request.messages, model: request.model, started: true, pendingRunId: runId }
+      // 대기열에서 꺼낸 메시지는 대화에 넣는 같은 커밋에서 대기열에서 지워 중복 실행을 막습니다.
+      const sent = new Set(request.messages.map((message) => message.id))
+      const queue = (current.queue ?? []).filter((message) => !sent.has(message.id))
+      let chat: LocalChat = {
+        ...current,
+        messages: request.messages,
+        model: request.model,
+        started: true,
+        pendingRunId: runId,
+        queue: queue.length ? queue : undefined
+      }
       const saved = await this.save(snapshot, chat)
+      run.runId = runId
       const maxOutputTokens = Math.min(4096, limits.maxOutputTokens, limits.contextWindow - 1)
       const key = JSON.stringify([
         request.model,
@@ -208,13 +261,19 @@ export class ChatStore implements ChatStoreLike {
         instructions: `You are a knowledgeable and helpful AI assistant. Be clear, accurate and concise.
 Do not use markdown headings. Use bold text for section labels instead.
 ${request.webSearch && !request.model.startsWith('google/') ? 'Use native web search when current information is needed and cite sources.' : 'Web search is disabled. Do not claim to have verified live information.'}`,
-        onFinish: async (message) => {
-          await this.complete(id, runId, message)
+        steer: run.steer,
+        onFinish: async (message, steered) => {
+          // 종료를 확정하는 동안 도착한 지시와 대기 메시지는 이 실행에 붙이지 않고 다음 커밋으로 넘깁니다.
+          run.closing = true
+          run.steer.close()
+          await this.complete(id, runId, message, steered, run)
+          settled = true
         }
       })
     } finally {
-      this.active.delete(id)
+      run.steer.close()
       try {
+        await this.runs.release(id, run, settled)
         await this.trimRuntimes(8)
       } finally {
         release()
@@ -239,8 +298,8 @@ ${request.webSearch && !request.model.startsWith('google/') ? 'Use native web se
         events: (async function* () {
           for (const entry of run.journal) yield entry.event
         })(),
-        onFinish: async (message) => {
-          await this.complete(id, run.request.input.runId, message)
+        onFinish: async (message, steered) => {
+          await this.complete(id, run.request.input.runId, message, steered)
         }
       })
       try {

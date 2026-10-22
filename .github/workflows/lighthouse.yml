@@ -4,28 +4,8 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
-    # 같은 이벤트에서 paths와 paths-ignore를 함께 정의할 수 없다.
-    # 제외 경로는 `!` 패턴으로 적는다. 뒤에 오는 `!` 패턴은 앞선 일치 경로를 제외한다.
-    paths:
-      - 'apps/web/app/**'
-      - 'apps/web/public/**'
-      - 'apps/web/shared/**'
-      - 'apps/web/nuxt.config.ts'
-      - 'apps/web/package.json'
-      - 'packages/chat-app/app/**'
-      - 'packages/chat-app/public/**'
-      - 'packages/chat-app/shared/**'
-      - 'packages/chat-app/nuxt.config.ts'
-      - 'packages/chat-app/package.json'
-      - 'packages/ui/app/**'
-      - 'packages/ui/public/**'
-      - 'packages/ui/shared/**'
-      - 'packages/ui/nuxt.config.ts'
-      - 'packages/ui/package.json'
-      - '!*.md'
-      - '!apps/*/README.md'
-      - '!packages/*/README.md'
-      - '!tools/*/README.md'
+    # 필수 검사가 항상 생성되도록 트리거에는 경로 필터를 두지 않는다.
+    # UI 변경 여부는 changes 작업에서 판단한다.
 
 permissions:
   contents: read
@@ -35,9 +15,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: UI 변경 확인
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read # paths-filter가 PR의 변경 파일을 조회한다.
+    outputs:
+      ui: ${{ github.event.pull_request.head.repo.full_name == github.repository && steps.filter.outputs.ui == 'true' }}
+    steps:
+      - name: 변경 경로 확인
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            ui:
+              - 'apps/web/app/**'
+              - 'apps/web/public/**'
+              - 'apps/web/shared/**'
+              - 'apps/web/nuxt.config.ts'
+              - 'apps/web/package.json'
+              - 'packages/chat-app/app/**'
+              - 'packages/chat-app/public/**'
+              - 'packages/chat-app/shared/**'
+              - 'packages/chat-app/nuxt.config.ts'
+              - 'packages/chat-app/package.json'
+              - 'packages/ui/app/**'
+              - 'packages/ui/public/**'
+              - 'packages/ui/shared/**'
+              - 'packages/ui/nuxt.config.ts'
+              - 'packages/ui/package.json'
+
   preview:
     name: 현재 커밋의 프리뷰 배포 대기
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
@@ -83,7 +96,6 @@ jobs:
     if: needs.preview.outputs.url != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    continue-on-error: true
     outputs:
       report: ${{ steps.summary.outputs.report || steps.failure.outputs.report }}
     permissions:
@@ -100,6 +112,15 @@ jobs:
           persist-credentials: false
 
       - name: 개발 환경 준비
+        id: setup
+        continue-on-error: true
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+        with:
+          cache: true
+          require-lockfile: true
+
+      - name: 개발 환경 준비 재시도
+        if: ${{ !cancelled() && steps.setup.outcome == 'failure' }}
         uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         with:
           cache: true
@@ -123,12 +144,13 @@ jobs:
       - name: Lighthouse 결과 요약
         id: summary
         run: |
-          LIGHTHOUSE_REPORT_DIR=.unlighthouse node tools/lighthouse/summary.mjs > "$RUNNER_TEMP/lighthouse-report.md"
+          LIGHTHOUSE_REPORT_DIR=.unlighthouse LIGHTHOUSE_RESULT_FILE="$RUNNER_TEMP/lighthouse-result" node tools/lighthouse/summary.mjs > "$RUNNER_TEMP/lighthouse-report.md"
           cat "$RUNNER_TEMP/lighthouse-report.md" >> "$GITHUB_STEP_SUMMARY"
           {
             echo 'report<<LIGHTHOUSE_REPORT'
             cat "$RUNNER_TEMP/lighthouse-report.md"
             echo 'LIGHTHOUSE_REPORT'
+            echo "result=$(cat "$RUNNER_TEMP/lighthouse-result")"
           } >> "$GITHUB_OUTPUT"
 
       - name: Lighthouse 상세 보고서 보관
@@ -145,15 +167,37 @@ jobs:
         id: failure
         if: failure()
         run: |
-          echo '::warning::Lighthouse 검사를 완료하지 못했습니다. 검사 로그를 확인하세요.'
-          report='Lighthouse 검사를 완료하지 못했습니다. 낮은 점수에 따른 실패가 아닙니다. 작업 로그를 확인하세요.'
+          echo '::error::Lighthouse 검사를 완료하지 못했습니다. 점수를 확인하지 못했으므로 병합을 차단합니다.'
+          report='Lighthouse 검사를 완료하지 못했습니다. 점수를 확인하지 못했으므로 병합을 차단합니다. 작업 로그를 확인하고 재실행하세요.'
           echo "$report" >> "$GITHUB_STEP_SUMMARY"
           echo "report=$report" >> "$GITHUB_OUTPUT"
 
+      - name: 점수 기준 확인
+        if: steps.summary.outputs.result != 'passed'
+        run: |
+          echo '::error::70점 이하인 Lighthouse 항목이 있습니다. 작업 요약을 확인하세요.'
+          exit 1
+
+  lighthouse-gate:
+    name: Lighthouse 점수 기준
+    needs: [changes, preview, lighthouse]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Lighthouse 검사 결과 확인
+        uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
+        with:
+          jobs: ${{ toJSON(needs) }}
+          # UI 변경이 없거나 외부 포크 PR이면 검사를 생략한다.
+          # 검사 도중 PR이 닫히거나 커밋이 바뀌면 새 커밋의 실행이 검사를 담당한다.
+          allowed-skips: ${{ needs.changes.outputs.ui != 'true' && 'preview,lighthouse' || (needs.preview.result == 'success' && needs.preview.outputs.url == '' && 'lighthouse' || '') }}
+
   lighthouse-comment:
     name: Lighthouse 결과 댓글 갱신
-    needs: [preview, lighthouse]
-    if: ${{ always() && !cancelled() && github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: [changes, preview, lighthouse]
+    if: ${{ always() && !cancelled() && needs.changes.outputs.ui == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

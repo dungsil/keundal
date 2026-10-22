@@ -71,6 +71,29 @@ web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도�
 
 설정을 변경한 뒤 웹 호스트나 desktop sidecar를 다시 시작해야 합니다. 기존 저장소와 같은 경로를 선택하면 대화 기록을 유지합니다. 저장소를 바꿔도 데이터를 자동으로 이전하지 않습니다.
 
+### Deferred Tools
+
+`agent.config.deferredTools`에 `{}`를 지정하면 기본 web과 Node.js 조립이 MCP 도구를 검색 대상으로 분리합니다. Agent Plugins가 제공하는 MCP 도구도 같은 대상에 포함합니다. 매니페스트 도구 팩터리와 직접 전달한 기본 도구는 항상 노출합니다.
+
+```json
+{
+  "plugins": [{ "module": "builtin:llm" }, { "module": "builtin:store" }],
+  "agent": {
+    "module": "builtin:agent",
+    "config": {
+      "deferredTools": {
+        "maxSearchResults": 8,
+        "maxActiveTools": 16,
+        "maxSchemaBytes": 16384,
+        "maxTotalSchemaBytes": 65536
+      }
+    }
+  }
+}
+```
+
+설정을 생략하면 기존처럼 MCP Schema를 직접 노출합니다. 별도 조립은 `loadRuntimePlugins()`의 `deferredToolProvider`에 현재 권한으로 조회하는 도구 공급자를 전달합니다. 검색과 실행은 기존 MCP 허용 목록과 리소스 권한을 유지합니다.
+
 ### 신뢰 경계
 
 설정은 실행할 코드를 선택하므로 신뢰할 수 있는 파일과 URL만 사용해야 합니다. 플러그인은 샌드박스에서 실행하지 않습니다. 브라우저 플러그인은 앱 origin의 데이터에, Node.js 플러그인은 호스트 프로세스의 권한과 환경 변수에 접근할 수 있습니다. 브라우저에 전달하는 공개 설정에는 비밀 값을 넣지 않습니다.

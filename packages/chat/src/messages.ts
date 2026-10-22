@@ -20,6 +20,8 @@ export function toMessages(messages: ChatMessage[], model: string): AgentMessage
       const parsed = parseRunAgentInput(input(data.messages)).messages
       return prepareReplayMessages(parsed, resolveModel(data.model).value, resolveModel(model).value)
     }
+    // 반영된 지시는 그 실행의 어시스턴트 기록에 원래 위치로 들어 있으므로 다시 보내지 않습니다.
+    if (message.role === 'user' && message.metadata?.steeredRunId) return []
     if (message.role === 'user') {
       const content: Exclude<Extract<AgentMessage, { role: 'user' }>['content'], string> = []
       for (const part of message.parts) {

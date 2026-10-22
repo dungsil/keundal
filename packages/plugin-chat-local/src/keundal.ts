@@ -4,7 +4,7 @@ import { ChatMessageAssembly, type ChatMessage } from '@keundal/chat/chat-messag
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
 import { validateChatTitle } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
-import { type Reasoning, EventType, type AGUIEvent, type AgentMessage } from '@keundal/core'
+import { type Reasoning, EventType, type AGUIEvent, type AgentMessage, type SteerQueue } from '@keundal/core'
 import type { Fiber } from 'cordis'
 import type { Context } from 'cordis'
 export { toMessages } from '@keundal/chat/messages'
@@ -12,6 +12,29 @@ import { resolveModel } from '@keundal/chat/models'
 
 const randomUUID = () => globalThis.crypto.randomUUID()
 export type MountAgent = (ctx: Context, config: AgentConfig) => Promise<Fiber>
+
+/** 로컬 채팅 실행에 필요한 입력과 이벤트 처리 계약입니다. */
+export interface KeundalChatRequest {
+  threadId: string
+  messages: ChatMessage[]
+  instructions: string
+  signal?: AbortSignal
+  runId?: string
+  state?: unknown
+  /** A stored journal may be rendered without rerunning the agent or provider. */
+  events?: AsyncIterable<AGUIEvent>
+  onMessage?: (message: ChatMessage) => void
+  /** 실행 중 지시를 받는 대기열입니다. 다음 모델 요청 전의 안전한 경계에서 반영됩니다. */
+  steer?: SteerQueue
+  onFinish?: (message: ChatMessage, steered: ChatMessageAssembly['steered']) => Promise<void>
+}
+
+/** 로컬 채팅의 제목 생성, 응답 실행, 자원 해제 계약입니다. */
+export interface KeundalChatRuntime {
+  dispose(): Promise<void>
+  title(message: ChatMessage, signal?: AbortSignal, titleModel?: string): Promise<string>
+  respond(request: KeundalChatRequest): AsyncGenerator<AGUIEvent>
+}
 const input = (
   messages: AgentMessage[],
   threadId: string = randomUUID(),
@@ -30,7 +53,7 @@ export async function createKeundalChat(
     maxOutputTokens?: number
   },
   mountAgent: MountAgent
-) {
+): Promise<KeundalChatRuntime> {
   const config = resolveModel(name)
   const maxOutputTokens = options.maxOutputTokens ?? 4096
   const ctx = context.isolate('agent')
@@ -38,9 +61,11 @@ export async function createKeundalChat(
     await mountAgent(child, {
       model: config.value,
       maxOutputTokens,
-      webSearch: !!options.webSearch && config.provider !== 'google',
+      webSearch: !!options.webSearch && config.provider !== 'google' && config.provider !== 'openai-chat',
       reasoning:
-        options.reasoning !== undefined && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id)
+        options.reasoning !== undefined &&
+        (config.provider === 'openai' || config.provider === 'openai-chat') &&
+        !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id)
           ? undefined
           : options.reasoning,
       maxToolRounds: 4,
@@ -88,18 +113,7 @@ export async function createKeundalChat(
       }
       return validateChatTitle(title)
     },
-    async *respond(request: {
-      threadId: string
-      messages: ChatMessage[]
-      instructions: string
-      signal?: AbortSignal
-      runId?: string
-      state?: unknown
-      /** A stored journal may be rendered without rerunning the agent or provider. */
-      events?: AsyncIterable<AGUIEvent>
-      onMessage?: (message: ChatMessage) => void
-      onFinish?: (message: ChatMessage) => Promise<void>
-    }): AsyncGenerator<AGUIEvent> {
+    async *respond(request: KeundalChatRequest): AsyncGenerator<AGUIEvent> {
       const runId = request.runId ?? randomUUID()
       const projection = new ChatMessageAssembly(runId)
       const publisher = new ChatMessagePublisher(request.onMessage)
@@ -117,7 +131,7 @@ export async function createKeundalChat(
               runId,
               request.state
             ),
-            { signal: request.signal }
+            { signal: request.signal, steer: request.steer }
           )) {
           projection.apply(event)
           publisher.update(event, projection.message)
@@ -132,7 +146,7 @@ export async function createKeundalChat(
         yield { type: EventType.RUN_ERROR, message: error instanceof Error ? error.message : String(error) }
       } finally {
         projection.finish(name)
-        await request.onFinish?.(projection.message)
+        await request.onFinish?.(projection.message, projection.steered)
         publisher.finish(projection.message)
       }
       // The UI sees success only after the display message is durably saved too.

@@ -1,11 +1,16 @@
 <script setup lang="ts">
+import { useMounted } from '@vueuse/core'
 import type { McpClientConfig } from '@keundal/mcp'
 
 const { t } = useLocale()
 const { $mcpManager, $saveMcpSettings, $remoteAgent } = useNuxtApp()
+const mounted = useMounted()
 const desktop = useRuntimeConfig().public.chatCapabilities.secureSettings
-const hosted = $remoteAgent && !desktop
-const servers = ref($mcpManager.configuration)
+const hosted = computed(() => mounted.value && Boolean($remoteAgent) && !desktop)
+const servers = ref<McpClientConfig[]>([])
+onMounted(() => {
+  servers.value = $mcpManager.configuration
+})
 const editing = ref<number | null>(null)
 const name = ref('')
 const transport = ref('streamable-http')

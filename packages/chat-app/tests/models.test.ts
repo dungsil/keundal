@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { listAnthropicModels } from '@keundal/plugin-llm-anthropic'
 import { listGeminiModels } from '@keundal/plugin-llm-gemini'
 import { listOpenAIModels } from '@keundal/plugin-llm-openai'
+import { listOpenAIChatModels } from '@keundal/plugin-llm-openai-chat'
 import { expect, test, onTestFinished, vi } from 'vitest'
 import { loadModels, MODEL_CACHE_TTL } from '@keundal/plugin-llm-browser/models'
 import { defaultLLMSettings } from '@keundal/llm-settings'
@@ -27,12 +28,14 @@ async function fixture(handler: (req: IncomingMessage, res: ServerResponse) => v
     removeItem: (key: string) => { values.delete(key) }
   }
   const settings = defaultLLMSettings()
-  for (const provider of ['openai', 'anthropic', 'google'] as const) settings[provider] = { apiKey: `private-${provider}`, baseURL: `http://127.0.0.1:${address.port}/gateway` }
+  for (const provider of ['openai', 'openai-chat', 'anthropic', 'google'] as const)
+    settings[provider] = { apiKey: `private-${provider}`, baseURL: `http://127.0.0.1:${address.port}/gateway` }
   return { requests, settings, storage, values }
 }
 
 test.each([
   { provider: 'openai' as const, list: listOpenAIModels, suffix: '/models' },
+  { provider: 'openai-chat' as const, list: listOpenAIChatModels, suffix: '/models' },
   { provider: 'anthropic' as const, list: listAnthropicModels, suffix: '/v1/models?limit=1000' },
   { provider: 'google' as const, list: listGeminiModels, suffix: '/v1beta/models' }
 ])('$provider 모델 조회는 경로 내부의 슬래시를 보존하고 끝의 슬래시만 모두 제거한다', async ({ provider, list, suffix }) => {
@@ -152,7 +155,7 @@ test('취소한 모델 조회는 결과를 캐시하지 않는다', async () => 
   expect(values.size).toBe(0)
 })
 
-test.each(['openai', 'anthropic', 'google'] as const)('%s 모델 목록은 빈 API 키일 때 기본 인증을 생략하고 커스텀 인증과 캐시 전환을 지원한다', async (provider) => {
+test.each(['openai', 'openai-chat', 'anthropic', 'google'] as const)('%s 모델 목록은 빈 API 키일 때 기본 인증을 생략하고 커스텀 인증과 캐시 전환을 지원한다', async (provider) => {
   const { settings, storage, requests } = await fixture((_req, res) => {
     res.end(JSON.stringify(provider === 'google'
       ? { models: [{ name: 'models/local', supportedGenerationMethods: ['generateContent'] }] }
@@ -194,7 +197,7 @@ test('같은 종류의 공급자는 모델 ID가 같아도 인증·모델 선택
   expect([...values.values()].join('')).not.toContain('work-key')
 })
 
-test.each(['openai', 'anthropic', 'google'] as const)('%s의 한도를 넘는 모델 목록은 캐시하지 않는다', async (provider) => {
+test.each(['openai', 'openai-chat', 'anthropic', 'google'] as const)('%s의 한도를 넘는 모델 목록은 캐시하지 않는다', async (provider) => {
   const { settings, storage, values } = await fixture((_req, res) => {
     res.end(' '.repeat(1024 * 1024 + 1))
   })

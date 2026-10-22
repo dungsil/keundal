@@ -1,6 +1,6 @@
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
 import { saveTitleModel } from '@keundal/chat/model-preferences'
-import { FALLBACK_MODEL } from '@keundal/llm-settings'
+import { FALLBACK_MODEL, providerIcon } from '@keundal/llm-settings'
 import { createModelSelection } from '../../shared/utils/model-selection'
 
 export function useModels() {
@@ -27,7 +27,7 @@ export function useModels() {
       {
         value: selected.value,
         label: selected.id,
-        icon: `i-simple-icons-${selected.provider === 'google' ? 'google' : selected.provider}`
+        icon: providerIcon(selected.configuration)
       },
       ...available
     ]

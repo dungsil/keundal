@@ -37,6 +37,7 @@ async function createKeundalChat(name: string, options: { webSearch?: boolean, r
   const ctx = new Context()
   const llm = ctx.plugin(browserLLMPlugin, { getSettings: () => ({
     openai: { apiKey: env.OPENAI_API_KEY ?? '', baseURL: env.OPENAI_BASE_URL ?? '' },
+    'openai-chat': { apiKey: env.OPENAI_API_KEY ?? '', baseURL: env.OPENAI_BASE_URL ?? '' },
     anthropic: { apiKey: env.ANTHROPIC_API_KEY ?? '', baseURL: env.ANTHROPIC_BASE_URL ?? '' },
     google: { apiKey: env.GEMINI_API_KEY ?? '', baseURL: env.GEMINI_BASE_URL ?? '' }
   }) })

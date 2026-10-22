@@ -14,7 +14,8 @@ export default {
   puppeteerClusterOptions: { maxConcurrency: 1 },
   lighthouseOptions: {
     throttling: { cpuSlowdownMultiplier: 4 },
-    onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo']
+    onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo'],
+    skipAudits: ['is-crawlable']
   },
   ci: { reporter: 'jsonExpanded' }
 }

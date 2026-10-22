@@ -7,14 +7,6 @@ const props = defineProps<{
   invocation: ChartUIToolInvocation
 }>()
 
-const color = computed(() => {
-  return (
-    {
-      'output-error': 'bg-muted text-error'
-    }[props.invocation.state as string] || 'bg-muted text-white'
-  )
-})
-
 const icon = computed(() => {
   return (
     {
@@ -73,7 +65,7 @@ const formatValue = (value: string | number | undefined): string => {
     <div v-if="invocation.output.title" class="flex items-center gap-2 mb-2">
       <UIcon name="i-lucide-line-chart" class="size-5 text-primary shrink-0" />
       <div class="min-w-0">
-        <h3 class="text-lg font-semibold truncate">
+        <h3 class="text-lg font-semibold leading-normal [overflow-wrap:anywhere]">
           {{ invocation.output.title }}
         </h3>
       </div>
@@ -125,13 +117,16 @@ const formatValue = (value: string | number | undefined): string => {
     </div>
   </div>
 
-  <div v-else class="rounded-xl px-5 py-4 my-5" :class="color">
+  <div v-else class="rounded-xl bg-muted px-5 py-4 my-5 text-default">
     <div class="flex items-center justify-center h-44">
       <div class="text-center">
         <UIcon
           :name="icon"
           class="size-8 mx-auto mb-2"
-          :class="[invocation.state === 'input-streaming' && 'motion-safe:animate-spin']"
+          :class="[
+            invocation.state === 'input-streaming' && 'animate-spin motion-reduce:animate-none',
+            invocation.state === 'output-error' && 'text-error'
+          ]"
         />
         <div class="text-sm">
           {{ message }}

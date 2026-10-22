@@ -31,12 +31,11 @@ const isZoomable = computed(() => props.type.startsWith('image/') && props.previ
 <template>
   <div class="relative group">
     <UModal v-if="isZoomable" :title="removeRandomSuffix(name)" :transition="false" :ui="{ content: 'max-w-[95vw]', body: 'flex justify-center' }">
-      <button type="button" class="rounded-lg cursor-zoom-in" :aria-label="`${t('common.view')}: ${removeRandomSuffix(name)}`">
+      <button type="button" class="cursor-zoom-in rounded-lg" :aria-label="`${t('file.zoom')}: ${removeRandomSuffix(name)}`">
         <UAvatar
           :size="size"
           :src="previewUrl"
           alt=""
-          :icon="getFileIcon(type, name)"
           class="rounded-lg"
           :class="{ 'opacity-50': status === 'uploading' }"
         />
@@ -46,11 +45,17 @@ const isZoomable = computed(() => props.type.startsWith('image/') && props.previ
       </template>
     </UModal>
     <UTooltip v-else :text="removeRandomSuffix(name)">
-      <UAvatar :size="size" :icon="getFileIcon(type, name)" :alt="removeRandomSuffix(name)" class="rounded-lg" />
+      <UAvatar
+        :size="size"
+        :icon="getFileIcon(type, name)"
+        :alt="removeRandomSuffix(name)"
+        class="rounded-lg"
+        :class="{ 'opacity-50': status === 'uploading' }"
+      />
     </UTooltip>
 
     <div v-if="status === 'uploading'" class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
-      <UIcon name="i-lucide-loader-2" class="size-6 motion-safe:animate-spin text-white" />
+      <UIcon name="i-lucide-loader-2" class="size-6 animate-spin motion-reduce:animate-none text-white" />
     </div>
 
     <UTooltip v-if="status === 'error'" :text="error">
@@ -64,7 +69,7 @@ const isZoomable = computed(() => props.type.startsWith('image/') && props.previ
       icon="i-lucide-x"
       size="xs"
       color="neutral"
-      class="absolute size-6 p-0 -top-1 -right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity rounded-full ring ring-bg"
+      class="absolute size-6 p-0 -top-1 -right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity rounded-full ring ring-bg"
       :aria-label="`${t('file.remove')}: ${removeRandomSuffix(name)}`"
       @click="emit('remove')"
     />

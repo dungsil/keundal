@@ -14,6 +14,7 @@
 | `@keundal/plugin-agent-coding`         | 공통 루프에 코딩 지침을 적용하여 에이전트를 등록합니다.                    |
 | `@keundal/tools`                       | 에이전트와 도구 공급자가 공유하는 실행 계약을 제공합니다.                  |
 | `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                                 |
+| `@keundal/plugin-llm-openai-chat`      | OpenAI Chat Completions API로 `llm`을 구현합니다.                          |
 | `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                           |
 | `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                               |
 | `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                     |
@@ -29,7 +30,7 @@
 `ShellService`는 `@keundal/shell`에, `TranscriptionService`는 `@keundal/transcription`에 둡니다.
 교체 가능한 서비스의 계약은 구현과 분리합니다. 소비자는 계약에 의존하고 앱에서 구현을 조립합니다.
 
-플러그인 설정과 사용법은 [공통 루프 문서](packages/agent-loop/README.md), [대화 에이전트 문서](packages/plugin-agent-chat/README.md), [코딩 에이전트 문서](packages/plugin-agent-coding/README.md), [OpenAI 문서](packages/plugin-llm-openai/README.md), [Gemini 문서](packages/plugin-llm-gemini/README.md), [Anthropic 문서](packages/plugin-llm-anthropic/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [축약 문서](packages/compaction/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
+플러그인 설정과 사용법은 [공통 루프 문서](packages/agent-loop/README.md), [대화 에이전트 문서](packages/plugin-agent-chat/README.md), [코딩 에이전트 문서](packages/plugin-agent-coding/README.md), [OpenAI 문서](packages/plugin-llm-openai/README.md), [OpenAI Chat Completions 문서](packages/plugin-llm-openai-chat/README.md), [Gemini 문서](packages/plugin-llm-gemini/README.md), [Anthropic 문서](packages/plugin-llm-anthropic/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [축약 문서](packages/compaction/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
 
 ## 앱 의존성 경계
 
@@ -46,6 +47,8 @@
 - `generation`은 실행·journal·커밋·복구를 담당하며, 성공한 `RUN_FINISHED`는 커밋 이후에 전달합니다. 내구성이 필요한 저장소는 커밋의 영속성을 보장해야 합니다.
 - `generation.run()`은 `GenerationOptions.stream`이 있으면 해당 이벤트 공급자에 취소 신호를 전달하여 실행합니다. 함수는 실행 요청과 분리하며 저장하거나 복구 시 재호출하지 않습니다.
 - `generation.recover()`는 저장된 부분 응답과 확정된 종료 상태를 보존하고, 미완료 실행을 `interrupted`로 확정합니다. LLM을 다시 호출하거나 자동 재시도하지 않습니다.
+- `generation.subscribe()`는 `afterSequence` 다음의 journal을 재생하고 실행 중이면 새 기록을 이어서 전달합니다. 실행을 다시 시작하지 않으며, 살아 있는 실행의 재구독과 `recover()`의 복구는 서로 다른 기능입니다.
+- 실행 중 지시는 `ExecutionOptions.steer`의 `SteerQueue`로 전달하고, 에이전트는 다음 모델 요청 전의 안전한 경계에서만 반영합니다. Queue·Steer·재구독의 규칙은 [실행 제어 문서](docs/run-control.md)를 따릅니다.
 - 각 서비스는 취소 신호를 실제 작업에 연결하고 자원을 정리해야 합니다.
 
 ## 에이전트 조합

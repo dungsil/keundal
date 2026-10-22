@@ -54,6 +54,8 @@ function copy() {
 
 <template>
   <template v-if="message.role === 'assistant' && !streaming">
+    <span role="status" class="sr-only">{{ copied ? t('chat.copied') : '' }}</span>
+
     <UTooltip :text="t('chat.copy')">
       <UButton
         size="sm"
@@ -69,7 +71,7 @@ function copy() {
       <UButton
         size="sm"
         :color="vote === true ? 'success' : 'neutral'"
-        variant="ghost"
+        :variant="vote === true ? 'soft' : 'ghost'"
         icon="i-lucide-thumbs-up"
         :aria-label="t('chat.good')"
         :aria-pressed="vote === true"
@@ -82,7 +84,7 @@ function copy() {
       <UButton
         size="sm"
         :color="vote === false ? 'error' : 'neutral'"
-        variant="ghost"
+        :variant="vote === false ? 'soft' : 'ghost'"
         icon="i-lucide-thumbs-down"
         :aria-label="t('chat.bad')"
         :aria-pressed="vote === false"

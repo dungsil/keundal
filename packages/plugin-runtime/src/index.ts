@@ -35,6 +35,7 @@ export interface LoadRuntimePluginsOptions {
   readonly importModule: RuntimeModuleImporter
   readonly builtins?: RuntimeModuleRegistry
   readonly tools?: ToolProvider
+  readonly deferredToolProvider?: ToolProvider
 }
 
 interface ResolvedModule {
@@ -197,14 +198,25 @@ export async function loadRuntimePlugins(
         }
       : undefined
 
+  const catalogTools: ToolProvider | undefined =
+    composedTools || options.deferredToolProvider
+      ? async (execution) => [
+          ...((await composedTools?.(execution)) ?? []),
+          ...((await options.deferredToolProvider?.(execution)) ?? [])
+        ]
+      : undefined
+
   return {
-    tools: composedTools,
+    tools: catalogTools,
     async setup(ctx) {
       for (const { plugin, config } of plugins) await ctx.plugin(plugin, config)
     },
     async mountAgent(ctx, config) {
       const agentConfig = { ...agent.config, ...config }
-      if (composedTools) agentConfig.tools = composedTools
+      const deferred = agentConfig.deferredTools !== undefined && options.deferredToolProvider
+      const visibleTools = deferred ? composedTools : catalogTools
+      if (visibleTools) agentConfig.tools = visibleTools
+      if (deferred) agentConfig.deferredToolProvider = options.deferredToolProvider
       return await ctx.plugin(agent.plugin, agentConfig)
     }
   }

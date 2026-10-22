@@ -33,9 +33,11 @@ useHead(() => {
     <template #header>
       <Navbar>
         <template #title>
-          <h1 class="text-lg font-semibold text-highlighted">
-            {{ t('settings.title') }}
-          </h1>
+          <div class="w-full max-w-6xl">
+            <h1 class="text-lg font-semibold text-highlighted">
+              {{ t('settings.title') }}
+            </h1>
+          </div>
         </template>
       </Navbar>
     </template>
@@ -53,7 +55,7 @@ useHead(() => {
         <div class="flex flex-col gap-8 md:flex-row md:gap-10 lg:gap-14">
           <nav
             :aria-label="t('settings.title')"
-            class="flex shrink-0 flex-col gap-4 border-b border-default pb-4 md:sticky md:top-0 md:w-48 md:self-start md:border-0 md:pb-0"
+            class="flex shrink-0 flex-col gap-4 border-b border-default pb-4 md:sticky md:top-(--ui-header-height) md:w-48 md:self-start md:border-0 md:pb-0"
           >
             <div class="flex flex-wrap gap-1 md:flex-col">
               <UButton

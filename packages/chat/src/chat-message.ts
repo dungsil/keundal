@@ -2,6 +2,8 @@ import {
   EventType,
   LLM_SOURCE_EVENT,
   MessageAssembly,
+  STEER_MESSAGE_EVENT,
+  isSteerMessage,
   prepareReplayMessages,
   type AGUIEvent,
   type AgentMessage,
@@ -46,11 +48,18 @@ export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
   parts: ChatPart[]
+  /**
+   * 실행 중에 지시로 반영된 사용자 메시지는 반영한 실행 id를 가집니다. 모델 입력은 그 실행의
+   * 어시스턴트 기록이 원래 위치로 다시 조립하므로, 이 메시지는 화면 표시에만 사용합니다.
+   */
+  metadata?: { steeredRunId?: string }
 }
 
 /** Projects native AG-UI events into the existing chat components and durable replay. */
 export class ChatMessageAssembly {
   readonly message: ChatMessage
+  /** 이 실행이 journal에 반영한 지시입니다. 반영한 순서를 유지합니다. */
+  readonly steered: Extract<AgentMessage, { role: 'user' }>[] = []
   private readonly assembly = new MessageAssembly()
   private readonly texts = new Map<string, TextPart>()
   private readonly calls = new Map<string, { args: string; part: ToolPart }>()
@@ -63,6 +72,10 @@ export class ChatMessageAssembly {
 
   apply(event: AGUIEvent) {
     this.assembly.apply(event)
+    if (event.type === EventType.CUSTOM && event.name === STEER_MESSAGE_EVENT && isSteerMessage(event.value)) {
+      this.steered.push(event.value)
+      return
+    }
     switch (event.type) {
       case EventType.TEXT_MESSAGE_START:
       case EventType.REASONING_MESSAGE_START: {

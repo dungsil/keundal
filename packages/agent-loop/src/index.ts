@@ -3,19 +3,29 @@ import { compact } from '@keundal/compaction'
 import type {} from '@keundal/context'
 import {
   CONTEXT_MESSAGE_EVENT,
+  CONTEXT_MESSAGE_PREFIX,
   EventType,
   isContextOverflow,
-  CONTEXT_MESSAGE_PREFIX,
+  LLM_USAGE_EVENT,
+  TRACE_EVENT,
   parseRunAgentInput,
   parseReasoning,
+  traceEvent,
   type AGUIEvent,
   type CompactionResult,
   type ExecutionOptions,
   type LLMRequest,
   type LLMEvent,
-  type RunAgentInput
+  type RunAgentInput,
+  type SteerQueue,
+  type TraceMetadataEvent,
+  type TraceCost,
+  type TraceErrorCategory,
+  type TraceSpan,
+  type TraceUsage,
+  type LLMService
 } from '@keundal/core'
-import type { ToolProvider } from '@keundal/tools'
+import { createDeferredToolSession, parseDeferredToolsConfig, type ToolProvider } from '@keundal/tools'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { type Context } from 'cordis'
 
@@ -37,6 +47,207 @@ import { addTools, parseTools, streamWithTools } from './tools.js'
 
 export { TOOL_PROGRESS_EVENT } from './tools.js'
 export type { ExecutableTool, ToolExecutionContext } from './tools.js'
+
+type TraceParent = { readonly traceId: string; readonly parentSpanId: string }
+
+class TraceRecorder {
+  readonly traceId: string
+  readonly root: TraceSpan
+  lastModelSpanId?: string
+  private sequence = 0
+  private pending: TraceMetadataEvent[] = []
+  private active = new Map<string, TraceSpan>()
+
+  constructor(
+    readonly runId: string,
+    parent?: TraceParent
+  ) {
+    this.traceId = parent?.traceId ?? globalThis.crypto.randomUUID()
+    this.root = this.start('agent', 'agent', parent?.parentSpanId)
+  }
+
+  start(
+    kind: TraceSpan['kind'],
+    name: string,
+    parentSpanId?: string,
+    toolCallId?: string,
+    model?: string,
+    enqueue = true,
+    detached = false
+  ): TraceSpan {
+    const span: TraceSpan = {
+      version: 1,
+      traceId: this.traceId,
+      spanId: globalThis.crypto.randomUUID(),
+      ...(parentSpanId ? { parentSpanId } : {}),
+      runId: this.runId,
+      ...(toolCallId ? { toolCallId } : {}),
+      kind,
+      name,
+      sequence: this.sequence++,
+      startedAt: Date.now(),
+      status: 'running',
+      ...(model ? { model } : {}),
+      ...(detached ? { detached: true } : {})
+    }
+    if (enqueue) this.pending.push(traceEvent(span))
+    this.active.set(span.spanId, span)
+    return span
+  }
+
+  finish(
+    span: TraceSpan,
+    status: TraceSpan['status'],
+    options: { usage?: TraceUsage; cost?: TraceCost; ttftMs?: number; error?: TraceErrorCategory } = {},
+    enqueue = true
+  ): TraceSpan {
+    const current = this.active.get(span.spanId)
+    if (!current) return span
+    const completed: TraceSpan = {
+      ...current,
+      endedAt: Date.now(),
+      status,
+      ...(options.usage ? { usage: options.usage } : {}),
+      ...(options.cost ? { cost: options.cost } : {}),
+      ...(options.ttftMs === undefined ? {} : { ttftMs: options.ttftMs }),
+      ...(options.error ? { error: options.error } : {})
+    }
+    this.active.delete(span.spanId)
+    if (enqueue) this.pending.push(traceEvent(completed))
+    return completed
+  }
+
+  finishOpenSpans(exceptSpanId: string): void {
+    for (const span of this.active.values()) {
+      if (span.spanId !== exceptSpanId && !span.detached) this.finish(span, 'interrupted')
+    }
+  }
+
+  updateUsage(span: TraceSpan, usage: TraceUsage, cost?: TraceCost): void {
+    const active = this.active.get(span.spanId)
+    if (!active) return
+    const updated = { ...active, usage, ...(cost ? { cost } : {}) }
+    this.active.set(span.spanId, updated)
+    this.pending.push(traceEvent(updated))
+  }
+
+  drain(): TraceMetadataEvent[] {
+    return this.pending.splice(0)
+  }
+}
+
+function usageFromEvent(value: unknown): { usage: TraceUsage; cost?: TraceCost } | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const source = value as Record<string, unknown>
+  if (source.source !== 'provider' && source.source !== 'estimate') return undefined
+  const usage: {
+    source: TraceUsage['source']
+    inputTokens?: number
+    outputTokens?: number
+    cacheReadTokens?: number
+    cacheWriteTokens?: number
+  } = { source: source.source }
+  for (const field of ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'] as const) {
+    const count = source[field]
+    if (typeof count === 'number' && Number.isSafeInteger(count) && count >= 0) usage[field] = count
+  }
+  const valueCost = source.cost
+  const cost =
+    typeof valueCost === 'object' && valueCost !== null && !Array.isArray(valueCost)
+      ? (valueCost as Record<string, unknown>)
+      : undefined
+  const safeCost =
+    cost &&
+    typeof cost.currency === 'string' &&
+    cost.currency.trim() &&
+    typeof cost.amount === 'number' &&
+    Number.isFinite(cost.amount) &&
+    cost.amount >= 0 &&
+    (cost.source === 'provider' || cost.source === 'estimate')
+      ? { currency: cost.currency, amount: cost.amount, source: cost.source }
+      : undefined
+  return { usage, ...(safeCost ? { cost: safeCost as TraceCost } : {}) }
+}
+
+function safeTraceError(error: unknown): TraceErrorCategory {
+  return isContextOverflow(error) ? 'context_overflow' : 'provider_error'
+}
+
+async function* tracedModelStream(
+  stream: AsyncIterable<LLMEvent>,
+  model: string,
+  trace: TraceRecorder,
+  parentSpanId: string,
+  signal: AbortSignal,
+  publishTraceEvents = true,
+  detached = false
+): AsyncGenerator<LLMEvent> {
+  const span = trace.start('model', 'generate', parentSpanId, undefined, model, true, detached)
+  if (publishTraceEvents) trace.lastModelSpanId = span.spanId
+  if (publishTraceEvents) yield* trace.drain()
+  let usage: TraceUsage | undefined
+  let cost: TraceCost | undefined
+  let ttftMs: number | undefined
+  try {
+    for await (const event of stream) {
+      if (event.type === EventType.CUSTOM && event.name === LLM_USAGE_EVENT) {
+        const parsed = usageFromEvent(event.value)
+        if (parsed) {
+          usage = parsed.usage
+          cost = parsed.cost ?? cost
+          trace.updateUsage(span, usage, cost)
+        }
+      } else if (
+        ttftMs === undefined &&
+        (event.type === EventType.TEXT_MESSAGE_CONTENT ||
+          event.type === EventType.REASONING_MESSAGE_CONTENT ||
+          event.type === EventType.TOOL_CALL_ARGS)
+      ) {
+        ttftMs = Math.max(0, Date.now() - span.startedAt)
+      }
+      yield event
+      if (publishTraceEvents) yield* trace.drain()
+    }
+    trace.finish(span, 'completed', {
+      ...(usage ? { usage } : {}),
+      ...(cost ? { cost } : {}),
+      ...(ttftMs === undefined ? {} : { ttftMs })
+    })
+    if (publishTraceEvents) yield* trace.drain()
+  } catch (error) {
+    trace.finish(span, signal.aborted ? 'cancelled' : 'failed', {
+      ...(usage ? { usage } : {}),
+      ...(cost ? { cost } : {}),
+      ...(ttftMs === undefined ? {} : { ttftMs }),
+      ...(signal.aborted ? {} : { error: safeTraceError(error) })
+    })
+    if (publishTraceEvents) yield* trace.drain()
+    throw error
+  }
+}
+
+function tracedCompactionLLM(
+  llm: LLMService,
+  trace: TraceRecorder,
+  parentSpanId: string,
+  signal: AbortSignal,
+  detached = false
+): Pick<LLMService, 'getModel' | 'countTokens' | 'stream'> {
+  return {
+    getModel: (model, options) => llm.getModel(model, options),
+    countTokens: (request, options) => llm.countTokens(request, options),
+    stream: (request, options) =>
+      tracedModelStream(
+        llm.stream(request, options),
+        request.model,
+        trace,
+        parentSpanId,
+        options?.signal ?? signal,
+        false,
+        detached
+      )
+  }
+}
 
 /**
  * 에이전트 설정을 검증하고 기본값을 채웁니다. 잘못된 값은 예외로 알립니다.
@@ -63,6 +274,17 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     }
   }
   const configuredTools = 'tools' in value ? value.tools : undefined
+  const deferredTools =
+    'deferredTools' in value && value.deferredTools !== undefined
+      ? parseDeferredToolsConfig(value.deferredTools)
+      : undefined
+  const deferredToolProvider = 'deferredToolProvider' in value ? value.deferredToolProvider : undefined
+  if (deferredToolProvider !== undefined && typeof deferredToolProvider !== 'function') {
+    throw new Error('deferredToolProvider must be a function')
+  }
+  if ((deferredToolProvider === undefined) !== (deferredTools === undefined)) {
+    throw new Error('deferredTools and deferredToolProvider must be configured together')
+  }
   const tools = typeof configuredTools === 'function' ? (configuredTools as ToolProvider) : parseTools(configuredTools)
   const maxActiveSubagents =
     'maxActiveSubagents' in value && value.maxActiveSubagents !== undefined ? value.maxActiveSubagents : 8
@@ -95,6 +317,8 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     ...('reasoning' in value ? { reasoning: parseReasoning(value.reasoning) } : {}),
     compaction,
     tools,
+    ...(deferredTools === undefined ? {} : { deferredTools }),
+    ...(deferredToolProvider === undefined ? {} : { deferredToolProvider: deferredToolProvider as ToolProvider }),
     subagents,
     maxActiveSubagents,
     skills,
@@ -160,7 +384,7 @@ export class Agent extends AgentService {
 
   private runInternal(
     input: RunAgentInput,
-    options: ExecutionOptions,
+    options: ExecutionOptions & Partial<TraceParent>,
     allowSubagents: boolean
   ): AsyncIterableIterator<AGUIEvent> {
     if (this.closed) throw new Error('agent disposed')
@@ -181,7 +405,11 @@ export class Agent extends AgentService {
       if (!controller.signal.aborted) controller.abort(new Error('agent run stopped'))
       cleanup()
     }
-    const iterator = this.execute(input, controller.signal, stop, allowSubagents)
+    const traceParent =
+      options.traceId && options.parentSpanId
+        ? { traceId: options.traceId, parentSpanId: options.parentSpanId }
+        : undefined
+    const iterator = this.execute(input, controller.signal, stop, allowSubagents, traceParent, options.steer)
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -202,11 +430,17 @@ export class Agent extends AgentService {
     input: RunAgentInput,
     signal: AbortSignal,
     cleanup: () => void,
-    allowSubagents: boolean
+    allowSubagents: boolean,
+    traceParent?: TraceParent,
+    steer?: SteerQueue
   ): AsyncGenerator<AGUIEvent, void, unknown> {
+    let failedTrace: TraceRecorder | undefined
+    let rootFinalized = false
     try {
       signal.throwIfAborted()
       const request = parseRunAgentInput(input)
+      const trace = new TraceRecorder(request.runId, traceParent)
+      failedTrace = trace
       for (const reserved of [SKILL_CATALOG_ID, SYSTEM_PROMPT_ID]) {
         if (request.messages.some((message) => message.id === reserved)) {
           throw new Error(`message id is reserved: ${reserved}`)
@@ -222,6 +456,12 @@ export class Agent extends AgentService {
         typeof this.config.tools === 'function' ? await this.config.tools(options) : this.config.tools
       )
       signal.throwIfAborted()
+      const deferredSession = this.config.deferredToolProvider
+        ? await createDeferredToolSession(this.config.deferredToolProvider, options, this.config.deferredTools)
+        : undefined
+      if (deferredSession && configuredTools.some((tool) => tool.name === 'search_tool')) {
+        throw new Error('search_tool is reserved when deferred tools are enabled')
+      }
       if (this.config.skills && configuredTools.some((tool) => tool.name === 'skill'))
         throw new Error('skill tool name is reserved when skills are enabled')
       if (this.config.subagents && configuredTools.some((tool) => tool.name === SUBAGENT_TOOL_NAME))
@@ -238,7 +478,8 @@ export class Agent extends AgentService {
                 this.config.maxActiveSubagents ?? 8
               )
             ]
-          : [])
+          : []),
+        ...(deferredSession ? [deferredSession.searchTool] : [])
       ]
       const preparedInput = addTools(
         withSystemPrompt(withSkillCatalog(parseRunAgentInput(prepared.input), catalog), this.systemPrompt()),
@@ -274,7 +515,7 @@ export class Agent extends AgentService {
             contextWindow: model.contextWindow
           })
         : preparedInput
-      const fitted = await this.fitInput(contextualInput, maxInputTokens, signal)
+      const fitted = await this.fitInput(contextualInput, maxInputTokens, signal, false, signal, trace)
       const previousIds = this.config.context ? new Set(preparedInput.messages.map((message) => message.id)) : undefined
       const initialContext = previousIds
         ? fitted.input.messages.filter(
@@ -283,7 +524,7 @@ export class Agent extends AgentService {
         : []
       const llm = this.ctx.llm
       const stream = (request: LLMRequest, execution?: ExecutionOptions) =>
-        this.streamWithRetry(request, maxInputTokens, execution?.signal ?? signal)
+        this.streamWithRetry(request, maxInputTokens, execution?.signal ?? signal, trace!)
       const maxToolRounds = this.config.maxToolRounds ?? 8
       const maxToolCalls = this.config.maxToolCalls ?? 32
       const parallel = this.config.parallelTools ?? false
@@ -296,10 +537,35 @@ export class Agent extends AgentService {
               contextWindow: model.contextWindow
             })
           : next
-        return (await this.fitInput(contextual, maxInputTokens, generationSignal, false, signal)).input
+        return (await this.fitInput(contextual, maxInputTokens, generationSignal, false, signal, trace)).input
       }
 
-      signal.throwIfAborted()
+      const toolSpans = new Map<string, TraceSpan>()
+      const traceContext = (call: { id: string; name: string }) => {
+        const span = trace.start(
+          'tool',
+          call.name,
+          trace.lastModelSpanId ?? trace.root.spanId,
+          call.id,
+          undefined,
+          false
+        )
+        toolSpans.set(call.id, span)
+        return { traceId: trace.traceId, parentSpanId: span.spanId }
+      }
+      const traceHooks = {
+        onToolStart(call: { id: string; name: string }) {
+          const span = toolSpans.get(call.id)
+          return span ? traceEvent(span) : undefined
+        },
+        onToolEnd(call: { id: string; name: string; status: 'completed' | 'failed' | 'cancelled' }) {
+          const span = toolSpans.get(call.id)
+          if (!span) return undefined
+          toolSpans.delete(call.id)
+          const ended = trace.finish(span, call.status, call.status === 'failed' ? { error: 'tool_error' } : {}, false)
+          return traceEvent(ended)
+        }
+      }
       const generation = this.ctx.generation.run(
         {
           input: fitted.input,
@@ -314,31 +580,82 @@ export class Agent extends AgentService {
           signal,
           stream: async function* (generationRequest, execution) {
             const generationSignal = execution?.signal ?? signal
-            for (const message of initialContext) {
+            yield* trace.drain()
+            try {
+              for (const message of initialContext) {
+                generationSignal.throwIfAborted()
+                yield { type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value: message }
+              }
               generationSignal.throwIfAborted()
-              yield { type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value: message }
+              yield* tools.length
+                ? streamWithTools(
+                    llm,
+                    generationRequest,
+                    tools,
+                    maxToolRounds,
+                    (next) => prepareNext(next, generationSignal),
+                    generationSignal,
+                    {
+                      parallel,
+                      stream,
+                      maxToolCalls,
+                      ...(steer ? { steer: () => steer.take() } : {}),
+                      ...(deferredSession
+                        ? {
+                            resolveTools: async () => {
+                              await deferredSession.refresh()
+                              return deferredSession.activeTools
+                            }
+                          }
+                        : {}),
+                      traceContext,
+                      trace: traceHooks
+                    }
+                  )
+                : stream(generationRequest, { signal: generationSignal })
+              trace.finishOpenSpans(trace.root.spanId)
+              trace.finish(trace.root, 'completed')
+              rootFinalized = true
+              yield* trace.drain()
+            } catch (error) {
+              trace.finishOpenSpans(trace.root.spanId)
+              const status = generationSignal.aborted ? 'cancelled' : 'failed'
+              trace.finish(trace.root, status, status === 'failed' ? { error: 'agent_error' } : {})
+              rootFinalized = true
+              yield* trace.drain()
+              throw error
             }
-            generationSignal.throwIfAborted()
-            yield* tools.length
-              ? streamWithTools(
-                  llm,
-                  generationRequest,
-                  tools,
-                  maxToolRounds,
-                  (next) => prepareNext(next, generationSignal),
-                  generationSignal,
-                  { parallel, stream, maxToolCalls }
-                )
-              : stream(generationRequest, { signal: generationSignal })
           }
         }
       )
       for await (const event of generation) {
+        if ((event.type === EventType.RUN_FINISHED || event.type === EventType.RUN_ERROR) && !rootFinalized) {
+          const status =
+            event.type === EventType.RUN_ERROR
+              ? 'failed'
+              : signal.aborted
+                ? 'cancelled'
+                : event.outcome?.type === 'success'
+                  ? 'completed'
+                  : 'failed'
+          trace.finishOpenSpans(trace.root.spanId)
+          trace.finish(trace.root, status, status === 'failed' ? { error: 'agent_error' } : {})
+          rootFinalized = true
+          yield* trace.drain()
+        }
         if (event.type === EventType.RUN_FINISHED) {
           for (const entry of this.preparations.values()) if (entry.sourceSignal === signal) entry.detach()
         }
         yield event
       }
+    } catch (error) {
+      if (failedTrace && !rootFinalized) {
+        const status = signal.aborted ? 'cancelled' : 'failed'
+        failedTrace.finishOpenSpans(failedTrace.root.spanId)
+        failedTrace.finish(failedTrace.root, status, status === 'failed' ? { error: 'agent_error' } : {})
+        rootFinalized = true
+      }
+      throw error
     } finally {
       cleanup()
     }
@@ -355,7 +672,13 @@ export class Agent extends AgentService {
     entry.controller.abort(new Error('compaction preparation discarded'))
   }
 
-  private prepareCompaction(input: RunAgentInput, maxInputTokens: number, inputTokens: number, signal: AbortSignal) {
+  private prepareCompaction(
+    input: RunAgentInput,
+    maxInputTokens: number,
+    inputTokens: number,
+    signal: AbortSignal,
+    trace?: TraceRecorder
+  ) {
     if (this.preparations.has(input.threadId)) return
     // 준비 결과와 진행 중 작업의 수를 함께 제한합니다.
     if (this.preparations.size >= 32) {
@@ -382,8 +705,11 @@ export class Agent extends AgentService {
       task: Promise.resolve(undefined)
     }
     this.preparations.set(input.threadId, entry)
+    const span = trace?.start('compaction', 'background_prepare', trace.root.spanId, undefined, undefined, true, true)
+    const compactionLLM =
+      span && trace ? tracedCompactionLLM(this.ctx.llm, trace, span.spanId, controller.signal, true) : this.ctx.llm
     entry.task = compact(
-      this.ctx.llm,
+      compactionLLM,
       {
         input: entry.input,
         model: this.config.model,
@@ -393,10 +719,17 @@ export class Agent extends AgentService {
     ).then(
       (result) => {
         if (!controller.signal.aborted && this.preparations.get(input.threadId) === entry) entry.result = result
+        if (span && trace) trace.finish(span, controller.signal.aborted ? 'cancelled' : 'completed')
         detach()
         return entry.result
       },
       () => {
+        if (span && trace)
+          trace.finish(
+            span,
+            controller.signal.aborted ? 'cancelled' : 'failed',
+            controller.signal.aborted ? {} : { error: 'compaction_error' }
+          )
         detach()
         // 준비 실패는 실제 생성에 영향을 주지 않습니다. 필요해지면 동기 축약으로 재시도합니다.
         if (this.preparations.get(input.threadId) === entry) this.preparations.delete(input.threadId)
@@ -408,21 +741,35 @@ export class Agent extends AgentService {
   private async *streamWithRetry(
     request: LLMRequest,
     maxInputTokens: number,
-    signal: AbortSignal
+    signal: AbortSignal,
+    trace: TraceRecorder
   ): AsyncGenerator<LLMEvent> {
     let emitted = false
     try {
-      for await (const event of this.ctx.llm.stream(request, { signal })) {
+      for await (const event of tracedModelStream(
+        this.ctx.llm.stream(request, { signal }),
+        request.model,
+        trace,
+        trace.root.spanId,
+        signal
+      )) {
         signal.throwIfAborted()
-        emitted = true
+        if (!(event.type === EventType.CUSTOM && (event.name === TRACE_EVENT || event.name === LLM_USAGE_EVENT)))
+          emitted = true
         yield event
       }
     } catch (error) {
       signal.throwIfAborted()
       if (emitted || !isContextOverflow(error)) throw error
-      const fitted = await this.fitInput(request.input, maxInputTokens, signal, true)
+      const fitted = await this.fitInput(request.input, maxInputTokens, signal, true, signal, trace)
       signal.throwIfAborted()
-      yield* this.ctx.llm.stream({ ...request, input: fitted.input }, { signal })
+      yield* tracedModelStream(
+        this.ctx.llm.stream({ ...request, input: fitted.input }, { signal }),
+        request.model,
+        trace,
+        trace.root.spanId,
+        signal
+      )
     }
   }
 
@@ -431,7 +778,8 @@ export class Agent extends AgentService {
     maxInputTokens: number,
     signal: AbortSignal,
     force = false,
-    backgroundSignal = signal
+    backgroundSignal = signal,
+    trace?: TraceRecorder
   ): Promise<{ input: RunAgentInput; compaction?: CompactionResult }> {
     signal.throwIfAborted()
     const countTokens = async (candidate: RunAgentInput) => {
@@ -472,19 +820,31 @@ export class Agent extends AgentService {
         input.messages.filter((message) => message.role === 'user' && !message.id.startsWith(CONTEXT_MESSAGE_PREFIX))
           .length > 1
       )
-        this.prepareCompaction(input, maxInputTokens, count, backgroundSignal)
+        this.prepareCompaction(input, maxInputTokens, count, backgroundSignal, trace)
       return { input }
     }
 
-    const compaction = await compact(
-      this.ctx.llm,
-      {
-        input,
-        model: this.config.model,
-        maxInputTokens
-      },
-      { ...this.compactionPolicy, signal, inputTokens: count, force }
-    )
+    const compactionSpan = trace?.start('compaction', 'compact', trace.root.spanId)
+    let compaction: CompactionResult
+    const compactionLLM =
+      compactionSpan && trace ? tracedCompactionLLM(this.ctx.llm, trace, compactionSpan.spanId, signal) : this.ctx.llm
+    try {
+      compaction = await compact(
+        compactionLLM,
+        { input, model: this.config.model, maxInputTokens },
+        { ...this.compactionPolicy, signal, inputTokens: count, force }
+      )
+    } catch (error) {
+      if (compactionSpan && trace) {
+        trace.finish(
+          compactionSpan,
+          signal.aborted ? 'cancelled' : 'failed',
+          signal.aborted ? {} : { error: 'compaction_error' }
+        )
+      }
+      throw error
+    }
+    if (compactionSpan && trace) trace.finish(compactionSpan, 'completed')
     signal.throwIfAborted()
     const compacted = { ...input, messages: compaction.messages }
     // 축약기의 기본 계산과 달리 네이티브 검색 도구의 입력 비용까지 포함해 다시 검사합니다.

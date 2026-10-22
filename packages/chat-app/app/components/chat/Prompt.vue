@@ -3,6 +3,7 @@ import type { FileWithStatus } from '@keundal/chat/file'
 import { useElementBounding } from '@vueuse/core'
 
 import type { ChatStatus } from '@keundal/chat/chat-message'
+import type { DeliveryMode } from '../../composables/useKeundalChat'
 
 const { t } = useLocale()
 
@@ -31,6 +32,15 @@ const emit = defineEmits<{
 }>()
 
 const input = defineModel<string>({ default: '' })
+/** 실행 중에 보낸 메시지를 대기열에 넣을지, 진행 중인 실행에 지시로 반영할지 정합니다. */
+const delivery = defineModel<DeliveryMode>('delivery', { default: 'queue' })
+
+const running = computed(() => props.status === 'submitted' || props.status === 'streaming')
+const deliveryModes = computed(() => [
+  { value: 'queue' as const, label: t('chat.deliveryQueue'), description: t('chat.deliveryQueueDescription'), icon: 'i-lucide-list-ordered' },
+  { value: 'steer' as const, label: t('chat.deliverySteer'), description: t('chat.deliverySteerDescription'), icon: 'i-lucide-corner-down-right' }
+])
+
 const { $promptCatalog } = useNuxtApp()
 const container = useTemplateRef('container')
 const { top: promptTop } = useElementBounding(container)
@@ -207,7 +217,7 @@ function appendTranscript(text: string) {
       aria-autocomplete="list"
       color="neutral"
       variant="subtle"
-      :ui="{ base: ['px-1.5', dictation !== 'idle' && 'placeholder:italic'], footer: 'flex-wrap gap-y-2' }"
+      :ui="{ base: ['px-1.5', dictation !== 'idle' && 'placeholder:italic'], footer: 'gap-y-2' }"
       @focus="focused = true; updateCursor()"
       @click="updateCursor"
       @keyup="updateCursor"
@@ -221,10 +231,22 @@ function appendTranscript(text: string) {
       <template #footer>
         <ChatPromptMenu :open="open" />
 
-        <div class="flex min-w-0 flex-wrap items-center justify-end gap-1 ml-auto">
+        <div class="flex min-w-0 flex-wrap items-center justify-end gap-1 ms-auto">
           <ModelSelect />
           <ChatReasoningSelect />
 
+          <UFieldGroup v-if="running" size="sm" :aria-label="t('chat.delivery')">
+            <UTooltip v-for="mode in deliveryModes" :key="mode.value" :text="mode.description">
+              <UButton
+                :label="mode.label"
+                :icon="mode.icon"
+                color="neutral"
+                :variant="delivery === mode.value ? 'solid' : 'outline'"
+                :aria-pressed="delivery === mode.value"
+                @click="delivery = mode.value"
+              />
+            </UTooltip>
+          </UFieldGroup>
           <ChatDictateButton
             v-if="canDictate"
             v-model:state="dictation"
@@ -232,6 +254,22 @@ function appendTranscript(text: string) {
             :disabled="uploading || disabled"
             @transcript="appendTranscript"
           />
+          <template v-else-if="running">
+            <UButton
+              icon="i-lucide-square"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              :aria-label="t('chat.stop')"
+              @click="emit('stop')"
+            />
+            <UChatPromptSubmit
+              status="ready"
+              :disabled="uploading || disabled || !input.trim()"
+              color="neutral"
+              size="sm"
+            />
+          </template>
           <UChatPromptSubmit
             v-else
             :status="status"

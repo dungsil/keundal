@@ -78,6 +78,38 @@ for await (const event of ctx.agent.run({
 
 `tools`에는 배열 대신 `(options: ExecutionOptions) => ExecutableTool[] | Promise<ExecutableTool[]>` 공급자를 지정할 수 있습니다. 공급자는 실행 시작마다 취소 신호를 받으며, 반환한 도구 목록은 해당 실행의 후속 생성까지 고정합니다. 조회 실패나 중복 이름은 생성을 시작하기 전에 거부합니다. 외부 MCP 서버 연결은 [`@keundal/mcp`](../mcp/README.md)를 참고합니다.
 
+### 도구 검색으로 원격 목록 지연 노출
+
+`deferredToolProvider`에는 검색이 허용된 MCP 도구 공급자만 지정합니다. `deferredTools`를 설정하면 모델은 처음에 `search_tool`과 `tools`의 기존 도구만 봅니다. 이름이나 설명으로 검색한 도구의 스키마는 다음 요청에서만 추가합니다.
+
+```ts
+import { McpClient } from '@keundal/plugin-mcp-client'
+
+const mcp = await McpClient.connect({
+  serverName: 'documents',
+  transport: 'stdio',
+  command: 'node',
+  args: ['/absolute/path/to/mcp-server.js'],
+  permissions: { tools: ['search'] }
+})
+ctx.fiber.effect(() => () => mcp.close())
+
+await ctx.plugin(agentPlugin, {
+  model: 'your-model',
+  maxOutputTokens: 1024,
+  tools: [],
+  deferredTools: {
+    maxSearchResults: 8,
+    maxActiveTools: 16,
+    maxSchemaBytes: 16_384,
+    maxTotalSchemaBytes: 65_536
+  },
+  deferredToolProvider: (options) => mcp.tools(options)
+})
+```
+
+한 실행에서 검색된 도구만 실행할 수 있습니다. 실행 직전에 공급자를 다시 조회하며, 현재 권한에서 사라졌거나 도구 정의가 바뀌면 실행을 거부합니다. 기본 한도는 검색 결과 8개, 활성 도구 16개, 도구 스키마 16 KiB, 전체 스키마 64 KiB입니다.
+
 ## 스킬 사용
 
 `skills: true`를 설정하면 `skills` 서비스를 추가로 주입받습니다. 서비스가 사라지면 진행 중 실행을 취소하고, 서비스가 돌아오면 에이전트를 다시 구성합니다. 기본값은 비활성화이며 기존 세 서비스만 필요합니다.
@@ -164,6 +196,22 @@ await ctx.plugin(agentPlugin, {
 
 세부 동작과 요약 과정은 [축약 문서](../compaction/README.md)를 참고합니다.
 
+## 실행 추적과 모델 사용량
+
+`Agent`는 `keundal.trace` CUSTOM 이벤트에 버전 1 추적 span을 기록합니다. Span은 실행, 모델 요청, 실제 도구 실행, 축약을 연결합니다. Span은 시작 순서를 보존합니다.
+
+오류에는 안전한 범주만 기록합니다. 도구 인자와 결과는 기록하지 않습니다. 공급자의 원문 오류도 기록하지 않습니다.
+
+실행 종료 때 계속 진행 중인 백그라운드 축약 Span에는 `detached: true`를 표시하고 마지막 관측 상태를 유지합니다. 실제 종료 시각을 만들지 않으며 실행 성공 여부는 generation의 최종 상태로 판단합니다.
+
+OpenAI, Anthropic, Gemini 공급자는 확인한 토큰 사용량을 `keundal.llm.usage` 이벤트로 전달합니다. 확인한 캐시 토큰도 별도 필드로 기록합니다. 명시된 가격 정보가 없으면 비용을 계산하지 않습니다. 누락된 사용량은 알 수 없는 값으로 유지합니다. 집계기는 모델 Span만 합산하며 실행과 축약 Span의 토큰은 다시 더하지 않습니다.
+
+## 지연 도구
+
+`deferredTools`를 설정하면 `deferredToolProvider`도 설정합니다. 에이전트는 실행마다 검색 도구만 먼저 노출합니다. 검색 결과에는 도구 이름과 설명만 포함합니다. 선택한 도구 스키마는 다음 모델 요청에 노출합니다.
+
+기존 `tools` 설정은 첫 요청에 계속 노출됩니다. 에이전트는 요청마다 지연 도구 카탈로그를 다시 확인합니다. 검색한 도구만 실행할 수 있습니다. `deferredTools`로 검색 결과 수, 선택 가능한 도구 수, 스키마 크기를 제한합니다.
+
 ## 실행과 종료
 
 - `AgentConfig.webSearch?: boolean`과 `reasoning?: boolean | 'low' | 'medium' | 'high'`은 입력 토큰 계산, generation 요청, 모든 도구 후속 요청에 그대로 전달됩니다. 생략하면 기존 공급자 기본값을 유지하며 정의되지 않은 추론 수준은 거부합니다. 축약 후에도 이 옵션을 포함한 입력 비용을 다시 확인합니다. 요약 자체는 검색 도구 없이 수행합니다.
@@ -176,6 +224,7 @@ await ctx.plugin(agentPlugin, {
 - 후속 요청마다 입력 토큰을 다시 계산하고 필요하면 이전 대화를 축약합니다. 현재 사용자 턴의 도구 호출과 결과를 보존할 수 없으면 후속 생성을 시작하지 않습니다.
 - 도구 실행 함수나 공급자가 실패하면 순회 중 예외로 전달합니다. 이미 기록한 호출과 결과는 실행 기록에 남기며, 성공한 세션 커밋은 수행하지 않습니다. 도구 오류를 모델이 처리하게 하려면 실행 함수가 오류 내용을 문자열로 반환하도록 구성합니다.
 - 취소, 반복자 반환, 플러그인 해제는 실행 함수와 후속 생성에 취소 신호를 전달합니다. 실행 함수도 `signal`을 실제 작업에 연결해야 합니다.
+- `run(input, { steer })`에 `SteerQueue`를 넘기면 실행 중에 사용자 지시를 받습니다. 진행 중인 모델 요청과 도구는 중단하지 않습니다. 도구 결과를 기록한 뒤나 도구 호출이 없는 응답 뒤에 지시를 꺼내 다음 요청의 사용자 메시지로 넣습니다. 지시는 `STEER_MESSAGE_EVENT` CUSTOM 이벤트로 journal에 남고, 다음 요청에는 같은 입력 예산 검사와 축약을 적용합니다. 도구를 등록하지 않았거나 `maxToolRounds`에 도달하면 지시를 꺼내지 않습니다. 자세한 규칙은 [실행 제어 문서](../../docs/run-control.md)를 참고합니다.
 
 전체 과정은 같은 `runId`를 사용하며, `RUN_STARTED`와 `RUN_FINISHED`는 각각 한 번만 전달합니다. 메모리·SQLite·IndexedDB 저장소는 최종 답변과 도구 결과를 함께 커밋한 뒤 `RUN_FINISHED`를 전달합니다. 다만 SQLite·IndexedDB에서 실행이 임차 만료 등으로 다른 프로세스나 탭에 회수되어 종료가 확정되면 이 실행의 종료는 적용되지 않고, `RUN_FINISHED` 없이 순회가 끝납니다. `generation.recover()`는 저장된 결과를 복구하며 도구나 모델을 다시 호출하지 않습니다. 외부 시스템에서 발생한 도구 부작용을 되돌리거나 정확히 한 번 실행하도록 보장하지는 않습니다.
 

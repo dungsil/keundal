@@ -46,6 +46,7 @@ async function submit() {
         :aria-invalid="invalid ? 'true' : undefined"
         :aria-describedby="invalid ? 'chat-title-error' : undefined"
         :placeholder="t('chat.titlePlaceholder')"
+        :aria-label="t('chat.titlePlaceholder')"
         class="w-full"
         :ui="{ root: 'w-full' }"
         @keydown.enter.prevent="submit"
