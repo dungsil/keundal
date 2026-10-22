@@ -4,16 +4,24 @@ import { z } from 'zod'
 export const FALLBACK_MODEL = 'anthropic/claude-haiku-4-5'
 
 export const LLM_PROVIDERS = [
-  { id: 'anthropic', label: 'Anthropic', baseURL: 'https://api.anthropic.com' },
-  { id: 'google', label: 'Google Gemini', baseURL: 'https://generativelanguage.googleapis.com' },
-  { id: 'openai', label: 'OpenAI', baseURL: 'https://api.openai.com/v1' }
+  { id: 'anthropic', label: 'Anthropic', baseURL: 'https://api.anthropic.com', icon: 'anthropic' },
+  { id: 'google', label: 'Google Gemini', baseURL: 'https://generativelanguage.googleapis.com', icon: 'google' },
+  { id: 'openai', label: 'OpenAI Responses', baseURL: 'https://api.openai.com/v1', icon: 'openai' },
+  { id: 'openai-chat', label: 'OpenAI Chat Completions', baseURL: 'https://api.openai.com/v1', icon: 'openai' }
 ] as const
 
 export type LLMProvider = (typeof LLM_PROVIDERS)[number]['id']
 
 export function providerType(id: string): LLMProvider {
-  if (!/^(openai|anthropic|google)(@[a-zA-Z0-9-]+)?$/.test(id)) throw new Error('Unknown provider configuration')
+  if (!/^(openai-chat|openai|anthropic|google)(@[a-zA-Z0-9-]+)?$/.test(id))
+    throw new Error('Unknown provider configuration')
   return id.split('@')[0] as LLMProvider
+}
+
+/** 같은 회사의 API 종류는 같은 아이콘을 공유합니다. */
+export function providerIcon(id: string): string {
+  const type = providerType(id)
+  return `i-simple-icons-${LLM_PROVIDERS.find((item) => item.id === type)!.icon}`
 }
 
 export function configuredProviders(settings: LLMSettings) {
@@ -88,7 +96,8 @@ export const llmSettingsSchema = z
   .object({
     anthropic: providerSettingsSchema.default({ apiKey: '', baseURL: '' }),
     google: providerSettingsSchema.default({ apiKey: '', baseURL: '' }),
-    openai: providerSettingsSchema.default({ apiKey: '', baseURL: '' })
+    openai: providerSettingsSchema.default({ apiKey: '', baseURL: '' }),
+    'openai-chat': providerSettingsSchema.default({ apiKey: '', baseURL: '' })
   })
   .catchall(providerSettingsSchema)
   .superRefine((settings, ctx) => {

@@ -61,9 +61,11 @@ export async function createKeundalChat(
     await mountAgent(child, {
       model: config.value,
       maxOutputTokens,
-      webSearch: !!options.webSearch && config.provider !== 'google',
+      webSearch: !!options.webSearch && config.provider !== 'google' && config.provider !== 'openai-chat',
       reasoning:
-        options.reasoning !== undefined && config.provider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id)
+        options.reasoning !== undefined &&
+        (config.provider === 'openai' || config.provider === 'openai-chat') &&
+        !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.id)
           ? undefined
           : options.reasoning,
       maxToolRounds: 4,

@@ -14,6 +14,7 @@
 | `@keundal/plugin-agent-coding`         | 공통 루프에 코딩 지침을 적용하여 에이전트를 등록합니다.                    |
 | `@keundal/tools`                       | 에이전트와 도구 공급자가 공유하는 실행 계약을 제공합니다.                  |
 | `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                                 |
+| `@keundal/plugin-llm-openai-chat`      | OpenAI Chat Completions API로 `llm`을 구현합니다.                          |
 | `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                           |
 | `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                               |
 | `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                     |
@@ -29,7 +30,7 @@
 `ShellService`는 `@keundal/shell`에, `TranscriptionService`는 `@keundal/transcription`에 둡니다.
 교체 가능한 서비스의 계약은 구현과 분리합니다. 소비자는 계약에 의존하고 앱에서 구현을 조립합니다.
 
-플러그인 설정과 사용법은 [공통 루프 문서](packages/agent-loop/README.md), [대화 에이전트 문서](packages/plugin-agent-chat/README.md), [코딩 에이전트 문서](packages/plugin-agent-coding/README.md), [OpenAI 문서](packages/plugin-llm-openai/README.md), [Gemini 문서](packages/plugin-llm-gemini/README.md), [Anthropic 문서](packages/plugin-llm-anthropic/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [축약 문서](packages/compaction/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
+플러그인 설정과 사용법은 [공통 루프 문서](packages/agent-loop/README.md), [대화 에이전트 문서](packages/plugin-agent-chat/README.md), [코딩 에이전트 문서](packages/plugin-agent-coding/README.md), [OpenAI 문서](packages/plugin-llm-openai/README.md), [OpenAI Chat Completions 문서](packages/plugin-llm-openai-chat/README.md), [Gemini 문서](packages/plugin-llm-gemini/README.md), [Anthropic 문서](packages/plugin-llm-anthropic/README.md), [메모리 저장소 문서](packages/plugin-store-memory/README.md), [축약 문서](packages/compaction/README.md), [IndexedDB 저장소 문서](packages/plugin-store-indexeddb/README.md), [SQLite 저장소 문서](packages/plugin-store-sqlite/README.md)를 참고합니다.
 
 ## 앱 의존성 경계
 

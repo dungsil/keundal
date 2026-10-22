@@ -21,6 +21,7 @@ Keundal("큰달"으로 읽음)은 개인용 오픈소스 에이전트 도구입�
 | `@keundal/mcp`                         | SDK와 무관한 MCP 설정 계약과 검증을 제공합니다.                        |
 | `@keundal/plugin-mcp-client`           | 외부 MCP 서버의 도구와 리소스를 에이전트 도구에 연결합니다.            |
 | `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                             |
+| `@keundal/plugin-llm-openai-chat`      | OpenAI Chat Completions API로 `llm`을 구현합니다.                      |
 | `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                       |
 | `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                           |
 | `@keundal/plugin-transcription-openai` | OpenAI 실시간 받아쓰기 자격 증명과 브라우저 전송을 제공합니다.         |

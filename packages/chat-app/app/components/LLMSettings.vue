@@ -27,7 +27,8 @@ const draft = ref(defaultLLMSettings())
 const headerRows = ref<Record<string, { id: string, key: string, value: string }[]>>({
   anthropic: [],
   google: [],
-  openai: []
+  openai: [],
+  'openai-chat': []
 })
 const error = ref('')
 const saving = ref(false)

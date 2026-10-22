@@ -1,0 +1,36 @@
+{
+  "name": "@keundal/plugin-llm-openai-chat",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@keundal/core": "workspace:*",
+    "@standard-schema/spec": "catalog:",
+    "cordis": "catalog:",
+    "openai": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/plugin-store-indexeddb": "workspace:*",
+    "@keundal/tsconfig": "workspace:*",
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "fake-indexeddb": "6.2.6",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
