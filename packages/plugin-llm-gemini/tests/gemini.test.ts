@@ -5,6 +5,7 @@ import { setImmediate } from 'node:timers/promises'
 
 import {
   EventType,
+  LLM_USAGE_EVENT,
   MessageAssembly,
   parseAGUIEvent,
   type AgentMessage,
@@ -680,11 +681,17 @@ test('후보 없이 사용량만 있는 청크를 허용하고 STOP 수신 시 �
       { responseId: 'resp-1', usageMetadata: { totalTokenCount: 6 }, candidates: [{ finishReason: 'STOP' }] }
     ])
   )
-  expect(await collect(ctx.llm.stream(request))).toStrictEqual([
+  const events = await collect(ctx.llm.stream(request))
+  expect(events.filter((event) => event.type !== EventType.CUSTOM || event.name !== LLM_USAGE_EVENT)).toStrictEqual([
     { type: EventType.TEXT_MESSAGE_START, messageId: 'resp-1-text-0', role: 'assistant' },
     { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'resp-1-text-0', delta: 'Hi' },
     { type: EventType.TEXT_MESSAGE_END, messageId: 'resp-1-text-0' }
   ])
+  expect(events.filter((event) => event.type === EventType.CUSTOM && event.name === LLM_USAGE_EVENT).at(-1)).toEqual({
+    type: EventType.CUSTOM,
+    name: LLM_USAGE_EVENT,
+    value: { source: 'provider', inputTokens: 4 }
+  })
 })
 
 test('HTTP 오류를 재시도하지 않고 SDK의 상태 코드를 보존한다', async (t) => {
@@ -839,3 +846,52 @@ test.for(['low', 'medium', 'high'] as const)(
     })
   }
 )
+
+test('Gemini의 누적 사용량 필드를 병합하고 추론 토큰을 출력에 포함한다', async (t) => {
+  const { ctx } = await setup(t, (_request, response) =>
+    send(response, [
+      { responseId: 'resp-1', usageMetadata: { promptTokenCount: 10 } },
+      {
+        responseId: 'resp-1',
+        usageMetadata: { candidatesTokenCount: 4, thoughtsTokenCount: 2, cachedContentTokenCount: 3 },
+        candidates: [{ content: { role: 'model', parts: [{ text: 'answer' }] }, finishReason: 'STOP' }]
+      }
+    ])
+  )
+  const events = await collect(ctx.llm.stream(request))
+  expect(events.filter((event) => event.type === EventType.CUSTOM && event.name === LLM_USAGE_EVENT).at(-1)).toEqual({
+    type: EventType.CUSTOM,
+    name: LLM_USAGE_EVENT,
+    value: { source: 'provider', inputTokens: 10, outputTokens: 6, cacheReadTokens: 3 }
+  })
+})
+
+test('Gemini의 출력 한도 종료도 알려진 사용량을 보존하고 실패한다', async (t) => {
+  const { ctx } = await setup(t, (_request, response) =>
+    send(response, [
+      {
+        responseId: 'failed-usage',
+        usageMetadata: {
+          promptTokenCount: 10,
+          candidatesTokenCount: 4,
+          thoughtsTokenCount: 2,
+          cachedContentTokenCount: 3
+        },
+        candidates: [{ finishReason: 'MAX_TOKENS' }]
+      }
+    ])
+  )
+  const accepted: LLMEvent[] = []
+  await expect(
+    (async () => {
+      for await (const event of ctx.llm.stream(request)) accepted.push(event)
+    })()
+  ).rejects.toThrow('MAX_TOKENS')
+  expect(accepted).toEqual([
+    {
+      type: EventType.CUSTOM,
+      name: LLM_USAGE_EVENT,
+      value: { source: 'provider', inputTokens: 10, outputTokens: 6, cacheReadTokens: 3 }
+    }
+  ])
+})

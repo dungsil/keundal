@@ -5,6 +5,7 @@ import {
   EventType,
   StreamBudget,
   GenerationService,
+  reconcileTerminalTraceJournal,
   type AGUIEvent,
   type ExecutionOptions,
   type GenerationOptions,
@@ -39,7 +40,7 @@ interface ActiveRun {
 const snapshot = (run: StoredRun): GenerationSnapshot => ({
   request: run.request,
   status: run.status,
-  journal: run.journal,
+  journal: reconcileTerminalTraceJournal(run.journal, run.status),
   messages: run.messages
 })
 

@@ -42,7 +42,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         'builtin:skills': { exports: { default: skillPlugin }, config: { providers: [...options.skills, ...(plugins ? [plugins.provider] : [])] } },
         'builtin:agent': { exports: { default: agentPlugin }, config: { maxToolRounds: 4, subagents: true, parallelTools: true } },
         'builtin:chat-tools': { exports: { default: createChatTools } }
-      }, async execution => [...await mcp.tools(execution), ...await plugins!.tools(execution)])
+      }, undefined, async execution => [...await mcp.tools(execution), ...await plugins!.tools(execution)])
       const root = new Context()
       const scope = root.plugin(async (ctx: Context) => composition.setup(ctx))
       let store: ChatStore | undefined

@@ -3,10 +3,14 @@ import {
   CONTEXT_MESSAGE_PREFIX,
   EventType,
   MessageAssembly,
+  readTraceSpans,
+  traceEvent,
+  type AGUIEvent,
   type LLMEvent,
   type LLMRequest,
   type LLMService,
-  type RunAgentInput
+  type RunAgentInput,
+  type TraceSpan
 } from '@keundal/core'
 import { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 import type { ExecutableTool, ToolExecutionContext } from '@keundal/tools'
@@ -61,15 +65,50 @@ export async function* streamWithTools(
   maxToolRounds: number,
   prepareInput: (input: RunAgentInput) => Promise<RunAgentInput>,
   signal: AbortSignal,
-  options: { parallel?: boolean; stream?: LLMService['stream']; maxToolCalls?: number } = {}
+  options: {
+    parallel?: boolean
+    stream?: LLMService['stream']
+    maxToolCalls?: number
+    resolveTools?: () => readonly ExecutableTool[] | Promise<readonly ExecutableTool[]>
+    traceContext?: (call: { id: string; name: string }) => { traceId: string; parentSpanId: string }
+    trace?: {
+      onToolStart(call: { id: string; name: string }): AGUIEvent | undefined
+      onToolEnd(call: { id: string; name: string; status: 'completed' | 'failed' | 'cancelled' }): AGUIEvent | undefined
+    }
+  } = {}
 ): AsyncGenerator<LLMEvent> {
-  const registered = new Map(tools.map((tool) => [tool.name, tool]))
+  let registered = new Map(tools.map((tool) => [tool.name, tool]))
   const usedIds = new Set(
     request.input.messages.flatMap((message) =>
       message.role === 'assistant' ? (message.toolCalls ?? []).map((call) => call.id) : []
     )
   )
   let current = request
+  const configuredNames = new Set(tools.map((tool) => tool.name))
+  const initialInputNames = new Set(request.input.tools.map((tool) => tool.name))
+  let previousResolvedNames = new Set<string>()
+  let resolvedToolsPrepared = false
+  const refreshResolvedTools = async (input: RunAgentInput): Promise<RunAgentInput> => {
+    const resolvedTools = await options.resolveTools!()
+    const allTools = [...tools, ...resolvedTools]
+    registered = new Map(allTools.map((tool) => [tool.name, tool]))
+    if (registered.size !== allTools.length) throw new Error('duplicate tool name in resolved tool catalog')
+    for (const tool of resolvedTools) {
+      if (initialInputNames.has(tool.name) && !configuredNames.has(tool.name)) {
+        throw new Error(`deferred tool is defined in both input and deferred catalog: ${tool.name}`)
+      }
+    }
+    const managedNames = new Set([...configuredNames, ...previousResolvedNames])
+    const retainedTools = input.tools.filter((tool) => !managedNames.has(tool.name))
+    const definitions = allTools.map(({ name, description, parameters }) => ({ name, description, parameters }))
+    const retainedNames = new Set(retainedTools.map((tool) => tool.name))
+    for (const definition of definitions) {
+      if (retainedNames.has(definition.name))
+        throw new Error(`tool is defined in both input and agent config: ${definition.name}`)
+    }
+    previousResolvedNames = new Set(resolvedTools.map((tool) => tool.name))
+    return { ...input, tools: [...retainedTools, ...definitions] }
+  }
   let rounds = 0
   let totalCalls = 0
   const maxToolCalls = options.maxToolCalls ?? 32
@@ -78,6 +117,10 @@ export async function* streamWithTools(
   }
   while (true) {
     signal.throwIfAborted()
+    if (options.resolveTools && !resolvedToolsPrepared) {
+      current = { ...current, input: await refreshResolvedTools(current.input) }
+    }
+    resolvedToolsPrepared = false
     const assembly = new MessageAssembly()
     const calls = new Map<string, PendingCall>()
     for await (const event of options.stream ? options.stream(current, { signal }) : llm.stream(current, { signal })) {
@@ -128,14 +171,18 @@ export async function* streamWithTools(
     })
     const batches = options.parallel ? [executions] : executions.map((execution) => [execution])
     for (const batch of batches) {
-      for await (const event of executeBatch(batch, executionContext, signal)) {
+      for await (const event of executeBatch(batch, executionContext, signal, options.trace, options.traceContext)) {
         assembly.apply(event)
         yield event
       }
     }
     rounds++
     signal.throwIfAborted()
-    const next = { ...current.input, messages: [...current.input.messages, ...assembly.messages] }
+    let next = { ...current.input, messages: [...current.input.messages, ...assembly.messages] }
+    if (options.resolveTools) {
+      next = await refreshResolvedTools(next)
+      resolvedToolsPrepared = true
+    }
     const prepared = await prepareInput(next)
     signal.throwIfAborted()
     const previousIds = new Set(next.messages.map((message) => message.id))
@@ -152,43 +199,133 @@ export async function* streamWithTools(
 async function* executeBatch(
   executions: { call: PendingCall; tool: ExecutableTool; args: Record<string, unknown> }[],
   context: (call: PendingCall) => ToolExecutionContext,
-  signal: AbortSignal
+  signal: AbortSignal,
+  trace?: {
+    onToolStart(call: { id: string; name: string }): AGUIEvent | undefined
+    onToolEnd(call: { id: string; name: string; status: 'completed' | 'failed' | 'cancelled' }): AGUIEvent | undefined
+  },
+  traceContext?: (call: { id: string; name: string }) => { traceId: string; parentSpanId: string }
 ): AsyncGenerator<LLMEvent> {
   const progress: LLMEvent[] = []
   let wake: (() => void) | undefined
   let closed = false
+  let onAbort: (() => void) | undefined
   const notify = () => wake?.()
   signal.addEventListener('abort', notify, { once: true })
   try {
     signal.throwIfAborted()
     const pending = executions.map(({ call, tool, args }) => {
       let settled = false
+      let started = false
+      let ended = false
+      const finish = (status: 'completed' | 'failed' | 'cancelled') => {
+        if (!started || ended) return
+        ended = true
+        const event = trace?.onToolEnd({ id: call.id, name: call.name, status })
+        if (!event) return
+        if (event.type !== EventType.CUSTOM) throw new Error('tool trace hooks must return CUSTOM events')
+        progress.push(event)
+        notify()
+      }
       const task = Promise.resolve()
-        .then(() => {
-          signal.throwIfAborted()
-          return tool.execute(args, {
-            ...context(call),
-            reportProgress(value) {
-              if (closed || signal.aborted) return
-              progress.push({
-                type: EventType.CUSTOM,
-                name: TOOL_PROGRESS_EVENT,
-                value: { toolCallId: call.id, value }
-              })
+        .then(async () => {
+          try {
+            signal.throwIfAborted()
+            const callInfo = { id: call.id, name: call.name }
+            const toolTraceContext = traceContext?.(callInfo)
+            const event = trace?.onToolStart(callInfo)
+            if (event) {
+              if (event.type !== EventType.CUSTOM) throw new Error('tool trace hooks must return CUSTOM events')
+              progress.push(event)
               notify()
             }
-          })
+            started = true
+            const value = await tool.execute(args, {
+              ...context(call),
+              ...toolTraceContext,
+              reportTrace(span: TraceSpan) {
+                if (closed || signal.aborted || !toolTraceContext) return
+                const validated = readTraceSpans([traceEvent(span)], undefined, 1)[0]
+                if (!validated || validated.traceId !== toolTraceContext.traceId) return
+                const safeSpan: TraceSpan = {
+                  version: 1,
+                  traceId: validated.traceId,
+                  spanId: validated.spanId,
+                  ...(validated.parentSpanId ? { parentSpanId: validated.parentSpanId } : {}),
+                  runId: validated.runId,
+                  ...(validated.toolCallId ? { toolCallId: validated.toolCallId } : {}),
+                  kind: validated.kind,
+                  name: validated.name,
+                  sequence: validated.sequence,
+                  startedAt: validated.startedAt,
+                  ...(validated.endedAt === undefined ? {} : { endedAt: validated.endedAt }),
+                  status: validated.status,
+                  ...(validated.model ? { model: validated.model } : {}),
+                  ...(validated.usage
+                    ? {
+                        usage: {
+                          source: validated.usage.source,
+                          ...(validated.usage.inputTokens === undefined
+                            ? {}
+                            : { inputTokens: validated.usage.inputTokens }),
+                          ...(validated.usage.outputTokens === undefined
+                            ? {}
+                            : { outputTokens: validated.usage.outputTokens }),
+                          ...(validated.usage.cacheReadTokens === undefined
+                            ? {}
+                            : { cacheReadTokens: validated.usage.cacheReadTokens }),
+                          ...(validated.usage.cacheWriteTokens === undefined
+                            ? {}
+                            : { cacheWriteTokens: validated.usage.cacheWriteTokens })
+                        }
+                      }
+                    : {}),
+                  ...(validated.cost
+                    ? {
+                        cost: {
+                          currency: validated.cost.currency,
+                          amount: validated.cost.amount,
+                          source: validated.cost.source
+                        }
+                      }
+                    : {}),
+                  ...(validated.ttftMs === undefined ? {} : { ttftMs: validated.ttftMs }),
+                  ...(validated.error ? { error: validated.error } : {}),
+                  ...(validated.detached ? { detached: true } : {})
+                }
+                progress.push(traceEvent(safeSpan))
+                notify()
+              },
+              reportProgress(value) {
+                if (closed || signal.aborted) return
+                progress.push({
+                  type: EventType.CUSTOM,
+                  name: TOOL_PROGRESS_EVENT,
+                  value: { toolCallId: call.id, value }
+                })
+                notify()
+              }
+            })
+            if (typeof value !== 'string') throw new Error(`tool result must be a string: ${tool.name}`)
+            finish(signal.aborted ? 'cancelled' : 'completed')
+            return { ok: true as const, value }
+          } catch (error: unknown) {
+            finish(signal.aborted ? 'cancelled' : 'failed')
+            return { ok: false as const, error }
+          }
         })
-        .then(
-          (value) => ({ ok: true as const, value }),
-          (error: unknown) => ({ ok: false as const, error })
-        )
         .finally(() => {
           settled = true
           notify()
         })
-      return { call, tool, task, settled: () => settled }
+      return { call, tool, task, settled: () => settled, started: () => started, finish }
     })
+    onAbort = () => {
+      for (const entry of pending) {
+        if (entry.started()) entry.finish('cancelled')
+      }
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
     for (const entry of pending) {
       while (true) {
         signal.throwIfAborted()
@@ -198,9 +335,9 @@ async function* executeBatch(
           continue
         }
         if (entry.settled()) break
-        await new Promise<void>((resolve) => {
-          wake = resolve
-        })
+        const waiting = Promise.withResolvers<void>()
+        wake = waiting.resolve
+        await waiting.promise
       }
       const result = await entry.task
       signal.throwIfAborted()
@@ -216,6 +353,7 @@ async function* executeBatch(
     }
   } finally {
     closed = true
+    if (onAbort) signal.removeEventListener('abort', onAbort)
     signal.removeEventListener('abort', notify)
   }
 }

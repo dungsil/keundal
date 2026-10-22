@@ -6,6 +6,7 @@ import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
 import { type Reasoning, EventType, type AGUIEvent, type GenerationSnapshot, type SessionSnapshot } from '@keundal/core'
+import type { ExecutionOptions } from '@keundal/core'
 
 type ChatState = { web: LocalChat }
 
@@ -95,6 +96,13 @@ export class RemoteChatStore implements ChatStoreLike {
     if (response.status === 404) return undefined
     if (!response.ok) throw new Error(`Keundal host request failed (HTTP ${response.status})`)
     return this.chat(this.snapshot(await response.json()))
+  }
+
+  async getRun(runId: string, options: ExecutionOptions = {}): Promise<GenerationSnapshot | undefined> {
+    const response = await this.raw(`/runs/${encodeURIComponent(runId)}`, { signal: options.signal })
+    if (response.status === 404) return undefined
+    if (!response.ok) throw new Error(`Keundal host request failed (HTTP ${response.status})`)
+    return (await response.json()) as GenerationSnapshot
   }
 
   private async save(snapshot: SessionSnapshot | undefined, chat: LocalChat) {

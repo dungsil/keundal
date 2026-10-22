@@ -2,6 +2,7 @@ import {
   fetchWithStreamLimit,
   StreamBudget,
   LLMService,
+  llmUsageEvent,
   type ExecutionOptions,
   type LLMEvent,
   type LLMModel,
@@ -130,6 +131,22 @@ export class OpenAILLMService extends LLMService {
           signal.throwIfAborted()
           budget.accept(event)
           if (event.type === 'error') throw new Error(event.message, { cause: event })
+          if (
+            event.type === 'response.completed' ||
+            event.type === 'response.failed' ||
+            event.type === 'response.incomplete'
+          ) {
+            const usage = event.response.usage
+            if (usage) {
+              const cached = usage.input_tokens_details?.cached_tokens
+              yield llmUsageEvent({
+                source: 'provider',
+                inputTokens: usage.input_tokens,
+                outputTokens: usage.output_tokens,
+                ...(Number.isSafeInteger(cached) && cached! >= 0 ? { cacheReadTokens: cached } : {})
+              })
+            }
+          }
           if (event.type === 'response.failed' || event.type === 'response.incomplete') {
             throw new Error(
               event.response.error?.message ??

@@ -4,4 +4,6 @@
 
 공급자 설정은 `@keundal/llm-settings`, 스킬 관리는 `@keundal/plugin-chat-browser/skills`, 날씨와 차트 도구 실행은 `@keundal/plugin-tool-chat`이 제공합니다.
 
+`ChatStoreLike.getRun(runId)`는 알려진 실행 ID 하나의 저널과 상태를 가져옵니다. 실행 전체를 나열하지 않으므로 UI는 대화 메시지의 실행 ID로 필요한 기록만 조회합니다.
+
 [플러그인 조립과 의존성 경계](../../docs/plugin-composition.md)를 참고합니다.

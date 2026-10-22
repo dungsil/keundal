@@ -127,41 +127,42 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
     }
   }
   const defaultTools = manifest.tools === undefined ? options.defaultTools : undefined
-  const hasToolSources = Boolean(defaultTools || options.tools || mcpServers.length || options.plugins?.length)
-  const suppliedTools: ToolProvider | undefined = hasToolSources
-    ? async (execution: ExecutionOptions) => {
-        const signal = execution.signal
-          ? globalThis.AbortSignal.any([execution.signal, mcpLifetime.signal])
-          : mcpLifetime.signal
-        const result: ExecutableTool[] = [
-          ...(typeof defaultTools === 'function' ? await defaultTools({ signal }) : (defaultTools ?? [])),
-          ...(typeof options.tools === 'function' ? await options.tools({ signal }) : (options.tools ?? []))
+  const suppliedTools: ToolProvider | undefined =
+    defaultTools || options.tools
+      ? async (execution) => [
+          ...(typeof defaultTools === 'function' ? await defaultTools(execution) : (defaultTools ?? [])),
+          ...(typeof options.tools === 'function' ? await options.tools(execution) : (options.tools ?? []))
         ]
-        for (const server of mcpServers) {
-          signal.throwIfAborted()
-          let pending = mcpClients.get(server.serverName)
-          if (!pending) {
-            pending = McpClient.connect(server, { signal: mcpLifetime.signal })
-            mcpClients.set(server.serverName, pending)
-            void pending.catch(() => {
-              if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
-            })
-          }
-          try {
-            const client = await pending
-            signal.throwIfAborted()
-            result.push(...(await client.tools({ signal })))
-          } catch (error) {
-            if (signal.aborted) throw error
-            if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
-            await pending.then((client) => client.close()).catch(() => {})
-            throw error
-          }
-        }
-        for (const plugin of plugins) result.push(...(await plugin.tools({ signal })))
-        return result
+      : undefined
+  const deferredToolProvider: ToolProvider = async (execution: ExecutionOptions) => {
+    const signal = execution.signal
+      ? globalThis.AbortSignal.any([execution.signal, mcpLifetime.signal])
+      : mcpLifetime.signal
+    const result: ExecutableTool[] = []
+    for (const server of mcpServers) {
+      signal.throwIfAborted()
+      let pending = mcpClients.get(server.serverName)
+      if (!pending) {
+        pending = McpClient.connect(server, { signal: mcpLifetime.signal })
+        mcpClients.set(server.serverName, pending)
+        void pending.catch(() => {
+          if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
+        })
       }
-    : undefined
+      try {
+        const client = await pending
+        signal.throwIfAborted()
+        result.push(...(await client.tools({ signal })))
+      } catch (error) {
+        if (signal.aborted) throw error
+        if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
+        await pending.then((client) => client.close()).catch(() => {})
+        throw error
+      }
+    }
+    for (const plugin of plugins) result.push(...(await plugin.tools({ signal })))
+    return result
+  }
   let runtime: LoadedNodePlugins | undefined
   let runtimePromise: Promise<LoadedNodePlugins> | undefined
 
@@ -200,7 +201,8 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       runtimePromise ??= loadRuntimePlugins(manifest, {
         importModule: createNodeImporter(basePath),
         builtins: builtinRegistry,
-        tools: suppliedTools
+        tools: suppliedTools,
+        deferredToolProvider
       })
       runtime = await runtimePromise
       await runtime.setup(ctx)

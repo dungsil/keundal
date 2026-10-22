@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@keundal/chat/chat-message'
+import { EventType, TRACE_EVENT, readTraceSpans } from '@keundal/core'
+import type { TraceSpan } from '@keundal/core'
+import { shallowRef } from 'vue'
 
 const { t } = useLocale()
 
@@ -38,6 +41,10 @@ const {
 const votes = ref<NonNullable<typeof data.value>['votes']>([])
 
 const input = useState(`chat-input-${route.params.id}`, () => '')
+const activeTraceRunId = ref(data.value?.pendingRunId)
+const liveTrace = shallowRef(new Map<string, TraceSpan>())
+const liveTraceSpans = computed(() => [...liveTrace.value.values()])
+let activeTraceId: string | undefined
 
 const { messages, status, error, sendMessage, regenerate, stop } = useKeundalChat({
   respond: (messages, onMessage, signal) => $chatStore.respond(route.params.id as string, {
@@ -48,6 +55,23 @@ const { messages, status, error, sendMessage, regenerate, stop } = useKeundalCha
       void refreshNuxtData('chats')
     }
   }, signal),
+  onEvent(event) {
+    if (event.type === EventType.RUN_STARTED) {
+      activeTraceRunId.value = event.runId
+      activeTraceId = undefined
+      liveTrace.value = new Map()
+    } else if (event.type === EventType.CUSTOM && event.name === TRACE_EVENT) {
+      const span = readTraceSpans([event], undefined, 1)[0]
+      if (!span) return
+      if (span.runId === activeTraceRunId.value && span.kind === 'agent') activeTraceId = span.traceId
+      if (span.traceId !== activeTraceId) return
+      const updated = new Map(liveTrace.value)
+      updated.delete(span.spanId)
+      updated.set(span.spanId, span)
+      while (updated.size > 200) updated.delete(updated.keys().next().value!)
+      liveTrace.value = updated
+    }
+  },
   onFinish: async () => {
     await refreshNuxtData('chats')
   },
@@ -70,6 +94,11 @@ const { messages, status, error, sendMessage, regenerate, stop } = useKeundalCha
     })
   }
 })
+watch(() => data.value?.pendingRunId, (runId) => {
+  if (runId) activeTraceRunId.value = runId
+})
+const showRootTrace = computed(() => !!activeTraceRunId.value && !messages.value.some(message => message.role === 'assistant' && message.id === activeTraceRunId.value && message.parts.length > 0))
+const traceRunIds = computed(() => new Set(messages.value.filter(message => message.role === 'assistant').slice(-20).map(message => message.id)))
 
 async function handleSubmit(e: Event) {
   e.preventDefault()
@@ -207,6 +236,7 @@ onBeforeUnmount(() => {
 
                 <UChatShimmer :text="t('chat.thinking')" class="text-sm" />
               </div>
+              <ChatTraceViewer v-if="showRootTrace" :run-id="activeTraceRunId!" :live="status === 'streaming'" :live-spans="liveTraceSpans" />
             </template>
 
             <template #files="{ message, parts }">
@@ -226,6 +256,12 @@ onBeforeUnmount(() => {
                 :editing="isOwner && editingMessageId === message.id"
                 @save="saveEdit"
                 @cancel-edit="editingMessageId = null"
+              />
+              <ChatTraceViewer
+                v-if="message.role === 'assistant' && traceRunIds.has(message.id)"
+                :run-id="message.id"
+                :live="status === 'streaming' && message.id === messages[messages.length - 1]?.id"
+                :live-spans="message.id === activeTraceRunId ? liveTraceSpans : undefined"
               />
             </template>
 

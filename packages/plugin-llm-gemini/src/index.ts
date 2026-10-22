@@ -3,6 +3,7 @@ import {
   fetchWithStreamLimit,
   StreamBudget,
   LLMService,
+  llmUsageEvent,
   type ExecutionOptions,
   type LLMEvent,
   type LLMModel,
@@ -113,6 +114,7 @@ export class GeminiLLMService extends LLMService {
     signal: AbortSignal,
     cleanup: () => void
   ): AsyncGenerator<LLMEvent, void, unknown> {
+    let usage: { inputTokens?: number; outputTokens?: number; cacheReadTokens?: number } | undefined
     try {
       signal.throwIfAborted()
       this.validateRequest(request)
@@ -160,9 +162,28 @@ export class GeminiLLMService extends LLMService {
       })
       const budget = new StreamBudget()
       const events = new ContentsEvents()
+      let candidateTokens: number | undefined
+      let thoughtsTokens: number | undefined
       for await (const chunk of stream) {
         signal.throwIfAborted()
         budget.accept(chunk)
+        const metadata = chunk.usageMetadata
+        if (metadata) {
+          const inputTokens = safeTokenCount(metadata.promptTokenCount)
+          const candidateCount = safeTokenCount(metadata.candidatesTokenCount)
+          const thoughtsCount = safeTokenCount(metadata.thoughtsTokenCount)
+          if (candidateCount !== undefined) candidateTokens = candidateCount
+          if (thoughtsCount !== undefined) thoughtsTokens = thoughtsCount
+          const outputTokens = candidateTokens === undefined ? undefined : candidateTokens + (thoughtsTokens ?? 0)
+          const cacheReadTokens = safeTokenCount(metadata.cachedContentTokenCount)
+          usage = {
+            ...usage,
+            ...(inputTokens === undefined ? {} : { inputTokens }),
+            ...(outputTokens === undefined ? {} : { outputTokens }),
+            ...(cacheReadTokens === undefined ? {} : { cacheReadTokens })
+          }
+        }
+        if (metadata && usage && Object.keys(usage).length) yield llmUsageEvent({ source: 'provider', ...usage })
         for (const mapped of events.convert(chunk)) {
           signal.throwIfAborted()
           yield mapped
@@ -224,4 +245,7 @@ export const geminiLLMPlugin = Object.assign(
   { Config: GeminiLLMConfigSchema }
 )
 
+function safeTokenCount(value: unknown): number | undefined {
+  return Number.isSafeInteger(value) && (value as number) >= 0 ? (value as number) : undefined
+}
 export default geminiLLMPlugin
