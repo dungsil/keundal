@@ -56,21 +56,31 @@ onUnmounted(() => {
 <template>
   <div class="relative group">
     <UTooltip :text="removeRandomSuffix(name)">
+      <UButton
+        v-if="isZoomable"
+        variant="ghost"
+        :aria-label="t('file.zoom')"
+        class="cursor-zoom-in rounded-lg p-0"
+        @click="openZoom"
+      >
+        <UAvatar
+          :size="size"
+          :src="previewUrl"
+          alt=""
+          class="rounded-lg"
+        />
+      </UButton>
       <UAvatar
+        v-else
         :size="size"
-        :src="type.startsWith('image/') ? previewUrl : undefined"
         :icon="getFileIcon(type, name)"
         class="rounded-lg"
-        :class="{
-          'opacity-50': status === 'uploading',
-          'cursor-zoom-in': isZoomable
-        }"
-        @click="openZoom"
+        :class="{ 'opacity-50': status === 'uploading' }"
       />
     </UTooltip>
 
     <div v-if="status === 'uploading'" class="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
-      <UIcon name="i-lucide-loader-2" class="size-6 animate-spin text-white" />
+      <UIcon name="i-lucide-loader-2" class="size-6 animate-spin motion-reduce:animate-none text-white" />
     </div>
 
     <UTooltip v-if="status === 'error'" :text="error">
@@ -84,7 +94,7 @@ onUnmounted(() => {
       icon="i-lucide-x"
       size="xs"
       color="neutral"
-      class="absolute p-0 -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity rounded-full ring ring-bg"
+      class="absolute p-0 -top-1 -right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity rounded-full ring ring-bg"
       :aria-label="t('file.remove')"
       @click="emit('remove')"
     />

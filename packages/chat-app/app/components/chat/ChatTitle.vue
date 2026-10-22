@@ -59,7 +59,7 @@ const items = computed<DropdownMenuItem[][]>(() => [
       :label="displayTitle"
       :class="['group min-w-0 max-w-3xs data-[state=open]:bg-elevated', { 'text-muted': !title }]"
       :ui="{
-        trailingIcon: 'text-dimmed shrink-0 group-data-[state=open]:rotate-180 transition-transform duration-200'
+        trailingIcon: 'text-muted shrink-0 group-data-[state=open]:rotate-180 transition-transform duration-200'
       }"
     />
   </UDropdownMenu>

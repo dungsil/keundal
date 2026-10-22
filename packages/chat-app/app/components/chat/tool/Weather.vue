@@ -8,13 +8,10 @@ const props = defineProps<{
 }>()
 
 const color = computed(() => {
-  return (
-    {
-      'output-available':
-        'bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 dark:from-sky-500 dark:via-blue-600 dark:to-indigo-700 text-white',
-      'output-error': 'bg-muted text-error'
-    }[props.invocation.state as string] || 'bg-muted text-white'
-  )
+  if (props.invocation.state === 'output-available') {
+    return 'bg-gradient-to-br from-sky-800 via-blue-800 to-indigo-900 text-white'
+  }
+  return 'bg-muted text-default'
 })
 
 const icon = computed(() => {
@@ -87,7 +84,7 @@ const message = computed(() => {
           <UIcon :name="forecast.condition.icon" class="size-5 text-white" />
           <div class="text-xs font-medium">
             <div>{{ forecast.high }}°</div>
-            <div class="text-white/60">
+            <div class="text-white/70">
               {{ forecast.low }}°
             </div>
           </div>
@@ -106,7 +103,10 @@ const message = computed(() => {
         <UIcon
           :name="icon"
           class="size-8 mx-auto mb-2"
-          :class="[invocation.state === 'input-streaming' && 'animate-spin']"
+          :class="[
+            invocation.state === 'input-streaming' && 'animate-spin motion-reduce:animate-none',
+            invocation.state === 'output-error' && 'text-error'
+          ]"
         />
         <div class="text-sm">
           {{ message }}

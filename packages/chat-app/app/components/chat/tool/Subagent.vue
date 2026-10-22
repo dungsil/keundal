@@ -22,6 +22,7 @@ const label = computed(() => {
   const input = props.invocation.input
   return input && typeof input === 'object' && 'label' in input && typeof input.label === 'string' ? input.label : task.value
 })
+const labelTruncated = computed(() => label.value.length > 80)
 const diagnostic = computed(() => {
   const output = props.invocation.output
   if (output && typeof output === 'object' && 'error' in output && output.error && typeof output.error === 'object'
@@ -43,6 +44,9 @@ const answer = computed(() => {
     chevron="leading"
   >
     <div class="space-y-3 text-sm">
+      <p v-if="labelTruncated" class="whitespace-pre-wrap break-words">
+        {{ label }}
+      </p>
       <p class="whitespace-pre-wrap break-words">
         {{ task }}
       </p>

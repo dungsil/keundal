@@ -225,7 +225,7 @@ function appendTranscript(text: string) {
       <template #footer>
         <ChatPromptMenu :open="open" />
 
-        <div class="flex min-w-0 items-center justify-end gap-1 ms-auto">
+        <div class="flex min-w-0 flex-wrap items-center justify-end gap-1 ms-auto">
           <ModelSelect />
           <ChatReasoningSelect />
 
