@@ -30,7 +30,7 @@ async function collect(events: AsyncIterable<AGUIEvent>) {
   return result
 }
 
-test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제목·투표·편집·삭제를 수행한다 (desktop=%s)', async (desktop) => {
+test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제목·투표·편집·분기·삭제를 수행한다 (desktop=%s)', async (desktop) => {
   const ctx = new Context()
   const titleModels: string[] = []
   const selections: unknown[] = []
@@ -126,6 +126,25 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
   await collect(chats.respond('chat', { model, messages: [edited] }))
   expect((await chats.get('chat'))!.messages).toHaveLength(2)
   expect((await chats.get('chat'))!.messages[1]!.parts).toContainEqual({ type: 'text', text: '편집 응답' })
+
+  const original = (await chats.get('chat'))!
+  const runId = original.messages[1]!.id
+  await chats.vote('chat', runId, true)
+  const branched = await chats.branch('chat', runId, 'branch')
+  expect(branched.messages).toEqual(original.messages)
+  expect(branched.votes).toEqual([{ chatId: 'branch', messageId: runId, isUpvoted: true }])
+  expect(branched.started).toBe(true)
+  expect(await chats.get('branch')).toEqual(branched)
+  expect((await chats.get('chat'))!.votes).toEqual([{ chatId: 'chat', messageId: runId, isUpvoted: true }])
+  await expect(chats.branch('chat', runId, 'branch')).rejects.toThrow('Chat already exists')
+  await expect(chats.branch('chat', 'missing', 'other')).rejects.toThrow('Invalid message')
+  expect(await chats.get('other')).toBeUndefined()
+  expect(await chats.getRun(runId)).toMatchObject({ status: 'completed' })
+  await chats.delete('chat')
+  expect(await chats.get('branch')).toEqual(branched)
+  expect(await chats.getRun(runId)).toBeUndefined()
+  await chats.delete('branch')
+  await chats.create('chat', user, model)
 
   await chats.delete('chat')
   expect(await chats.get('chat')).toBeUndefined()

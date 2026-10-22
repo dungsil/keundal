@@ -1,5 +1,5 @@
 import type { ChatMessage, ChatMessageAssembly } from '@keundal/chat/chat-message'
-import { validateChatTitle } from '@keundal/chat/chat-store'
+import { branchChat, validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
 import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
 import { SteerQueue, type Reasoning, type AGUIEvent, type SessionSnapshot, type ExecutionOptions } from '@keundal/core'
@@ -131,6 +131,16 @@ export class ChatStore implements ChatStoreLike {
   async rename(id: string, title: string) {
     title = validateChatTitle(title)
     await this.update(id, (chat) => ({ ...chat, title }))
+  }
+
+  /** 원래 대화는 읽기만 하므로 실행 중에도 허용하며, 새 대화는 한 번의 커밋으로 저장합니다. */
+  async branch(sourceId: string, messageId: string, newId: string): Promise<LocalChat> {
+    const source = this.chat(await this.ctx.session.get(sourceId))
+    if (!source) throw new Error('Chat not found')
+    if (await this.ctx.session.get(newId)) throw new Error('Chat already exists')
+    const chat = branchChat(source, messageId, newId, new Date().toISOString())
+    await this.save(undefined, chat)
+    return chat
   }
 
   async truncate(id: string, messageId: string, type: 'edit' | 'regenerate') {

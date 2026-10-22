@@ -72,6 +72,8 @@ export default {
   'chat.bad': '좋지 않은 응답',
   'chat.regenerate': '응답 다시 생성',
   'chat.editMessage': '메시지 수정',
+  'chat.branch': '새 대화로 분기',
+  'chat.branchFailed': '대화를 분기하지 못했습니다.',
   'chat.prompt': '무엇이든 물어보세요…',
   'chat.delivery': '실행 중 전송 방식',
   'chat.deliveryQueue': '대기열',

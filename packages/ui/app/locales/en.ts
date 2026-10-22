@@ -70,6 +70,8 @@ export default {
   'chat.bad': 'Bad response',
   'chat.regenerate': 'Regenerate response',
   'chat.editMessage': 'Edit message',
+  'chat.branch': 'Branch into new chat',
+  'chat.branchFailed': 'Failed to branch the chat.',
   'chat.prompt': 'Ask anything…',
   'chat.delivery': 'Send mode while running',
   'chat.deliveryQueue': 'Queue',

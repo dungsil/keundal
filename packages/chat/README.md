@@ -6,4 +6,6 @@
 
 `ChatStoreLike.getRun(runId)`는 알려진 실행 ID 하나의 저널과 상태를 가져옵니다. 실행 전체를 나열하지 않으므로 UI는 대화 메시지의 실행 ID로 필요한 기록만 조회합니다.
 
+`ChatStoreLike.branch(sourceId, messageId, newId)`는 선택한 사용자·어시스턴트 메시지까지 복사한 새 대화를 만들고 원래 대화는 바꾸지 않습니다. 실행 중에도 호출할 수 있으며, 두 저장소 구현은 `branchChat()`의 같은 복사 규칙을 씁니다. 규칙은 [대화 분기](../../docs/chat-branch.md)를 참고합니다.
+
 [플러그인 조립과 의존성 경계](../../docs/plugin-composition.md)를 참고합니다.

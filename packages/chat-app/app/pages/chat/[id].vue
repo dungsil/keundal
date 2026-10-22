@@ -173,6 +173,16 @@ async function regenerateMessage(message: ChatMessage) {
   regenerate({ messageId: message.id })
 }
 
+async function branchMessage(message: ChatMessage) {
+  try {
+    const branched = await $chatStore.branch(data.value!.id, message.id, crypto.randomUUID())
+    await refreshNuxtData('chats')
+    await navigateTo(`/chat/${branched.id}`)
+  } catch {
+    toast.add({ description: t('chat.branchFailed'), icon: 'i-lucide-alert-circle', color: 'error', duration: 0 })
+  }
+}
+
 function getVote(messageId: string) {
   const vote = votes.value?.find(v => v.messageId === messageId)
   if (!vote) return null
@@ -309,6 +319,7 @@ onBeforeUnmount(() => {
                 @vote="(_message, isUpvoted) => vote(_message, isUpvoted)"
                 @edit="startEdit"
                 @regenerate="regenerateMessage"
+                @branch="branchMessage"
               />
             </template>
           </UChatMessages>
