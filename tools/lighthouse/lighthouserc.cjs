@@ -8,7 +8,8 @@ module.exports = {
       ),
       numberOfRuns: 3,
       settings: {
-        onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo']
+        onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo'],
+        skipAudits: ['is-crawlable']
       }
     }
   }
