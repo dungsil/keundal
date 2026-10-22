@@ -50,6 +50,9 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
   const agent = await ctx.plugin(agentPlugin, { model: 'test', maxOutputTokens: 100 })
   const services: AgentAppServices = {
     run: (input, options?: ExecutionOptions) => ctx.agent.run(input, options),
+    steer: () => 0,
+    cancel: () => false,
+    subscribe: (runId, options) => ctx.generation.subscribe(runId, options),
     session: {
       get: (threadId, options) => ctx.session.get(threadId, options),
       list: options => ctx.session.list(options),

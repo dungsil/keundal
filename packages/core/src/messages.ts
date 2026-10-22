@@ -6,6 +6,28 @@ type AssistantToolCall = NonNullable<AssistantMessage['toolCalls']>[number]
 
 export const CONTEXT_MESSAGE_PREFIX = 'keundal:context:'
 export const CONTEXT_MESSAGE_EVENT = 'keundal.context.message'
+/**
+ * 실행 중에 반영한 사용자 지시를 journal에 남기는 AG-UI CUSTOM 이벤트 이름입니다. value는 사용자
+ * 메시지이며, 재생과 복구는 이 기록으로 지시를 원래 위치에 다시 조립합니다.
+ */
+export const STEER_MESSAGE_EVENT = 'keundal.steer.message'
+
+type UserMessage = Extract<AgentMessage, { role: 'user' }>
+
+/** 지시 이벤트의 값이 사용자 메시지인지 확인합니다. */
+export function isSteerMessage(value: unknown): value is UserMessage {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    value.id.length > 0 &&
+    'role' in value &&
+    value.role === 'user' &&
+    'content' in value &&
+    (typeof value.content === 'string' || Array.isArray(value.content))
+  )
+}
 
 /** 결과 없는 도구 호출과 서명 없는 추론을 제외합니다. 모델을 바꾸면 공급자 전용 상태도 제거합니다. */
 export function prepareReplayMessages(
@@ -80,6 +102,11 @@ export class MessageAssembly {
   apply(event: AGUIEvent): AgentMessage | undefined {
     switch (event.type) {
       case EventType.CUSTOM: {
+        if (event.name === STEER_MESSAGE_EVENT) {
+          if (!isSteerMessage(event.value)) throw new Error('invalid steer message event')
+          this.open = undefined
+          return this.write(event.value)
+        }
         if (event.name !== CONTEXT_MESSAGE_EVENT) return undefined
         const value: unknown = event.value
         if (

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { createServer, request as httpRequest } from 'node:http'
+import { createServer, request as httpRequest, type ServerResponse } from 'node:http'
 import { connect } from 'node:net'
 
 import {
@@ -40,7 +40,11 @@ const reply: LLMEvent[] = [
   { type: EventType.TEXT_MESSAGE_END, messageId: 'reply' }
 ]
 
-const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {}) => {
+const setup = async (
+  t: TestContext,
+  options: Omit<AgentAppOptions, 'token'> = {},
+  script?: (request: LLMRequest, options?: ExecutionOptions) => AsyncIterable<LLMEvent>
+) => {
   const ctx = new Context()
   class LLM extends LLMService {
     async getModel() {
@@ -49,8 +53,9 @@ const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {
     async countTokens() {
       return 10
     }
-    stream(request: LLMRequest): AsyncIterableIterator<LLMEvent> {
+    stream(request: LLMRequest, execution?: ExecutionOptions): AsyncIterableIterator<LLMEvent> {
       return (async function* () {
+        if (script) return yield* script(request, execution)
         yield* reply.map((event) => ({ ...event, messageId: `reply:${request.input.runId}` }))
       })()
     }
@@ -65,6 +70,9 @@ const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {
       agentCalls++
       return ctx.agent.run(run, options)
     },
+    steer: () => 0,
+    cancel: () => false,
+    subscribe: (runId, options) => ctx.generation.subscribe(runId, options),
     session: {
       get: (threadId, options) => ctx.session.get(threadId, options),
       list: (options) => ctx.session.list(options),
@@ -140,12 +148,24 @@ const setup = async (t: TestContext, options: Omit<AgentAppOptions, 'token'> = {
   }
 }
 
-const parseSse = (text: string): AGUIEvent[] =>
+const parseFrames = (text: string): { id?: number; event: AGUIEvent }[] =>
   text
     .split('\n\n')
-    .filter((line) => line.startsWith('data: '))
-    .map((line) => JSON.parse(line.slice(6)) as AGUIEvent)
-    .map((event) => parseAGUIEvent(event))
+    .filter(Boolean)
+    .flatMap((frame) => {
+      const lines = frame.split('\n')
+      const data = lines.find((line) => line.startsWith('data: '))
+      if (!data) return []
+      const id = lines.find((line) => line.startsWith('id: '))
+      return [
+        {
+          ...(id ? { id: Number(id.slice(4)) } : {}),
+          event: parseAGUIEvent(JSON.parse(data.slice(6)))
+        }
+      ]
+    })
+
+const parseSse = (text: string): AGUIEvent[] => parseFrames(text).map((frame) => frame.event)
 
 test('토큰 설정이 누락되거나 비어 있거나 Bearer 형식이 아니면 앱 생성을 거부한다', async (t) => {
   const { services } = await setup(t)
@@ -514,14 +534,24 @@ test('허용하지 않은 origin의 preflight는 403으로 거부한다', async 
   expect(response.headers.get('access-control-allow-origin')).toBeNull()
 })
 
-test('SSE 연결을 중단하면 호스트 실행에 취소 신호를 전달한다', async (t) => {
-  const { base, services } = await setup(t)
-  let signal: AbortSignal | undefined
-  services.run = async function* (request, options) {
-    signal = options?.signal
-    yield { type: EventType.RUN_STARTED, threadId: request.threadId, runId: request.runId }
-    await new Promise<void>((resolve) => signal!.addEventListener('abort', () => resolve(), { once: true }))
-  }
+const runStatus = async (base: string, runId: string): Promise<unknown> => {
+  const response = await fetch(`${base}/runs/${runId}`, { headers: { authorization: `Bearer ${token}` } })
+  const body: unknown = await response.json()
+  return typeof body === 'object' && body !== null && 'status' in body ? body.status : undefined
+}
+
+test('SSE 연결을 끊어도 실행을 취소하지 않고 afterSequence 재구독이 누락·중복 없이 이어받는다', async (t) => {
+  const release = Promise.withResolvers<void>()
+  let calls = 0
+  const { base, services } = await setup(t, {}, async function* (request) {
+    calls++
+    const messageId = `reply:${request.input.runId}`
+    yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' }
+    yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: 'before' }
+    await release.promise
+    yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: 'after' }
+    yield { type: EventType.TEXT_MESSAGE_END, messageId }
+  })
   const abort = new AbortController()
   const response = await fetch(`${base}/runs`, {
     method: 'POST',
@@ -530,10 +560,45 @@ test('SSE 연결을 중단하면 호스트 실행에 취소 신호를 전달한�
     signal: abort.signal
   })
   const reader = response.body!.getReader()
-  await reader.read()
+  const decoder = new TextDecoder()
+  let received = ''
+  while (!parseFrames(received).some((frame) => frame.event.type === EventType.TEXT_MESSAGE_CONTENT)) {
+    received += decoder.decode((await reader.read()).value, { stream: true })
+  }
+  const first = parseFrames(received.slice(0, received.lastIndexOf('\n\n') + 2))
   abort.abort()
-  await expect.poll(() => signal?.aborted).toBe(true)
-  reader.releaseLock()
+  await reader.cancel().catch(() => {})
+  expect(await runStatus(base, 'r1')).toBe('running')
+  release.resolve()
+  const lastId = first.at(-1)!.id!
+  const resumed = await fetch(`${base}/runs/r1/events?afterSequence=${lastId}`, {
+    headers: { authorization: `Bearer ${token}` }
+  })
+  const rest = parseFrames(await resumed.text())
+  const delivered = [...first, ...rest]
+  const journal = (await services.generation.get('r1'))!.journal
+  expect(delivered.map((frame) => frame.id)).toEqual(journal.map((entry) => entry.sequence))
+  expect(delivered.map((frame) => frame.event)).toEqual(journal.map((entry) => entry.event))
+  expect(
+    delivered.flatMap((frame) => (frame.event.type === EventType.TEXT_MESSAGE_CONTENT ? [frame.event.delta] : []))
+  ).toEqual(['before', 'after'])
+  expect(rest.at(-1)?.event.type).toBe(EventType.RUN_FINISHED)
+  expect(calls).toBe(1)
+  expect(await runStatus(base, 'r1')).toBe('completed')
+  const replay = parseFrames(
+    await (await fetch(`${base}/runs/r1/events`, { headers: { authorization: `Bearer ${token}` } })).text()
+  )
+  expect(replay.map((frame) => frame.id)).toEqual(journal.map((entry) => entry.sequence))
+  expect(replay.map((frame) => frame.event)).toEqual(journal.map((entry) => entry.event))
+  expect(calls).toBe(1)
+})
+
+test('없는 실행의 재구독은 404, 잘못된 커서는 400으로 거부한다', async (t) => {
+  const { requestJson, requestText } = await setup(t)
+  expect((await requestJson('GET', '/runs/missing/events')).status).toBe(404)
+  await requestText('POST', '/runs', input)
+  expect((await requestJson('GET', '/runs/r1/events?afterSequence=-2')).status).toBe(400)
+  expect((await requestJson('GET', '/runs/r1/events?afterSequence=x')).status).toBe(400)
 })
 
 test('제목 요청 연결을 중단하면 공급자 호출에 취소 신호를 전달한다', async (t) => {
@@ -558,28 +623,20 @@ test('제목 요청 연결을 중단하면 공급자 호출에 취소 신호를 
   await request
 })
 
-test('SSE 쓰기가 막히면 다음 이벤트를 요청하지 않고 연결 종료 때 공급자를 닫는다', async (t) => {
-  const { base, server, services } = await setup(t)
-  let advanced = false
-  let closed = false
-  let signal: AbortSignal | undefined
-  const blocked = Promise.withResolvers<void>()
-  server.prependListener('request', (_request, response) => {
+test('SSE 쓰기가 막혀도 실행은 끝까지 진행하고 연결을 닫으면 구독만 해제한다', async (t) => {
+  let streamed = false
+  const { base, server } = await setup(t, {}, async function* (request) {
+    yield* reply.map((event) => ({ ...event, messageId: `reply:${request.input.runId}` }))
+    streamed = true
+  })
+  const blocked = Promise.withResolvers<ServerResponse>()
+  server.prependListener('request', (request, response) => {
+    if (request.method !== 'POST') return
     response.write = (() => {
-      blocked.resolve()
+      blocked.resolve(response)
       return false
     }) as typeof response.write
   })
-  services.run = async function* (_request, options) {
-    signal = options?.signal
-    try {
-      yield { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'r1' }
-      advanced = true
-      yield { type: EventType.RUN_FINISHED, threadId: 'thread', runId: 'r1' }
-    } finally {
-      closed = true
-    }
-  }
   const abort = new AbortController()
   const pending = fetch(`${base}/runs`, {
     method: 'POST',
@@ -587,20 +644,19 @@ test('SSE 쓰기가 막히면 다음 이벤트를 요청하지 않고 연결 종
     body: JSON.stringify(input),
     signal: abort.signal
   }).catch(() => undefined)
-  await blocked.promise
-  expect(advanced).toBe(false)
+  const response = await blocked.promise
   abort.abort()
   await pending
-  await expect.poll(() => closed).toBe(true)
-  expect(signal?.aborted).toBe(true)
-  expect(advanced).toBe(false)
+  await expect.poll(() => runStatus(base, 'r1')).toBe('completed')
+  expect(streamed).toBe(true)
+  await expect.poll(() => response.listenerCount('drain')).toBe(0)
 })
 
 test('SSE 쓰기의 drain을 기다린 뒤 남은 이벤트를 전달한다', async (t) => {
-  const { server, services, requestText } = await setup(t)
-  let advanced = false
-  const blocked = Promise.withResolvers<import('node:http').ServerResponse>()
-  server.prependListener('request', (_request, response) => {
+  const { server, requestText } = await setup(t)
+  const blocked = Promise.withResolvers<ServerResponse>()
+  server.prependListener('request', (request, response) => {
+    if (request.method !== 'POST') return
     const write = response.write.bind(response)
     response.write = ((chunk: string) => {
       response.write = write
@@ -609,33 +665,21 @@ test('SSE 쓰기의 drain을 기다린 뒤 남은 이벤트를 전달한다', as
       return false
     }) as typeof response.write
   })
-  services.run = async function* () {
-    yield { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'r1' }
-    advanced = true
-    yield { type: EventType.RUN_FINISHED, threadId: 'thread', runId: 'r1' }
-  }
   const pending = requestText('POST', '/runs', input)
   const response = await blocked.promise
-  expect(advanced).toBe(false)
   response.emit('drain')
   expect(parseSse((await pending).text).at(-1)?.type).toBe(EventType.RUN_FINISHED)
-  expect(advanced).toBe(true)
   expect(response.listenerCount('drain')).toBe(0)
 })
 
-test('큰 SSE 이벤트는 직렬화 전에 거부하고 오류 이벤트만 전달한다', async (t) => {
-  const { services, requestText } = await setup(t)
-  let closed = false
-  services.run = async function* () {
-    try {
-      yield { type: EventType.CUSTOM, name: 'large', value: 'x'.repeat(8 * 1024 * 1024 + 1) }
-    } finally {
-      closed = true
-    }
-  }
+test('큰 이벤트는 직렬화 전에 거부하고 실패를 RUN_ERROR로 전달한다', async (t) => {
+  const { base, requestText } = await setup(t, {}, async function* () {
+    yield { type: EventType.CUSTOM, name: 'large', value: 'x'.repeat(8 * 1024 * 1024 + 1) }
+  })
   const events = parseSse((await requestText('POST', '/runs', input)).text)
-  expect(events).toEqual([{ type: EventType.RUN_ERROR, message: 'stream byte limit exceeded' }])
-  expect(closed).toBe(true)
+  expect(events.at(-1)).toEqual({ type: EventType.RUN_ERROR, message: 'stream byte limit exceeded' })
+  expect(events.some((event) => event.type === EventType.CUSTOM && event.name === 'large')).toBe(false)
+  expect(await runStatus(base, 'r1')).toBe('failed')
 })
 
 test.for(['low', 'medium', 'high'])('%s 추론 수준 헤더를 실행 옵션으로 전달한다', async (reasoning, t) => {

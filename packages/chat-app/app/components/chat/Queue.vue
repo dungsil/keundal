@@ -1,0 +1,64 @@
+<script setup lang="ts">
+import type { ChatMessage } from '@keundal/chat/chat-message'
+
+const { t } = useLocale()
+
+defineProps<{
+  queue: ChatMessage[]
+  /** 실행이 없는데 대기 메시지가 남아 있으면 정상 종료가 아니었으므로 이어서 보낼지 묻습니다. */
+  paused: boolean
+  /** 실행이 브라우저 탭 안에서만 진행되는지 여부입니다. */
+  browserOnly: boolean
+}>()
+
+const emit = defineEmits<{
+  remove: [messageId: string]
+  resume: []
+}>()
+
+function preview(message: ChatMessage) {
+  const text = message.parts.flatMap(part => (part.type === 'text' ? [part.text] : [])).join(' ').trim()
+  return text || t('chat.attachment')
+}
+</script>
+
+<template>
+  <section
+    v-if="queue.length"
+    :aria-label="t('chat.queued')"
+    class="rounded-lg border border-default bg-elevated/50 px-3 py-2 text-sm"
+  >
+    <div class="flex items-center justify-between gap-2">
+      <span class="font-medium text-highlighted">{{ t('chat.queued') }} ({{ queue.length }})</span>
+      <UButton
+        v-if="paused"
+        :label="t('chat.queueResume')"
+        icon="i-lucide-play"
+        size="xs"
+        color="neutral"
+        variant="soft"
+        @click="emit('resume')"
+      />
+    </div>
+    <p v-if="paused" class="mt-1 text-muted">
+      {{ t('chat.queuePaused') }}
+    </p>
+    <ol class="mt-2 flex flex-col gap-1">
+      <li v-for="(message, index) in queue" :key="message.id" class="flex items-center gap-2">
+        <span class="text-dimmed tabular-nums">{{ index + 1 }}.</span>
+        <span class="min-w-0 flex-1 truncate">{{ preview(message) }}</span>
+        <UButton
+          icon="i-lucide-x"
+          size="xs"
+          color="neutral"
+          variant="ghost"
+          :aria-label="t('chat.queueRemove')"
+          @click="emit('remove', message.id)"
+        />
+      </li>
+    </ol>
+    <p v-if="browserOnly" class="mt-2 text-xs text-dimmed">
+      {{ t('chat.queueBrowserOnly') }}
+    </p>
+  </section>
+</template>

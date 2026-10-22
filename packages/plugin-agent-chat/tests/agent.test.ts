@@ -108,6 +108,7 @@ async function setup(testContext: TestContext, overrides: Overrides = {}) {
       })()
     }
     get = unexpected
+    subscribe = unexpected
     list = unexpected
     recover = unexpected
   }

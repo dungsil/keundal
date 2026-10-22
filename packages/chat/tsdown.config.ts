@@ -8,6 +8,7 @@ export default defineConfig({
     'src/file.ts',
     'src/models.ts',
     'src/chat-store.ts',
+    'src/run-queue.ts',
     'src/platform.ts',
     'src/messages.ts',
     'src/index.ts',

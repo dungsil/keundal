@@ -17,6 +17,7 @@ import {
   type LLMRequest,
   type LLMEvent,
   type RunAgentInput,
+  type SteerQueue,
   type TraceMetadataEvent,
   type TraceCost,
   type TraceErrorCategory,
@@ -408,7 +409,7 @@ export class Agent extends AgentService {
       options.traceId && options.parentSpanId
         ? { traceId: options.traceId, parentSpanId: options.parentSpanId }
         : undefined
-    const iterator = this.execute(input, controller.signal, stop, allowSubagents, traceParent)
+    const iterator = this.execute(input, controller.signal, stop, allowSubagents, traceParent, options.steer)
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -430,7 +431,8 @@ export class Agent extends AgentService {
     signal: AbortSignal,
     cleanup: () => void,
     allowSubagents: boolean,
-    traceParent?: TraceParent
+    traceParent?: TraceParent,
+    steer?: SteerQueue
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     let failedTrace: TraceRecorder | undefined
     let rootFinalized = false
@@ -597,6 +599,7 @@ export class Agent extends AgentService {
                       parallel,
                       stream,
                       maxToolCalls,
+                      ...(steer ? { steer: () => steer.take() } : {}),
                       ...(deferredSession
                         ? {
                             resolveTools: async () => {

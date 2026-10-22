@@ -46,6 +46,8 @@
 - `generation`은 실행·journal·커밋·복구를 담당하며, 성공한 `RUN_FINISHED`는 커밋 이후에 전달합니다. 내구성이 필요한 저장소는 커밋의 영속성을 보장해야 합니다.
 - `generation.run()`은 `GenerationOptions.stream`이 있으면 해당 이벤트 공급자에 취소 신호를 전달하여 실행합니다. 함수는 실행 요청과 분리하며 저장하거나 복구 시 재호출하지 않습니다.
 - `generation.recover()`는 저장된 부분 응답과 확정된 종료 상태를 보존하고, 미완료 실행을 `interrupted`로 확정합니다. LLM을 다시 호출하거나 자동 재시도하지 않습니다.
+- `generation.subscribe()`는 `afterSequence` 다음의 journal을 재생하고 실행 중이면 새 기록을 이어서 전달합니다. 실행을 다시 시작하지 않으며, 살아 있는 실행의 재구독과 `recover()`의 복구는 서로 다른 기능입니다.
+- 실행 중 지시는 `ExecutionOptions.steer`의 `SteerQueue`로 전달하고, 에이전트는 다음 모델 요청 전의 안전한 경계에서만 반영합니다. Queue·Steer·재구독의 규칙은 [실행 제어 문서](docs/run-control.md)를 따릅니다.
 - 각 서비스는 취소 신호를 실제 작업에 연결하고 자원을 정리해야 합니다.
 
 ## 에이전트 조합

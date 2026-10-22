@@ -2,6 +2,8 @@ import type { AgentConfig } from '@keundal/agent-loop'
 import {
   EventType,
   LLMService,
+  SteerQueue,
+  readTraceSpans,
   type AGUIEvent,
   type ExecutionOptions,
   type LLMEvent,
@@ -450,6 +452,51 @@ test('검색한 도구는 같은 Agent의 다음 실행에 유지되지 않는�
       })()
     ).rejects.toThrow('no executor registered')
     expect(executions).toBe(1)
+  } finally {
+    await setup.close()
+  }
+})
+
+test('Steer를 반영한 후속 요청에서도 검색한 도구를 실행하고 추적을 완료한다', async () => {
+  const steer = new SteerQueue()
+  let executions = 0
+  const setup = await runAgent(
+    [
+      call('search-steer', 'search_tool', '{"query":"remote item"}'),
+      call('read-steer', 'mcp_read', '{}'),
+      answer('steered-answer')
+    ],
+    {
+      deferredTools: {},
+      deferredToolProvider: () => [
+        mcpTool('mcp_read', 'Read remote item', { type: 'object', properties: {} }, () => {
+          executions++
+          return 'remote value'
+        })
+      ]
+    },
+    (_request, index) => {
+      if (index === 0) steer.push([{ id: 'steer-discovery', role: 'user', content: 'Keep the response brief' }])
+    }
+  )
+  try {
+    const events: AGUIEvent[] = []
+    for await (const event of setup.ctx.agent.run(input, { steer })) events.push(event)
+    expect(executions).toBe(1)
+    expect(setup.requests).toHaveLength(3)
+    expect(setup.requests[1]!.input.tools.map((tool) => tool.name)).toContain('mcp_read')
+    for (const request of setup.requests.slice(1)) {
+      expect(request.input.messages.filter((message) => message.id === 'steer-discovery')).toEqual([
+        { id: 'steer-discovery', role: 'user', content: 'Keep the response brief' }
+      ])
+    }
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: EventType.TOOL_CALL_RESULT, toolCallId: 'read-steer', content: 'remote value' })
+    )
+    expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+    const spans = readTraceSpans(events)
+    expect(spans.find((span) => span.kind === 'agent' && span.parentSpanId === undefined)?.status).toBe('completed')
+    expect(spans.find((span) => span.kind === 'tool' && span.toolCallId === 'read-steer')?.status).toBe('completed')
   } finally {
     await setup.close()
   }

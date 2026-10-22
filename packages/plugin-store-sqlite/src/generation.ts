@@ -5,13 +5,17 @@ import {
   EventType,
   StreamBudget,
   GenerationService,
+  JournalHub,
+  followJournal,
   reconcileTerminalTraceJournal,
   type AGUIEvent,
   type ExecutionOptions,
+  type GenerationJournalEntry,
   type GenerationOptions,
   type GenerationRequest,
   type GenerationSnapshot,
   type GenerationStatus,
+  type GenerationSubscriptionOptions,
   type TerminalGeneration
 } from '@keundal/core'
 import type { Context } from 'cordis'
@@ -54,6 +58,7 @@ const snapshot = (run: StoredRun): GenerationSnapshot => ({
 export class SqliteGenerationService extends GenerationService {
   private readonly controllers = new Set<globalThis.AbortController>()
   private readonly active = new Map<string, ActiveRun>()
+  private readonly hub = new JournalHub()
   private readonly ownerId = randomUUID()
   private heartbeat?: NodeJS.Timeout
   private closed = false
@@ -79,6 +84,7 @@ export class SqliteGenerationService extends GenerationService {
         }
         // 해제한 서비스가 소유하던 실행은 다른 프로세스의 recover()가 확정할 수 있게 합니다.
         this.store.releaseLeases(this.ownerId)
+        for (const runId of this.active.keys()) this.hub.end(runId)
       } finally {
         this.store.release()
       }
@@ -143,6 +149,27 @@ export class SqliteGenerationService extends GenerationService {
     return this.store.listRuns().map(snapshot)
   }
 
+  subscribe(runId: string, options: GenerationSubscriptionOptions = {}): AsyncIterable<GenerationJournalEntry> {
+    this.assertOpen()
+    return followJournal(
+      {
+        read: () => {
+          const stored = this.store.readJournal(runId)
+          if (!stored) throw new Error(`generation run not found: ${runId}`)
+          const active = this.active.get(runId)
+          const journal = active ? [...stored.journal, ...active.recorder.buffered] : stored.journal
+          return {
+            journal: reconcileTerminalTraceJournal(journal, stored.status),
+            done: stored.status !== 'running' && !active
+          }
+        },
+        listen: (listener) => this.hub.listen(runId, listener)
+      },
+      options.afterSequence ?? -1,
+      options.signal
+    )
+  }
+
   /**
    * 저장된 부분 응답과 실행 상태를 복원합니다. 다른 소유자가 임차를 연장하고 있는 실행은 실행 중으로
    * 두고, 그 밖의 미완료 실행은 interrupted로 확정합니다. LLM은 다시 호출하지 않습니다.
@@ -157,6 +184,7 @@ export class SqliteGenerationService extends GenerationService {
         if (ownership.ownerId !== this.ownerId && (ownership.leaseExpiresAt ?? 0) > now) continue
         if (ownership.ownerId === this.ownerId && this.active.has(ownership.runId)) continue
         this.store.finishRun(ownership.runId, 'interrupted')
+        this.hub.end(ownership.runId)
       }
     })
     return this.store.listRuns().map(snapshot)
@@ -187,7 +215,7 @@ export class SqliteGenerationService extends GenerationService {
         runId,
         threadId,
         request,
-        recorder: new RunRecorder(this.store, runId, this.ownerId),
+        recorder: new RunRecorder(this.store, runId, this.ownerId, (entry) => this.hub.publish(runId, entry)),
         token,
         settled: false
       }
@@ -249,8 +277,14 @@ export class SqliteGenerationService extends GenerationService {
     run.recorder.flush()
     run.settled = true
     const stored = this.store.readRun(run.runId)
-    if (!stored) return undefined
-    if (stored.status !== 'running') return stored.status
+    if (!stored) {
+      this.hub.end(run.runId)
+      return undefined
+    }
+    if (stored.status !== 'running') {
+      this.hub.end(run.runId)
+      return stored.status
+    }
     const generation: TerminalGeneration = {
       request: run.request,
       status,
@@ -269,6 +303,8 @@ export class SqliteGenerationService extends GenerationService {
     } catch (error) {
       this.store.abandonRun(run.runId, this.ownerId, 'interrupted')
       throw error
+    } finally {
+      this.hub.end(run.runId)
     }
   }
 

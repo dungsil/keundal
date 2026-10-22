@@ -2,13 +2,17 @@ import {
   EventType,
   StreamBudget,
   GenerationService,
+  JournalHub,
+  followJournal,
   reconcileTerminalTraceJournal,
   type AGUIEvent,
   type ExecutionOptions,
+  type GenerationJournalEntry,
   type GenerationOptions,
   type GenerationRequest,
   type GenerationSnapshot,
   type GenerationStatus,
+  type GenerationSubscriptionOptions,
   type TerminalGeneration
 } from '@keundal/core'
 import type { Context } from 'cordis'
@@ -24,6 +28,7 @@ const snapshot = (r: StoredRun): GenerationSnapshot => ({
 export class MemoryGenerationService extends GenerationService {
   private readonly controllers = new Set<globalThis.AbortController>()
   private readonly active = new Map<string, AbortSignal>()
+  private readonly hub = new JournalHub()
   private readonly owner = Symbol('generation-service')
   private closed = false
   constructor(
@@ -33,8 +38,10 @@ export class MemoryGenerationService extends GenerationService {
     super(ctx)
     ctx.fiber.effect(() => () => {
       this.closed = true
-      for (const run of this.store.runs.values())
+      for (const run of this.store.runs.values()) {
         if (run.owner === this.owner && run.status === 'running') run.lease.active = false
+        this.hub.end(run.runId)
+      }
       for (const c of this.controllers) c.abort(new Error('memory generation service disposed'))
     })
   }
@@ -76,6 +83,7 @@ export class MemoryGenerationService extends GenerationService {
           record.lease.active = false
           record.journal = [...record.journal]
           record.messages = [...record.messages]
+          this.hub.end(request.input.runId)
         }
       }
     }
@@ -132,6 +140,26 @@ export class MemoryGenerationService extends GenerationService {
     options?.signal?.throwIfAborted()
     return [...this.store.runs.values()].map(snapshot)
   }
+
+  subscribe(runId: string, options: GenerationSubscriptionOptions = {}): AsyncIterable<GenerationJournalEntry> {
+    this.assertOpen()
+    if (!this.store.runs.has(runId)) throw new Error(`generation run not found: ${runId}`)
+    return followJournal(
+      {
+        read: () => {
+          const record = this.store.runs.get(runId)
+          const journal = record?.journal ?? []
+          return {
+            journal: reconcileTerminalTraceJournal(journal, record?.status ?? 'running'),
+            done: !record || record.status !== 'running' || !this.active.has(runId)
+          }
+        },
+        listen: (listener) => this.hub.listen(runId, listener)
+      },
+      options.afterSequence ?? -1,
+      options.signal
+    )
+  }
   async recover(options?: ExecutionOptions): Promise<GenerationSnapshot[]> {
     this.assertOpen()
     options?.signal?.throwIfAborted()
@@ -141,6 +169,7 @@ export class MemoryGenerationService extends GenerationService {
         r.status = 'interrupted'
         r.journal = [...r.journal]
         r.messages = [...r.messages]
+        this.hub.end(r.runId)
       }
       out.push(snapshot(r))
     }
@@ -187,6 +216,7 @@ export class MemoryGenerationService extends GenerationService {
         activeRecord.messages = terminal.messages
         activeRecord.owner = undefined
         activeRecord.lease.active = false
+        this.hub.end(runId)
       }
     }
     try {
@@ -210,7 +240,7 @@ export class MemoryGenerationService extends GenerationService {
       registered = true
       this.active.set(runId, signal)
       const started: AGUIEvent = { type: EventType.RUN_STARTED, threadId, runId }
-      recorder.record(started)
+      this.hub.publish(runId, recorder.record(started))
       yield started
       signal.throwIfAborted()
       const budget = new StreamBudget()
@@ -219,7 +249,7 @@ export class MemoryGenerationService extends GenerationService {
         signal.throwIfAborted()
         budget.accept(event)
         if (!current()) return
-        recorder.record(event)
+        this.hub.publish(runId, recorder.record(event))
         yield event
       }
       signal.throwIfAborted()
@@ -234,13 +264,11 @@ export class MemoryGenerationService extends GenerationService {
         state: request.input.state,
         generation: terminal
       })
-      if (this.store.runs.get(runId) === record) {
-        record.status = 'completed'
-        record.journal = journal
-        record.messages = terminal.messages
-        record.owner = undefined
-        record.lease.active = false
-      }
+      // 종료 커밋은 저장소의 실행 기록을 새 객체로 바꾸므로, 확정된 journal에서 마지막 항목을 전달합니다.
+      const stored = this.store.runs.get(runId)
+      const last = stored?.journal[stored.journal.length - 1]
+      if (last) this.hub.publish(runId, last)
+      this.hub.end(runId)
       settled = true
       yield finished
     } catch (error) {
@@ -277,6 +305,7 @@ export class MemoryGenerationService extends GenerationService {
       } finally {
         if (this.active.get(runId) === signal) this.active.delete(runId)
         if (record?.token === token && record.status === 'running') record.lease.active = false
+        this.hub.end(runId)
         stop()
       }
     }
