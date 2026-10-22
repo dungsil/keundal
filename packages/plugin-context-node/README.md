@@ -6,8 +6,6 @@
 - `LocalFileReferenceService`와 `localFileReferencePlugin`은 로컬 파일을 탐색하여 `fileReferences` 계약을 구현합니다.
 - `createTmuxContext(config)`는 tmux와 프로세스 TTY를 확인합니다. 취소 신호를 프로세스 호출에 전달합니다.
 
-기존 `@keundal/context`에서 위 항목과 해당 설정 타입, `DEFAULT_FILE_SEARCH_*` 상수를 가져오던 코드는 이 패키지로 import를 바꿉니다. 전체 대응 목록은 [context](../context/README.md)에 있습니다.
-
 호스트는 이 공급자들을 `@keundal/plugin-context`의 `contextPlugin.providers`에 전달합니다. `createFileReferenceContext`는 `@keundal/plugin-context`에서, `activeAtToken`과 `formatFileMention`은 `@keundal/context`에서 가져옵니다.
 
 동작과 설정은 [plugin-context 문서](../plugin-context/README.md)를 참고하십시오. 참조 코드의 MIT 라이선스는 [LICENSE](./LICENSE)에 보존합니다.

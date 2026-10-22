@@ -103,10 +103,6 @@ SDK의 자동 협상으로 지원하는 프로토콜 버전을 선택합니다. 
 
 원격 작업의 취소와 정리 완료 여부는 서버 구현에 달려 있습니다. 취소는 이미 발생한 부작용을 되돌리지 않습니다. 연결이 끊기면 새 클라이언트를 생성합니다. 자동 재접속, 도구 재실행, 서버 지시문 삽입, MCP prompts, sampling, elicitation, task 실행, 레거시 SSE 전송은 지원하지 않습니다.
 
-## 참고 구현
-
-[DeepSeek Harness MCP](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/mcp)의 전송 분리, 안정적인 도구 이름, 지연 리소스 조회 방식을 참고했습니다. Harness의 도구 레지스트리와 권한 서비스는 가져오지 않고 Keundal의 `ExecutableTool` 계약에 연결합니다.
-
 ## 브라우저에서 사용
 
 `@keundal/plugin-mcp-client/browser`에서 `McpClient`를 가져오면 Node.js 전용 모듈 없이 Streamable HTTP에 연결할 수 있습니다. 이 진입점은 stdio를 거부합니다. 브라우저의 CORS와 보안 컨텍스트 정책을 따르며, 서버는 앱 origin과 MCP 요청 헤더를 허용해야 합니다. 도구 이름과 권한, 취소 계약은 Node.js 진입점과 같습니다.

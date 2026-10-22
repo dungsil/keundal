@@ -13,4 +13,4 @@ await ctx.plugin(chatAgentPlugin, {
 })
 ```
 
-도구 선택은 앱의 조립부가 담당합니다. 이전 `@keundal/chat/tools/agent` 대신 이 패키지를 사용합니다.
+도구 선택은 앱의 조립부가 담당합니다.

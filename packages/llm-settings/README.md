@@ -9,4 +9,4 @@ const settings = defaultLLMSettings()
 const providers = registeredProviders(settings)
 ```
 
-`providerError()`는 화면에 전달할 진단에서 자격 증명을 제거합니다. 브라우저 저장소와 네이티브 보안 저장소는 같은 설정 타입을 사용하고, 각 앱이 저장소 구현을 선택합니다. 이전 `@keundal/chat/llm-settings` 대신 이 패키지를 사용합니다.
+`providerError()`는 화면에 전달할 진단에서 자격 증명을 제거합니다. 브라우저 저장소와 네이티브 보안 저장소는 같은 설정 타입을 사용하고, 각 앱이 저장소 구현을 선택합니다.

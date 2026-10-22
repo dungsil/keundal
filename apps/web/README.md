@@ -74,21 +74,17 @@ pnpm --filter @keundal/web preview
 
 ## 저장소와 실행 경계
 
-- 공급자별 모델 목록 조회는 각 `plugin-llm-*` 패키지의 `listOpenAIModels`·`listAnthropicModels`·`listGeminiModels`가 담당합니다. 웹 앱은 설정 읽기, 모델 별칭, 아이콘, 캐시, 시간제한과 오류 표시를 담당합니다.
-- `@keundal/core`의 `prepareReplayMessages(messages, sourceModel, targetModel)`는 결과 없는 도구 호출과 서명 없는 추론을 제외합니다. 다른 모델로 전송할 때는 추론과 어시스턴트 메타데이터·도구 서명도 제거합니다. 원본 메시지는 변경하지 않습니다. 모델 별칭 정규화는 호출자가 담당합니다.
-- `shared`의 `ChatMessage`·`ChatMessageAssembly`·`ChatStore`는 앱의 표시 형식과 `session.state.web` 저장 정책을 담당합니다. 설정 저장, 첨부 파일 표시, chart/weather 예제 도구와 Nuxt 인증 타입도 앱에 둡니다.
 - 브라우저의 Cordis Context에 `@keundal/plugin-store-indexeddb`와 런타임 설정을 읽는 `llm` 서비스를 등록합니다. `agentPlugin`이 입력 예산 검사·도구 실행·후속 생성을 수행하고, `session`과 `generation`이 대화·실행 journal을 IndexedDB `keundal-web`에 저장합니다.
 - 기존 OpenAI·Anthropic·Gemini 플러그인이 브라우저에서 모델 한도·토큰 계산·스트림을 제공합니다. OpenAI·Anthropic SDK는 명시적인 브라우저 실행 opt-in을 사용합니다. `/api/llm` 프록시는 없으며 서버 DB, D1, R2, NuxtHub도 사용하지 않습니다. 키·URL·헤더는 생성 요청이나 journal에 넣지 않고, 400 오류의 진단 메시지만 위 규칙으로 정제해 전달합니다.
 - 제목·투표·UI 메시지·첨부 이미지는 `session.state.web`에 보관합니다. 정규 AG-UI 대화는 `session.messages`에 저장합니다. 웹 앱은 저장소 내부 API나 독자적인 IndexedDB 테이블을 사용하지 않습니다.
 - `ChatStore.respond()`는 HTTP나 SSE로 변환하지 않고 `AsyncIterable<AGUIEvent>`를 반환합니다. `useKeundalChat()`이 전송·중단·편집·재생성 상태를 관리하며 `ChatMessageAssembly`가 텍스트·추론·도구·출처 이벤트를 앱 소유의 `ChatMessage`로 투영합니다. `RUN_FINISHED`는 표시 메시지까지 저장한 뒤 전달합니다. 기존 `session.state.web` 메시지와 `data-keundal`의 정규 대화는 그대로 읽을 수 있습니다.
-- Nuxt UI는 표시 컴포넌트로만 사용합니다. `.pnpmfile.cjs`는 Nuxt UI의 선택적 `ai` peer를 제거해 잠금 파일과 설치 그래프에 AI SDK가 다시 남지 않게 합니다.
 - 이미지(파일당 최대 8MB)는 data URL로 저장하므로 새로고침 후에도 유지됩니다. 로그인은 필요하지 않습니다. PDF·CSV 등 미지원 형식은 오류로 알립니다.
 - 재접속 시 `generation.recover()`가 저장된 부분 응답을 복원합니다. 미완료 실행은 `interrupted`이며 LLM 재호출·자동 재시도는 하지 않습니다. 마지막 journal 저장 이후의 조각은 유실될 수 있습니다.
 - 데이터는 **현재 브라우저·origin에만** 존재합니다. 브라우저 데이터 삭제·저장소 축출 시 사라질 수 있으며 다른 기기나 로그인 계정으로 동기화되지 않습니다. 공개 링크 공유는 비활성화합니다. 기존 서버 SQLite 데이터는 자동 이전하지 않습니다.
 
 ### 저장소 교체 계약
 
-`ChatStore`는 공개 `SessionService`·`GenerationService`만 사용합니다. 같은 실행 환경에서 저장소 플러그인 등록만 바꾸면 앱/에이전트 로직을 유지할 수 있습니다. 웹 테스트는 동일한 시나리오를 memory·IndexedDB·SQLite에 적용합니다. SQLite는 Node.js 대상이므로 브라우저에서 import하는 방식으로 교체할 수는 없으며, 서버로 배치할 때도 동일 서비스 계약을 사용해야 합니다. 서로 다른 저장소의 데이터 이전은 별도입니다.
+`ChatStore`는 공개 `SessionService`·`GenerationService`만 사용합니다. 같은 실행 환경에서 저장소 플러그인 등록만 바꾸면 앱/에이전트 로직을 유지할 수 있습니다. SQLite는 Node.js 대상이므로 브라우저에서 import하는 방식으로 교체할 수는 없으며, 서버로 배치할 때도 동일 서비스 계약을 사용해야 합니다. 서로 다른 저장소의 데이터 이전은 별도입니다.
 
 - `session.commit()`은 기본적으로 메시지를 병합합니다. 편집·재생성처럼 뒤의 메시지를 제거할 때는 `mode: 'replace'`로 전체 배열(빈 배열 포함)을 교체합니다. revision 검사는 동일합니다.
 - `session.delete(threadId, expectedRevision)`는 스레드·관련 실행·journal을 원자적으로 삭제합니다. 실행 중이면 거부하므로 호출자가 먼저 중단해야 합니다. 영구 tombstone은 남기지 않습니다.
@@ -99,8 +95,6 @@ pnpm --filter @keundal/web preview
 상단의 언어 선택 메뉴에서 **한국어**와 **English**를 전환합니다. 처음 방문하면 브라우저의 선호 언어를 사용하고, 지원하는 언어가 없으면 영어로 표시합니다. 선택한 언어는 `keundal-locale` 쿠키에 1년 동안 저장하며 다음 방문에도 우선 적용합니다.
 
 메뉴, 설정, 알림, 접근성 문구와 날짜 표시는 선택한 언어를 따릅니다. 사용자가 작성한 대화 제목·메시지·스킬과 공급자가 반환한 진단 내용은 번역하지 않습니다. 표시 언어는 모델의 응답 언어를 강제하지 않습니다.
-
-번역 사전은 공통 UI 레이어의 `packages/ui/app/locales/en.ts`와 `ko.ts`에 있습니다. 새 화면 문구는 두 사전에 같은 키로 추가하고 `useLocale().t()`로 표시합니다. 보간 값은 `{name}` 형식을 사용합니다. Nuxt UI의 기본 문구도 앱의 언어 설정에 맞춰 전환합니다.
 
 ## 스킬 관리
 
@@ -114,11 +108,10 @@ pnpm --filter @keundal/web preview
 
 ## 검색·추론·받아쓰기
 
-- Web search는 OpenAI/Anthropic 내장 검색을 사용하고 URL 출처·후속 요청용 검색 블록을 보존합니다. 원본 템플릿과 마찬가지로 Gemini에서는 함수 도구와 검색을 함께 등록하지 않습니다.
+- Web search는 OpenAI/Anthropic 내장 검색을 사용하고 URL 출처·후속 요청용 검색 블록을 보존합니다. Gemini에서는 함수 도구와 검색을 함께 등록하지 않습니다.
 - Extended thinking은 Keundal `reasoning` 옵션으로 전달합니다. 켜면 OpenAI medium·Anthropic thinking 예산·Gemini 3 high를 사용합니다. 끄면 Anthropic disabled·GPT-5 Nano minimal(검색 시 low)·Gemini 3 Flash minimal이며, 후자의 두 모델은 추론을 완전히 끌 수 없습니다.
-- 서명된 추론·검색 블록은 다음 턴에도 유지하고 다른 모델로 전환하면 공급자 전용 상태를 제거합니다. chart/weather 도구를 지원하며 weather는 원본 템플릿의 데모 데이터입니다.
+- 서명된 추론·검색 블록은 다음 턴에도 유지하고 다른 모델로 전환하면 공급자 전용 상태를 제거합니다. chart/weather 도구를 지원하며 weather는 데모 데이터를 사용합니다.
 - 받아쓰기는 브라우저의 OpenAI 설정과 `@keundal/plugin-transcription-openai`로 단기 자격 증명을 직접 발급하고 PCM16 24kHz를 스트리밍합니다. 로그인은 필요하지 않으며 모델은 `gpt-4o-mini-transcribe`입니다. 사용자 지정 OpenAI 주소는 Realtime REST·WebSocket도 지원해야 합니다.
-- 로컬 공급자 fixture로 프로토콜과 취소·도구 후속 요청을 검증합니다. 실제 유료 API의 모델 접근 권한·검색 결과·음성 인식 품질은 별도 확인이 필요합니다.
 
 ## Cloudflare Workers
 
@@ -175,13 +168,6 @@ pnpm --filter @keundal/web test
 pnpm --filter @keundal/web typecheck
 pnpm --filter @keundal/web lint
 ```
-
-웹 테스트는 빌드한 Node.js 프로덕션 서버를 실행하여 홈·대화 경로의 HTTP 200 응답도 확인합니다. 루트 `pnpm test`는 필요한 빌드를 먼저 실행합니다. Zod는 pnpm 저장소의 locale 파일 경로가 런타임 외부 참조로 남지 않도록 Nitro에 번들링합니다.
-
-웹·데스크톱·공유 채팅 소스는 루트 Oxlint 설정으로 검사하며, 각 패키지의 `lint` 명령도 같은 설정을 사용합니다.
-루트 Oxfmt는 기존처럼 이 소스를 재포맷하지 않습니다. Vue 템플릿과 템플릿 내부 Tailwind 클래스는 검사하지 않습니다.
-검사 범위와 실행 환경은 [CI 문서](../../docs/ci.md#린터의-실행-환경)를 참고합니다.
-
 
 ## 선제적 축약
 
