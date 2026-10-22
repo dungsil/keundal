@@ -6,11 +6,12 @@ const items = computed(() => reasoningLevels.value.map(value => ({ label: value,
 
 <template>
   <USelect
+    v-if="reasoningLevels.length"
     v-model="reasoning"
     :items="items"
     :aria-label="t('prompt.reasoningLevel')"
-    :disabled="!reasoningLevels.length"
-    :title="reasoningLevels.length ? t('prompt.reasoningLevel') : t('prompt.unsupported')"
+    :content="{ 'aria-label': t('prompt.reasoningLevel') }"
+    :title="t('prompt.reasoningLevel')"
     icon="i-lucide-brain"
     size="sm"
     color="neutral"
