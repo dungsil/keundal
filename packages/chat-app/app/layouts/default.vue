@@ -129,13 +129,13 @@ defineShortcuts({
           :collapsed="collapsed"
           orientation="vertical"
           :ui="{
-            link: 'overflow-hidden pr-14.5',
+            link: 'overflow-hidden pe-14.5',
             linkTrailing: 'gap-0 ms-0 absolute inset-e-px'
           }"
         >
           <template #chat-trailing="{ item }">
             <span class="inline-flex overflow-hidden">
-              <span class="inline-flex translate-x-full group-hover:translate-x-0 focus-within:translate-x-0 transition-transform">
+              <span class="inline-flex translate-x-full rtl:translate-x-[-100%] group-hover:translate-x-0 focus-within:translate-x-0 transition-transform">
                 <UButton
                   as="div"
                   role="button"
@@ -154,7 +154,7 @@ defineShortcuts({
               </span>
             </span>
             <span class="inline-flex overflow-hidden">
-              <span class="inline-flex translate-x-full group-hover:translate-x-0 focus-within:translate-x-0 transition-transform">
+              <span class="inline-flex translate-x-full rtl:translate-x-[-100%] group-hover:translate-x-0 focus-within:translate-x-0 transition-transform">
                 <UButton
                   as="div"
                   role="button"
@@ -206,7 +206,7 @@ defineShortcuts({
       }, ...groups]"
     />
 
-    <div class="flex-1 flex mt-4 ml-4 lg:ml-0 rounded-tl-lg ring ring-default bg-default/75 shadow-sm min-w-0 overflow-hidden">
+    <div class="flex-1 flex mt-4 ms-4 lg:ms-0 rounded-ss-lg ring ring-default bg-default/75 shadow-sm min-w-0 overflow-hidden">
       <slot />
     </div>
   </UDashboardGroup>
