@@ -1,5 +1,3 @@
 <template>
-  <ClientOnly>
-    <SkillSettings />
-  </ClientOnly>
+  <SkillSettings />
 </template>

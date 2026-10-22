@@ -122,6 +122,10 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(settingsHtml).not.toContain('id="llm-settings-title"')
     const llm = await fetch(new URL('/settings/llm', origin), { headers })
     expect(await llm.text()).toContain('id="llm-settings-title"')
+    const mcp = await fetch(new URL('/settings/mcp', origin), { headers })
+    expect(await mcp.text()).toContain('id="mcp-settings-title"')
+    const skills = await fetch(new URL('/settings/skills', origin), { headers })
+    expect(await skills.text()).toContain('id="skill-settings-title"')
   }))
   for (const [query, target] of [
     ['section=appearance', 'appearance'],
