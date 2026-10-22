@@ -59,8 +59,8 @@ const isZoomable = computed(() => props.type.startsWith('image/') && props.previ
     </div>
 
     <UTooltip v-if="status === 'error'" :text="error">
-      <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-error/50 rounded-lg">
-        <UIcon name="i-lucide-alert-circle" class="size-6 text-white" />
+      <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-error rounded-lg">
+        <UIcon name="i-lucide-alert-circle" class="size-6 text-inverted" />
       </div>
     </UTooltip>
 

@@ -41,11 +41,20 @@
   font-size: calc(100% * var(--ui-scale));
 
   --ui-primary: var(--ui-color-primary-600);
+  /* Nuxt UI 기본값인 500 단계는 흰 배경의 글자와 흰 글자의 배경 모두 4.5:1에 미달한다.
+     soft·subtle 변형의 10% 배경과 bg-elevated 위에서도 4.5:1을 넘는 단계를 색상마다 골랐다. */
+  --ui-success: var(--ui-color-success-800);
+  --ui-warning: var(--ui-color-warning-800);
+  --ui-error: var(--ui-color-error-700);
   --ui-container: var(--container-3xl);
 }
 
 .dark {
   --ui-primary: var(--ui-color-primary-400);
+  --ui-success: var(--ui-color-success-400);
+  --ui-warning: var(--ui-color-warning-400);
+  /* 400 단계는 soft 변형의 10% 배경 위에서 4.5:1에 미달한다. */
+  --ui-error: var(--ui-color-error-300);
 }
 
 html.dark .shiki span {

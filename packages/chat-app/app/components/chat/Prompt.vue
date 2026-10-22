@@ -184,7 +184,7 @@ function appendTranscript(text: string) {
           role="option"
           tabindex="-1"
           :aria-selected="index === selected"
-          class="flex min-h-11 w-full cursor-pointer items-start gap-3 rounded-md px-3 py-2 text-left"
+          class="group flex min-h-11 w-full cursor-pointer items-start gap-3 rounded-md px-3 py-2 text-left"
           :class="index === selected ? 'bg-elevated' : 'hover:bg-elevated/50'"
           @pointermove="selected = index"
           @mousedown.prevent
@@ -193,9 +193,9 @@ function appendTranscript(text: string) {
           <UIcon :name="command.kind === 'skill' ? 'i-lucide-book-open' : 'i-lucide-plug'" class="mt-0.5 size-4 shrink-0 text-muted" />
           <span class="min-w-0 flex-1">
             <span class="block truncate text-sm font-medium text-highlighted">/{{ command.name }}</span>
-            <span class="line-clamp-2 block text-xs text-muted">{{ command.description }}</span>
+            <span class="line-clamp-2 block text-xs text-muted group-aria-selected:text-toned">{{ command.description }}</span>
           </span>
-          <span class="shrink-0 text-xs text-muted">{{ command.kind === 'skill' ? t('skill.title') : 'MCP' }}</span>
+          <span class="shrink-0 text-xs text-muted group-aria-selected:text-toned">{{ command.kind === 'skill' ? t('skill.title') : 'MCP' }}</span>
         </button>
       </div>
     </div>
