@@ -75,7 +75,7 @@ export async function createAgentRuntime(
   const provider = (env.KEUNDAL_PROVIDER ||
     (env.OPENAI_API_KEY ? 'openai' : env.GEMINI_API_KEY ? 'gemini' : 'anthropic')) as AgentHostProvider
   const apiKey =
-    provider === 'openai'
+    provider === 'openai' || provider === 'openai-chat'
       ? env.OPENAI_API_KEY
       : provider === 'gemini'
         ? env.GEMINI_API_KEY

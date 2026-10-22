@@ -10,6 +10,7 @@ import agentPlugin from '@keundal/plugin-agent-chat'
 import anthropic from '@keundal/plugin-llm-anthropic'
 import gemini from '@keundal/plugin-llm-gemini'
 import openai from '@keundal/plugin-llm-openai'
+import openaiChat from '@keundal/plugin-llm-openai-chat'
 import { McpClient } from '@keundal/plugin-mcp-client'
 import { loadRuntimePlugins, parseRuntimePluginManifest, type RuntimePluginManifest } from '@keundal/plugin-runtime'
 import skillPlugin from '@keundal/plugin-skill'
@@ -20,7 +21,7 @@ import { resolve as resolveModule } from 'import-meta-resolve'
 
 import type { HostCompositionFactory, NodeHostOptions } from './index.js'
 
-const providerPlugins = { openai, anthropic, gemini }
+const providerPlugins = { openai, 'openai-chat': openaiChat, anthropic, gemini }
 
 interface LoadedNodePlugins {
   setup(ctx: Context): Promise<void>
@@ -212,7 +213,9 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       return runtime.mountAgent(ctx, {
         ...config,
         reasoning:
-          hasBuiltinLlm && builtinLlmProvider === 'openai' && !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.model)
+          hasBuiltinLlm &&
+          (builtinLlmProvider === 'openai' || builtinLlmProvider === 'openai-chat') &&
+          !/^(gpt-5|o\d)(?:[-.]|$)/.test(config.model)
             ? undefined
             : config.reasoning
       })

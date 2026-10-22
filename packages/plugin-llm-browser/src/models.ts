@@ -5,6 +5,7 @@ import {
   LLM_PROVIDERS,
   providerCredentials,
   providerError,
+  providerIcon,
   providerType,
   type LLMSettings
 } from '@keundal/llm-settings'
@@ -13,6 +14,7 @@ import { z } from 'zod'
 export const MODEL_CACHE_TTL = 60 * 60 * 1000
 const modelLoaders = {
   openai: () => import('@keundal/plugin-llm-openai').then((module) => module.listOpenAIModels),
+  'openai-chat': () => import('@keundal/plugin-llm-openai-chat').then((module) => module.listOpenAIChatModels),
   anthropic: () => import('@keundal/plugin-llm-anthropic').then((module) => module.listAnthropicModels),
   google: () => import('@keundal/plugin-llm-gemini').then((module) => module.listGeminiModels)
 }
@@ -79,7 +81,7 @@ export async function loadModels(
         provider.includes('@') || settings[provider]?.name
           ? `${model.name} · ${settings[provider]!.name || provider}`
           : model.name,
-      icon: `i-simple-icons-${providerType(provider)}`,
+      icon: providerIcon(provider),
       contextWindow: model.contextWindow,
       maxOutputTokens: model.maxOutputTokens
     }))
