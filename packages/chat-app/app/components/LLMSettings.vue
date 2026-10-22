@@ -99,11 +99,15 @@ async function save(forget = false) {
       if (rows.some(row => !row.key)) {
         provider.value = item.id
         error.value = t('llm.headerKeyRequired')
+        await nextTick()
+        document.getElementById(headerRows.value[item.id]!.find(row => !row.key.trim())!.id)?.focus()
         return
       }
       if (new Set(rows.map(row => row.key.toLowerCase())).size !== rows.length) {
         provider.value = item.id
         error.value = t('llm.duplicateHeaders')
+        await nextTick()
+        document.getElementById(headerRows.value[item.id]!.find(row => row.key.trim())!.id)?.focus()
         return
       }
       draft.value[item.id]!.headers = Object.fromEntries(rows.map(row => [row.key, row.value]))
@@ -120,6 +124,9 @@ async function save(forget = false) {
                 ? 'llm.invalidURL'
                 : 'llm.invalidHeaders'
         )
+        await nextTick()
+        const inputId = field === 'name' ? 'llm-provider-name' : field === 'apiKey' ? 'llm-api-key' : 'llm-base-url'
+        document.getElementById(inputId)?.focus()
         return
       }
       next[item.id] = parsed.data
@@ -187,18 +194,20 @@ async function save(forget = false) {
     <UModal v-model:open="adding" :title="t('llm.addProvider')">
       <template #body>
         <form class="space-y-4" @submit.prevent="addProvider">
-          <UFormField :label="t('llm.providerType')">
+          <UFormField :label="t('llm.providerType')" name="providerType">
             <USelect
               v-model="newType"
+              name="providerType"
               :items="[...LLM_PROVIDERS]"
               value-key="id"
               label-key="label"
               class="w-full"
             />
           </UFormField>
-          <UFormField :label="t('llm.providerName')">
+          <UFormField :label="t('llm.providerName')" name="providerName">
             <UInput
               v-model="newName"
+              name="providerName"
               :maxlength="100"
               :placeholder="LLM_PROVIDERS.find(item => item.id === newType)?.label"
               class="w-full"
@@ -228,6 +237,7 @@ async function save(forget = false) {
       </h3>
       <UFormField :label="t('llm.providerName')" name="providerName">
         <UInput
+          id="llm-provider-name"
           v-model="currentDraft.name"
           :placeholder="current.label"
           :maxlength="100"
@@ -240,6 +250,7 @@ async function save(forget = false) {
       </p>
       <UFormField :label="t('llm.apiKey')" name="apiKey">
         <UInput
+          id="llm-api-key"
           v-model="currentDraft.apiKey"
           type="password"
           autocomplete="off"
@@ -252,6 +263,7 @@ async function save(forget = false) {
       </UFormField>
       <UFormField :label="t('llm.baseURL')" name="baseURL" :description="t('llm.baseURLDescription')">
         <UInput
+          id="llm-base-url"
           v-model="currentDraft.baseURL"
           :placeholder="current.baseURL"
           type="url"

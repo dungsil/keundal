@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { usePreferredReducedMotion } from '@vueuse/core'
+
+const reducedMotion = usePreferredReducedMotion()
 const size = 4
 const gap = 2
 const totalDots = size * size
@@ -41,8 +44,11 @@ function nextStep() {
 let matrixInterval: ReturnType<typeof setInterval> | undefined
 
 onMounted(() => {
-  nextStep()
-  matrixInterval = setInterval(nextStep, 120)
+  watch(reducedMotion, (preference) => {
+    clearInterval(matrixInterval)
+    nextStep()
+    if (preference === 'no-preference') matrixInterval = setInterval(nextStep, 120)
+  }, { immediate: true })
 })
 
 onUnmounted(() => {
@@ -53,6 +59,7 @@ onUnmounted(() => {
 <template>
   <div
     class="shrink-0 grid size-4"
+    aria-hidden="true"
     :style="{
       gridTemplateColumns: `repeat(${size}, 1fr)`,
       gap: `${gap}px`
@@ -61,7 +68,7 @@ onUnmounted(() => {
     <span
       v-for="i in totalDots"
       :key="i"
-      class="rounded-sm bg-current transition-opacity duration-100"
+      class="rounded-sm bg-current motion-safe:transition-opacity duration-100"
       :class="activeDots.has(i - 1) ? 'opacity-100' : 'opacity-20'"
     />
   </div>

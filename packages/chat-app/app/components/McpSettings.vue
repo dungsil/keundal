@@ -100,6 +100,7 @@ async function save() {
           <span class="grow">{{ server.serverName }} <span class="text-sm text-muted">{{ server.transport }}</span></span>
           <UButton
             :label="t('mcp.edit')"
+            :aria-label="`${t('mcp.edit')} ${server.serverName}`"
             color="neutral"
             variant="soft"
             :disabled="saving"
@@ -107,6 +108,7 @@ async function save() {
           />
           <UButton
             :label="t('mcp.remove')"
+            :aria-label="`${t('mcp.remove')} ${server.serverName}`"
             color="error"
             variant="soft"
             :disabled="saving"
@@ -115,7 +117,7 @@ async function save() {
         </li>
       </ul>
       <form class="space-y-4" @submit.prevent="save">
-        <UFormField :label="t('mcp.name')" required>
+        <UFormField :label="t('mcp.name')" name="serverName" required>
           <UInput
             v-model="name"
             required
@@ -124,10 +126,10 @@ async function save() {
             :disabled="saving"
           />
         </UFormField>
-        <UFormField :label="t('mcp.transport')">
+        <UFormField :label="t('mcp.transport')" name="transport">
           <USelect v-model="transport" :items="transportItems" :disabled="saving" />
         </UFormField>
-        <UFormField :label="t(transport === 'stdio' ? 'mcp.command' : 'mcp.url')" required>
+        <UFormField :label="t(transport === 'stdio' ? 'mcp.command' : 'mcp.url')" name="address" required>
           <UInput
             v-model="address"
             required
@@ -143,14 +145,14 @@ async function save() {
           :disabled="saving"
         />
         <template v-if="transport === 'stdio'">
-          <UFormField :label="t('mcp.args')">
+          <UFormField :label="t('mcp.args')" name="args">
             <UTextarea v-model="args" class="w-full" :disabled="saving" />
           </UFormField>
-          <UFormField :label="t('mcp.cwd')">
+          <UFormField :label="t('mcp.cwd')" name="cwd">
             <UInput v-model="cwd" class="w-full" :disabled="saving" />
           </UFormField>
         </template>
-        <UFormField :label="t(transport === 'stdio' ? 'mcp.env' : 'mcp.headers')">
+        <UFormField :label="t(transport === 'stdio' ? 'mcp.env' : 'mcp.headers')" name="credentials">
           <UTextarea
             v-model="credentials"
             class="w-full"
@@ -158,13 +160,13 @@ async function save() {
             autocomplete="off"
           />
         </UFormField>
-        <UFormField :label="t('mcp.tools')" :description="t('mcp.permissions')">
+        <UFormField :label="t('mcp.tools')" name="tools" :description="t('mcp.permissions')">
           <UTextarea v-model="tools" class="w-full" :disabled="saving" />
         </UFormField>
-        <UFormField :label="t('mcp.resources')" :description="t('mcp.permissions')">
+        <UFormField :label="t('mcp.resources')" name="resources" :description="t('mcp.permissions')">
           <UTextarea v-model="resources" class="w-full" :disabled="saving" />
         </UFormField>
-        <UFormField :label="t('mcp.timeout')">
+        <UFormField :label="t('mcp.timeout')" name="timeoutMs">
           <UInput
             v-model.number="timeoutMs"
             type="number"
@@ -173,8 +175,8 @@ async function save() {
             :disabled="saving"
           />
         </UFormField>
-        <UAlert v-if="error" color="error" :title="error" />
-        <UAlert v-if="success" color="success" :title="t('mcp.saved')" />
+        <UAlert v-if="error" color="error" :title="error" role="alert" />
+        <UAlert v-if="success" color="success" :title="t('mcp.saved')" role="status" />
         <div class="flex gap-2">
           <UButton type="submit" :label="t(editing === null ? 'mcp.add' : 'mcp.save')" :loading="saving" />
           <UButton

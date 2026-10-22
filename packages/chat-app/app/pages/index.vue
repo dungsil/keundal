@@ -3,6 +3,7 @@ import type { ChatMessage } from '@keundal/chat/chat-message'
 import { getGreetingTime } from '../utils/greeting'
 
 const { t } = useLocale()
+useHead(() => ({ title: t('chat.new') }))
 
 if (import.meta.client) {
   document.documentElement.dataset.greetingTime = getGreetingTime()
@@ -91,7 +92,7 @@ const quickChats = computed(() => [
   <UDashboardPanel
     id="home"
     class="min-h-0"
-    :ui="{ body: 'p-0 sm:p-0' }"
+    :ui="{ body: 'px-0 pb-0 pt-(--ui-header-height) sm:px-0 sm:pb-0 sm:pt-(--ui-header-height) scroll-pt-(--ui-header-height)' }"
   >
     <template #header>
       <Navbar />

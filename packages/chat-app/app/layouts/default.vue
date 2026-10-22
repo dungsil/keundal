@@ -8,6 +8,13 @@ const isSettings = computed(() => route.path === '/settings' || route.path.start
 const sidebarOpen = ref(false)
 const searchOpen = ref(false)
 const { $chatStore } = useNuxtApp()
+const mainContent = useTemplateRef('mainContent')
+const removePageHook = useNuxtApp().hook('page:finish', async () => {
+  sidebarOpen.value = false
+  await nextTick()
+  mainContent.value?.focus()
+})
+onUnmounted(removePageHook)
 
 const { data: chats, status: chatsStatus } = await useAsyncData('chats', () => $chatStore.list(), {
   server: false,
@@ -31,18 +38,6 @@ const localizedChats = computed(() => chats.value?.map(chat => ({
 })))
 const { groups } = useChats(localizedChats)
 
-const items = computed(() => groups.value?.flatMap((group) => {
-  return [{
-    label: group.label,
-    type: 'label' as const
-  }, ...group.items.map(item => ({
-    ...item,
-    slot: 'chat' as const,
-    icon: undefined,
-    class: item.untitled ? 'text-muted' : ''
-  }))]
-}))
-
 defineShortcuts({
   meta_o: () => {
     navigateTo('/')
@@ -51,9 +46,14 @@ defineShortcuts({
 </script>
 
 <template>
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-default focus:p-3" @click.prevent="mainContent?.focus()">
+    {{ t('navigation.skipToContent') }}
+  </a>
   <UDashboardGroup unit="rem">
     <UDashboardSidebar
       id="default"
+      role="complementary"
+      :aria-label="t('navigation.chats')"
       v-model:open="sidebarOpen"
       :min-size="12"
       collapsible
@@ -76,13 +76,16 @@ defineShortcuts({
 
       <template #default="{ collapsed }">
         <UNavigationMenu
+          :aria-label="t('chat.actions')"
           :items="[{
             label: t('chat.new'),
+            'aria-label': collapsed ? t('chat.new') : undefined,
             to: '/',
             kbds: ['meta', 'o'],
             icon: 'i-lucide-circle-plus'
           }, {
             label: t('chat.search'),
+            'aria-label': collapsed ? t('chat.search') : undefined,
             icon: 'i-lucide-search',
             kbds: ['meta', 'k'],
             onSelect: () => {
@@ -123,57 +126,43 @@ defineShortcuts({
           </div>
         </div>
 
-        <UNavigationMenu
-          v-else-if="!collapsed"
-          :items="items"
-          :collapsed="collapsed"
-          orientation="vertical"
-          :ui="{
-            link: 'overflow-hidden pr-14.5',
-            linkTrailing: 'gap-0 ms-0 absolute inset-e-px'
-          }"
-        >
-          <template #chat-trailing="{ item }">
-            <span class="inline-flex overflow-hidden">
-              <span class="inline-flex translate-x-full group-hover:translate-x-0 focus-within:translate-x-0 transition-transform">
-                <UButton
-                  as="div"
-                  role="button"
-                  icon="i-lucide-pencil"
-                  color="neutral"
-                  variant="link"
-                  size="sm"
-                  class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50"
-                  :aria-label="t('common.rename')"
-                  :title="t('common.rename')"
-                  tabindex="0"
-                  @click.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
-                  @keydown.enter.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
-                  @keydown.space.stop.prevent="renameChat(item.id as string, item.untitled ? '' : item.label)"
-                />
-              </span>
-            </span>
-            <span class="inline-flex overflow-hidden">
-              <span class="inline-flex translate-x-full group-hover:translate-x-0 focus-within:translate-x-0 transition-transform">
-                <UButton
-                  as="div"
-                  role="button"
-                  icon="i-lucide-trash"
-                  color="neutral"
-                  variant="link"
-                  size="sm"
-                  class="rounded-[5px] hover:bg-accented/50 focus-visible:bg-accented/50"
-                  :aria-label="t('common.delete')"
-                  :title="t('common.delete')"
-                  tabindex="0"
-                  @click.stop.prevent="deleteChat(item.id as string)"
-                  @keydown.enter.stop.prevent="deleteChat(item.id as string)"
-                  @keydown.space.stop.prevent="deleteChat(item.id as string)"
-                />
-              </span>
-            </span>
-          </template>
-        </UNavigationMenu>
+        <nav v-else-if="!collapsed" :aria-label="t('navigation.chats')" class="space-y-1.5">
+          <div v-for="group in groups" :key="group.id">
+            <h2 class="px-2.5 py-1.5 text-xs font-semibold text-highlighted">{{ group.label }}</h2>
+            <ul class="space-y-1">
+              <li v-for="item in group.items" :key="item.id" class="group flex min-w-0 items-center rounded-md hover:bg-elevated/50 focus-within:bg-elevated/50">
+                <NuxtLink
+                  :to="`/chat/${item.id}`"
+                  class="min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 text-sm"
+                  :class="item.untitled ? 'text-muted' : 'text-default'"
+                  active-class="bg-elevated text-highlighted"
+                >{{ item.label }}</NuxtLink>
+                <div class="flex shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+                  <UButton
+                    icon="i-lucide-pencil"
+                    color="neutral"
+                    variant="link"
+                    size="sm"
+                    class="rounded-[5px] hover:bg-accented/50"
+                    :aria-label="`${t('common.rename')}: ${item.label}`"
+                    :title="t('common.rename')"
+                    @click="renameChat(item.id, item.untitled ? '' : item.label)"
+                  />
+                  <UButton
+                    icon="i-lucide-trash"
+                    color="neutral"
+                    variant="link"
+                    size="sm"
+                    class="rounded-[5px] hover:bg-accented/50"
+                    :aria-label="`${t('common.delete')}: ${item.label}`"
+                    :title="t('common.delete')"
+                    @click="deleteChat(item.id)"
+                  />
+                </div>
+              </li>
+            </ul>
+          </div>
+        </nav>
       </template>
 
       <template #footer="{ collapsed }">
@@ -206,8 +195,8 @@ defineShortcuts({
       }, ...groups]"
     />
 
-    <div class="flex-1 flex mt-4 ml-4 lg:ml-0 rounded-tl-lg ring ring-default bg-default/75 shadow-sm min-w-0 overflow-hidden">
+    <main id="main-content" ref="mainContent" tabindex="-1" class="flex-1 flex mt-4 ml-4 lg:ml-0 rounded-tl-lg ring ring-default bg-default/75 shadow-sm min-w-0 overflow-hidden">
       <slot />
-    </div>
+    </main>
   </UDashboardGroup>
 </template>

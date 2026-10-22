@@ -106,7 +106,7 @@ const message = computed(() => {
         <UIcon
           :name="icon"
           class="size-8 mx-auto mb-2"
-          :class="[invocation.state === 'input-streaming' && 'animate-spin']"
+          :class="[invocation.state === 'input-streaming' && 'motion-safe:animate-spin']"
         />
         <div class="text-sm">
           {{ message }}
