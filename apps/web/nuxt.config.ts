@@ -18,6 +18,12 @@ export default defineNuxtConfig({
     experimental: { openAPI: true }
   },
   hooks: {
+    // 대기열 표시 상태를 확인하는 화면은 개발 중에만 등록한다.
+    'pages:extend'(pages) {
+      if (process.env.NODE_ENV === 'development') return
+      const index = pages.findIndex(page => page.path === '/break-queue')
+      if (index >= 0) pages.splice(index, 1)
+    },
     'build:manifest'(manifest) {
       // Load optional provider SDKs through their dynamic imports when needed.
       for (const entry of Object.values(manifest)) {
