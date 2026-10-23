@@ -47,7 +47,7 @@ describe('인용 링크의 URL 검증', () => {
     expect(urls.getCitationUrl(url)).toBeUndefined()
     expect(sourceToInlineMdc(url)).toBe('')
     const inline = await render(SourceLink, { url, label: '출처', favicon: '' })
-    expect(inline).toContain('<span>출처</span>')
+    expect(inline).toContain('<span class="break-words">출처</span>')
     expect(inline).not.toContain('<a')
     const list = await render(Sources, { sources: [{ url, title: '출처' }] })
     expect(list).not.toContain('href=')

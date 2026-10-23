@@ -36,13 +36,13 @@ const message = computed(() => {
 <template>
   <div class="rounded-xl px-5 py-4 my-5" :class="color">
     <template v-if="invocation.state === 'output-available'">
-      <div class="flex items-start justify-between mb-3">
-        <div class="flex items-baseline">
+      <div class="flex items-start justify-between gap-3 mb-3">
+        <div class="flex items-baseline shrink-0">
           <span class="text-4xl font-bold">{{ invocation.output.temperature }}°</span>
           <span class="text-base text-white/80">C</span>
         </div>
-        <div class="text-right">
-          <div class="text-base font-medium mb-1">
+        <div class="text-right min-w-0">
+          <div class="text-base font-medium mb-1 wrap-anywhere">
             {{ invocation.output.location }}
           </div>
           <div class="text-xs text-white/70">
@@ -51,33 +51,33 @@ const message = computed(() => {
         </div>
       </div>
 
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-2">
-          <UIcon :name="invocation.output.condition.icon" class="size-6 text-white" />
-          <div class="text-sm font-medium">
+      <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-4">
+        <div class="flex items-center gap-2 min-w-0">
+          <UIcon :name="invocation.output.condition.icon" class="size-6 shrink-0 text-white" />
+          <div class="text-sm font-medium min-w-0 wrap-anywhere">
             {{ invocation.output.condition.text }}
           </div>
         </div>
 
-        <div class="flex gap-3 text-xs">
-          <div class="flex items-center gap-1">
+        <div class="flex gap-3 text-xs shrink-0 whitespace-nowrap ml-auto">
+          <div v-if="invocation.output.humidity != null" class="flex items-center gap-1">
             <UIcon name="i-lucide-droplets" class="size-3 text-blue-200" />
             <span>{{ invocation.output.humidity }}%</span>
           </div>
-          <div class="flex items-center gap-1">
+          <div v-if="invocation.output.windSpeed != null" class="flex items-center gap-1">
             <UIcon name="i-lucide-wind" class="size-3 text-blue-200" />
             <span>{{ invocation.output.windSpeed }} km/h</span>
           </div>
         </div>
       </div>
 
-      <div v-if="invocation.output.dailyForecast.length > 0" class="flex items-center justify-between">
+      <div v-if="invocation.output.dailyForecast.length > 0" class="flex items-center justify-between gap-2 overflow-x-auto">
         <div
           v-for="(forecast, index) in invocation.output.dailyForecast"
           :key="index"
-          class="flex flex-col items-center gap-1.5"
+          class="flex flex-col items-center gap-1.5 shrink-0 max-w-20"
         >
-          <div class="text-xs text-white/70 font-medium">
+          <div class="text-xs text-white/70 font-medium text-center wrap-anywhere max-w-full">
             {{ forecast.day }}
           </div>
 

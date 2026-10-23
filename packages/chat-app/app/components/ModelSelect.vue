@@ -10,15 +10,17 @@ const { selectedModel, models, loading, switching, error, refresh } = useModels(
     :items="models"
     :aria-label="`${t('model.select')}: ${models.find(m => m.value === selectedModel)?.label || selectedModel}`"
     :loading="loading"
+    :aria-busy="loading"
     :disabled="switching"
     size="sm"
     :icon="models.find((m) => m.value === selectedModel)?.icon"
     color="neutral"
     variant="ghost"
     value-key="value"
-    class="data-[state=open]:bg-elevated"
+    class="max-w-full data-[state=open]:bg-elevated"
     :ui="{
       content: 'w-80 max-w-[calc(100vw-2rem)]',
+      itemLabel: 'text-clip whitespace-normal wrap-anywhere',
       trailingIcon: 'group-data-[state=open]:rotate-180 motion-safe:transition-transform duration-200'
     }"
     @update:open="
@@ -29,7 +31,7 @@ const { selectedModel, models, loading, switching, error, refresh } = useModels(
   >
     <template #content-bottom>
       <div class="border-t border-default p-2 space-y-2 max-w-80">
-        <p v-if="error" role="alert" class="text-xs text-error break-words">
+        <p v-if="error" role="alert" tabindex="0" class="max-h-10 overflow-y-auto text-xs text-error break-words">
           {{ error }}
         </p>
         <p class="text-xs text-muted">

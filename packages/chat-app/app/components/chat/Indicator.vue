@@ -47,7 +47,7 @@ function startPattern() {
   clearInterval(matrixInterval)
   matrixInterval = undefined
   // 감축 모션을 선호하면 움직이지 않는 상태로 둔다.
-  if (reducedMotion.value) return
+  if (reducedMotion.value === 'reduce') return
 
   nextStep()
   matrixInterval = setInterval(nextStep, 120)

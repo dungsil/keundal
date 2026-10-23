@@ -132,6 +132,7 @@ export default {
   'file.imagesOnly': 'Keundal currently supports image attachments only',
   'file.tooLarge': 'File exceeds 8MB',
   'file.failed': 'Upload failed',
+  'file.uploading': 'Uploading',
   'model.select': 'Select model',
   'model.defaultTitle': 'Model settings',
   'model.defaultLabel': 'Chat model',

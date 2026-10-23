@@ -9,6 +9,7 @@ const plugins = ref<AgentPluginInfo[]>([])
 const error = ref('')
 const busy = ref(false)
 const input = ref<HTMLInputElement | null>(null)
+const permissionsForm = ref<HTMLFormElement | null>(null)
 const selected = ref<AgentPluginInfo | null>(null)
 const deleting = ref<string | null>(null)
 const scopes = ref<Record<string, { tools: string, resources: string }>>({})
@@ -49,12 +50,19 @@ async function cancelDelete(name: string) {
   await nextTick()
   document.getElementById(`plugin-delete-${encodeURIComponent(name)}`)?.focus()
 }
-function edit(plugin: AgentPluginInfo) {
+async function edit(plugin: AgentPluginInfo) {
   selected.value = plugin
   scopes.value = Object.fromEntries(plugin.servers.map(server => [server.name, {
     tools: text(plugin.permissions[server.name]?.tools),
     resources: text(plugin.permissions[server.name]?.resources)
   }]))
+  await nextTick()
+  permissionsForm.value?.querySelector('textarea')?.focus()
+}
+async function closeEdit(name: string) {
+  selected.value = null
+  await nextTick()
+  document.getElementById(`plugin-permissions-${encodeURIComponent(name)}`)?.focus()
 }
 async function savePermissions() {
   const plugin = selected.value!
@@ -67,6 +75,7 @@ async function savePermissions() {
     }, stop)
     selected.value = null
   })
+  if (!selected.value) await closeEdit(plugin.name)
 }
 </script>
 
@@ -135,7 +144,7 @@ async function savePermissions() {
               @update:model-value="run(() => manager!.configure(plugin.name, { enabled: $event, permissions: plugin.permissions }, stop))"
             />
           </div>
-          <p class="text-sm text-muted">
+          <p class="text-sm text-muted break-words">
             {{ t('plugin.skills') }}: {{ plugin.skills.join(', ') || t('plugin.none') }}
           </p>
           <div v-if="plugin.servers.length" class="space-y-2">
@@ -146,6 +155,7 @@ async function savePermissions() {
               {{ server.name }} · {{ server.url }}
             </p>
             <UButton
+              :id="`plugin-permissions-${encodeURIComponent(plugin.name)}`"
               :label="t('plugin.permissions')"
               :aria-label="`${t('plugin.permissions')} ${plugin.name}`"
               color="neutral"
@@ -161,6 +171,7 @@ async function savePermissions() {
             variant="subtle"
             :title="[diagnostic.component, diagnostic.entry].filter(Boolean).join(' · ')"
             :description="diagnostic.message"
+            :ui="{ title: 'break-words', description: 'break-words' }"
           />
           <div v-if="deleting === plugin.name" class="flex flex-wrap items-center gap-3">
             <p class="text-sm">
@@ -195,15 +206,15 @@ async function savePermissions() {
           />
         </li>
       </ul>
-      <form v-if="selected" class="space-y-4 rounded-lg border border-default p-4" @submit.prevent="savePermissions">
-        <h3 class="font-semibold">
+      <form v-if="selected" ref="permissionsForm" class="space-y-4 rounded-lg border border-default p-4" @submit.prevent="savePermissions">
+        <h3 class="font-semibold break-words">
           {{ selected.name }} · {{ t('plugin.permissions') }}
         </h3>
         <p class="text-sm text-muted">
           {{ t('mcp.permissions') }}
         </p>
-        <fieldset v-for="server in selected.servers" :key="server.name" class="space-y-3">
-          <legend class="mb-2 text-sm font-medium">
+        <fieldset v-for="server in selected.servers" :key="server.name" class="min-w-0 space-y-3">
+          <legend class="mb-2 w-full text-sm font-medium break-words">
             {{ server.name }}
           </legend>
           <UFormField :label="t('mcp.tools')" :name="`${server.name}-tools`">
@@ -220,7 +231,7 @@ async function savePermissions() {
             color="neutral"
             variant="ghost"
             :disabled="busy"
-            @click="selected = null"
+            @click="closeEdit(selected.name)"
           />
         </div>
       </form>
