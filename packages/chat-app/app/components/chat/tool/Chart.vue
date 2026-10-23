@@ -71,7 +71,7 @@ const formatValue = (value: string | number | undefined): string => {
       </div>
     </div>
 
-    <div class="relative overflow-hidden">
+    <div class="relative overflow-hidden [&_[data-vis-bullet-legend]]:flex-wrap">
       <div class="dot-pattern h-full -top-5 left-0 right-0" />
 
       <LineChart
