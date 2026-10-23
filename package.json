@@ -33,10 +33,10 @@
   "lint-staged": {
     "**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue}": [
       "oxlint --fix --no-error-on-unmatched-pattern",
-      "oxfmt"
+      "oxfmt --no-error-on-unmatched-pattern"
     ],
     "**/*.{json,jsonc}": [
-      "oxfmt"
+      "oxfmt --no-error-on-unmatched-pattern"
     ]
   },
   "devEngines": {
