@@ -81,8 +81,8 @@ const items = computed<DropdownMenuItem[][]>(() => [
       <span dir="auto" class="truncate">{{ displayTitle }}</span>
     </UButton>
 
-    <template #title-label="{ item }">
-      <span dir="auto" class="block whitespace-pre-wrap [overflow-wrap:anywhere]">{{ item.label }}</span>
+    <template #title-label>
+      <span dir="auto" class="block whitespace-pre-wrap [overflow-wrap:anywhere]">{{ displayTitle }}</span>
     </template>
   </UDropdownMenu>
 </template>
