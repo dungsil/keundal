@@ -31,6 +31,9 @@ jobs:
         with:
           filters: |
             ui:
+              - 'tools/lighthouse/**'
+              - '.github/workflows/lighthouse.yml'
+              - 'pnpm-lock.yaml'
               - 'apps/web/app/**'
               - 'apps/web/public/**'
               - 'apps/web/shared/**'
@@ -175,7 +178,7 @@ jobs:
       - name: 점수 기준 확인
         if: steps.summary.outputs.result != 'passed'
         run: |
-          echo '::error::70점 이하인 Lighthouse 항목이 있습니다. 작업 요약을 확인하세요.'
+          echo '::error::Lighthouse 점수 또는 CLS 예산을 초과한 항목이 있습니다. 작업 요약을 확인하세요.'
           exit 1
 
   lighthouse-gate:

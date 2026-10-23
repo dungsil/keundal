@@ -42,13 +42,40 @@ const errorMessage = (error: unknown): string => {
 
 const SSE_HEADERS = {
   'content-type': 'text/event-stream',
-  'cache-control': 'no-cache',
+  'cache-control': 'private, no-store',
   connection: 'keep-alive'
 } as const
 
 const sendJson = (response: ServerResponse, status: number, body: unknown): void => {
-  response.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
+  response.writeHead(status, {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'private, no-store'
+  })
   response.end(JSON.stringify(body))
+}
+
+// Summary projections contain only explicitly requested scalar leaves, never object subtrees.
+function projectScalarState(state: unknown, fields: string[]): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  for (const field of fields) {
+    const parts = field.split('.')
+    let value: unknown = state
+    for (const part of parts) {
+      if (!value || typeof value !== 'object' || Array.isArray(value) || !Object.hasOwn(value, part)) {
+        value = undefined
+        break
+      }
+      value = (value as Record<string, unknown>)[part]
+    }
+    if (value !== null && !['string', 'number', 'boolean'].includes(typeof value)) continue
+    let target = result
+    for (const part of parts.slice(0, -1)) {
+      if (!target[part] || typeof target[part] !== 'object') target[part] = {}
+      target = target[part] as Record<string, unknown>
+    }
+    target[parts.at(-1)!] = value
+  }
+  return result
 }
 
 const readBody = async (request: IncomingMessage, maxBytes: number): Promise<string> => {
@@ -212,6 +239,7 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
   }
 
   async function requestListener(request: IncomingMessage, response: ServerResponse) {
+    response.setHeader('cache-control', 'private, no-store')
     try {
       const origin = request.headers.origin
       const allowedOrigin = origin && allowedOrigins.has(origin) ? origin : undefined
@@ -364,7 +392,38 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
       }
 
       if (request.method === 'GET' && segments[0] === 'threads') {
-        if (segments.length === 1) return sendJson(response, 200, await services.session.list())
+        if (segments.length === 1) {
+          const view = url.searchParams.get('view')
+          if (view !== null && view !== 'summary') return sendJson(response, 400, { error: 'invalid view' })
+          const fields = (url.searchParams.get('stateFields') ?? '').split(',').filter(Boolean)
+          if (
+            view === 'summary' &&
+            (fields.length > 16 ||
+              fields.some(
+                (field) =>
+                  field.length > 160 ||
+                  !field
+                    .split('.')
+                    .every(
+                      (part) =>
+                        /^[A-Za-z][A-Za-z0-9_]*$/.test(part) &&
+                        !['__proto__', 'prototype', 'constructor'].includes(part)
+                    )
+              ))
+          )
+            return sendJson(response, 400, { error: 'invalid stateFields' })
+          const snapshots = await services.session.list()
+          if (view !== 'summary') return sendJson(response, 200, snapshots)
+          return sendJson(
+            response,
+            200,
+            snapshots.map((snapshot) => ({
+              threadId: snapshot.threadId,
+              revision: snapshot.revision,
+              state: projectScalarState(snapshot.state, fields)
+            }))
+          )
+        }
         const snapshot = await services.session.get(segments[1])
         if (!snapshot) return sendJson(response, 404, { error: `thread not found: ${segments[1]}` })
         return sendJson(response, 200, snapshot)

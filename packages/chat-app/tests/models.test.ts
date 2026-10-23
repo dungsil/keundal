@@ -4,7 +4,7 @@ import { listGeminiModels } from '@keundal/plugin-llm-gemini'
 import { listOpenAIModels } from '@keundal/plugin-llm-openai'
 import { listOpenAIChatModels } from '@keundal/plugin-llm-openai-chat'
 import { expect, test, onTestFinished, vi } from 'vitest'
-import { loadModels, MODEL_CACHE_TTL } from '@keundal/plugin-llm-browser/models'
+import { loadModels, MODEL_CACHE_TTL, MODEL_CACHE_MAX_AGE } from '@keundal/plugin-llm-browser/models'
 import { defaultLLMSettings } from '@keundal/llm-settings'
 
 async function fixture(handler: (req: IncomingMessage, res: ServerResponse) => void) {
@@ -203,4 +203,43 @@ test.each(['openai', 'openai-chat', 'anthropic', 'google'] as const)('%s의 한�
   })
   await expect(loadModels(provider, settings, storage)).rejects.toThrow()
   expect(values.size).toBe(0)
+})
+
+
+test('갱신 실패 시 같은 설정의 캐시만 최대 수명까지 재사용하고 시계 역행은 거부한다', async () => {
+  let fail = false
+  const { settings, storage } = await fixture((_req, res) => {
+    res.statusCode = fail ? 503 : 200
+    res.end(JSON.stringify({ data: [{ id: 'cached' }] }))
+  })
+  const now = vi.spyOn(Date, 'now').mockReturnValue(100_000)
+  onTestFinished(() => now.mockRestore())
+  const first = await loadModels('openai', settings, storage)
+  fail = true
+  now.mockReturnValue(100_000 + MODEL_CACHE_TTL)
+  expect(await loadModels('openai', settings, storage)).toEqual(first)
+  now.mockReturnValue(100_000 + MODEL_CACHE_MAX_AGE)
+  await expect(loadModels('openai', settings, storage)).rejects.toThrow()
+  fail = false
+  now.mockReturnValue(100_000)
+  await loadModels('openai', settings, storage)
+  fail = true
+  now.mockReturnValue(99_999)
+  await expect(loadModels('openai', settings, storage)).rejects.toThrow()
+})
+
+test('이전 인증 설정의 늦은 응답은 새 설정의 저장된 캐시를 덮어쓰지 않는다', async () => {
+  const delayed = Promise.withResolvers<ServerResponse>()
+  const { settings, storage, requests } = await fixture((req, res) => {
+    if (req.headers.authorization === 'Bearer private-openai') delayed.resolve(res)
+    else res.end(JSON.stringify({ data: [{ id: 'new' }] }))
+  })
+  const old = loadModels('openai', settings, storage)
+  const response = await delayed.promise
+  settings.openai.apiKey = 'new'
+  const next = await loadModels('openai', settings, storage)
+  response.end(JSON.stringify({ data: [{ id: 'old' }] }))
+  await old
+  expect(await loadModels('openai', settings, storage)).toEqual(next)
+  expect(requests).toHaveLength(2)
 })

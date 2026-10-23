@@ -1,5 +1,5 @@
 {
   "extends": "./.nuxt/tsconfig.server.json",
-  "compilerOptions": { "types": ["node"] },
-  "include": ["tests/**/*.ts"]
+  "compilerOptions": { "types": ["node"], "lib": ["ESNext", "DOM", "DOM.Iterable"] },
+  "include": ["tests/**/*.ts", "playwright.config.ts"]
 }

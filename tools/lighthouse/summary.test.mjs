@@ -7,6 +7,7 @@ const url = 'https://preview.example/settings'
 const collect = { url: [url], numberOfRuns: 3 }
 function report(score, overrides = {}) {
   return {
+    audits: { 'cumulative-layout-shift': { numericValue: 0.05 } },
     requestedUrl: url,
     finalDisplayedUrl: url,
     categories: Object.fromEntries(
@@ -54,5 +55,26 @@ test('브라우저 오류와 로그인 화면으로의 이동을 감지한다', 
   assert.throws(
     () => summarize([report(1), report(1), report(1, { finalDisplayedUrl: 'https://preview.example/login' })], collect),
     /redirected/
+  )
+})
+
+test('접근성 및 CLS 예산 경계와 중앙값을 검사한다', () => {
+  const sample = (cls, accessibility = 0.9) =>
+    report(1, {
+      categories: { ...report(1).categories, accessibility: { score: accessibility } },
+      audits: { 'cumulative-layout-shift': { numericValue: cls } }
+    })
+  assert.deepEqual(summarize([sample(0), sample(0.1), sample(1)], collect).failures, [])
+  assert.deepEqual(summarize([sample(0.11, 0.89), sample(0.11, 0.89), sample(0)], collect).failures, [
+    '/settings의 접근성 89점',
+    '/settings의 CLS 0.11 (최대 0.1)'
+  ])
+  assert.throws(
+    () => summarize([report(1), report(1), report(1, { audits: {} })], collect),
+    /missing cumulative-layout-shift/
+  )
+  assert.throws(
+    () => summarize([report(1), report(1), report(1)], collect, { performance: NaN }),
+    /Invalid Lighthouse budget/
   )
 })

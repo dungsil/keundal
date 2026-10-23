@@ -109,6 +109,7 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
   expect(saved.messages).toHaveLength(2)
   expect(saved.messages[1]!.parts).toContainEqual({ type: 'text', text: '원격 응답' })
   expect((await chats.list())[0]!.id).toBe('chat')
+  expect(await chats.listSummaries!()).toEqual([{ id: saved.id, title: saved.title, createdAt: saved.createdAt }])
 
   services.title = async () => 'x'.repeat(101)
   await chats.create('oversized-title', user, model)
@@ -166,4 +167,22 @@ test('웹 API는 호스트 준비 실패를 503으로 알리고 내부 오류를
   const response = await fetch(`http://127.0.0.1:${address.port}/api/agent/models`)
   expect(response.status).toBe(503)
   expect(await response.text()).not.toContain('private host configuration')
+})
+
+
+test('원격 요약 요청은 상태 필드를 제한하고 캐시를 사용하지 않는다', async () => {
+  const requests: { url: string; cache: RequestCache | undefined }[] = []
+  const store = new RemoteChatStore({ endpoint: 'https://example.test', token }, async (url, init) => {
+    requests.push({ url: String(url), cache: init?.cache })
+    return new Response(JSON.stringify([
+      { state: { web: { id: 'b', title: null, createdAt: '2026-10-23', messages: ['must not escape'] } } },
+      { state: { web: { id: 'a', title: 'first', createdAt: '2026-10-23' } } },
+      { state: { unrelated: true } }
+    ]), { headers: { 'content-type': 'application/json' } })
+  })
+  expect(await store.listSummaries()).toEqual([
+    { id: 'a', title: 'first', createdAt: '2026-10-23' },
+    { id: 'b', title: null, createdAt: '2026-10-23' }
+  ])
+  expect(requests).toEqual([{ url: 'https://example.test/threads?view=summary&stateFields=web.id,web.title,web.createdAt', cache: 'no-store' }])
 })

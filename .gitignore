@@ -27,3 +27,7 @@ apps/web/.data
 ### Lighthouse reports ###
 .lighthouseci/
 .unlighthouse/
+
+### Browser test reports ###
+playwright-report/
+test-results/

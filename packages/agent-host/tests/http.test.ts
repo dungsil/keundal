@@ -701,3 +701,50 @@ test('잘못된 추론 수준을 실행 전에 400으로 거부한다', async (t
   expect(response.status).toBe(400)
   expect(fixture.agentCalls).toBe(0)
 })
+
+test('스레드 요약은 선택한 상태의 원시 값만 반환하고 전체 목록 계약을 유지한다', async (t) => {
+  const { requestJson } = await setup(t)
+  const state = {
+    web: { id: 'thread', title: 'title', createdAt: '2026-10-23', messages: [{ secret: 'private history' }] },
+    secret: 'private state'
+  }
+  await requestJson('PUT', '/threads/thread', { expectedRevision: 0, messages: input.messages, state })
+  const summary = await requestJson(
+    'GET',
+    '/threads?view=summary&stateFields=web.id,web.title,web.createdAt,web.messages,web'
+  )
+  expect(summary).toEqual({
+    status: 200,
+    json: [
+      { threadId: 'thread', revision: 1, state: { web: { id: 'thread', title: 'title', createdAt: '2026-10-23' } } }
+    ]
+  })
+  expect((await requestJson('GET', '/threads?view=summary')).json).toEqual([
+    { threadId: 'thread', revision: 1, state: {} }
+  ])
+  expect((await requestJson('GET', '/threads')).json).toEqual([
+    { threadId: 'thread', revision: 1, messages: input.messages, state }
+  ])
+  expect((await requestJson('GET', '/threads?view=summary&stateFields=constructor.prototype')).status).toBe(400)
+  expect((await requestJson('GET', '/threads?view=unknown')).status).toBe(400)
+})
+
+test('호스트는 JSON과 스트림과 인증 오류의 캐시 저장을 금지한다', async (t) => {
+  const { base } = await setup(t)
+  for (const [path, init] of [
+    ['/threads', { headers: { authorization: `Bearer ${token}` } }],
+    ['/threads', {}],
+    [
+      '/runs',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify(input)
+      }
+    ]
+  ] as const) {
+    const response = await fetch(`${base}${path}`, init)
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+    await response.text()
+  }
+})

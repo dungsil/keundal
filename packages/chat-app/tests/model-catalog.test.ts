@@ -82,3 +82,79 @@ test('모델 조회의 일반 오류는 현재 표시 언어를 따르고 공급
   await catalog.refresh(true)
   expect(catalog.error.value.trim()).toBe('Provider diagnostic')
 })
+
+test('공급자별 응답을 즉시 표시하고 동시 새로고침은 같은 요청을 기다린다', async () => {
+  vi.stubGlobal('localStorage', { removeItem: vi.fn() })
+  const scope = effectScope()
+  onTestFinished(() => { scope.stop(); vi.unstubAllGlobals() })
+  const settings = ref(defaultLLMSettings())
+  settings.value.openai.apiKey = 'key'
+  settings.value.google.apiKey = 'key'
+  const openai = Promise.withResolvers<modelRequests.ModelOption[]>()
+  const google = Promise.withResolvers<modelRequests.ModelOption[]>()
+  const loader = vi.fn((provider: string) => provider === 'openai' ? openai.promise : google.promise)
+  const catalog = scope.run(() => useModelCatalog(settings, loader))!
+  const first = catalog.refresh()
+  expect(catalog.refresh()).toBe(first)
+  expect(loader).toHaveBeenCalledTimes(2)
+  openai.resolve([{ value: 'openai/fast', label: 'Fast', icon: '' }])
+  await vi.waitFor(() => expect(catalog.models.value.map(item => item.value)).toEqual(['openai/fast']))
+  expect(catalog.loading.value).toBe(true)
+  google.resolve([{ value: 'google/slow', label: 'Slow', icon: '' }])
+  await first
+  expect(catalog.models.value.map(item => item.value)).toEqual(['google/slow', 'openai/fast'])
+  expect(catalog.loading.value).toBe(false)
+})
+
+test('설정 변경 전 늦은 응답과 범위 해제 후 응답은 새 목록을 덮어쓰지 않는다', async () => {
+  vi.stubGlobal('localStorage', { removeItem: vi.fn() })
+  const scope = effectScope()
+  onTestFinished(() => { scope.stop(); vi.unstubAllGlobals() })
+  const settings = ref(defaultLLMSettings())
+  settings.value.openai.apiKey = 'old'
+  const old = Promise.withResolvers<modelRequests.ModelOption[]>()
+  const next = Promise.withResolvers<modelRequests.ModelOption[]>()
+  const loader = vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(next.promise)
+  const catalog = scope.run(() => useModelCatalog(settings, loader))!
+  settings.value.openai.apiKey = 'new'
+  expect(loader.mock.calls[0]![1].openai.apiKey).toBe('old')
+  expect(loader.mock.calls[0]![3].signal.aborted).toBe(true)
+  next.resolve([{ value: 'openai/new', label: 'New', icon: '' }])
+  await catalog.refresh()
+  old.resolve([{ value: 'openai/old', label: 'Old', icon: '' }])
+  await old.promise
+  expect(catalog.models.value[0]!.value).toBe('openai/new')
+  const disposed = Promise.withResolvers<modelRequests.ModelOption[]>()
+  loader.mockReturnValueOnce(disposed.promise)
+  const pending = catalog.refresh(true)
+  scope.stop()
+  disposed.resolve([])
+  await pending
+  expect(catalog.models.value[0]!.value).toBe('openai/new')
+})
+
+
+test('강제 갱신은 진행 중인 일반 조회를 취소하고 강제 요청끼리만 합친다', async () => {
+  vi.stubGlobal('localStorage', { removeItem: vi.fn() })
+  const scope = effectScope()
+  onTestFinished(() => { scope.stop(); vi.unstubAllGlobals() })
+  const settings = ref(defaultLLMSettings())
+  settings.value.openai.apiKey = 'key'
+  settings.value.google.apiKey = 'key'
+  const slow = Promise.withResolvers<modelRequests.ModelOption[]>()
+  const fresh = Promise.withResolvers<modelRequests.ModelOption[]>()
+  const loader = vi.fn((provider: string, _settings: unknown, _storage: unknown, options?: { force?: boolean }) => {
+    if (options?.force) return fresh.promise
+    return provider === 'openai' ? Promise.resolve([{ value: 'openai/cached', label: 'Cached', icon: '' }]) : slow.promise
+  })
+  const catalog = scope.run(() => useModelCatalog(settings, loader))!
+  await vi.waitFor(() => expect(catalog.models.value[0]?.value).toBe('openai/cached'))
+  const pending = catalog.refresh(true)
+  expect(catalog.refresh(true)).toBe(pending)
+  expect(loader).toHaveBeenCalledTimes(4)
+  fresh.resolve([])
+  await pending
+  slow.resolve([{ value: 'google/old', label: 'Old', icon: '' }])
+  await slow.promise
+  expect(catalog.models.value).toEqual([])
+})
