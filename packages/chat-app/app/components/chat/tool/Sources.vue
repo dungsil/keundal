@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, onBeforeUnmount, reactive } from 'vue'
 import { getCitationUrl } from '../../../utils/url'
 
 const props = defineProps<{
