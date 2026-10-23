@@ -17,6 +17,9 @@ const preview = defineModel<string>('preview', { default: '' })
 const toast = useToast()
 const { ensureConfigured } = useLLMSettings()
 const { supported, recording, finalizing, level, transcript, error, start, stop, cancel } = useDictation()
+const root = useTemplateRef('root')
+const micButton = useTemplateRef<{ $el: HTMLElement }>('micButton')
+const finishButton = useTemplateRef<{ $el: HTMLElement }>('finishButton')
 
 // Rolling input levels rendered as a small waveform while recording
 const BARS = 14
@@ -33,8 +36,28 @@ watch(recording, (value) => {
   }
 })
 
-watch([recording, finalizing], ([isRecording, isFinalizing]) => {
+// Every state swaps its buttons out, which drops a keyboard user's focus on the page.
+// Hand focus to the control that takes over, unless the user already moved it elsewhere.
+let restoreFocus = false
+
+watch([recording, finalizing], async ([isRecording, isFinalizing]) => {
   state.value = isRecording ? 'recording' : isFinalizing ? 'transcribing' : 'idle'
+
+  if (root.value?.contains(document.activeElement)) restoreFocus = true
+  await nextTick()
+  if (!restoreFocus) return
+
+  const active = document.activeElement
+  if (active && active !== document.body && !root.value?.contains(active)) {
+    restoreFocus = false
+    return
+  }
+  if (isRecording) {
+    finishButton.value?.$el.focus()
+  } else if (!isFinalizing) {
+    micButton.value?.$el.focus()
+    restoreFocus = false
+  }
 })
 
 watch(transcript, (value) => {
@@ -56,7 +79,9 @@ function fail(cause: Error) {
     description: cause.message,
     icon: 'i-lucide-alert-circle',
     color: 'error',
-    duration: 0
+    duration: 0,
+    // An error message from the provider can be one long token, let it wrap inside the toast
+    ui: { description: 'break-words' }
   })
 }
 
@@ -94,7 +119,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex items-center gap-1">
+  <div ref="root" class="flex items-center gap-1">
+    <span role="status" class="sr-only">{{ state === 'recording' ? t('dictation.listening') : state === 'transcribing' ? t('dictation.transcribing') : '' }}</span>
     <template v-if="recording || finalizing">
       <div v-if="recording" class="flex items-center gap-0.75 h-7 px-2 motion-reduce:hidden" aria-hidden="true">
         <span
@@ -115,6 +141,7 @@ onBeforeUnmount(() => {
         @click="cancel()"
       />
       <UButton
+        ref="finishButton"
         icon="i-lucide-check"
         color="neutral"
         size="sm"
@@ -126,6 +153,7 @@ onBeforeUnmount(() => {
 
     <UTooltip v-else :text="tooltip" :content="{ side: 'top' }">
       <UButton
+        ref="micButton"
         icon="i-lucide-mic"
         color="neutral"
         variant="ghost"
