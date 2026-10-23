@@ -34,8 +34,7 @@ echo 'Preparing Rust for desktop builds and tests'
 SECONDS=0
 export PATH="$HOME/.cargo/bin:$PATH"
 if ! command -v rustc >/dev/null 2>&1; then
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
-    sh -s -- -y --profile minimal --default-toolchain stable --no-modify-path
+  bash .agents/install-rust
 fi
 profile_marker='# Keundal orb Rust toolchain'
 if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then

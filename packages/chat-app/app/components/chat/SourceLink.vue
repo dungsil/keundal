@@ -5,7 +5,6 @@ defineOptions({ inheritAttrs: false })
 
 const props = defineProps<{
   url: string
-  favicon: string
   label: string
 }>()
 
@@ -17,7 +16,7 @@ const destination = computed(() => getCitationUrl(props.url))
     v-if="destination"
     :to="destination"
     target="_blank"
-    :avatar="{ src: getCitationUrl(favicon) }"
+    icon="i-lucide-link"
     :label="label"
     trailing-icon="i-lucide-arrow-up-right"
     size="xs"
