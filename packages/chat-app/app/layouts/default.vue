@@ -190,7 +190,7 @@ defineShortcuts({
       }, ...groups]"
     />
 
-    <main id="main-content" ref="mainContent" tabindex="-1" class="flex-1 flex mt-4 ms-4 lg:ms-0 rounded-ss-lg ring ring-default bg-default/75 shadow-sm min-w-0 overflow-hidden">
+    <main id="main-content" ref="mainContent" tabindex="-1" class="flex-1 flex mt-4 sm:ms-4 lg:ms-0 sm:rounded-ss-lg ring ring-default bg-default/75 shadow-sm min-w-0 overflow-hidden">
       <slot />
     </main>
   </UDashboardGroup>
