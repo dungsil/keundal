@@ -1,0 +1,88 @@
+name: 툴체인 갱신
+
+# Dependabot은 packageManager와 devEngines를 갱신하지 않으므로 직접 갱신한다.
+on:
+  schedule:
+    # Dependabot PR과 겹치지 않도록 화요일에 실행한다. (한국 시간 매주 화요일 04:30)
+    - cron: '30 19 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SKIP_INSTALL_SIMPLE_GIT_HOOKS: '1'
+
+jobs:
+  update:
+    name: Node.js와 pnpm 갱신
+    # 기본 브랜치 이외의 체크아웃으로 자동 병합 PR을 만들지 않는다.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - name: 저장소 가져오기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 자동 수정 인증 확인
+        env:
+          AUTOFIX_TOKEN: ${{ secrets.AUTOFIX_TOKEN }}
+        run: |
+          if [ -z "$AUTOFIX_TOKEN" ]; then
+            echo '::error::Actions secret에 AUTOFIX_TOKEN을 등록해야 합니다.'
+            exit 1
+          fi
+
+      - name: 개발 환경 준비
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+        with:
+          install: false
+
+      - name: 갱신 전 버전 기록
+        id: before
+        run: |
+          echo "node=$(jq -r '.devEngines.runtime.version' package.json)" >> "$GITHUB_OUTPUT"
+          echo "pnpm=$(jq -r '.devEngines.packageManager.version' package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Node.js와 pnpm 갱신
+        run: |
+          pnpm runtime set node lts
+          pnpm self-update
+          pnpm install --no-frozen-lockfile
+
+      - name: 갱신 후 버전 기록
+        id: after
+        run: |
+          echo "node=$(jq -r '.devEngines.runtime.version' package.json)" >> "$GITHUB_OUTPUT"
+          echo "pnpm=$(jq -r '.devEngines.packageManager.version' package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: 갱신 PR 생성
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.AUTOFIX_TOKEN }}
+          base: main
+          branch: codex/autofix/toolchain
+          title: 'chore(deps): Node.js와 pnpm 버전을 갱신한다'
+          commit-message: 'chore(deps): Node.js와 pnpm 버전을 갱신한다'
+          labels: '유형:자동수정'
+          body: |
+            ## 요약
+
+            Dependabot이 갱신하지 않는 `packageManager`와 `devEngines`의 버전을 주간 워크플로에서 맞춥니다.
+
+            ## 수정 내역
+
+            - Node.js: `${{ steps.before.outputs.node }}` → `${{ steps.after.outputs.node }}` (최신 LTS)
+            - pnpm: `${{ steps.before.outputs.pnpm }}` → `${{ steps.after.outputs.pnpm }}`
+            - `pnpm-lock.yaml`을 갱신된 버전으로 다시 생성합니다.
+
+            ## 검증 사항
+
+            - 갱신된 버전으로 `pnpm install --no-frozen-lockfile`을 실행했습니다.
+            - PR의 CI가 통과하면 `유형:자동수정` 라벨로 자동 병합합니다.
