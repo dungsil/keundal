@@ -195,6 +195,7 @@ function toggleFile(path: string, enabled: boolean) {
             name="skill-name"
             :description="t('skill.nameDescription')"
             :error="errorField === 'name' ? error : undefined"
+            :ui="{ error: 'break-words' }"
           >
             <UInput
               id="skill-name"
@@ -243,7 +244,7 @@ function toggleFile(path: string, enabled: boolean) {
           v-if="deleting"
           class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-error/30 p-3"
         >
-          <p class="text-sm">
+          <p class="min-w-0 break-words text-sm">
             {{ t('skill.deleteDescription', { name: originalName ?? '' }) }}
           </p>
           <div class="flex gap-2">
@@ -263,7 +264,7 @@ function toggleFile(path: string, enabled: boolean) {
           <h3 class="text-sm font-semibold">
             {{ t(localSkills ? 'skill.savedApp' : 'skill.savedBrowser') }}
           </h3>
-          <div class="flex flex-wrap gap-2">
+          <div class="flex min-w-0 flex-wrap gap-2">
             <input
               ref="importInput"
               type="file"
@@ -277,6 +278,7 @@ function toggleFile(path: string, enabled: boolean) {
               icon="i-lucide-upload"
               color="neutral"
               variant="outline"
+              class="min-w-0"
               @click="importInput?.click()"
             />
             <UButton :label="t('skill.new')" icon="i-lucide-plus" @click="edit()" />
@@ -364,13 +366,13 @@ function toggleFile(path: string, enabled: boolean) {
           <p v-else-if="!loading && !files.length" class="text-sm text-muted">
             {{ t('skill.localEmpty') }}
           </p>
-          <ul v-else class="divide-y divide-default rounded-lg border border-default">
+          <ul v-else-if="files.length" class="divide-y divide-default rounded-lg border border-default">
             <li v-for="file in files" :key="file.path" class="flex items-center gap-3 p-3">
               <div class="min-w-0 flex-1">
                 <p class="truncate text-sm font-medium">
                   {{ file.definition?.name ?? t('skill.invalidFile') }}
                 </p>
-                <p class="truncate text-xs text-muted" :title="file.path">
+                <p class="text-xs text-muted" :class="file.definition ? 'truncate' : 'break-all'" :title="file.path">
                   {{ file.path }}
                 </p>
                 <p v-if="file.error" class="text-xs text-error">

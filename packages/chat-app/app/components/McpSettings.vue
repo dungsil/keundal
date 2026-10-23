@@ -32,6 +32,7 @@ const checkResult = ref<McpProbeResult | null>(null)
 const checkError = ref('')
 const checkDetail = ref('')
 let checkAbort: AbortController | undefined
+const cancelButton = useTemplateRef<{ $el: HTMLElement }>('cancelButton')
 // The manager exists only in the browser, so the button stays disabled until the component is mounted.
 const canCheck = computed(() => mounted.value && typeof $mcpManager.probe === 'function' && transport.value !== 'stdio')
 
@@ -81,7 +82,16 @@ watch(transport, () => {
 watch([transport, address, credentials, allowInsecureHttp, args, cwd, timeoutMs], clearCheck)
 onBeforeUnmount(cancelCheck)
 const scope = (value: string) => value.trim() === '*' ? '*' as const : value.split('\n').map(item => item.trim()).filter(Boolean)
+// Controls disable while a request runs, which drops keyboard focus to the page; give it back when the request ends.
+function holdFocus() {
+  const origin = document.activeElement
+  return async () => {
+    await nextTick()
+    if (origin instanceof HTMLElement && origin.isConnected && document.activeElement === document.body) origin.focus()
+  }
+}
 async function apply(next: unknown) {
+  const restoreFocus = holdFocus()
   saving.value = true
   error.value = ''
   success.value = false
@@ -94,6 +104,7 @@ async function apply(next: unknown) {
     error.value = t('mcp.saveFailed')
   } finally {
     saving.value = false
+    void restoreFocus()
   }
 }
 function buildServer(serverName: string) {
@@ -128,9 +139,12 @@ async function check() {
     checkError.value = t('mcp.invalidJSON')
     return
   }
+  const restoreFocus = holdFocus()
   const controller = new AbortController()
   checkAbort = controller
   checking.value = true
+  // The check button disables while it runs, so Cancel check is the control that still applies.
+  void nextTick().then(() => cancelButton.value?.$el.focus())
   try {
     const result = await $mcpManager.probe!(server, { signal: controller.signal })
     if (!controller.signal.aborted) checkResult.value = result
@@ -144,6 +158,7 @@ async function check() {
     }
   } finally {
     if (checkAbort === controller) cancelCheck()
+    void restoreFocus()
   }
 }
 const allowedTools = computed(() => scope(tools.value))
@@ -172,8 +187,8 @@ const unknownAllowed = computed(() => {
     </p>
     <template v-if="!hosted">
       <ul class="space-y-2">
-        <li v-for="(server, index) in servers" :key="server.serverName" class="flex items-center gap-2">
-          <span class="grow">{{ server.serverName }} <span class="text-sm text-muted">{{ server.transport }}</span></span>
+        <li v-for="(server, index) in servers" :key="server.serverName" class="flex flex-wrap items-center gap-2">
+          <span class="min-w-0 grow [overflow-wrap:anywhere]">{{ server.serverName }} <span class="text-sm text-muted">{{ server.transport }}</span></span>
           <UButton
             :label="t('mcp.edit')"
             :aria-label="`${t('mcp.edit')} ${server.serverName}`"
@@ -272,6 +287,7 @@ const unknownAllowed = computed(() => {
             />
             <UButton
               v-if="checking"
+              ref="cancelButton"
               :label="t('mcp.checkCancel')"
               color="neutral"
               variant="ghost"
@@ -283,6 +299,7 @@ const unknownAllowed = computed(() => {
             color="warning"
             :title="checkError"
             :description="checkDetail ? t('mcp.checkDetail', { message: checkDetail }) : undefined"
+            :ui="{ description: '[overflow-wrap:anywhere]' }"
             role="alert"
           />
           <div v-if="checkResult" class="space-y-2">
@@ -292,22 +309,25 @@ const unknownAllowed = computed(() => {
             <p v-if="!checkResult.tools.length" class="text-sm">
               {{ t('mcp.checkNoTools') }}
             </p>
-            <fieldset v-else class="space-y-2">
+            <fieldset v-else class="min-w-0 space-y-2">
               <legend class="text-sm font-medium">
                 {{ t('mcp.checkTools', { count: checkResult.tools.length }) }}
               </legend>
               <p class="text-sm text-muted">
                 {{ t(allowedTools === '*' ? 'mcp.checkAllowAll' : 'mcp.checkPick') }}
               </p>
-              <ul class="max-h-64 space-y-2 overflow-y-auto">
+              <ul class="max-h-64 space-y-2 overflow-y-auto [overflow-wrap:anywhere]">
                 <li v-for="tool in checkResult.tools" :key="tool.name">
                   <UCheckbox
                     :model-value="isAllowed(tool.name)"
                     :label="tool.name"
-                    :description="tool.description?.slice(0, 160)"
                     :disabled="saving"
                     @update:model-value="toggleTool(tool.name, $event === true)"
-                  />
+                  >
+                    <template v-if="tool.description" #description>
+                      <span dir="auto" class="block">{{ tool.description.slice(0, 160) }}</span>
+                    </template>
+                  </UCheckbox>
                 </li>
               </ul>
             </fieldset>

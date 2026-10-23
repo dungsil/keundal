@@ -31,6 +31,9 @@ const headerRows = ref<Record<string, { id: string, key: string, value: string }
   'openai-chat': []
 })
 const error = ref('')
+const errorField = ref<'' | 'name' | 'apiKey' | 'baseURL'>('')
+// Header values that usually carry credentials are masked like the API key.
+const SENSITIVE_HEADER = /authorization|cookie|api[-_]?key|token|secret|password|credential/i
 const saving = ref(false)
 const providers = computed(() => configuredProviders(draft.value).filter(item => visibleIds.value.includes(item.id)))
 const current = computed(() => providers.value.find(item => item.id === provider.value))
@@ -88,6 +91,7 @@ async function addHeader() {
 async function save(forget = false) {
   if (saving.value) return
   error.value = ''
+  errorField.value = ''
   const next = JSON.parse(JSON.stringify(settings.value))
   if (forget) {
     if (provider.value.includes('@')) Reflect.deleteProperty(next, provider.value)
@@ -116,6 +120,7 @@ async function save(forget = false) {
       if (!parsed.success) {
         provider.value = item.id
         const field = parsed.error.issues[0]!.path[0]
+        errorField.value = field === 'name' || field === 'apiKey' || field === 'baseURL' ? field : ''
         error.value = t(
           field === 'name'
             ? 'llm.invalidName'
@@ -183,18 +188,18 @@ async function save(forget = false) {
           <button
             :id="`llm-provider-${item.id}`"
             type="button"
-            class="flex w-full items-center justify-between rounded-lg p-4 text-left"
+            class="flex w-full items-center justify-between gap-3 rounded-lg p-4 text-left"
             :class="provider === item.id ? 'rounded-b-none bg-primary/5' : ''"
             :aria-expanded="provider === item.id"
             :aria-controls="provider === item.id ? 'llm-settings' : undefined"
             :disabled="!mounted || saving"
             @click="provider = provider === item.id ? '' : item.id"
           >
-            <span>
-              <span class="block font-medium text-highlighted">{{ item.label }}</span>
-              <span class="block text-sm text-muted">{{ LLM_PROVIDERS.find(preset => preset.id === item.providerType)?.label }}</span>
+            <span class="min-w-0">
+              <span class="block break-words font-medium text-highlighted">{{ item.label }}</span>
+              <span class="block break-words text-sm text-muted">{{ LLM_PROVIDERS.find(preset => preset.id === item.providerType)?.label }}</span>
             </span>
-            <UIcon name="i-lucide-chevron-down" :class="provider === item.id ? 'rotate-180' : ''" />
+            <UIcon name="i-lucide-chevron-down" class="shrink-0" :class="provider === item.id ? 'rotate-180' : ''" />
           </button>
           <form
             v-if="provider === item.id && current"
@@ -203,7 +208,7 @@ async function save(forget = false) {
             :aria-labelledby="`llm-provider-${item.id}`"
             @submit.prevent="save()"
           >
-            <UFormField :label="t('llm.providerName')" name="providerName">
+            <UFormField :label="t('llm.providerName')" name="providerName" :error="errorField === 'name' ? error : undefined">
               <UInput
                 id="llm-provider-name"
                 v-model="currentDraft.name"
@@ -216,7 +221,7 @@ async function save(forget = false) {
             <p class="text-sm text-muted">
               {{ t('llm.modelsDescription') }}
             </p>
-            <UFormField :label="t('llm.apiKey')" name="apiKey">
+            <UFormField :label="t('llm.apiKey')" name="apiKey" :error="errorField === 'apiKey' ? error : undefined">
               <UInput
                 id="llm-api-key"
                 v-model="currentDraft.apiKey"
@@ -229,7 +234,7 @@ async function save(forget = false) {
                 :disabled="!mounted || saving"
               />
             </UFormField>
-            <UFormField :label="t('llm.baseURL')" name="baseURL" :description="t('llm.baseURLDescription')">
+            <UFormField :label="t('llm.baseURL')" name="baseURL" :description="t('llm.baseURLDescription')" :error="errorField === 'baseURL' ? error : undefined">
               <UInput
                 id="llm-base-url"
                 v-model="currentDraft.baseURL"
@@ -261,6 +266,7 @@ async function save(forget = false) {
                 />
                 <UInput
                   v-model="row.value"
+                  :type="SENSITIVE_HEADER.test(row.key) ? 'password' : 'text'"
                   :aria-label="t('llm.headerValue', { index: index + 1 })"
                   :placeholder="t('common.value')"
                   autocomplete="off"
@@ -297,7 +303,7 @@ async function save(forget = false) {
               :description="secureSettings ? t('llm.storageOS') : t('llm.storageBrowser')"
             />
             <div class="flex flex-wrap items-center justify-between gap-3 w-full">
-              <p v-if="error" role="alert" class="w-full text-sm text-error">
+              <p v-if="error && !errorField" role="alert" class="w-full text-sm text-error">
                 {{ error }}
               </p>
               <UButton
@@ -305,6 +311,8 @@ async function save(forget = false) {
                 :label="t('llm.forget')"
                 color="error"
                 variant="ghost"
+                class="max-w-full"
+                :ui="{ label: 'whitespace-normal overflow-visible' }"
                 :disabled="
                   saving
                     || (!provider.includes('@')
@@ -318,6 +326,8 @@ async function save(forget = false) {
               <UButton
                 :label="secureSettings ? t('llm.saveOS') : t('llm.saveBrowser')"
                 type="submit"
+                class="max-w-full"
+                :ui="{ label: 'whitespace-normal overflow-visible' }"
                 :loading="saving"
               />
             </div>

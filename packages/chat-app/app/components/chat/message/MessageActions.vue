@@ -37,6 +37,8 @@ const clipboard = useClipboard()
 
 const copied = ref(false)
 
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
+
 function copy() {
   clipboard.copy(
     props.message.parts
@@ -47,7 +49,8 @@ function copy() {
 
   copied.value = true
 
-  setTimeout(() => {
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => {
     copied.value = false
   }, 2000)
 }
@@ -120,7 +123,7 @@ function copy() {
 
   <template v-if="message.role === 'user' && !streaming && !editing">
     <UTooltip v-if="formattedDate" :text="formattedDate.full">
-      <time :datetime="formattedDate.iso" class="text-xs text-muted mr-1.5">
+      <time :datetime="formattedDate.iso" tabindex="0" class="text-xs text-muted mr-1.5">
         {{ formattedDate.time }}
       </time>
     </UTooltip>

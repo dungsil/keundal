@@ -25,7 +25,7 @@ const emit = defineEmits<{
       :streaming="part.state === 'streaming'"
       chevron="leading"
     >
-      <ChatComark :value="part.text" :streaming="part.state === 'streaming'" />
+      <ChatComark dir="auto" class="wrap-break-word" :value="part.text" :streaming="part.state === 'streaming'" />
     </UChatReasoning>
 
     <template v-else-if="'toolCallId' in part">
@@ -77,7 +77,7 @@ const emit = defineEmits<{
     </template>
 
     <template v-else-if="part.type === 'text'">
-      <ChatComark v-if="message.role === 'assistant'" :value="part.text" :streaming="part.state === 'streaming'" />
+      <ChatComark v-if="message.role === 'assistant'" dir="auto" class="wrap-break-word" :value="part.text" :streaming="part.state === 'streaming'" />
       <template v-else-if="message.role === 'user'">
         <ChatMessageEdit
           v-if="editing"
@@ -86,7 +86,7 @@ const emit = defineEmits<{
           @save="(msg, text) => emit('save', msg, text)"
           @cancel="emit('cancelEdit')"
         />
-        <p v-else class="whitespace-pre-wrap">
+        <p v-else dir="auto" class="whitespace-pre-wrap wrap-break-word">
           {{ part.text }}
         </p>
       </template>
