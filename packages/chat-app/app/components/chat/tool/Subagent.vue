@@ -22,7 +22,18 @@ const label = computed(() => {
   const input = props.invocation.input
   return input && typeof input === 'object' && 'label' in input && typeof input.label === 'string' ? input.label : task.value
 })
-const labelTruncated = computed(() => label.value.length > 80)
+const LABEL_LIMIT = 80
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+// 이모지 같은 서로게이트 쌍과 결합 문자를 가르지 않도록 글자 단위로 자릅니다.
+const suffix = computed(() => {
+  let count = 0
+  for (const { index } of graphemes.segment(label.value)) {
+    if (++count > LABEL_LIMIT) return `${label.value.slice(0, index)}…`
+  }
+  return label.value
+})
+// 머리글은 폭에 맞춰 잘리므로 작업 지침과 다른 이름은 본문에서 전체를 읽을 수 있게 합니다.
+const showLabel = computed(() => label.value !== '' && label.value !== task.value)
 const diagnostic = computed(() => {
   const output = props.invocation.output
   if (output && typeof output === 'object' && 'error' in output && output.error && typeof output.error === 'object'
@@ -38,13 +49,13 @@ const answer = computed(() => {
 <template>
   <UChatTool
     :text="t(labels[status])"
-    :suffix="label.length > 80 ? `${label.slice(0, 80)}…` : label"
+    :suffix="suffix"
     :streaming="status === 'queued' || status === 'running'"
     icon="i-lucide-git-fork"
     chevron="leading"
   >
-    <div class="space-y-3 text-sm">
-      <p v-if="labelTruncated" class="whitespace-pre-wrap break-words">
+    <div class="space-y-3 text-sm break-words">
+      <p v-if="showLabel" class="whitespace-pre-wrap break-words">
         {{ label }}
       </p>
       <p class="whitespace-pre-wrap break-words">
