@@ -10,11 +10,14 @@ import {
   type Reasoning,
   EventType,
   parseAGUIEvent,
+  STREAM_LIMITS,
   type AGUIEvent,
   type GenerationSnapshot,
   type SessionSnapshot,
   type ExecutionOptions
 } from '@keundal/core'
+
+import { boundRemoteResponse, RemoteResponseLimitError, RemoteStreamBudget } from './response-budget'
 
 type ChatState = { web: LocalChat }
 
@@ -83,13 +86,16 @@ export class RemoteChatStore implements ChatStoreLike {
     const headers = new Headers(init.headers)
     if (this.connection.token) headers.set('authorization', `Bearer ${this.connection.token}`)
     if (init.body !== undefined) headers.set('content-type', 'application/json')
-    return this.request(this.url(path), { ...init, headers })
+    return boundRemoteResponse(await this.request(this.url(path), { ...init, headers }), init.signal ?? undefined)
   }
 
   private async call(path: string, init: RequestInit = {}): Promise<Response> {
     const response = await this.raw(path, init)
     if (!response.ok) {
-      const detail = await response.text().catch(() => '')
+      const detail = await response.text().catch((error) => {
+        if (error instanceof RemoteResponseLimitError) throw error
+        return ''
+      })
       throw new Error(detail || `Keundal host request failed (HTTP ${response.status})`)
     }
     return response
@@ -123,15 +129,21 @@ export class RemoteChatStore implements ChatStoreLike {
 
   async get(id: string): Promise<LocalChat | undefined> {
     const response = await this.raw(`/threads/${encodeURIComponent(id)}`)
-    if (response.status === 404) return undefined
-    if (!response.ok) throw new Error(`Keundal host request failed (HTTP ${response.status})`)
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => {})
+      if (response.status === 404) return undefined
+      throw new Error(`Keundal host request failed (HTTP ${response.status})`)
+    }
     return this.chat(this.snapshot(await response.json()))
   }
 
   async getRun(runId: string, options: ExecutionOptions = {}): Promise<GenerationSnapshot | undefined> {
     const response = await this.raw(`/runs/${encodeURIComponent(runId)}`, { signal: options.signal })
-    if (response.status === 404) return undefined
-    if (!response.ok) throw new Error(`Keundal host request failed (HTTP ${response.status})`)
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => {})
+      if (response.status === 404) return undefined
+      throw new Error(`Keundal host request failed (HTTP ${response.status})`)
+    }
     return (await response.json()) as GenerationSnapshot
   }
 
@@ -176,12 +188,14 @@ export class RemoteChatStore implements ChatStoreLike {
         method: 'POST',
         body: JSON.stringify({ messages: toMessages([message], chat?.model ?? '') })
       })
+      void response.body?.cancel().catch(() => {})
       return response.status === 202
     })
   }
 
   async create(id: string, message: ChatMessage, model: string): Promise<LocalChat> {
     const existing = await this.raw(`/threads/${encodeURIComponent(id)}`)
+    void existing.body?.cancel().catch(() => {})
     if (existing.status !== 404) {
       if (existing.ok) throw new Error('Chat already exists')
       throw new Error(`Keundal host request failed (HTTP ${existing.status})`)
@@ -219,6 +233,7 @@ export class RemoteChatStore implements ChatStoreLike {
     const source = await this.get(sourceId)
     if (!source) throw new Error('Chat not found')
     const existing = await this.raw(`/threads/${encodeURIComponent(newId)}`)
+    void existing.body?.cancel().catch(() => {})
     if (existing.status !== 404) {
       if (existing.ok) throw new Error('Chat already exists')
       throw new Error(`Keundal host request failed (HTTP ${existing.status})`)
@@ -260,7 +275,10 @@ export class RemoteChatStore implements ChatStoreLike {
       await active.done
     }
     const snapshot = this.snapshot(await (await this.call(`/threads/${encodeURIComponent(id)}`)).json())
-    await this.call(`/threads/${encodeURIComponent(id)}?revision=${snapshot.revision}`, { method: 'DELETE' })
+    const response = await this.call(`/threads/${encodeURIComponent(id)}?revision=${snapshot.revision}`, {
+      method: 'DELETE'
+    })
+    void response.body?.cancel().catch(() => {})
   }
 
   async models(): Promise<ModelOption[]> {
@@ -368,13 +386,22 @@ export class RemoteChatStore implements ChatStoreLike {
       let failed = false
       // 연결 종료는 호스트 실행을 멈추지 않으므로, 사용자의 중단은 명시적인 취소 요청으로 보냅니다.
       let cancelled: Promise<unknown> | undefined
+      let limited = false
       const cancel = () => {
-        cancelled = this.raw(`/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST' }).catch(() => {})
+        cancelled = this.raw(`/runs/${encodeURIComponent(runId)}/cancel`, {
+          method: 'POST',
+          signal: AbortSignal.timeout(5000)
+        })
+          .then((response) => {
+            void response.body?.cancel().catch(() => {})
+          })
+          .catch(() => {})
       }
       combined.addEventListener('abort', cancel, { once: true })
       run.runId = runId
       // 마지막으로 적용한 journal sequence입니다. 재연결은 이 커서 다음부터 받고, 이미 적용한 id는 건너뜁니다.
       let cursor = -1
+      const budget = new RemoteStreamBudget()
       try {
         let response = await this.call('/runs', {
           method: 'POST',
@@ -398,7 +425,7 @@ export class RemoteChatStore implements ChatStoreLike {
         let attempts = 0
         for (;;) {
           try {
-            for await (const frame of this.frames(response, combined)) {
+            for await (const frame of this.frames(response, combined, budget)) {
               if (frame.id !== undefined) {
                 if (frame.id <= cursor) continue
                 cursor = frame.id
@@ -415,7 +442,7 @@ export class RemoteChatStore implements ChatStoreLike {
             }
           } catch (error) {
             // 사용자의 중단과 달리 네트워크 오류는 같은 실행을 다시 구독해 이어받습니다.
-            if (combined.aborted) throw error
+            if (combined.aborted || error instanceof RemoteResponseLimitError) throw error
           }
           if (finished || failed) break
           combined.throwIfAborted()
@@ -429,18 +456,22 @@ export class RemoteChatStore implements ChatStoreLike {
           })
         }
       } catch (error) {
+        if (error instanceof RemoteResponseLimitError) {
+          limited = true
+          cancel()
+        }
         if (!combined.aborted && !failed) {
           yield { type: EventType.RUN_ERROR, message: error instanceof Error ? error.message : String(error) }
         }
       } finally {
         combined.removeEventListener('abort', cancel)
-        if (cancelled) {
+        if (cancelled && !limited) {
           await cancelled
           // 취소 전에 호스트가 기록한 부분 응답까지 저장하도록 종료된 journal의 나머지를 읽습니다.
           // 호스트가 실행을 끝냈으므로 구독은 마지막 기록에서 끝납니다.
           try {
             const rest = await this.call(`/runs/${encodeURIComponent(runId)}/events?afterSequence=${cursor}`)
-            for await (const frame of this.frames(rest, new AbortController().signal)) {
+            for await (const frame of this.frames(rest, new AbortController().signal, budget)) {
               if (frame.id === undefined || frame.id <= cursor) continue
               cursor = frame.id
               projection.apply(frame.event)
@@ -467,35 +498,60 @@ export class RemoteChatStore implements ChatStoreLike {
   }
 
   /** SSE 응답을 프레임으로 읽습니다. id 줄은 journal sequence이며 재연결 커서로 사용합니다. */
-  private async *frames(response: Response, signal: AbortSignal): AsyncGenerator<StreamFrame> {
+  private async *frames(
+    response: Response,
+    signal: AbortSignal,
+    budget: RemoteStreamBudget
+  ): AsyncGenerator<StreamFrame> {
     if (!response.body) throw new Error('Keundal host returned an empty stream')
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
-    let buffer = ''
+    // Include SSE id/data framing overhead around a maximum-size host event.
+    const limit = STREAM_LIMITS.eventBytes + 1024
+    let buffer = new Uint8Array(4096)
+    let length = 0
     try {
       while (true) {
         signal.throwIfAborted()
         const { done, value } = await reader.read()
+        signal.throwIfAborted()
         if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        let boundary = buffer.indexOf('\n\n')
-        while (boundary >= 0) {
-          const chunk = buffer.slice(0, boundary)
-          buffer = buffer.slice(boundary + 2)
+        budget.read(value.byteLength)
+        for (const byte of value) {
+          if (length === limit) throw new RemoteResponseLimitError('Remote response frame byte limit exceeded')
+          if (length === buffer.length) {
+            const next = new Uint8Array(Math.min(buffer.length * 2, limit))
+            next.set(buffer)
+            buffer = next
+          }
+          buffer[length++] = byte
+          if (
+            byte !== 10 ||
+            !(
+              buffer[length - 2] === 10 ||
+              (length >= 4 && buffer[length - 2] === 13 && buffer[length - 3] === 10 && buffer[length - 4] === 13)
+            )
+          )
+            continue
+          budget.frame()
+          const chunk = decoder.decode(buffer.subarray(0, length))
+          length = 0
           let id: number | undefined
           let data: string | undefined
-          for (const line of chunk.split('\n')) {
+          for (const line of chunk.split(/\r?\n/)) {
             if (line.startsWith('id: ')) id = Number(line.slice(4))
             else if (line.startsWith('data: ')) data = line.slice(6)
           }
           if (data !== undefined) {
-            const event = parseAGUIEvent(JSON.parse(data))
+            const value: unknown = JSON.parse(data)
+            budget.event(value)
+            const event = parseAGUIEvent(value)
             yield Number.isSafeInteger(id) ? { id, event } : { event }
           }
-          boundary = buffer.indexOf('\n\n')
         }
       }
     } finally {
+      void reader.cancel().catch(() => {})
       reader.releaseLock()
     }
   }

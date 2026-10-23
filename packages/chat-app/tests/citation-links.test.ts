@@ -29,8 +29,8 @@ function render(component: Vue.Component, props: Record<string, unknown>) {
   const app = Vue.createSSRApp(component, props)
   Object.assign(app.config.globalProperties, urls)
   app.component('UButton', Vue.defineComponent({
-    props: ['to', 'label'],
-    setup: props => () => Vue.h('a', { href: props.to }, props.label)
+    props: ['to', 'label', 'avatar'],
+    setup: props => () => Vue.h('a', { href: props.to }, [props.avatar ? Vue.h('img', { src: props.avatar.src }) : null, props.label])
   }))
   return renderToString(app)
 }
@@ -84,4 +84,16 @@ describe('인용 링크의 URL 검증', () => {
       expect(html).toContain('href="https://example.com/"')
     }
   })
+})
+
+
+test('인용 컴포넌트는 저장된 favicon 속성과 도구 출처에서 자동 요청을 만들지 않는다', async () => {
+  const url = 'https://example.com/source'
+  const inline = await render(SourceLink, { url, label: '출처', favicon: 'https://attacker.example/leak' })
+  const list = await render(Sources, { sources: [{ url, title: '출처' }] })
+  for (const html of [inline, list]) {
+    expect(html).toContain('href="https://example.com/source"')
+    expect(html).not.toContain('<img')
+    expect(html).not.toContain('src=')
+  }
 })

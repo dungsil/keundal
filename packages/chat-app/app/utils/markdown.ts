@@ -23,12 +23,12 @@ import xml from '@shikijs/langs/xml'
 
 const markdownAttributes = new Set([
   'class', 'classname', 'id', 'title', 'style',
-  'href', 'target', 'rel', 'src', 'alt', 'width', 'height',
+  'href', 'target', 'rel', 'alt', 'width', 'height',
   'start', 'align', 'colspan', 'rowspan',
   'type', 'disabled', 'checked', 'open',
   'code', 'language', 'filename', 'highlights', 'meta'
 ])
-const sourceAttributes = new Set(['url', 'favicon', 'label'])
+const sourceAttributes = new Set(['url', 'label'])
 
 export const chatMarkdownOptions = {
   plugins: [
@@ -54,11 +54,21 @@ export const chatMarkdownOptions = {
         graphql
       ]
     }),
+    defineComarkPlugin(() => ({
+      name: 'chat-image-links',
+      post(state) {
+        visit(state.tree, node => Array.isArray(node), (node) => {
+          if (typeof node === 'string' || node[0] !== 'img') return
+          const { src, alt } = node[1]
+          node.splice(0, node.length, 'a', { href: typeof src === 'string' ? src : '' }, typeof alt === 'string' ? alt : 'Image')
+        })
+      }
+    }))(),
     security({
       allowedTags: [
         'p', 'br', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'blockquote', 'ul', 'ol', 'li', 'strong', 'em', 's', 'del',
-        'a', 'img', 'pre', 'code', 'span', 'div',
+        'a', 'pre', 'code', 'span', 'div',
         'table', 'thead', 'tbody', 'tr', 'th', 'td',
         'input', 'details', 'summary', 'sup', 'sub', 'kbd', 'mark',
         'source-link'
@@ -73,6 +83,17 @@ export const chatMarkdownOptions = {
           if (typeof node === 'string') return
           node[1] = Object.fromEntries(Object.entries(node[1]).flatMap(([key, value]) => {
             const name = key.toLowerCase()
+            // Only inert Shiki styles survive, including styles on reused streaming nodes.
+            if (name === 'style') {
+              if (typeof value !== 'string') return []
+              const styles = value.split(';').filter(declaration => [
+                /^\s*(?:color|background-color|--shiki-(?:light|dark)(?:-bg)?):\s*#[0-9a-f]{3,8}\s*$/i,
+                /^\s*(?:font-style|--shiki-(?:light|dark)-font-style):\s*(?:normal|italic|oblique)\s*$/i,
+                /^\s*(?:font-weight|--shiki-(?:light|dark)-font-weight):\s*(?:normal|bold|[1-9]00)\s*$/i,
+                /^\s*(?:text-decoration|--shiki-(?:light|dark)-text-decoration):\s*(?:none|underline|line-through)\s*$/i
+              ].some(pattern => pattern.test(declaration))).join(';')
+              return styles ? [[key, styles]] : []
+            }
             if (node[0] === 'input' && [':disabled', ':checked'].includes(name) && value === 'true') {
               return [[name.slice(1), true]]
             }
@@ -86,6 +107,7 @@ export const chatMarkdownOptions = {
             }
             return [[key, value]]
           }))
+          if (node[0] === 'a') node[1].noPrefetch = true
         })
       }
     }))()

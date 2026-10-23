@@ -55,15 +55,7 @@ onBeforeUnmount(() => observer?.disconnect())
         class="flex items-center gap-2 px-2 py-1 text-sm text-muted min-w-0 rounded-md"
         :class="source.href && 'hover:text-default hover:bg-elevated/50 transition-colors'"
       >
-        <img
-          v-if="source.href"
-          :src="getFaviconUrl(source.url)"
-          alt=""
-          class="size-4 shrink-0 rounded-sm"
-          loading="lazy"
-          @error="($event.target as HTMLImageElement).style.display = 'none'"
-        >
-        <span v-else class="size-4 shrink-0" aria-hidden="true" />
+        <UIcon name="i-lucide-link" class="size-4 shrink-0" aria-hidden="true" />
         <span class="truncate">{{ source.title || source.domain }}</span>
         <span v-if="source.title" class="text-xs text-muted ms-auto shrink-0 max-w-[40%] truncate">{{ source.domain }}</span>
       </component>
