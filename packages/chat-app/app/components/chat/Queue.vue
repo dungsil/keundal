@@ -43,11 +43,12 @@ function preview(message: ChatMessage) {
     <p v-if="paused" class="mt-1 text-muted">
       {{ t('chat.queuePaused') }}
     </p>
-    <ol class="mt-2 flex flex-col gap-1">
+    <!-- 목록만 높이를 제한합니다. p-1과 음수 마진은 레이아웃 크기를 유지하면서 삭제 버튼의 포커스 링이 스크롤 경계에서 잘리지 않게 합니다. -->
+    <ol class="mt-1 -mx-1 -mb-1 flex max-h-32 flex-col gap-1 overflow-y-auto p-1">
       <li v-for="(message, index) in queue" :key="message.id" class="flex items-center gap-2">
-        <span class="text-muted tabular-nums">{{ index + 1 }}.</span>
+        <span class="w-[4ch] shrink-0 text-right text-muted tabular-nums">{{ index + 1 }}.</span>
         <UTooltip :text="preview(message)" :content="{ side: 'top' }">
-          <span class="min-w-0 flex-1 truncate">{{ preview(message) }}</span>
+          <span dir="auto" class="min-w-0 flex-1 truncate">{{ preview(message) }}</span>
         </UTooltip>
         <UButton
           icon="i-lucide-x"
