@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { SlotRoot } from '@keundal/ui-slots'
 import { en, ko } from '@nuxt/ui/locale'
-import { greetingTimeScript } from './utils/greeting'
 
 const { locale, t } = useLocale()
 const uiLocale = computed(() => locale.value === 'ko' ? ko : en)
@@ -13,8 +13,8 @@ const startupReady = ref(false)
 const splashLeaving = ref(false)
 const splashGone = ref(false)
 const mounted = ref(false)
-const startupPending = useState<Record<string, boolean>>('startup-pending', () => ({}))
-const modelSwitching = useState('model-switching', () => false)
+const { $ui } = useNuxtApp()
+const runtime = $ui.chatRuntime
 let splashTimer: ReturnType<typeof setTimeout> | undefined
 
 onNuxtReady(() => {
@@ -22,8 +22,7 @@ onNuxtReady(() => {
 })
 
 watch(
-  () => mounted.value && !colorMode.unknown && !modelSwitching.value
-    && !Object.values(startupPending.value).some(Boolean),
+  () => mounted.value && !colorMode.unknown && runtime.ready.value,
   async (ready, _, onCleanup) => {
     if (!ready || startupReady.value) return
     let cancelled = false
@@ -65,13 +64,6 @@ useHead({
   link: [
     { rel: 'icon', href: '/favicon.ico' }
   ],
-  script: [
-    {
-      key: 'greeting-time',
-      tagPriority: 'critical',
-      innerHTML: greetingTimeScript
-    }
-  ],
   htmlAttrs: {
     lang: locale
   }
@@ -95,9 +87,7 @@ useSeoMeta({
     <div :inert="!startupReady" :aria-busy="!startupReady" style="display: contents;">
       <NuxtLoadingIndicator color="var(--ui-primary)" />
 
-      <NuxtLayout>
-        <NuxtPage />
-      </NuxtLayout>
+      <SlotRoot :service="$ui.slots" />
     </div>
   </UApp>
 </template>

@@ -13,7 +13,7 @@ import { expect, onTestFinished, test } from 'vitest'
 import { ChatStore } from '@keundal/plugin-chat-local'
 import { browserLLMPlugin } from '@keundal/plugin-llm-browser'
 import { defaultLLMSettings } from '@keundal/llm-settings'
-import { useKeundalChat } from '../app/composables/useKeundalChat'
+import { useKeundalChat } from '../../ui-chat/app/lib/use-keundal-chat'
 
 const model = 'openai/gpt-5-nano'
 const user: ChatMessage = { id: 'user', role: 'user', parts: [

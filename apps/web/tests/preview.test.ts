@@ -4,7 +4,9 @@ import { createServer } from 'node:net'
 import { runInNewContext } from 'node:vm'
 import { DomUtils, parseDocument } from 'htmlparser2'
 import { expect, onTestFinished, test } from 'vitest'
-import { translate } from '../../../packages/ui/app/utils/locale'
+import { translateMessages } from '../../../packages/ui/app/utils/locale'
+import homeEn from '../../../packages/ui-home/app/locales/en'
+import homeKo from '../../../packages/ui-home/app/locales/ko'
 
 function readHeadScripts(html: string) {
   const document = parseDocument(html)
@@ -108,7 +110,7 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(heading).toBeDefined()
     for (const period of ['morning', 'afternoon', 'evening'] as const) {
       expect(heading).toContain(`data-greeting="${period}"`)
-      expect(heading).toContain(translate(language === 'ko' ? 'ko' : 'en', `greeting.${period}`))
+      expect(heading).toContain(translateMessages({ en: homeEn, ko: homeKo }, language === 'ko' ? 'ko' : 'en', `greeting.${period}`))
     }
     expect(html).not.toContain(`aria-label="${language === 'ko' ? '스킬' : 'Skills'}"`)
     expect(html).toContain(`aria-label="${language === 'ko' ? '설정' : 'Settings'}"`)

@@ -15,7 +15,7 @@ import { Context } from 'cordis'
 import { IDBFactory } from 'fake-indexeddb'
 import { expect, onTestFinished, test } from 'vitest'
 
-import { useKeundalChat } from '../app/composables/useKeundalChat'
+import { useKeundalChat } from '../../ui-chat/app/lib/use-keundal-chat'
 
 const model = 'openai/gpt-5-nano'
 const backends = ['memory', 'indexeddb', 'sqlite'] as const

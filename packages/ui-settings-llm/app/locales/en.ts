@@ -1,0 +1,49 @@
+export default {
+  'common.key': 'Key',
+  'common.value': 'Value',
+  'llm.title': 'LLM settings',
+  'llm.providerType': 'Provider type',
+  'llm.addProvider': 'Add provider',
+  'llm.invalidName': 'Use a provider name of up to 100 characters.',
+  'llm.providerName': 'Provider name',
+  'llm.noProviders': 'No providers registered. Add a provider to get started.',
+  'llm.registeredProviders': 'Registered providers',
+  'llm.configureProvider': 'Continue setup',
+  'llm.provider': 'Provider',
+  'llm.apiKey': 'API key',
+  'llm.apiKeyPlaceholder': 'Enter your API key',
+  'llm.baseURL': 'API base URL (optional)',
+  'llm.baseURLDescription':
+    'Leave empty for the official endpoint. A custom endpoint receives your key and must support browser CORS.',
+  'llm.modelsDescription':
+    'Models are loaded automatically from this provider after saving. Choose the active model in the chat composer.',
+  'llm.headers': 'Request headers (optional)',
+  'llm.headersDescription':
+    'Custom headers override provider defaults for HTTP requests, including model discovery. Your endpoint must allow them via CORS; browser-forbidden headers cannot be set. WebSocket connections cannot use custom headers.',
+  'llm.addHeader': 'Add header',
+  'llm.headerKeyRequired': 'Enter a key for every request header value.',
+  'llm.duplicateHeaders': 'Duplicate request header names',
+  'llm.removed': 'Provider settings removed',
+  'llm.savedOS': 'Settings saved in OS secret store',
+  'llm.savedBrowser': 'Settings saved in this browser',
+  'llm.saveFailedOS': 'Could not save or apply settings. Check your OS secret store and local host, then try again.',
+  'llm.saveFailedBrowser': 'Could not save settings. Check that browser storage is available.',
+  'llm.descriptionOS': 'Your settings are saved in your OS secret store. Requests go directly to the provider.',
+  'llm.descriptionBrowser': 'Your keys stay in this browser. Requests go directly to the provider.',
+  'llm.protectedOS': 'Protected by your OS secret store',
+  'llm.browserWarning': 'Browser storage is not a secure vault',
+  'llm.storageOS':
+    'API keys, URLs and headers are saved in macOS Keychain, Windows Credential Manager or Linux Secret Service, not localStorage. Settings are available in app memory while in use and are not synced to your account.',
+  'llm.storageBrowser':
+    'Keys and headers are stored unencrypted in localStorage. Scripts on this site and browser extensions may read them. Do not use a shared browser. Settings are not synced to your account.',
+  'llm.forget': 'Forget provider',
+  'llm.saveOS': 'Save in OS secret store',
+  'llm.saveBrowser': 'Save in this browser',
+  'llm.headerKey': 'Header {index} key',
+  'llm.headerValue': 'Header {index} value',
+  'llm.removeHeader': 'Remove header {index}',
+  'llm.invalidKey': 'API key must contain at most 4096 characters and no line breaks.',
+  'llm.invalidURL': 'Use an HTTPS API URL without credentials, query or fragment (HTTP is allowed for localhost)',
+  'llm.invalidHeaders':
+    'Use unique HTTP header names and ASCII values without line breaks (at most 4096 characters per value).'
+}

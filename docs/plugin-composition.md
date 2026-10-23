@@ -1,11 +1,12 @@
 # 플랫폼별 플러그인 조립
 
-web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도구를 런타임 JSON 설정으로 선택합니다. 앱의 `app/platform.ts`는 실행 환경과 기본 플러그인 목록을 제공합니다. 공통 채팅 레이어는 `ChatPlatform` 계약으로 설정·대화·모델 목록·받아쓰기를 사용합니다.
+web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도구를 런타임 JSON 설정으로 선택합니다. 앱의 `app/platform.ts`는 실행 환경과 기본 플러그인 목록을 제공합니다. 공통 채팅 레이어는 `@keundal/ui-runtime`을 거쳐 `ChatPlatform` 계약으로 설정·대화·모델 목록·받아쓰기를 사용합니다. 화면 구성은 [UI 플러그인 문서](ui-plugins.md)를 따릅니다.
 
 | 경계                                        | 담당 패키지 또는 경로                   |
 | ------------------------------------------- | --------------------------------------- |
 | 채팅 데이터와 플랫폼 계약                   | `@keundal/chat`                         |
-| 화면과 Vue 상태                             | `@keundal/chat-app`                     |
+| 화면 셸과 UI 플러그인 조립                  | `@keundal/chat-app`                     |
+| 화면 기능과 공유 화면 상태                  | `@keundal/ui-*`, `@keundal/ui-runtime`  |
 | Cordis 서비스로 대화 실행                   | `@keundal/plugin-chat-local`            |
 | HTTP 호스트 연결                            | `@keundal/plugin-chat-remote`           |
 | sidecar·OS 보안 저장소·로컬 스킬 IPC        | `@keundal/plugin-chat-desktop`          |

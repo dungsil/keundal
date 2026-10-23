@@ -4,8 +4,9 @@ import * as Vue from 'vue'
 import { compileScript, parse } from 'vue/compiler-sfc'
 import { renderToString } from 'vue/server-renderer'
 import ts from 'typescript'
-import * as urls from '../app/utils/url'
-import { getSources, sourceToInlineMdc } from '../app/utils/tool'
+import * as urls from '../../ui/app/utils/url'
+import { sourceToInlineMdc } from '../../ui-chat/app/lib/source'
+import { getSources } from '../../ui-tool/app/lib/tool'
 
 // Compile the actual SFCs, including their attribute inheritance and templates.
 function component(path: string): Vue.Component {
@@ -22,8 +23,8 @@ function component(path: string): Vue.Component {
   return exports.default
 }
 
-const SourceLink = component('../app/components/chat/SourceLink.vue')
-const Sources = component('../app/components/chat/tool/Sources.vue')
+const SourceLink = component('../../ui/app/components/chat/SourceLink.vue')
+const Sources = component('../../ui-tool/app/views/Sources.vue')
 
 function render(component: Vue.Component, props: Record<string, unknown>) {
   const app = Vue.createSSRApp(component, props)
