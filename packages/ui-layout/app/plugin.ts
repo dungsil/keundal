@@ -14,6 +14,7 @@ export function apply(ctx: Context) {
     children: {
       'page.home': 'single',
       'page.chat': 'single',
+      'page.history': 'single',
       'page.settings': 'single',
       'layout.sidebar': 'list',
       'layout.sidebar.footer': 'list',

@@ -43,5 +43,6 @@ export default {
     'LLM 설정을 불러오지 못했습니다. 운영체제 보안 저장소의 잠금을 해제한 뒤 앱을 다시 시작하세요. 브라우저 저장소에는 대신 저장하지 않습니다.',
   'mcp.tools': '허용할 도구',
   'mcp.resources': '허용할 리소스 URI',
-  'mcp.permissions': '이름이나 URI를 한 줄에 하나씩 입력하세요. *는 전체 허용이며, 비워 두면 접근을 차단합니다.'
+  'mcp.permissions': '이름이나 URI를 한 줄에 하나씩 입력하세요. *는 전체 허용이며, 비워 두면 접근을 차단합니다.',
+  'settings.title': '설정'
 } satisfies Record<keyof typeof en, string>

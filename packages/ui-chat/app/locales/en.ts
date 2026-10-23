@@ -32,5 +32,10 @@ export default {
   'chat.sharedTitle': 'Chat shared',
   'chat.share': 'Share chat',
   'chat.sharingUnavailable': 'Stored only in this browser. Public sharing is unavailable.',
-  'error.response': 'Response failed'
+  'error.response': 'Response failed',
+  'chat.scrollToBottom': 'Scroll to latest message',
+  'chat.loadOlder': 'Load older messages ({count})',
+  'chat.copyLink': 'Copy message link',
+  'chat.copyFailed': 'Could not copy to clipboard',
+  'chat.exportMarkdown': 'Export as Markdown'
 }

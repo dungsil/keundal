@@ -20,54 +20,85 @@ export function useModelCatalog(
   const loading = ref(false)
   const error = ref('')
   let active: AbortController | undefined
-  let previousIds: string[] = []
+  let pending: Promise<void> | undefined
+  let pendingForce = false
+  let previous: Partial<LLMSettings> = {}
+  let identity = ''
 
-  async function refresh(force = false) {
+  function refresh(force = false): Promise<void> {
+    // Snapshot before awaiting: Vue settings can change while a provider is responding.
+    const nextIdentity = JSON.stringify(settings.value)
+    if (pending && identity === nextIdentity && (!force || pendingForce)) return pending
     active?.abort()
     const controller = (active = new AbortController())
-    const ids = Object.keys(settings.value)
-    for (const id of previousIds.filter((id) => !ids.includes(id))) {
+    const snapshot: LLMSettings = JSON.parse(nextIdentity)
+    identity = nextIdentity
+    const ids = Object.keys(snapshot)
+    const unchanged = ids.filter((id) => JSON.stringify(previous[id]) === JSON.stringify(snapshot[id]))
+    models.value = models.value.filter((model) => unchanged.includes(model.value.split('/')[0]!))
+    for (const id of Object.keys(previous).filter((id) => !unchanged.includes(id))) {
       try {
         localStorage.removeItem(`keundal:models:${id}`)
       } catch {
         /* Storage may be unavailable. */
       }
     }
-    previousIds = ids
+    previous = snapshot
     loading.value = true
     error.value = ''
-    const results = await Promise.all(
-      configuredProviders(settings.value).map(async (provider) => {
-        const configured = settings.value[provider.id]
+    const results = new Map<string, ModelOption[]>()
+    for (const id of ids)
+      results.set(
+        id,
+        models.value.filter((model) => model.value.startsWith(`${id}/`))
+      )
+    const publish = () => {
+      models.value = ids.flatMap((id) => results.get(id) ?? [])
+    }
+    const work = Promise.all(
+      configuredProviders(snapshot).map(async (provider) => {
+        const configured = snapshot[provider.id]
         if (!configured?.apiKey && !configured?.baseURL && !Object.keys(configured?.headers ?? {}).length) {
           try {
             localStorage.removeItem(`keundal:models:${provider.id}`)
           } catch {
-            // Storage may be unavailable.
+            /* Storage may be unavailable. */
           }
-          return []
+          results.set(provider.id, [])
+          return
         }
         try {
-          return await loadModels(provider.id, settings.value, localStorage, { force, signal: controller.signal })
+          const available = await loadModels(provider.id, snapshot, localStorage, { force, signal: controller.signal })
+          if (controller.signal.aborted) return
+          results.set(provider.id, available)
         } catch (cause) {
-          if (!controller.signal.aborted)
-            error.value += `${cause instanceof Error ? cause.message : loadErrorMessage()} `
-          return models.value.filter((model) => model.value.startsWith(`${provider.id}/`))
+          if (controller.signal.aborted) return
+          error.value += `${cause instanceof Error ? cause.message : loadErrorMessage()} `
+          // The loader owns stale-cache expiry; never retain failed results indefinitely.
+          results.set(provider.id, [])
         }
+        publish()
       })
     )
-    if (controller.signal.aborted) return
-    models.value = results.flat()
-    loading.value = false
+      .then(() => {
+        if (controller.signal.aborted) return
+        publish()
+        loading.value = false
+      })
+      .finally(() => {
+        if (active === controller) pending = undefined
+      })
+    pendingForce = force
+    pending = work
+    return work
   }
 
   watch(
     settings,
     () => {
-      models.value = []
       void refresh()
     },
-    { deep: true, immediate: true }
+    { deep: true, immediate: true, flush: 'sync' }
   )
   onScopeDispose(() => active?.abort())
   return { models, loading, error, refresh }

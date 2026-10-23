@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import type { ModelOption } from '@keundal/chat/models'
+import { resolveModel, type ModelOption } from '@keundal/chat/models'
+import { FALLBACK_MODEL, providerIcon } from '@keundal/llm-settings'
+import { useMounted } from '@vueuse/core'
 import type { Ref } from 'vue'
 
 import { useText } from '../locale'
@@ -15,21 +17,27 @@ const props = defineProps<{
   refresh: (force?: boolean) => Promise<void>
 }>()
 
+const mounted = useMounted()
+// Browser preferences are loaded before hydration; keep the initial markup server-stable.
+const fallback = resolveModel(FALLBACK_MODEL)
+const displayedModels = computed(() => mounted.value ? props.models.value : [{
+  value: fallback.value, label: fallback.id, icon: providerIcon(fallback.configuration)
+}])
 const selected = computed({
-  get: () => props.selectedModel.value,
-  set: (value: string) => { props.selectedModel.value = value }
+  get: () => mounted.value ? props.selectedModel.value : fallback.value,
+  set: (value: string) => { if (mounted.value) props.selectedModel.value = value }
 })
-const current = computed(() => props.models.value.find(model => model.value === selected.value))
+const current = computed(() => displayedModels.value.find(model => model.value === selected.value))
 </script>
 
 <template>
   <USelectMenu
     v-model="selected"
-    :items="models.value"
+    :items="displayedModels"
     :aria-label="`${t('model.select')}: ${current?.label || selected}`"
-    :loading="loading.value"
-    :aria-busy="loading.value"
-    :disabled="switching.value"
+    :loading="mounted && loading.value"
+    :aria-busy="mounted && loading.value"
+    :disabled="!mounted || switching.value"
     size="sm"
     :icon="current?.icon"
     color="neutral"
@@ -61,7 +69,7 @@ const current = computed(() => props.models.value.find(model => model.value === 
           size="xs"
           color="neutral"
           variant="ghost"
-          :loading="loading.value"
+          :loading="mounted && loading.value"
           @click.stop="refresh()"
         />
       </div>

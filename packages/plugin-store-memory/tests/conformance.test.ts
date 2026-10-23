@@ -1,10 +1,15 @@
 import { LLMService, type LLMEvent, type LLMModel } from '@keundal/core'
 import memoryStorePlugin, { MemoryStore } from '@keundal/plugin-store-memory'
-import { expectedConformanceReport, runStoreConformance, type ConformanceStore } from '@keundal/store-conformance'
+import {
+  checkConcurrentCommitProperties,
+  expectedConformanceReport,
+  runStoreConformance,
+  type ConformanceStore
+} from '@keundal/store-conformance'
 import { Context, type Fiber } from 'cordis'
-import { expect, test } from 'vitest'
+import { assert, expect, test } from 'vitest'
 
-test('저장소 적합성 시나리오를 통과한다', async () => {
+test('저장소 적합성과 동시 커밋의 단일 반영 및 journal 재생을 검증한다', async () => {
   const makeStore = async (): Promise<ConformanceStore> => {
     const ctx = new Context()
     class LLM extends LLMService {
@@ -29,6 +34,7 @@ test('저장소 적합성 시나리오를 통과한다', async () => {
     }
   }
 
+  await checkConcurrentCommitProperties(makeStore, assert)
   const report = await runStoreConformance(makeStore)
   expect(report).toEqual(expectedConformanceReport)
   await checkSessionEditing(await makeStore())

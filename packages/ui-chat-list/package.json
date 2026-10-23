@@ -12,6 +12,7 @@
     "@keundal/ui": "workspace:*",
     "@keundal/ui-layout": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
+    "@keundal/ui-settings": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
     "cordis": "catalog:",
     "date-fns": "^4.4.0",

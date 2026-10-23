@@ -2,6 +2,7 @@
 import { useClipboard } from '@vueuse/core'
 
 import type { ChatMessage } from '@keundal/chat/chat-message'
+import { messagePermalink } from '../../lib/chat-transcript'
 import { useText } from '../../locale'
 
 const { t, intlLocale } = useText()
@@ -37,27 +38,52 @@ const hasFiles = computed(() => props.message.parts.some(part => part.type === '
 const clipboard = useClipboard()
 
 const copied = ref(false)
-
+const toast = useToast()
 let copiedTimer: ReturnType<typeof setTimeout> | undefined
+onBeforeUnmount(() => clearTimeout(copiedTimer))
 
-function copy() {
-  clipboard.copy(
-    props.message.parts
-      .filter(part => part.type === 'text')
-      .map(part => part.text)
-      .join('')
-  )
+async function copyLink() {
+  try {
+    await navigator.clipboard.writeText(messagePermalink(window.location.href, props.message.id))
+    toast.add({ description: t('chat.copied'), icon: 'i-lucide-check' })
+  } catch {
+    toast.add({ description: t('chat.copyFailed'), color: 'error' })
+  }
+}
 
-  copied.value = true
+async function copy() {
+  try {
+    await clipboard.copy(
+      props.message.parts
+        .filter(part => part.type === 'text')
+        .map(part => part.text)
+        .join('')
+    )
 
-  clearTimeout(copiedTimer)
-  copiedTimer = setTimeout(() => {
-    copied.value = false
-  }, 2000)
+    copied.value = true
+
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => {
+      copied.value = false
+    }, 2000)
+  } catch {
+    toast.add({ description: t('chat.copyFailed'), color: 'error' })
+  }
 }
 </script>
 
 <template>
+  <UTooltip v-if="!streaming && !editing" :text="t('chat.copyLink')">
+    <UButton
+      size="sm"
+      color="neutral"
+      variant="ghost"
+      icon="i-lucide-link"
+      :aria-label="t('chat.copyLink')"
+      :data-message-link="message.id"
+      @click="copyLink"
+    />
+  </UTooltip>
   <template v-if="message.role === 'assistant' && !streaming">
     <span role="status" class="sr-only">{{ copied ? t('chat.copied') : '' }}</span>
 

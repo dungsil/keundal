@@ -33,5 +33,10 @@ export default {
   'chat.sharedTitle': '공유된 대화',
   'chat.share': '대화 공유',
   'chat.sharingUnavailable': '대화는 이 브라우저에만 저장됩니다. 공개 공유는 지원하지 않습니다.',
-  'error.response': '응답 생성 실패'
+  'error.response': '응답 생성 실패',
+  'chat.scrollToBottom': '최신 메시지로 이동',
+  'chat.loadOlder': '이전 메시지 보기 ({count})',
+  'chat.copyLink': '메시지 링크 복사',
+  'chat.copyFailed': '클립보드에 복사하지 못했습니다',
+  'chat.exportMarkdown': 'Markdown으로 내보내기'
 } satisfies Record<keyof typeof en, string>

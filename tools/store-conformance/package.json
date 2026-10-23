@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@keundal/core": "workspace:*"
+    "@keundal/core": "workspace:*",
+    "fast-check": "4.9.0"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",

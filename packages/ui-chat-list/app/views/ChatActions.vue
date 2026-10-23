@@ -26,7 +26,7 @@ const { t } = useText()
       onSelect: () => {
         openSearch()
       }
-    }]"
+    }, { label: t('history.title'), to: '/history', icon: 'i-lucide-history', 'aria-label': collapsed ? t('history.title') : undefined }]"
     :collapsed="collapsed"
     orientation="vertical"
   >

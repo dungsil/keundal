@@ -1,14 +1,19 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import { LLMService, type LLMEvent, type LLMModel } from '@keundal/core'
 import sqliteStorePlugin from '@keundal/plugin-store-sqlite'
-import { expectedConformanceReport, runStoreConformance, type ConformanceStore } from '@keundal/store-conformance'
+import {
+  checkConcurrentCommitProperties,
+  expectedConformanceReport,
+  runStoreConformance,
+  type ConformanceStore
+} from '@keundal/store-conformance'
 import { Context, type Fiber } from 'cordis'
-import { expect, test } from 'vitest'
+import { assert, expect, test } from 'vitest'
 
-test('저장소 적합성 시나리오를 통과한다', async () => {
+test('저장소 적합성과 동시 커밋의 단일 반영 및 journal 재생을 검증한다', async () => {
   const makeStore = async (): Promise<ConformanceStore> => {
     const path = join(mkdtempSync(join(tmpdir(), 'conformance-')), 'db.sqlite')
     const ctx = new Context()
@@ -29,11 +34,16 @@ test('저장소 적합성 시나리오를 통과한다', async () => {
       session: ctx.session,
       generation: ctx.generation,
       disposeAll: async () => {
-        for (const fiber of fibers.toReversed()) await fiber.dispose()
+        try {
+          for (const fiber of fibers.toReversed()) await fiber.dispose()
+        } finally {
+          rmSync(dirname(path), { recursive: true, force: true })
+        }
       }
     }
   }
 
+  await checkConcurrentCommitProperties(makeStore, assert)
   const report = await runStoreConformance(makeStore)
   expect(report).toEqual(expectedConformanceReport)
   const store = await makeStore()

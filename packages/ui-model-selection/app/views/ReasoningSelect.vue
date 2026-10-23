@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { SelectProps } from '@nuxt/ui'
+import { useMounted } from '@vueuse/core'
 import type { AriaAttributes, Ref } from 'vue'
 
 import { useText } from '../locale'
 
 const { t } = useText()
+// Browser preferences are loaded before hydration; render the control only after mounting.
+const mounted = useMounted()
 
 const props = defineProps<{
   reasoning: Ref<string>
@@ -23,7 +26,7 @@ const content = computed<NonNullable<SelectProps['content']> & Pick<AriaAttribut
 
 <template>
   <USelect
-    v-if="reasoningLevels.value.length"
+    v-if="mounted && reasoningLevels.value.length"
     v-model="selected"
     :items="items"
     :aria-label="t('prompt.reasoningLevel')"

@@ -14,7 +14,13 @@ const categoryLabels = {
 // A median score at or below this value blocks the merge.
 export const blockingScore = 70
 
-export function summarize(reports, collect = config.ci.collect) {
+export function summarize(reports, collect = config.ci.collect, budgets = config.ci.budgets) {
+  for (const name of ['performance', 'accessibility', 'cls']) {
+    const value = budgets[name]
+    if (!Number.isFinite(value) || value < 0 || (name !== 'cls' && value > 100)) {
+      throw new Error(`Invalid Lighthouse budget: ${name}`)
+    }
+  }
   const failures = []
   const rows = collect.url.map((url) => {
     const path = new URL(url).pathname
@@ -38,21 +44,29 @@ export function summarize(reports, collect = config.ci.collect) {
       }
       values.sort((a, b) => a - b)
       const score = Math.round(values[Math.floor(values.length / 2)] * 100)
-      if (score <= blockingScore) failures.push(`${path}의 ${categoryLabels[category]} ${score}점`)
+      if (score < (budgets[category] ?? blockingScore + 1))
+        failures.push(`${path}의 ${categoryLabels[category]} ${score}점`)
       return score
     })
-    return `| ${path} | ${scores.join(' | ')} |`
+    const shifts = runs.map((report) => report.audits?.['cumulative-layout-shift']?.numericValue)
+    if (shifts.some((value) => typeof value !== 'number' || !Number.isFinite(value) || value < 0)) {
+      throw new Error(`${url}: missing cumulative-layout-shift value`)
+    }
+    shifts.sort((a, b) => a - b)
+    const cls = shifts[Math.floor(shifts.length / 2)]
+    if (cls > budgets.cls) failures.push(`${path}의 CLS ${cls} (최대 ${budgets.cls})`)
+    return `| ${path} | ${scores.join(' | ')} | ${cls.toFixed(3)} |`
   })
   const verdict = failures.length
-    ? [`${blockingScore}점 이하인 항목이 있어 병합을 차단합니다.`, '', ...failures.map((failure) => `- ${failure}`)]
-    : [`모든 항목이 ${blockingScore}점을 넘어 점수 기준을 통과했습니다.`]
+    ? ['예산을 초과한 항목이 있어 병합을 차단합니다.', '', ...failures.map((failure) => `- ${failure}`)]
+    : ['모든 항목이 점수와 CLS 기준을 통과했습니다.']
   const markdown = [
     '## Lighthouse 검사 결과',
     '',
-    `각 화면을 모바일 기본 설정으로 3회 측정한 항목별 중앙값입니다. 항목 하나라도 ${blockingScore}점 이하이면 병합을 차단합니다.`,
+    `각 화면을 모바일 기본 설정으로 ${collect.numberOfRuns}회 측정한 중앙값입니다. 성능 ${budgets.performance}점 이상, 접근성 ${budgets.accessibility}점 이상, 나머지 항목 ${blockingScore + 1}점 이상, CLS ${budgets.cls} 이하를 요구합니다. 이 값은 측정된 기준선이 아닌 초기 정책 예산입니다.`,
     '',
-    '| 경로 | 성능 | 접근성 | 권장사항 | SEO |',
-    '| --- | --- | --- | --- | --- |',
+    '| 경로 | 성능 | 접근성 | 권장사항 | SEO | CLS |',
+    '| --- | --- | --- | --- | --- | --- |',
     ...rows,
     '',
     ...verdict,

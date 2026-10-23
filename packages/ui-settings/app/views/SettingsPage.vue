@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { settingsReturnTo } from '@keundal/ui/app/utils/chat-navigation.ts'
 import { SlotOutlet, useSlotEntries } from '@keundal/ui-slots'
 
 import { useText } from '../locale'
@@ -9,10 +10,7 @@ const props = defineProps<{
 
 const { t, locale } = useText()
 const route = useRoute()
-const returnTo = computed(() => {
-  const path = route.query.returnTo
-  return typeof path === 'string' && (path === '/' || /^\/chat\/[^/?#]+$/.test(path)) ? path : '/'
-})
+const returnTo = computed(() => settingsReturnTo(route.query.returnTo))
 
 const entries = useSlotEntries('settings.section')
 const sections = computed(() => entries.value.map(entry => ({

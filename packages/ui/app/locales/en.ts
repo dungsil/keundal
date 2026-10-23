@@ -41,5 +41,6 @@ export default {
     'Could not load LLM settings. Unlock your OS secret store and restart the app. No browser storage fallback is used.',
   'mcp.tools': 'Allowed tools',
   'mcp.resources': 'Allowed resource URIs',
-  'mcp.permissions': 'One name or URI per line. Use * to allow all; leave empty to deny access.'
+  'mcp.permissions': 'One name or URI per line. Use * to allow all; leave empty to deny access.',
+  'settings.title': 'Settings'
 }

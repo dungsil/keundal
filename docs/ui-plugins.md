@@ -77,6 +77,7 @@ Nuxt는 레이어의 `components`, `composables`, `utils`, `plugins`, `pages`, `
 ```text
 root                               ui-layout
 ├─ page.home                       ui-home
+├─ page.history                    ui-chat-list
 ├─ page.chat                       ui-chat
 │  ├─ chat.message.tool            ui-tool (항목이 없으면 기본 도구 카드)
 │  ├─ chat.message.footer          ui-trace

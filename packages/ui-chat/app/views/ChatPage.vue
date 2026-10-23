@@ -6,8 +6,9 @@ import type { ComposerOwner, DeliveryMode } from '@keundal/ui-composer/slots'
 import type { ChatSummary } from '@keundal/ui-runtime'
 import { SlotFactory, SlotOutlet } from '@keundal/ui-slots'
 import { useElementSize } from '@vueuse/core'
-import type { Ref } from 'vue'
+import { useTemplateRef, type Ref } from 'vue'
 
+import { TRANSCRIPT_PAGE_SIZE, anchoredTranscriptStart, chatMarkdown, countToReveal, messageAnchor, messageIdFromHash } from '../lib/chat-transcript'
 import { useKeundalChat } from '../lib/use-keundal-chat'
 import { useText } from '../locale'
 import type { ChatObserverOwner } from '../slots'
@@ -54,6 +55,7 @@ const props = defineProps<{
 }>()
 
 const { t } = useText()
+const route = useRoute()
 const prompt = useTemplateRef<HTMLDivElement>('prompt')
 const { height: promptHeight } = useElementSize(prompt)
 
@@ -152,6 +154,55 @@ const { messages, queue, status, error, sendMessage, regenerate, stop, resumeQue
   }
 })
 
+const visibleCount = ref(TRANSCRIPT_PAGE_SIZE)
+const firstRevealedId = ref<string>()
+const revealingHistory = ref(false)
+const hiddenCount = computed(() => anchoredTranscriptStart(messages.value, visibleCount.value, firstRevealedId.value))
+const visibleMessages = computed(() => messages.value.slice(hiddenCount.value))
+const transcript = useTemplateRef('transcript')
+
+async function loadOlder() {
+  const first = visibleMessages.value[0]
+  const anchor = first ? document.getElementById(messageAnchor(first.id)) : null
+  const previousTop = anchor?.getBoundingClientRect().top
+  let scroller = transcript.value?.parentElement ?? null
+  while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement
+  revealingHistory.value = true
+  visibleCount.value = messages.value.length - hiddenCount.value + TRANSCRIPT_PAGE_SIZE
+  firstRevealedId.value = visibleMessages.value[0]?.id
+  await nextTick()
+  scroller ??= document.documentElement
+  if (anchor && previousTop !== undefined) {
+    scroller.scrollTop += anchor.getBoundingClientRect().top - previousTop
+  }
+  if (hiddenCount.value === 0) anchor?.focus({ preventScroll: true })
+  revealingHistory.value = false
+}
+
+const linkedMessageExists = computed(() => messages.value.some(message => message.id === messageIdFromHash(route.hash)))
+watch([() => route.hash, linkedMessageExists, loading], async ([hash]) => {
+  const id = messageIdFromHash(hash)
+  if (!id || !messages.value.some(message => message.id === id)) return
+  revealingHistory.value = true
+  visibleCount.value = countToReveal(messages.value, messages.value.length - hiddenCount.value, id)
+  firstRevealedId.value = visibleMessages.value[0]?.id
+  await nextTick()
+  const target = document.getElementById(messageAnchor(id))
+  target?.scrollIntoView({ block: 'start' })
+  target?.focus({ preventScroll: true })
+  revealingHistory.value = false
+}, { immediate: true, flush: 'post' })
+
+function exportMarkdown() {
+  const blob = new Blob([chatMarkdown(title.value || t('chat.untitled'), messages.value)], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `chat-${chatId.replace(/[^a-zA-Z0-9_-]/g, '_')}.md`
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 async function handleSubmit(e: Event) {
   e.preventDefault()
   if (input.value.trim() && !uploading.value) {
@@ -209,6 +260,7 @@ watch(editingMessageId, async (current, previous) => {
 function startEdit(message: ChatMessage) {
   if (editingMessageId.value) return
 
+  firstRevealedId.value = visibleMessages.value[0]?.id
   editingMessageId.value = message.id
 }
 
@@ -317,6 +369,14 @@ onBeforeUnmount(() => {
           />
         </template>
 
+        <UButton
+          icon="i-lucide-download"
+          color="neutral"
+          variant="ghost"
+          :aria-label="t('chat.exportMarkdown')"
+          :title="t('chat.exportMarkdown')"
+          @click="exportMarkdown"
+        />
         <ChatVisibility
           v-if="isOwner"
           :chat-id="data!.id"
@@ -331,59 +391,73 @@ onBeforeUnmount(() => {
         <DragDropOverlay v-if="isOwner" :show="dragging" />
 
         <UContainer class="flex-1 flex flex-col gap-4 sm:gap-6">
-          <UChatMessages
-            role="log"
-            :aria-label="t('chat.messages')"
-            :aria-busy="status === 'submitted' || status === 'streaming'"
-            should-auto-scroll
-            :messages="messages"
-            :status="status"
-            :spacing-offset="isOwner ? 200 : 0"
-            class="pt-(--ui-header-height) pb-4 sm:pb-6"
-          >
-            <template #indicator>
-              <div class="flex items-center gap-1.5">
-                <ChatIndicator />
+          <div ref="transcript" class="flex flex-1 flex-col pt-(--ui-header-height)">
+            <UButton
+              v-if="hiddenCount > 0"
+              class="my-4 self-start scroll-mt-[calc(var(--ui-header-height)+1rem)]"
+              variant="outline"
+              color="neutral"
+              :label="t('chat.loadOlder', { count: hiddenCount })"
+              @click="loadOlder"
+            />
+            <UChatMessages
+              role="log"
+              :aria-label="t('chat.messages')"
+              :aria-busy="status === 'submitted' || status === 'streaming'"
+              :auto-scroll="{ label: t('chat.scrollToBottom'), square: true, ui: { label: 'sr-only' } }"
+              :should-auto-scroll="!revealingHistory"
+              :should-scroll-to-bottom="!messageIdFromHash(route.hash)"
+              :messages="visibleMessages"
+              :status="status"
+              :spacing-offset="isOwner ? 200 : 0"
+              class="pb-4 sm:pb-6"
+            >
+              <template #indicator>
+                <div class="flex items-center gap-1.5">
+                  <ChatIndicator />
 
-                <UChatShimmer :text="t('chat.thinking')" class="text-sm" />
-              </div>
-              <SlotOutlet name="chat.indicator" :owner="{ chatId, messages, status }" />
-            </template>
+                  <UChatShimmer :text="t('chat.thinking')" class="text-sm" />
+                </div>
+                <SlotOutlet name="chat.indicator" :owner="{ chatId, messages, status }" />
+              </template>
 
-            <template #files="{ message, parts }">
-              <FilePreview
-                v-for="(part, index) in parts"
-                :key="`${message.id}-${index}`"
-                :name="part.filename || t('chat.attachment')"
-                :type="part.mediaType"
-                :preview-url="part.url"
-                size="3xl"
-              />
-            </template>
+              <template #files="{ message, parts }">
+                <FilePreview
+                  v-for="(part, index) in parts"
+                  :key="`${message.id}-${index}`"
+                  :name="part.filename || t('chat.attachment')"
+                  :type="part.mediaType"
+                  :preview-url="part.url"
+                  size="3xl"
+                />
+              </template>
 
-            <template #content="{ message }">
-              <MessageContent
-                :message="message"
-                :editing="isOwner && editingMessageId === message.id"
-                @save="saveEdit"
-                @cancel-edit="editingMessageId = null"
-              />
-              <SlotOutlet name="chat.message.footer" :owner="{ chatId, message, messages, status }" />
-            </template>
+              <template #content="{ message }">
+                <div :id="messageAnchor(message.id)" tabindex="-1" class="scroll-mt-20 outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  <MessageContent
+                    :message="message"
+                    :editing="isOwner && editingMessageId === message.id"
+                    @save="saveEdit"
+                    @cancel-edit="editingMessageId = null"
+                  />
+                  <SlotOutlet name="chat.message.footer" :owner="{ chatId, message, messages, status }" />
+                </div>
+              </template>
 
-            <template v-if="isOwner" #actions="{ message }">
-              <MessageActions
-                :message="message"
-                :streaming="status === 'streaming' && message.id === messages[messages.length - 1]?.id"
-                :editing="editingMessageId === message.id"
-                :vote="getVote(message.id)"
-                @vote="(_message, isUpvoted) => vote(_message, isUpvoted)"
-                @edit="startEdit"
-                @regenerate="regenerateMessage"
-                @branch="branchMessage"
-              />
-            </template>
-          </UChatMessages>
+              <template v-if="isOwner" #actions="{ message }">
+                <MessageActions
+                  :message="message"
+                  :streaming="status === 'streaming' && message.id === messages[messages.length - 1]?.id"
+                  :editing="editingMessageId === message.id"
+                  :vote="getVote(message.id)"
+                  @vote="(_message, isUpvoted) => vote(_message, isUpvoted)"
+                  @edit="startEdit"
+                  @regenerate="regenerateMessage"
+                  @branch="branchMessage"
+                />
+              </template>
+            </UChatMessages>
+          </div>
 
           <div v-if="isOwner" class="sticky bottom-0 z-10 flex flex-col gap-2 [view-transition-name:chat-prompt]">
             <ChatQueue

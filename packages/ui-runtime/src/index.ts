@@ -1,4 +1,4 @@
-import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
+import { listChatSummaries, type ChatStoreLike, type ChatSummary } from '@keundal/chat/chat-store'
 import {
   DEFAULT_MODEL_KEY,
   MODEL_KEY,
@@ -68,11 +68,7 @@ export class SettingsLoadError extends Error {
   }
 }
 
-export interface ChatSummary {
-  id: string
-  title: string | null
-  createdAt: string
-}
+export type { ChatSummary }
 
 const unavailable = (name: string) => new Error(`${name} is not available until the chat runtime starts in the browser`)
 
@@ -302,8 +298,7 @@ export class ChatRuntime extends Service {
   async refreshChats(): Promise<void> {
     this.setPending('chats', true)
     try {
-      const chats = await this.store.list()
-      this.chats.value = chats.map(({ id, title, createdAt }: LocalChat) => ({ id, title, createdAt }))
+      this.chats.value = await listChatSummaries(this.store)
     } finally {
       this.setPending('chats', false)
     }

@@ -60,6 +60,8 @@ test.each(['memory', 'indexeddb', 'sqlite'] as const)('%s 플러그인만 교체
     await rm(directory, { recursive: true, force: true })
   })
   await chats.create('chat', user, model)
+  const created = (await chats.get('chat'))!
+  expect(await chats.listSummaries()).toEqual([{ id: created.id, title: created.title, createdAt: created.createdAt }])
   for await (const event of chats.respond('chat', { model, messages: [user] })) {
     if (event.type === EventType.RUN_FINISHED) {
       expect((await chats.get('chat'))!.messages[1]!.parts).toContainEqual({ type: 'text', text: '원본 응답' })
