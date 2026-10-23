@@ -644,13 +644,13 @@ test.for(['orphan-body', 'orphan-id'] as const)(
   '%s 응답은 SDK의 알 수 없는 응답 오류로 다시 직렬화하지 않는다',
   async (mode, t) => {
     const { connect, state } = await httpFixture(t)
-    const client = await connect('orphan', { tools: ['subtract'] }, 100, 256)
+    const client = await connect('orphan', { tools: ['subtract'] }, 2000, 256)
     const tools = await client.tools()
     state.resultMode = mode
     state.resultText = 'REMOTE_PAYLOAD'.repeat(170000)
     const stringify = vi.spyOn(JSON, 'stringify')
     t.onTestFinished(() => stringify.mockRestore())
-    await expect(execute(tools, 'mcp__orphan__tool__subtract')).rejects.toThrow()
+    await expect(execute(tools, 'mcp__orphan__tool__subtract')).rejects.toThrow('MCP server disconnected: orphan')
     const oversized = stringify.mock.calls.filter(
       ([value]) =>
         value &&
