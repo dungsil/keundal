@@ -1,0 +1,122 @@
+{
+  "packages/ui/app/components/LanguageSelect.vue": {
+    "scenario": "@a11y:language-menu",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/ui/app/components/Logo.vue": {
+    "scenario": "@a11y:home",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/ui/app/components/ModalConfirm.vue": {
+    "exemption": "Requires stored chat data and a message action; empty home fixtures do not exercise this state yet."
+  },
+  "packages/ui/app/components/ModalRename.vue": {
+    "exemption": "Requires stored chat data and a message action; empty home fixtures do not exercise this state yet."
+  },
+  "packages/ui/app/components/Navbar.vue": {
+    "scenario": "@a11y:home",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/ui/app/components/drag-drop/Overlay.vue": {
+    "exemption": "Requires uploaded files or native file drag; browser attachment fixtures are not implemented yet."
+  },
+  "packages/chat-app/app/components/AgentPluginSettings.vue": {
+    "scenario": "@a11y:plugins",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/chat-app/app/components/LLMSettings.vue": {
+    "scenario": "@a11y:llm",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/chat-app/app/components/McpSettings.vue": {
+    "scenario": "@a11y:mcp",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/chat-app/app/components/ModelSelect.vue": {
+    "scenario": "@a11y:home",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/chat-app/app/components/ModelSettings.vue": {
+    "scenario": "@a11y:models",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/chat-app/app/components/SidebarChatList.vue": {
+    "scenario": "@a11y:home",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/chat-app/app/components/SkillSettings.vue": {
+    "scenario": "@a11y:skills",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/chat-app/app/components/StartupSplash.vue": {
+    "exemption": "Transient startup or loading content is absent after readiness; hydration tests verify completion."
+  },
+  "packages/chat-app/app/components/chat/ChatTitle.vue": {
+    "scenario": "@a11y:transcript",
+    "test": "apps/web/tests/browser/transcript.spec.ts"
+  },
+  "packages/chat-app/app/components/chat/ChatVisibility.vue": {
+    "exemption": "Lifecycle-only visibility controller has no interactive or visual content."
+  },
+  "packages/chat-app/app/components/chat/DictateButton.vue": {
+    "scenario": "@a11y:home",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/chat-app/app/components/chat/FilePreview.vue": {
+    "exemption": "Requires uploaded files or native file drag; browser attachment fixtures are not implemented yet."
+  },
+  "packages/chat-app/app/components/chat/Files.vue": {
+    "exemption": "Requires uploaded files or native file drag; browser attachment fixtures are not implemented yet."
+  },
+  "packages/chat-app/app/components/chat/Indicator.vue": {
+    "exemption": "Transient startup or loading content is absent after readiness; hydration tests verify completion."
+  },
+  "packages/chat-app/app/components/chat/Prompt.vue": {
+    "scenario": "@a11y:home",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/chat-app/app/components/chat/PromptMenu.vue": {
+    "scenario": "@a11y:prompt-menu",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/chat-app/app/components/chat/Queue.vue": {
+    "exemption": "Requires stored chat data and a message action; empty home fixtures do not exercise this state yet."
+  },
+  "packages/chat-app/app/components/chat/ReasoningSelect.vue": {
+    "scenario": "@a11y:home",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/chat-app/app/components/chat/Skeleton.vue": {
+    "exemption": "Transient startup or loading content is absent after readiness; hydration tests verify completion."
+  },
+  "packages/chat-app/app/components/chat/SourceLink.vue": {
+    "exemption": "Requires generated tool output or source citations; browser generation fixtures are not implemented yet."
+  },
+  "packages/chat-app/app/components/chat/TraceViewer.vue": {
+    "exemption": "Requires stored chat data and a message action; empty home fixtures do not exercise this state yet."
+  },
+  "packages/chat-app/app/components/chat/message/MessageActions.vue": {
+    "scenario": "@a11y:transcript",
+    "test": "apps/web/tests/browser/transcript.spec.ts"
+  },
+  "packages/chat-app/app/components/chat/message/MessageContent.vue": {
+    "scenario": "@a11y:transcript",
+    "test": "apps/web/tests/browser/transcript.spec.ts"
+  },
+  "packages/chat-app/app/components/chat/message/MessageEdit.vue": {
+    "scenario": "@a11y:message-edit",
+    "test": "apps/web/tests/browser/transcript.spec.ts"
+  },
+  "packages/chat-app/app/components/chat/tool/Chart.vue": {
+    "exemption": "Requires generated tool output or source citations; browser generation fixtures are not implemented yet."
+  },
+  "packages/chat-app/app/components/chat/tool/Sources.vue": {
+    "exemption": "Requires generated tool output or source citations; browser generation fixtures are not implemented yet."
+  },
+  "packages/chat-app/app/components/chat/tool/Subagent.vue": {
+    "exemption": "Requires generated tool output or source citations; browser generation fixtures are not implemented yet."
+  },
+  "packages/chat-app/app/components/chat/tool/Weather.vue": {
+    "exemption": "Requires generated tool output or source citations; browser generation fixtures are not implemented yet."
+  }
+}

@@ -1,6 +1,18 @@
 import type en from './en'
 
 export default {
+  'history.title': '대화 기록',
+  'history.loadMore': '대화 더 보기',
+  'history.newest': '최신순',
+  'history.oldest': '오래된순',
+  'history.empty': '검색 결과가 없습니다',
+  'history.search': '제목 검색',
+  'history.sort': '대화 정렬',
+  'chat.scrollToBottom': '최신 메시지로 이동',
+  'chat.loadOlder': '이전 메시지 보기 ({count})',
+  'chat.copyLink': '메시지 링크 복사',
+  'chat.copyFailed': '클립보드에 복사하지 못했습니다',
+  'chat.exportMarkdown': 'Markdown으로 내보내기',
   'plugin.title': '에이전트 플러그인',
   'plugin.manage': '설치된 플러그인',
   'plugin.description': 'Agent Plugins 1.0.0 폴더를 가져와 웹 대화에서 스킬과 HTTP MCP 도구를 사용합니다.',

@@ -1,6 +1,6 @@
 import type { ChatMessage, ChatMessageAssembly } from '@keundal/chat/chat-message'
-import { branchChat, validateChatTitle } from '@keundal/chat/chat-store'
-import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
+import { branchChat, chatSummary, validateChatTitle } from '@keundal/chat/chat-store'
+import type { ChatStoreLike, ChatSummary, LocalChat } from '@keundal/chat/chat-store'
 import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
 import { SteerQueue, type Reasoning, type AGUIEvent, type SessionSnapshot, type ExecutionOptions } from '@keundal/core'
 import type { Context } from 'cordis'
@@ -55,6 +55,10 @@ export class ChatStore implements ChatStoreLike {
         return chat ? [chat] : []
       })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id))
+  }
+
+  async listSummaries(): Promise<ChatSummary[]> {
+    return (await this.list()).map(chatSummary)
   }
 
   async get(id: string): Promise<LocalChat | undefined> {

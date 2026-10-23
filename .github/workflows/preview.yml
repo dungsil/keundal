@@ -48,7 +48,7 @@ jobs:
             // 일반 CI 성공도 이 워크플로를 실행하므로 아티팩트 유무와 별도로 검사한다.
             // preview-build.yml의 paths-ignore와 같은 제외 경로를 유지한다.
             const isPreviewInput = path => !(
-              /^(\.github|ci|docs|examples|tools\/store-conformance)\//.test(path) ||
+              /^(ci|docs|examples|tools\/store-conformance)\//.test(path) ||
               /^[^/]+\.md$/.test(path) ||
               /^(apps|packages|tools)\/[^/]+\/README\.md$/.test(path)
             );

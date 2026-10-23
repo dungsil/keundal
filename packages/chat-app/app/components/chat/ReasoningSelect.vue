@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { SelectProps } from '@nuxt/ui'
+import { useMounted } from '@vueuse/core'
 import type { AriaAttributes } from 'vue'
 
 const { t } = useLocale()
+const mounted = useMounted()
 const { reasoning, reasoningLevels } = useChatSettings()
 const items = computed(() => reasoningLevels.value.map((value) => ({ label: value, value })))
 const content = computed<NonNullable<SelectProps['content']> & Pick<AriaAttributes, 'aria-label'>>(() => ({
@@ -12,7 +14,7 @@ const content = computed<NonNullable<SelectProps['content']> & Pick<AriaAttribut
 
 <template>
   <USelect
-    v-if="reasoningLevels.length"
+    v-if="mounted && reasoningLevels.length"
     v-model="reasoning"
     :items="items"
     :aria-label="t('prompt.reasoningLevel')"

@@ -496,3 +496,5 @@ export async function runStoreConformance(make: () => Promise<ConformanceStore>)
   }
   return report
 }
+
+export { checkConcurrentCommitProperties } from './properties.js'

@@ -1,19 +1,33 @@
 <script setup lang="ts">
+import { useMounted } from '@vueuse/core'
+import { FALLBACK_MODEL, providerIcon } from '@keundal/llm-settings'
+import { resolveModel } from '@keundal/chat/models'
+
 const { t } = useLocale()
 
 const { selectedModel, models, loading, switching, error, refresh } = useModels()
+const mounted = useMounted()
+// Browser preferences are loaded before hydration; keep the initial markup server-stable.
+const fallback = resolveModel(FALLBACK_MODEL)
+const displayedModels = computed(() => mounted.value ? models.value : [{
+  value: fallback.value, label: fallback.id, icon: providerIcon(fallback.configuration)
+}])
+const displayedModel = computed({
+  get: () => mounted.value ? selectedModel.value : fallback.value,
+  set: (value: string) => { if (mounted.value) selectedModel.value = value }
+})
 </script>
 
 <template>
   <USelectMenu
-    v-model="selectedModel"
-    :items="models"
-    :aria-label="`${t('model.select')}: ${models.find(m => m.value === selectedModel)?.label || selectedModel}`"
-    :loading="loading"
-    :aria-busy="loading"
-    :disabled="switching"
+    v-model="displayedModel"
+    :items="displayedModels"
+    :aria-label="`${t('model.select')}: ${displayedModels.find(m => m.value === displayedModel)?.label || displayedModel}`"
+    :loading="mounted && loading"
+    :aria-busy="mounted && loading"
+    :disabled="!mounted || switching"
     size="sm"
-    :icon="models.find((m) => m.value === selectedModel)?.icon"
+    :icon="displayedModels.find((m) => m.value === displayedModel)?.icon"
     color="neutral"
     variant="ghost"
     value-key="value"
@@ -43,7 +57,7 @@ const { selectedModel, models, loading, switching, error, refresh } = useModels(
           size="xs"
           color="neutral"
           variant="ghost"
-          :loading="loading"
+          :loading="mounted && loading"
           @click.stop="refresh()"
         />
       </div>

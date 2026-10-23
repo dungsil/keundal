@@ -1,10 +1,8 @@
 <script setup lang="ts">
+import { settingsReturnTo } from '../../shared/utils/chat-navigation'
 const { t } = useLocale()
 const route = useRoute()
-const returnTo = computed(() => {
-  const path = route.query.returnTo
-  return typeof path === 'string' && (path === '/' || /^\/chat\/[^/?#]+$/.test(path)) ? path : '/'
-})
+const returnTo = computed(() => settingsReturnTo(route.query.returnTo))
 
 const sections = computed(() => [
   { id: 'appearance', label: t('settings.appearance'), icon: 'i-lucide-palette' },

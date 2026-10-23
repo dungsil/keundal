@@ -1,8 +1,8 @@
 import { ChatMessageAssembly } from '@keundal/chat/chat-message'
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
-import { branchChat, validateChatTitle } from '@keundal/chat/chat-store'
-import type { ChatStoreLike, LocalChat } from '@keundal/chat/chat-store'
+import { branchChat, chatSummary, validateChatTitle } from '@keundal/chat/chat-store'
+import type { ChatStoreLike, ChatSummary, LocalChat } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
 import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
@@ -86,7 +86,10 @@ export class RemoteChatStore implements ChatStoreLike {
     const headers = new Headers(init.headers)
     if (this.connection.token) headers.set('authorization', `Bearer ${this.connection.token}`)
     if (init.body !== undefined) headers.set('content-type', 'application/json')
-    return boundRemoteResponse(await this.request(this.url(path), { ...init, headers }), init.signal ?? undefined)
+    return boundRemoteResponse(
+      await this.request(this.url(path), { ...init, headers, cache: 'no-store' }),
+      init.signal ?? undefined
+    )
   }
 
   private async call(path: string, init: RequestInit = {}): Promise<Response> {
@@ -123,6 +126,22 @@ export class RemoteChatStore implements ChatStoreLike {
       .flatMap((snapshot) => {
         const chat = this.chat(snapshot)
         return chat ? [chat] : []
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id))
+  }
+
+  async listSummaries(): Promise<ChatSummary[]> {
+    const response = await this.call('/threads?view=summary&stateFields=web.id,web.title,web.createdAt')
+    const snapshots = (await response.json()) as { state?: { web?: ChatSummary } }[]
+    return snapshots
+      .flatMap((snapshot) => {
+        const chat = snapshot.state?.web
+        return chat &&
+          typeof chat.id === 'string' &&
+          typeof chat.createdAt === 'string' &&
+          (chat.title === null || typeof chat.title === 'string')
+          ? [chatSummary(chat)]
+          : []
       })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id))
   }

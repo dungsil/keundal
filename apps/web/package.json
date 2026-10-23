@@ -12,7 +12,9 @@
     "postinstall": "nuxt prepare",
     "lint": "oxlint .",
     "test": "vitest run",
-    "typecheck": "nuxt typecheck && tsc -p tsconfig.test.json"
+    "typecheck": "nuxt typecheck && tsc -p tsconfig.test.json",
+    "test:browser": "playwright test --grep-invert @visual",
+    "test:visual": "playwright test --grep @visual"
   },
   "dependencies": {
     "@keundal/chat-app": "workspace:*",
@@ -46,6 +48,8 @@
     "@keundal/core": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",
     "fake-indexeddb": "6.2.6",
-    "@keundal/plugin-chat-desktop": "workspace:*"
+    "@keundal/plugin-chat-desktop": "workspace:*",
+    "@playwright/test": "1.62.1",
+    "@axe-core/playwright": "4.11.1"
   }
 }

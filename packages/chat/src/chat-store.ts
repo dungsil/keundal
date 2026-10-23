@@ -3,6 +3,7 @@ import type { ExecutionOptions, GenerationSnapshot, Reasoning, AGUIEvent } from 
 import type { ChatMessage } from './chat-message'
 export interface ChatStoreLike {
   list(): Promise<LocalChat[]>
+  listSummaries?(): Promise<ChatSummary[]>
   get(id: string): Promise<LocalChat | undefined>
   create(id: string, message: ChatMessage, model: string): Promise<LocalChat>
   rename(id: string, title: string): Promise<void>
@@ -62,6 +63,17 @@ export interface LocalChat {
   queue?: ChatMessage[]
   isOwner: true
   visibility: 'private'
+}
+
+export type ChatSummary = Pick<LocalChat, 'id' | 'title' | 'createdAt'>
+
+export function chatSummary(chat: ChatSummary): ChatSummary {
+  return { id: chat.id, title: chat.title, createdAt: chat.createdAt }
+}
+
+/** Supports older platform plugins while keeping UI caches free of message history. */
+export async function listChatSummaries(store: Pick<ChatStoreLike, 'list' | 'listSummaries'>): Promise<ChatSummary[]> {
+  return (await (store.listSummaries ? store.listSummaries() : store.list())).map(chatSummary)
 }
 
 /**

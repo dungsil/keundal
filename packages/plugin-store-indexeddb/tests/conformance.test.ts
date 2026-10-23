@@ -1,9 +1,14 @@
 import { LLMService, type LLMEvent, type LLMModel } from '@keundal/core'
 import indexedDBStorePlugin, { IndexedDBStore, type WebLockManager } from '@keundal/plugin-store-indexeddb'
-import { expectedConformanceReport, runStoreConformance, type ConformanceStore } from '@keundal/store-conformance'
+import {
+  checkConcurrentCommitProperties,
+  expectedConformanceReport,
+  runStoreConformance,
+  type ConformanceStore
+} from '@keundal/store-conformance'
 import { Context, type Fiber } from 'cordis'
 import { IDBFactory } from 'fake-indexeddb'
-import { expect, test } from 'vitest'
+import { assert, expect, test } from 'vitest'
 
 class Locks implements WebLockManager {
   private readonly states = new Map<string, { locked: boolean; waiters: (() => void)[] }>()
@@ -29,7 +34,7 @@ class Locks implements WebLockManager {
   }
 }
 
-test('저장소 적합성 시나리오를 통과한다', async () => {
+test('저장소 적합성과 동시 커밋의 단일 반영 및 journal 재생을 검증한다', async () => {
   const factory = new IDBFactory()
   const locks = new Locks()
   const makeStore = async (): Promise<ConformanceStore> => {
@@ -61,6 +66,7 @@ test('저장소 적합성 시나리오를 통과한다', async () => {
     }
   }
 
+  await checkConcurrentCommitProperties(makeStore, assert)
   const report = await runStoreConformance(makeStore)
   expect(report).toEqual(expectedConformanceReport)
   const store = await makeStore()

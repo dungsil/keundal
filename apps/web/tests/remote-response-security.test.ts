@@ -27,6 +27,7 @@ const consumers = [
   ['recover', (store: RemoteChatStore) => store.recover()],
   ['catalog', (store: RemoteChatStore) => store.catalog()],
   ['threads', (store: RemoteChatStore) => store.list()],
+  ['summaries', (store: RemoteChatStore) => store.listSummaries()],
   ['thread', (store: RemoteChatStore) => store.get('chat')],
   ['run', (store: RemoteChatStore) => store.getRun('run')]
 ] as const

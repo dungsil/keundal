@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { listChatSummaries } from '@keundal/chat/chat-store'
+import { useTemplateRef } from 'vue'
+import { chatPath } from '../../shared/utils/chat-navigation'
+
 const { t } = useLocale()
 
 const { renameChat, deleteChat } = useChatActions()
@@ -16,12 +20,12 @@ const removePageHook = useNuxtApp().hook('page:finish', async () => {
 })
 onUnmounted(removePageHook)
 
-const { data: chats, status: chatsStatus } = await useAsyncData('chats', () => $chatStore.list(), {
+const { data: chats, status: chatsStatus } = await useAsyncData('chats', () => listChatSummaries($chatStore), {
   server: false,
   transform: data => data.map(chat => ({
     id: chat.id,
     label: chat.title || '',
-    to: `/chat/${chat.id}`,
+    to: chatPath(chat.id),
     icon: 'i-lucide-message-circle',
     createdAt: chat.createdAt
   }))
@@ -37,6 +41,41 @@ const localizedChats = computed(() => chats.value?.map(chat => ({
   label: chat.label || t('chat.untitled')
 })))
 const { groups } = useChats(localizedChats)
+const currentChat = computed(() => localizedChats.value?.find(chat => chat.id === route.params.id))
+const commandGroups = computed(() => [{
+  id: 'links',
+  items: [
+    { label: t('chat.new'), to: '/', icon: 'i-lucide-circle-plus', kbds: ['meta', 'o'] },
+    { label: t('history.title'), to: '/history', icon: 'i-lucide-history' }
+  ]
+}, {
+  id: 'settings',
+  label: t('settings.title'),
+  items: [
+    { label: t('settings.appearance'), path: 'appearance', icon: 'i-lucide-palette' },
+    { label: 'LLM', path: 'llm', icon: 'i-lucide-plug' },
+    { label: t('model.defaultTitle'), path: 'models', icon: 'i-lucide-bot' },
+    { label: t('plugin.manage'), path: 'plugins', icon: 'i-lucide-blocks' },
+    { label: t('skill.title'), path: 'skills', icon: 'i-lucide-book-open' },
+    { label: t('plugin.servers'), path: 'mcp', icon: 'i-lucide-network' }
+  ].map(item => ({ ...item, to: { path: `/settings/${item.path}`, query: { returnTo: isSettings.value ? route.query.returnTo : route.path } } }))
+}, ...(currentChat.value ? [{
+  id: 'current-chat',
+  label: currentChat.value.label,
+  items: [
+    { label: t('common.rename'), icon: 'i-lucide-pencil', onSelect: () => runCurrentChatAction('rename') },
+    { label: t('common.delete'), icon: 'i-lucide-trash', onSelect: () => runCurrentChatAction('delete') }
+  ]
+}] : []), ...groups.value])
+
+async function runCurrentChatAction(action: 'rename' | 'delete') {
+  const chat = currentChat.value
+  if (!chat) return
+  searchOpen.value = false
+  await nextTick()
+  if (action === 'rename') await renameChat(chat.id, chat.untitled ? '' : chat.label)
+  else await deleteChat(chat.id)
+}
 
 defineShortcuts({
   meta_o: () => {
@@ -82,7 +121,7 @@ defineShortcuts({
             onSelect: () => {
               searchOpen = true
             }
-          }]"
+          }, { label: t('history.title'), to: '/history', icon: 'i-lucide-history', 'aria-label': collapsed ? t('history.title') : undefined }]"
           :collapsed="collapsed"
           orientation="vertical"
         >
@@ -117,47 +156,7 @@ defineShortcuts({
           </div>
         </div>
 
-        <ul v-else-if="!collapsed && groups" class="flex flex-col">
-          <template v-for="group in groups" :key="group.label">
-            <li class="w-full flex items-center gap-1.5 font-semibold text-xs/5 text-highlighted px-2.5 py-1.5">
-              {{ group.label }}
-            </li>
-            <li
-              v-for="item in group.items"
-              :key="item.id"
-              class="group relative min-w-0"
-            >
-              <NuxtLink
-                :to="`/chat/${item.id}`"
-                class="group relative w-full flex items-center gap-1.5 font-medium text-sm before:absolute before:z-[-1] before:rounded-md flex-row px-2.5 py-1.5 before:inset-y-px before:inset-x-0 text-default hover:before:bg-elevated/50 focus-visible:before:bg-elevated/50 [&.router-link-exact-active]:text-primary [&.router-link-exact-active]:before:bg-elevated overflow-hidden pe-14.5"
-              >
-                <span class="truncate" :class="item.untitled ? 'text-muted group-[.router-link-exact-active]:text-toned' : ''">{{ item.label }}</span>
-              </NuxtLink>
-              <div class="absolute end-0 inset-y-0 flex items-center gap-0.5 pe-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                <UButton
-                  icon="i-lucide-pencil"
-                  color="neutral"
-                  variant="ghost"
-                  size="sm"
-                  class="rounded-[5px]"
-                  :aria-label="`${t('common.rename')}: ${item.label}`"
-                  :title="t('common.rename')"
-                  @click="renameChat(item.id, item.untitled ? '' : item.label)"
-                />
-                <UButton
-                  icon="i-lucide-trash"
-                  color="neutral"
-                  variant="ghost"
-                  size="sm"
-                  class="rounded-[5px]"
-                  :aria-label="`${t('common.delete')}: ${item.label}`"
-                  :title="t('common.delete')"
-                  @click="deleteChat(item.id)"
-                />
-              </div>
-            </li>
-          </template>
-        </ul>
+        <SidebarChatList v-else-if="!collapsed" :chats="localizedChats ?? []" />
       </template>
 
       <template #footer="{ collapsed }">
@@ -179,15 +178,7 @@ defineShortcuts({
     <UDashboardSearch
       v-model:open="searchOpen"
       :placeholder="t('chat.searchPlaceholder')"
-      :groups="[{
-        id: 'links',
-        items: [{
-          label: t('chat.new'),
-          to: '/',
-          icon: 'i-lucide-circle-plus',
-          kbds: ['meta', 'o']
-        }]
-      }, ...groups]"
+      :groups="commandGroups"
     />
 
     <main id="main-content" ref="mainContent" tabindex="-1" class="flex-1 flex mt-4 sm:ms-4 lg:ms-0 sm:rounded-ss-lg ring ring-default bg-default/75 shadow-sm min-w-0 overflow-hidden">

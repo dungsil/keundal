@@ -52,6 +52,7 @@ const items = computed<DropdownMenuItem[][]>(() => [
 
 <template>
   <UDropdownMenu
+    :modal="false"
     :items="items"
     :content="{ side: 'top', align: 'start', alignOffset: -4 }"
     :ui="{ content: 'w-52' }"
