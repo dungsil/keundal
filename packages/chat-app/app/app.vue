@@ -5,11 +5,17 @@ import { greetingTimeScript } from './utils/greeting'
 const { locale, t } = useLocale()
 const uiLocale = computed(() => locale.value === 'ko' ? ko : en)
 
+// StartupSplash.vue의 페이드 아웃 시간과 맞춘다.
+const SPLASH_FADE_MS = 200
+
 const colorMode = useColorMode()
 const startupReady = ref(false)
+const splashLeaving = ref(false)
+const splashGone = ref(false)
 const mounted = ref(false)
 const startupPending = useState<Record<string, boolean>>('startup-pending', () => ({}))
 const modelSwitching = useState('model-switching', () => false)
+let splashTimer: ReturnType<typeof setTimeout> | undefined
 
 onNuxtReady(() => {
   mounted.value = true
@@ -33,6 +39,20 @@ watch(
   },
   { flush: 'post' }
 )
+
+watch(startupReady, (ready) => {
+  if (!ready) return
+  splashLeaving.value = true
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  // 전환이 끝난 뒤에 제거하려고 프레임 여유를 조금 더 둔다.
+  splashTimer = setTimeout(() => {
+    splashGone.value = true
+  }, reducedMotion ? 0 : SPLASH_FADE_MS + 50)
+})
+
+onBeforeUnmount(() => {
+  if (splashTimer) clearTimeout(splashTimer)
+})
 
 const color = computed(() => colorMode.value === 'dark' ? '#1b1718' : 'white')
 
@@ -71,7 +91,7 @@ useSeoMeta({
 
 <template>
   <UApp :locale="uiLocale" :toaster="{ position: 'top-right' }" :tooltip="{ delayDuration: 200 }">
-    <StartupSplash v-if="!startupReady" />
+    <StartupSplash v-if="!splashGone" :leaving="splashLeaving" />
     <div :inert="!startupReady" :aria-busy="!startupReady" style="display: contents;">
       <NuxtLoadingIndicator color="var(--ui-primary)" />
 
