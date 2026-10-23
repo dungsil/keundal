@@ -7,6 +7,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: [string | false] }>()
 
+// 저장소의 제목 한도(validateChatTitle: 1–100자, UTF-16 단위)와 같은 값입니다.
+const MAX_TITLE_LENGTH = 100
+
 const value = ref(props.title ?? '')
 
 const trimmed = computed(() => value.value.trim())
@@ -47,6 +50,7 @@ async function submit() {
         :aria-describedby="invalid ? 'chat-title-error' : undefined"
         :placeholder="t('chat.titlePlaceholder')"
         :aria-label="t('chat.titlePlaceholder')"
+        :maxlength="MAX_TITLE_LENGTH"
         class="w-full"
         :ui="{ root: 'w-full' }"
         @keydown.enter.prevent="submit"
