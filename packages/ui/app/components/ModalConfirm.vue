@@ -15,14 +15,19 @@ const emit = defineEmits<{ close: [boolean] }>()
     :title="title"
     :description="description"
     :ui="{
-      footer: 'flex-row-reverse justify-start'
+      header: 'items-start overflow-y-auto',
+      wrapper: 'min-w-0',
+      title: 'break-words',
+      description: 'break-words',
+      footer: 'justify-end'
     }"
+    :content="{ onEscapeKeyDown: () => emit('close', false) }"
     :close="false"
     :dismissible="false"
   >
     <template #footer>
-      <UButton :color="color" :label="t('common.delete')" @click="emit('close', true)" />
       <UButton color="neutral" variant="ghost" :label="t('common.cancel')" autofocus @click="emit('close', false)" />
+      <UButton :color="color" :label="t('common.delete')" @click="emit('close', true)" />
     </template>
   </UModal>
 </template>

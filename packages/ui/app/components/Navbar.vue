@@ -5,7 +5,9 @@ const { t } = useLocale()
 <template>
   <UDashboardNavbar class="absolute top-0 inset-x-0 border-b-0 z-10 backdrop-blur-sm sm:px-4" :ui="{ left: 'min-w-0' }">
     <template #left>
-      <slot name="title" />
+      <div v-if="$slots.title" class="flex min-w-0 items-center whitespace-nowrap [&>*]:truncate">
+        <slot name="title" />
+      </div>
     </template>
 
     <template #right>

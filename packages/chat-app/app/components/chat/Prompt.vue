@@ -254,7 +254,7 @@ function appendTranscript(text: string) {
             :disabled="uploading || disabled"
             @transcript="appendTranscript"
           />
-          <template v-else-if="running">
+          <div v-else-if="running" class="flex shrink-0 items-center gap-1">
             <UButton
               icon="i-lucide-square"
               color="neutral"
@@ -269,11 +269,12 @@ function appendTranscript(text: string) {
               color="neutral"
               size="sm"
             />
-          </template>
+          </div>
           <UChatPromptSubmit
             v-else
             :status="status"
             :disabled="uploading || disabled"
+            v-bind="status === 'error' ? { 'aria-label': t('chat.regenerate') } : {}"
             color="neutral"
             size="sm"
             @stop="emit('stop')"
