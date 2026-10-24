@@ -439,7 +439,7 @@ onBeforeUnmount(() => {
               </template>
 
               <template #content="{ message }">
-                <div :id="messageAnchor(message.id)" tabindex="-1" class="scroll-mt-20 outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <div :id="messageAnchor(message.id)" tabindex="-1" class="scroll-mt-20 outline-none focus-visible:ring-2 focus-visible:ring-primary forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-[Highlight]">
                   <MessageContent
                     :message="message"
                     :editing="isOwner && editingMessageId === message.id"

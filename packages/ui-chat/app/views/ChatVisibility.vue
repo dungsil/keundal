@@ -14,6 +14,32 @@ const emit = defineEmits<{
 
 const isShared = computed(() => props.visibility === 'public')
 
+function onRadioKeydown(event: KeyboardEvent, index: number) {
+  const radios = Array.from(
+    (event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('button[role="radio"]:not([disabled])')
+  )
+  if (radios.length === 0) return
+  const currentIndex = radios.indexOf(event.target as HTMLButtonElement)
+  let nextIndex = currentIndex
+
+  if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+    nextIndex = (currentIndex + 1) % radios.length
+  } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+    nextIndex = (currentIndex - 1 + radios.length) % radios.length
+  } else if (event.key === 'Home') {
+    nextIndex = 0
+  } else if (event.key === 'End') {
+    nextIndex = radios.length - 1
+  } else {
+    return
+  }
+
+  event.preventDefault()
+  radios[nextIndex]?.focus()
+  const value = radios[nextIndex]?.dataset.value as 'private' | 'public' | undefined
+  if (value && value !== 'public') emit('update:visibility', value)
+}
+
 const options = computed(() => [
   {
     value: 'private' as const,
@@ -40,7 +66,7 @@ const options = computed(() => [
     </UTooltip>
 
     <template #body>
-      <div role="radiogroup" :aria-label="t('chat.share')" class="flex flex-col gap-0.5 rounded-lg ring ring-default p-1">
+      <div role="radiogroup" :aria-label="t('chat.share')" class="flex flex-col gap-0.5 rounded-lg ring ring-default p-1" @keydown="onRadioKeydown">
         <button
           v-for="option in options"
           :key="option.value"
@@ -48,8 +74,10 @@ const options = computed(() => [
           role="radio"
           :aria-checked="option.value === visibility"
           :disabled="option.value === 'public'"
+          :tabindex="option.value === 'public' ? -1 : 0"
+          :data-value="option.value"
           :data-selected="option.value === visibility"
-          class="flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-elevated/50 disabled:opacity-50 data-[selected=true]:bg-elevated/50"
+          class="flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-elevated/50 disabled:opacity-50 data-[selected=true]:bg-elevated/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           @click="option.value !== 'public' && emit('update:visibility', option.value)"
         >
           <UIcon :name="option.icon" class="size-5 text-muted shrink-0" />
