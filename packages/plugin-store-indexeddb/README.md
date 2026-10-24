@@ -44,7 +44,8 @@ store.close()
 실행별 Web Locks를 생성부터 종료 커밋 또는 서비스 해제까지 유지합니다. 따라서 같은 브라우저
 프로필의 다른 탭에서 `recover()`를 호출해도 살아 있는 실행을 `interrupted`로 바꾸지 않습니다.
 `recover()`는 실행 lock을 즉시 얻을 수 있는 경우에만 중단된 실행을 확정하며 LLM을 다시 호출하지
-않습니다.
+않습니다. 같은 서비스에서 진행 중인 실행의 잠금을 얻지 못하면 구독을 종료하지 않으며, 실행이
+끝날 때까지 journal 이벤트를 전달합니다.
 
 Web Locks API는 secure context에서만 제공되므로 HTTPS 또는 `localhost`에서 실행해야 합니다.
 `navigator.locks`가 없는 환경에서는 실행과 복구가 명시적인 오류로 실패합니다. 테스트용
