@@ -6,7 +6,7 @@ import type { AriaAttributes } from 'vue'
 const { t } = useLocale()
 const mounted = useMounted()
 const { reasoning, reasoningLevels } = useChatSettings()
-const items = computed(() => reasoningLevels.value.map((value) => ({ label: value, value })))
+const items = computed(() => reasoningLevels.value.map((value) => ({ label: t(`prompt.reasoningLevel.${value}`), value })))
 const content = computed<NonNullable<SelectProps['content']> & Pick<AriaAttributes, 'aria-label'>>(() => ({
   'aria-label': t('prompt.reasoningLevel')
 }))
