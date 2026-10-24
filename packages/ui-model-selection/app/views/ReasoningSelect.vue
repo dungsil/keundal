@@ -18,7 +18,18 @@ const selected = computed({
   get: () => props.reasoning.value,
   set: (value: string) => { props.reasoning.value = value }
 })
-const items = computed(() => props.reasoningLevels.value.map((value) => ({ label: value, value })))
+// The translated label of each level; unknown values keep their raw name.
+const levelKeys = {
+  low: 'prompt.reasoningLevel.low',
+  medium: 'prompt.reasoningLevel.medium',
+  high: 'prompt.reasoningLevel.high',
+  xhigh: 'prompt.reasoningLevel.xhigh',
+  max: 'prompt.reasoningLevel.max'
+} as const
+const items = computed(() => props.reasoningLevels.value.map(value => ({
+  label: t(levelKeys[value as keyof typeof levelKeys] ?? 'prompt.reasoningLevel'),
+  value
+})))
 const content = computed<NonNullable<SelectProps['content']> & Pick<AriaAttributes, 'aria-label'>>(() => ({
   'aria-label': t('prompt.reasoningLevel')
 }))

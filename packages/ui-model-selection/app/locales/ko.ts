@@ -3,6 +3,11 @@ import type en from './en'
 export default {
   'prompt.reasoning': '심층 사고',
   'prompt.reasoningLevel': '추론 수준',
+  'prompt.reasoningLevel.low': '낮음',
+  'prompt.reasoningLevel.medium': '중간',
+  'prompt.reasoningLevel.high': '높음',
+  'prompt.reasoningLevel.xhigh': '매우 높음',
+  'prompt.reasoningLevel.max': '최대',
   'model.select': '모델 선택',
   'model.defaultTitle': '모델 설정',
   'model.defaultLabel': '채팅 모델',

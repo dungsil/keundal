@@ -19,6 +19,7 @@ export default {
   'chat.renameFailed': 'Failed to rename chat',
   'chat.deleteFailed': 'Failed to delete chat',
   'chat.regenerate': 'Regenerate response',
+
   'dictation.listening': 'Listening…',
   'dictation.transcribing': 'Transcribing…',
   'file.drop': 'Drop your files here',

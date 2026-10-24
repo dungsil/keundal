@@ -4,6 +4,8 @@ import type { ReasoningLevel } from '@keundal/core'
 export function reasoningLevels(model: string): ReasoningLevel[] {
   const { provider, id } = resolveModel(model)
   if ((provider === 'openai' || provider === 'openai-chat') && !/^(gpt-5|o\d)(?:[-.]|$)/.test(id)) return []
+  if (provider === 'openai') return ['low', 'medium', 'high', 'xhigh', 'max']
+  if (provider === 'openai-chat') return ['low', 'medium', 'high']
   if (provider === 'google' && id.startsWith('gemini-3') && !id.includes('flash')) return ['low', 'high']
   return ['low', 'medium', 'high']
 }

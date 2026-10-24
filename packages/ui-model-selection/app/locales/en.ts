@@ -1,6 +1,11 @@
 export default {
   'prompt.reasoning': 'Extended thinking',
   'prompt.reasoningLevel': 'Reasoning level',
+  'prompt.reasoningLevel.low': 'Low',
+  'prompt.reasoningLevel.medium': 'Medium',
+  'prompt.reasoningLevel.high': 'High',
+  'prompt.reasoningLevel.xhigh': 'Extra high',
+  'prompt.reasoningLevel.max': 'Max',
   'model.select': 'Select model',
   'model.defaultTitle': 'Model settings',
   'model.defaultLabel': 'Chat model',

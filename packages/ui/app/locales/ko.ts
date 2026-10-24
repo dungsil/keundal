@@ -21,6 +21,7 @@ export default {
   'chat.renameFailed': '대화 이름을 변경하지 못했습니다.',
   'chat.deleteFailed': '대화를 삭제하지 못했습니다.',
   'chat.regenerate': '응답 다시 생성',
+
   'dictation.listening': '듣는 중…',
   'dictation.transcribing': '음성을 텍스트로 변환 중…',
   'file.drop': '파일을 여기에 놓으세요',
