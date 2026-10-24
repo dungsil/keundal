@@ -44,11 +44,13 @@ interface StreamFrame {
   readonly event: AGUIEvent
 }
 
-const instructions = (
-  webSearch: boolean
-) => `You are a knowledgeable and helpful AI assistant. Be clear, accurate and concise.
+const instructions = (webSearch: boolean, systemPrompt?: string) => {
+  const builtIn = `You are a knowledgeable and helpful AI assistant. Be clear, accurate and concise.
 Do not use markdown headings. Use bold text for section labels instead.
 ${webSearch ? 'Use native web search when current information is needed and cite sources.' : 'Web search is disabled. Do not claim to have verified live information.'}`
+  const custom = systemPrompt?.trim()
+  return custom ? `${builtIn}\n\n${custom}` : builtIn
+}
 
 /** Keundal HTTP 호스트에 대화·실행을 맡기는 클라이언트 저장소입니다. */
 export class RemoteChatStore implements ChatStoreLike {
@@ -350,6 +352,7 @@ export class RemoteChatStore implements ChatStoreLike {
       messages: ChatMessage[]
       model: string
       titleModel?: string
+      systemPrompt?: string
       reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void
@@ -436,7 +439,11 @@ export class RemoteChatStore implements ChatStoreLike {
             context: [],
             tools: [],
             messages: [
-              { id: randomUUID(), role: 'system', content: instructions(!!request.webSearch) },
+              {
+                id: 'keundal:web-instructions',
+                role: 'system',
+                content: instructions(!!request.webSearch, request.systemPrompt)
+              },
               ...toMessages(request.messages, request.model)
             ]
           })

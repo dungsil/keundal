@@ -1,4 +1,8 @@
 export default {
+  'prompt.title': 'System prompt',
+  'prompt.placeholder': 'Enter instructions for the assistant',
+  'prompt.saved': 'System prompt saved',
+  'prompt.saveFailed': 'Could not save the system prompt. Check that browser storage is available.',
   'common.key': 'Key',
   'common.value': 'Value',
   'llm.title': 'LLM settings',

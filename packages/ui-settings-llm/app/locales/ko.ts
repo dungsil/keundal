@@ -1,6 +1,10 @@
 import type en from './en'
 
 export default {
+  'prompt.title': '시스템 프롬프트',
+  'prompt.placeholder': '어시스턴트에게 전달할 지침을 입력하세요',
+  'prompt.saved': '시스템 프롬프트를 저장했습니다.',
+  'prompt.saveFailed': '시스템 프롬프트를 저장하지 못했습니다. 브라우저 저장소를 사용할 수 있는지 확인하세요.',
   'common.key': '키',
   'common.value': '값',
   'llm.title': 'LLM 설정',

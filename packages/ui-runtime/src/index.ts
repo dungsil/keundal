@@ -84,6 +84,7 @@ export class ChatRuntime extends Service {
   readonly model = ref(FALLBACK_MODEL)
   readonly titleModel = ref('')
   readonly defaultModel = ref('')
+  readonly systemPrompt = ref('')
   readonly switching = ref(false)
   readonly webSearch = computed<boolean>({
     get: () => this.options.preferences.webSearch.value ?? true,
@@ -179,6 +180,7 @@ export class ChatRuntime extends Service {
     const storage = this.options.storage
     if (!storage) throw unavailable('Browser storage')
     await platform.mcp.load()
+    this.systemPrompt.value = storage.getItem('keundal:system-prompt') ?? ''
     const preferences = loadModelPreferences(storage)
     this.defaultModel.value = preferences.defaultModel
     this.titleModel.value = readModelPreference(storage, TITLE_MODEL_KEY) ?? ''
@@ -271,6 +273,15 @@ export class ChatRuntime extends Service {
 
   saveTitleModel(value: string): void {
     if (this.options.storage) this.titleModel.value = saveTitleModel(this.options.storage, value)
+  }
+
+  saveSystemPrompt(value: string): void {
+    const storage = this.options.storage
+    if (!storage) throw unavailable('Browser storage')
+    const prompt = value.trim()
+    if (prompt) storage.setItem('keundal:system-prompt', prompt)
+    else storage.removeItem('keundal:system-prompt')
+    this.systemPrompt.value = prompt
   }
 
   /** Switch to the saved default model when the connection can serve it. */

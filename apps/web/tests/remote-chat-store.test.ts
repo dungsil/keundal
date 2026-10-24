@@ -32,12 +32,14 @@ async function collect(events: AsyncIterable<AGUIEvent>) {
 
 test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제목·투표·편집·분기·삭제를 수행한다 (desktop=%s)', async (desktop) => {
   const ctx = new Context()
+  const inputs: unknown[] = []
   const titleModels: string[] = []
   const selections: unknown[] = []
   class ScriptedLLM extends LLMService {
     async getModel() { return { contextWindow: 128_000, maxOutputTokens: 4096 } }
     async countTokens() { return 40 }
     async* stream(request: LLMRequest): AsyncIterable<LLMEvent> {
+      inputs.push(request.input)
       const text = JSON.stringify(request.input).includes('편집한 질문') ? '편집 응답' : '원격 응답'
       const messageId = crypto.randomUUID()
       yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' }
@@ -95,8 +97,23 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
       }, () => [], model)
     : new RemoteChatStore({ endpoint, token })
   await chats.create('chat', user, model)
-  const events = await collect(chats.respond('chat', { model, titleModel: 'anthropic/title', messages: [user] }))
+  const events = await collect(chats.respond('chat', { model, titleModel: 'anthropic/title', messages: [user], systemPrompt: 'First system prompt.' }))
   expect(events.some(event => event.type === EventType.RUN_FINISHED)).toBe(true)
+  const firstInput = JSON.stringify(inputs[0])
+  expect(firstInput).toContain('First system prompt.')
+  expect(firstInput).toContain('You are a knowledgeable and helpful AI assistant.')
+  await collect(chats.respond('chat', { model, messages: [user], systemPrompt: 'Changed system prompt.' }))
+  const changedInput = JSON.stringify(inputs[1])
+  expect(changedInput).toContain('Changed system prompt.')
+  expect(changedInput).not.toContain('First system prompt.')
+  expect(changedInput).toContain('keundal:web-instructions')
+  expect(changedInput.match(/keundal:web-instructions/g)).toHaveLength(1)
+  await collect(chats.respond('chat', { model, messages: [user], systemPrompt: ' \n ' }))
+  const clearedInput = JSON.stringify(inputs[2])
+  expect(clearedInput).not.toContain('Changed system prompt.')
+  expect(clearedInput).toContain('You are a knowledgeable and helpful AI assistant.')
+  expect(clearedInput).toContain('keundal:web-instructions')
+  expect(clearedInput.match(/keundal:web-instructions/g)).toHaveLength(1)
 
   const saved = (await chats.get('chat'))!
   expect(titleModels).toEqual(['title'])
