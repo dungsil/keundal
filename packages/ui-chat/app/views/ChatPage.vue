@@ -5,7 +5,7 @@ import type { AGUIEvent, ReasoningLevel } from '@keundal/core'
 import type { ComposerOwner, DeliveryMode } from '@keundal/ui-composer/slots'
 import type { ChatSummary } from '@keundal/ui-runtime'
 import { SlotFactory, SlotOutlet } from '@keundal/ui-slots'
-import { useElementSize } from '@vueuse/core'
+import { useElementSize, useMounted } from '@vueuse/core'
 import { useTemplateRef, type Ref } from 'vue'
 
 import { TRANSCRIPT_PAGE_SIZE, anchoredTranscriptStart, chatMarkdown, countToReveal, messageAnchor, messageIdFromHash } from '../lib/chat-transcript'
@@ -64,6 +64,9 @@ const toast = useToast()
 const { data, status: loadStatus } = await useAsyncData(`chat-${props.chatId}`, () => props.getChat(), { server: false, lazy: true })
 
 const loading = computed(() => loadStatus.value === 'idle' || loadStatus.value === 'pending')
+// The view loads after hydration starts, so the stored conversation can arrive first. Keep the server markup until then.
+const mounted = useMounted()
+const showSkeleton = computed(() => !mounted.value || loading.value)
 
 watch(loadStatus, (value) => {
   props.setPending(value === 'pending' || value === 'idle')
@@ -347,7 +350,7 @@ onBeforeUnmount(() => {
 <template>
   <SlotOutlet name="chat.observer" :owner="observer" />
 
-  <ChatSkeleton v-if="loading" />
+  <ChatSkeleton v-if="showSkeleton" />
 
   <UDashboardPanel
     v-else-if="data?.id"

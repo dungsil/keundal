@@ -5,11 +5,12 @@ import type {} from '@keundal/ui-settings/slots'
 import { lazyView } from '@keundal/ui-slots'
 import { computed, reactive } from 'vue'
 
+import ChatActions from './views/ChatActions.vue'
+import ChatHistory from './views/ChatHistory.vue'
+
 export const name = 'ui-chat-list'
 export const inject = ['slots', 'chatRuntime']
 
-const ChatActions = lazyView(() => import('./views/ChatActions.vue'), ['collapsed', 'openSearch'])
-const ChatHistory = lazyView(() => import('./views/ChatHistory.vue'), ['collapsed', 'chats', 'rename', 'remove'])
 const ChatSearch = lazyView(
   () => import('./views/ChatSearch.vue'),
   ['chats', 'settingsSections', 'search', 'setSearchOpen', 'rename', 'remove']

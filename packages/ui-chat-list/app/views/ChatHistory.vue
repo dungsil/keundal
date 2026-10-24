@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useMounted } from '@vueuse/core'
 import type { ChatSummary } from '@keundal/ui-runtime'
 import { chatPath, sidebarChats } from '@keundal/ui/app/utils/chat-navigation.ts'
 import type { Ref } from 'vue'
@@ -22,9 +21,7 @@ const { renameChat, deleteChat } = useChatActions({
   remove: id => props.remove(id)
 })
 
-// The view loads after hydration starts, so the stored chats can arrive first. Keep the server markup until mounted.
-const mounted = useMounted()
-const showChatsSkeleton = computed(() => !mounted.value || !props.chats.value)
+const showChatsSkeleton = computed(() => !props.chats.value)
 
 const route = useRoute()
 const limit = ref(40)

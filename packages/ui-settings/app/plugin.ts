@@ -5,13 +5,13 @@ import { localizedText } from '@keundal/ui/app/utils/locale.ts'
 
 import { messages } from './locale'
 import type {} from './slots'
+import SettingsLink from './views/SettingsLink.vue'
+import SettingsPage from './views/SettingsPage.vue'
 
 export const name = 'ui-settings'
 export const inject = ['slots']
 
-const SettingsPage = lazyView(() => import('./views/SettingsPage.vue'), ['section'])
 const AppearanceSection = lazyView(() => import('./views/AppearanceSection.vue'), [])
-const SettingsLink = lazyView(() => import('./views/SettingsLink.vue'), ['collapsed', 'close'])
 
 /** Render the settings page with its section navigation, the appearance section and the sidebar link. */
 export function apply(ctx: Context) {
