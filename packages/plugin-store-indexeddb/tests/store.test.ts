@@ -328,6 +328,55 @@ test('다른 탭이 실행 잠금을 보유하면 복구 시 running 상태를 �
   expect((await second.ctx.generation.recover())[0]?.status).toBe('interrupted')
 })
 
+test('실행 잠금이 유지된 복구 뒤에도 진행 중인 구독에 텍스트와 종료 이벤트를 전달한다', async (t) => {
+  const gate = Promise.withResolvers<void>()
+  const { ctx, calls, methodCalls } = await setup(
+    t,
+    [
+      { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' },
+      { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'reply', delta: 'recovered reply' },
+      { type: EventType.TEXT_MESSAGE_END, messageId: 'reply' }
+    ],
+    undefined,
+    gate.promise
+  )
+  const run = ctx.generation.run(request())
+  const iterator = run[Symbol.asyncIterator]()
+  expect((await iterator.next()).value?.type).toBe(EventType.RUN_STARTED)
+  const subscription = ctx.generation.subscribe('run', { afterSequence: 0 })
+  const received = Array.fromAsync(subscription)
+
+  expect((await ctx.generation.recover())[0]?.status).toBe('running')
+  gate.resolve()
+  await Array.fromAsync(run)
+
+  const entries = await received
+  expect(entries.map(({ sequence }) => sequence)).toEqual([1, 2, 3, 4])
+  expect(entries.map(({ event }) => event.type)).toEqual([
+    EventType.TEXT_MESSAGE_START,
+    EventType.TEXT_MESSAGE_CONTENT,
+    EventType.TEXT_MESSAGE_END,
+    EventType.RUN_FINISHED
+  ])
+  expect(calls()).toBe(1)
+  expect(methodCalls).toEqual(['stream'])
+})
+
+test('잠금이 없는 미완료 실행을 복구하면 기존 구독을 종료한다', async (t) => {
+  const { ctx, store, calls } = await setup(t)
+  await store.startRun(request())
+  await store.appendEvents('run', [
+    { sequence: 0, event: { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' } }
+  ])
+  const subscriber = ctx.generation.subscribe('run')[Symbol.asyncIterator]()
+  expect((await subscriber.next()).value?.sequence).toBe(0)
+  const ending = subscriber.next()
+
+  expect((await ctx.generation.recover())[0]?.status).toBe('interrupted')
+  await expect(ending).resolves.toMatchObject({ done: true })
+  expect(calls()).toBe(0)
+})
+
 test('revision 충돌은 RUN_FINISHED를 저장하지 않고 실행을 recover 가능한 interrupted로 남긴다', async (t) => {
   const { ctx } = await setup(t)
   const iterator = ctx.generation.run(request())[Symbol.asyncIterator]()

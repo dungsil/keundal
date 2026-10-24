@@ -155,11 +155,11 @@ export class IndexedDBGenerationService extends GenerationService {
     const runs = await this.store.listRuns()
     for (const run of runs) {
       if (run.status !== 'running') continue
-      await this.store.recoverIfUnlocked(run.request.input.runId, signal, async () => {
+      const recovered = await this.store.recoverIfUnlocked(run.request.input.runId, signal, async () => {
         const latest = await this.store.getRun(run.request.input.runId)
         if (latest?.status === 'running') await this.store.markInterrupted(run.request.input.runId)
       })
-      this.hub.end(run.request.input.runId)
+      if (recovered) this.hub.end(run.request.input.runId)
     }
     return (await this.store.listRuns()).map(reconcileSnapshot)
   }
