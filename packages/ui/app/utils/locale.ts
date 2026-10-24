@@ -36,7 +36,37 @@ export function resolveLocale(saved?: unknown, languages: string | readonly stri
   return 'en'
 }
 
-export function translate(locale: Locale, key: MessageKey, params: MessageParams = {}): string {
-  const message = messages[locale][key] || en[key]
+/** One feature's dictionaries. Korean must translate every English key. */
+export interface MessageSet<K extends string> {
+  en: Record<K, string>
+  ko: Record<K, string>
+}
+
+function interpolate(message: string, params: MessageParams): string {
   return message.replace(/\{(\w+)\}/g, (placeholder, name: string) => String(params[name] ?? placeholder))
+}
+
+export function translate(locale: Locale, key: MessageKey, params: MessageParams = {}): string {
+  return interpolate(messages[locale][key] || en[key], params)
+}
+
+export function translateMessages<K extends string>(
+  set: MessageSet<K>,
+  locale: Locale,
+  key: K,
+  params: MessageParams = {}
+): string {
+  return interpolate(set[locale][key] || set.en[key], params)
+}
+
+/** Text given in every supported language, for metadata that is read outside the component that owns the copy. */
+export type LocalizedText = Record<Locale, string>
+
+export function localizedText<K extends string>(set: MessageSet<K>, key: K): LocalizedText {
+  return { en: set.en[key], ko: set.ko[key] }
+}
+
+/** A shared dictionary entry in every supported language. */
+export function sharedText(key: MessageKey): LocalizedText {
+  return { en: en[key], ko: ko[key] }
 }

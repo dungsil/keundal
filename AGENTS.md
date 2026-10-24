@@ -2,26 +2,29 @@
 
 ## 패키지 구성
 
-| 패키지                                 | 역할                                                                       |
-| -------------------------------------- | -------------------------------------------------------------------------- |
-| `@keundal/ui`                          | 웹 UI의 공통 Vue 컴포넌트를 Nuxt 레이어로 제공합니다.                      |
-| `@keundal/chat-app`                    | web과 desktop이 공유하는 채팅 화면과 실행 코드를 Nuxt 레이어로 제공합니다. |
-| `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.     |
-| `@keundal/agent-host`                  | 주입받은 LLM·저장소·에이전트로 호스트와 HTTP 계층에 서비스를 제공합니다.   |
-| `@keundal/agent`                       | 교체 가능한 에이전트 서비스 계약을 제공합니다.                             |
-| `@keundal/agent-loop`                  | 공통 실행 루프와 축약·도구 반복 설정을 제공합니다.                         |
-| `@keundal/plugin-agent-chat`           | 공통 루프로 대화 에이전트를 등록합니다.                                    |
-| `@keundal/plugin-agent-coding`         | 공통 루프에 코딩 지침을 적용하여 에이전트를 등록합니다.                    |
-| `@keundal/tools`                       | 에이전트와 도구 공급자가 공유하는 실행 계약을 제공합니다.                  |
-| `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                                 |
-| `@keundal/plugin-llm-openai-chat`      | OpenAI Chat Completions API로 `llm`을 구현합니다.                          |
-| `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                           |
-| `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                               |
-| `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                     |
-| `@keundal/compaction`                  | 이전 대화를 요약하고 최근 대화를 보존하는 축약 함수를 제공합니다.          |
-| `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.              |
-| `@keundal/plugin-store-sqlite`         | SQLite 파일로 `session`과 `generation`을 구현합니다.                       |
-| `@keundal/tsconfig`, `@keundal/tsdown` | 공통 TypeScript·빌드 설정을 제공합니다.                                    |
+| 패키지                                 | 역할                                                                        |
+| -------------------------------------- | --------------------------------------------------------------------------- |
+| `@keundal/ui`                          | 웹 UI의 공통 Vue 컴포넌트를 Nuxt 레이어로 제공합니다.                       |
+| `@keundal/chat-app`                    | web과 desktop이 공유하는 셸이며, UI 플러그인을 조립합니다.                  |
+| `@keundal/ui-slots`                    | UI 플러그인이 컴포넌트를 등록하는 슬롯 레지스트리 `ctx.slots`를 제공합니다. |
+| `@keundal/ui-runtime`                  | 채팅 플랫폼 연결과 공유 화면 상태를 `ctx.chatRuntime`으로 제공합니다.       |
+| `@keundal/ui-*`                        | 화면 기능 하나를 슬롯에 등록하는 UI 플러그인입니다.                         |
+| `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.      |
+| `@keundal/agent-host`                  | 주입받은 LLM·저장소·에이전트로 호스트와 HTTP 계층에 서비스를 제공합니다.    |
+| `@keundal/agent`                       | 교체 가능한 에이전트 서비스 계약을 제공합니다.                              |
+| `@keundal/agent-loop`                  | 공통 실행 루프와 축약·도구 반복 설정을 제공합니다.                          |
+| `@keundal/plugin-agent-chat`           | 공통 루프로 대화 에이전트를 등록합니다.                                     |
+| `@keundal/plugin-agent-coding`         | 공통 루프에 코딩 지침을 적용하여 에이전트를 등록합니다.                     |
+| `@keundal/tools`                       | 에이전트와 도구 공급자가 공유하는 실행 계약을 제공합니다.                   |
+| `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                                  |
+| `@keundal/plugin-llm-openai-chat`      | OpenAI Chat Completions API로 `llm`을 구현합니다.                           |
+| `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                            |
+| `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                                |
+| `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                      |
+| `@keundal/compaction`                  | 이전 대화를 요약하고 최근 대화를 보존하는 축약 함수를 제공합니다.           |
+| `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.               |
+| `@keundal/plugin-store-sqlite`         | SQLite 파일로 `session`과 `generation`을 구현합니다.                        |
+| `@keundal/tsconfig`, `@keundal/tsdown` | 공통 TypeScript·빌드 설정을 제공합니다.                                     |
 
 서비스 계약은 `packages/core/src/{llm,session,generation,compaction}.ts`에 정의하고, 구체 구현은 플러그인으로 주입합니다. 저장소가 공유하는 대화 병합과 실행 메시지 조립은 `packages/core/src/messages.ts`에 둡니다. AG-UI 타입, 이벤트 상수, 검증 기능은 `@keundal/core`에서 가져옵니다. `@ag-ui/core` 직접 의존은 코어의 프로토콜 래퍼에서만 관리합니다.
 
@@ -34,7 +37,9 @@
 
 ## 앱 의존성 경계
 
-`apps/*`는 `packages/*`의 공용 패키지와 Nuxt 레이어를 사용하며, 다른 앱을 의존하거나 상속하지 않습니다. `packages/*`도 앱을 참조하지 않습니다. 앱 간에 공유하는 채팅 화면과 실행 코드는 `@keundal/chat-app`에 두고, 공통 표시 컴포넌트는 `@keundal/ui`에 둡니다. 앱별 실행·배포 설정은 각 앱에서 관리합니다.
+`apps/*`는 `packages/*`의 공용 패키지와 Nuxt 레이어를 사용하며, 다른 앱을 의존하거나 상속하지 않습니다. `packages/*`도 앱을 참조하지 않습니다. 앱 간에 공유하는 화면 기능은 `@keundal/ui-*` 플러그인에 두고, `@keundal/chat-app`은 플러그인을 조립합니다. 공통 표시 컴포넌트는 `@keundal/ui`에 둡니다. 앱별 실행·배포 설정은 각 앱에서 관리합니다.
+
+UI 플러그인의 컴포넌트는 `ctx`나 서비스 객체를 받지 않고, 슬롯 소유자의 값과 등록의 `inject` 결과만 props로 받습니다. 슬롯 선언, 플러그인 구조와 번역 규칙은 [UI 플러그인 문서](docs/ui-plugins.md)를 따릅니다.
 
 `pnpm check:boundaries`는 워크스페이스 의존성 선언, 소스 참조, Nuxt 상속과 스크립트의 앱 참조를 검사합니다. 이 검사는 `pnpm lint`와 CI에서도 실행합니다.
 

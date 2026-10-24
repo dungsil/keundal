@@ -6,7 +6,7 @@ import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { ChatStore } from '@keundal/plugin-chat-local'
 import { expect, test } from 'vitest'
 import { mountAgent } from './fixtures/agent'
-import { useKeundalChat } from '../app/composables/useKeundalChat'
+import { useKeundalChat } from '../../ui-chat/app/lib/use-keundal-chat'
 
 test('공급자가 첫 응답을 보류해도 실행 ID와 모델의 실행 중 Trace를 먼저 제공한다', async (t) => {
   const release = Promise.withResolvers<void>()

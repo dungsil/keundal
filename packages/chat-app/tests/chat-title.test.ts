@@ -5,7 +5,7 @@ import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { expect, onTestFinished, test } from 'vitest'
 import { createKeundalChat } from '@keundal/plugin-chat-local/keundal'
 import { ChatStore } from '@keundal/plugin-chat-local'
-import { validateChatTitle } from '../shared/utils/chat-title'
+import { validateChatTitle } from '@keundal/chat/chat-store'
 
 const model = 'openai/test'
 const user = { id: 'user', role: 'user', parts: [{ type: 'text', text: '질문' }] } as const

@@ -7,10 +7,18 @@ import { scenarioTitles } from './scenarios.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const inventory = JSON.parse(await readFile(new URL('./components.json', import.meta.url), 'utf8'))
+// UI plugins keep their components in `app/views`, outside Nuxt's global component directories.
+const plugins = (await readdir(resolve(root, 'packages'), { withFileTypes: true }))
+  .filter((entry) => entry.isDirectory() && entry.name.startsWith('ui-'))
+  .map((entry) => `packages/${entry.name}/app/views`)
+const directories = ['packages/ui/app/components', 'packages/chat-app/app/components', ...plugins]
 const files = (
   await Promise.all(
-    ['packages/ui/app/components', 'packages/chat-app/app/components'].map(async (directory) => {
-      const entries = await readdir(resolve(root, directory), { recursive: true })
+    directories.map(async (directory) => {
+      const entries = await readdir(resolve(root, directory), { recursive: true }).catch((error) => {
+        if (error.code === 'ENOENT') return []
+        throw error
+      })
       return entries.filter((file) => file.endsWith('.vue')).map((file) => `${directory}/${file.replaceAll('\\', '/')}`)
     })
   )

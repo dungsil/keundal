@@ -1,4 +1,13 @@
-import { isLocale, resolveLocale, translate, type Locale, type MessageKey, type MessageParams } from '../utils/locale'
+import {
+  isLocale,
+  resolveLocale,
+  translate,
+  translateMessages,
+  type Locale,
+  type MessageKey,
+  type MessageParams,
+  type MessageSet
+} from '../utils/locale'
 
 export function useLocale() {
   const saved = useCookie<string | undefined>('keundal-locale', {
@@ -25,4 +34,19 @@ export function useLocale() {
   }
 
   return { locale: readonly(locale), intlLocale, setLocale, t }
+}
+
+/**
+ * Create a feature's translation composable. Its `t` resolves the feature's own keys first and then the shared
+ * dictionary, so a plugin package owns the copy only it uses.
+ */
+export function defineMessages<K extends string>(set: MessageSet<K>) {
+  const owns = (key: string): key is K => Object.hasOwn(set.en, key)
+  return function useMessages() {
+    const shared = useLocale()
+    function t(key: K | MessageKey, params?: MessageParams) {
+      return owns(key) ? translateMessages(set, shared.locale.value, key, params) : shared.t(key, params)
+    }
+    return { ...shared, t }
+  }
 }

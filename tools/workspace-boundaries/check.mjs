@@ -27,6 +27,9 @@ const implementationIndependent = new Set([
   '@keundal/shell',
   '@keundal/transcription'
 ])
+// Every UI plugin package is presentation over contracts: apps choose the implementations.
+const isImplementationIndependent = (name) =>
+  implementationIndependent.has(name) || name === '@keundal/ui' || name.startsWith('@keundal/ui-')
 const isImplementation = (name) =>
   name.startsWith('@keundal/plugin-') ||
   name === '@keundal/agent-loop' ||
@@ -101,7 +104,7 @@ export async function checkWorkspaceBoundaries(root) {
       const source = await readFile(file, 'utf8')
       for (const value of strings(source, file)) {
         const local = relative(workspace.directory, file)
-        if (implementationIndependent.has(workspace.manifest.name) && /^(src|app|shared)[/\\]/.test(local)) {
+        if (isImplementationIndependent(workspace.manifest.name) && /^(src|app|shared)[/\\]/.test(local)) {
           const target = value.startsWith('.') ? resolve(dirname(file), value) : null
           const implementation = workspaces.find(
             (candidate) =>
@@ -144,7 +147,7 @@ export async function checkWorkspaceBoundaries(root) {
           for (const name of Object.keys(workspace.manifest[field] ?? {})) {
             if (
               field !== 'devDependencies' &&
-              implementationIndependent.has(workspace.manifest.name) &&
+              isImplementationIndependent(workspace.manifest.name) &&
               isImplementation(name)
             ) {
               errors.push(

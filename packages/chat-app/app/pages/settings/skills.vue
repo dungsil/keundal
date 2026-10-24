@@ -1,3 +1,0 @@
-<template>
-  <SkillSettings />
-</template>

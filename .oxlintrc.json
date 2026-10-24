@@ -24,7 +24,12 @@
       }
     },
     {
-      "files": ["packages/ui/nuxt.config.ts", "packages/chat-app/nuxt.config.ts", "apps/*/nuxt.config.ts"],
+      "files": [
+        "packages/ui/nuxt.config.ts",
+        "packages/ui-*/nuxt.config.ts",
+        "packages/chat-app/nuxt.config.ts",
+        "apps/*/nuxt.config.ts"
+      ],
       "env": {
         "node": true
       },
@@ -33,7 +38,7 @@
       }
     },
     {
-      "files": ["packages/ui/app/**", "packages/chat-app/app/**", "apps/*/app/**"],
+      "files": ["packages/ui/app/**", "packages/ui-*/app/**", "packages/chat-app/app/**", "apps/*/app/**"],
       "env": {
         "browser": true
       },
@@ -61,6 +66,7 @@
         "useLocale": "readonly",
         "useNuxtApp": "readonly",
         "useNuxtData": "readonly",
+        "useRouter": "readonly",
         "useRequestHeaders": "readonly",
         "useRoute": "readonly",
         "useRuntimeConfig": "readonly",
@@ -71,31 +77,28 @@
       }
     },
     {
-      "files": ["packages/chat-app/app/**"],
+      "files": ["packages/ui/app/**", "packages/ui-*/app/**", "packages/chat-app/app/**"],
       "globals": {
+        "abortNavigation": "readonly",
         "defineMarkdownComponent": "readonly",
         "definePageMeta": "readonly",
         "defineShortcuts": "readonly",
         "getDomain": "readonly",
-        "sourceToInlineMdc": "readonly",
         "useChatActions": "readonly",
-        "useChatSettings": "readonly",
-        "useChats": "readonly",
         "useColorMode": "readonly",
-        "useDictation": "readonly",
         "useFileUpload": "readonly",
         "useFileUploadWithStatus": "readonly",
-        "useKeundalChat": "readonly",
-        "useLLMSettings": "readonly",
-        "useModelCatalog": "readonly",
-        "useModels": "readonly",
         "useOverlay": "readonly",
-        "useStartupPending": "readonly",
         "useToast": "readonly"
       }
     },
     {
-      "files": ["packages/ui/app/**/*.vue", "packages/chat-app/app/**/*.vue", "apps/*/app/**/*.vue"],
+      "files": [
+        "packages/ui/app/**/*.vue",
+        "packages/ui-*/app/**/*.vue",
+        "packages/chat-app/app/**/*.vue",
+        "apps/*/app/**/*.vue"
+      ],
       "globals": {
         "defineEmits": "readonly",
         "defineModel": "readonly",
@@ -113,6 +116,8 @@
     {
       "files": [
         "packages/chat/src/**",
+        "packages/ui-runtime/src/**",
+        "packages/ui-slots/src/**",
         "packages/plugin-chat-*/src/**",
         "packages/plugin-llm-browser/src/**",
         "packages/plugin-transcription-browser/src/**"

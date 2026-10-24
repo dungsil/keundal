@@ -1,0 +1,49 @@
+import type { ToolPart } from '@keundal/chat/chat-message'
+
+export interface Source {
+  url: string
+  title?: string
+}
+
+interface GoogleGroundingChunk {
+  web?: { uri?: string, title?: string }
+}
+
+interface SearchOutput {
+  sources?: { url: string, type?: string }[]
+  groundingChunks?: GoogleGroundingChunk[]
+  groundingMetadata?: { groundingChunks?: GoogleGroundingChunk[] }
+}
+
+export function isToolStreaming(part: ToolPart): boolean {
+  return part.state === 'input-streaming' || part.state === 'input-available'
+}
+
+export function getSearchQuery(part: ToolPart): string | undefined {
+  return (part.input as { query?: string } | undefined)?.query
+}
+
+export function getSources(part: ToolPart): Source[] {
+  const output = part.output
+  if (!output) return []
+
+  // Anthropic: array of { url, title }
+  if (Array.isArray(output)) {
+    return output.filter((s: Source) => s.url).map((s: Source) => ({ url: s.url, title: s.title }))
+  }
+
+  const typed = output as SearchOutput
+
+  // OpenAI: { sources: [{ type: 'url', url }] }
+  if (typed.sources) {
+    return typed.sources.filter(s => s.url).map(s => ({ url: s.url }))
+  }
+
+  // Google: grounding chunks with { web: { uri, title } }
+  const chunks = typed.groundingChunks ?? typed.groundingMetadata?.groundingChunks
+  if (chunks) {
+    return chunks.filter(c => c.web?.uri).map(c => ({ url: c.web!.uri!, title: c.web!.title }))
+  }
+
+  return []
+}

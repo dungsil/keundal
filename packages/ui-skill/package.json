@@ -1,0 +1,33 @@
+{
+  "name": "@keundal/ui-skill",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./nuxt.config.ts",
+  "exports": {
+    ".": "./nuxt.config.ts",
+    "./plugin": "./app/plugin.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@keundal/chat": "workspace:*",
+    "@keundal/skill-markdown": "workspace:*",
+    "@keundal/ui": "workspace:*",
+    "@keundal/ui-runtime": "workspace:*",
+    "@keundal/ui-settings": "workspace:*",
+    "@keundal/ui-slots": "workspace:*",
+    "cordis": "catalog:",
+    "fflate": "0.8.3",
+    "nuxt": "^4.6.2",
+    "vue": "3.5.44"
+  },
+  "devDependencies": {
+    "@keundal/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

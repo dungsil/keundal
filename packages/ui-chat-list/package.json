@@ -1,0 +1,22 @@
+{
+  "name": "@keundal/ui-chat-list",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./nuxt.config.ts",
+  "exports": {
+    ".": "./nuxt.config.ts",
+    "./plugin": "./app/plugin.ts"
+  },
+  "dependencies": {
+    "@keundal/ui": "workspace:*",
+    "@keundal/ui-layout": "workspace:*",
+    "@keundal/ui-runtime": "workspace:*",
+    "@keundal/ui-settings": "workspace:*",
+    "@keundal/ui-slots": "workspace:*",
+    "cordis": "catalog:",
+    "date-fns": "^4.4.0",
+    "nuxt": "^4.6.2",
+    "vue": "3.5.44"
+  }
+}

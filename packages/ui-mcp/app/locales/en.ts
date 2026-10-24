@@ -1,0 +1,45 @@
+export default {
+  'mcp.name': 'Server name',
+  'mcp.transport': 'Transport',
+  'mcp.command': 'Command',
+  'mcp.url': 'Server URL',
+  'mcp.args': 'Arguments (JSON array)',
+  'mcp.cwd': 'Working directory (optional)',
+  'mcp.env': 'Environment variables (JSON object)',
+  'mcp.headers': 'HTTP headers (JSON object)',
+  'mcp.timeout': 'Timeout (ms)',
+  'mcp.edit': 'Edit',
+  'mcp.remove': 'Remove',
+  'mcp.add': 'Add server',
+  'mcp.save': 'Save changes',
+  'mcp.cancel': 'Cancel',
+  'mcp.saved': 'MCP settings saved. They apply to the next response.',
+  'mcp.saveFailed': 'Could not save or connect. Check the server, configuration, and secret store.',
+  'mcp.invalidJSON': 'Enter valid JSON for arguments and credentials.',
+  'mcp.check': 'Check connection',
+  'mcp.checkCancel': 'Cancel check',
+  'mcp.checkDescription':
+    'Connects with the values above, lists the tools and resources the server reports, and closes the connection. No tool runs. A failed check does not block saving.',
+  'mcp.checkDesktopLimit':
+    'On desktop, only Streamable HTTP servers can be checked. The check runs from this app window, so the server must allow this app origin through CORS. The local host that answers chats is not involved. stdio commands are never started by the check.',
+  'mcp.checkStdioUnsupported': 'stdio servers cannot be checked here. You can still save.',
+  'mcp.checkFailed':
+    'Could not reach the server. Check the URL, that the server is running, and that it allows CORS requests and MCP headers from this app. You can still save.',
+  'mcp.checkTimeout': 'The server did not answer within {ms} ms. You can still save.',
+  'mcp.checkDetail': 'Details: {message}',
+  'mcp.checkTools': 'Tools reported by the server ({count})',
+  'mcp.checkNoTools': 'The server reports no tools.',
+  'mcp.checkPick': 'Selecting a tool adds its name to Allowed tools. You can still type names by hand.',
+  'mcp.checkAllowAll': 'Every tool is allowed by *. Clearing one lists the others by name.',
+  'mcp.checkUnknown': 'Allowed but not reported by the server: {names}',
+  'mcp.checkResources': 'Resources: available ({count})',
+  'mcp.checkNoResources': 'Resources: not offered by this server',
+  'mcp.hosted': 'This app uses a remote agent. Configure MCP on its host with KEUNDAL_MCP_SERVERS.',
+  'mcp.webDescription':
+    'Connect to Streamable HTTP servers that allow this browser origin through CORS. Settings, including credentials, are saved in this browser. Saving stops active responses.',
+  'mcp.allowInsecureHttp': 'Allow HTTP for this server',
+  'mcp.allowInsecureHttpDescription':
+    'Use only on a trusted LAN or VPN. HTTP does not encrypt credentials or MCP traffic.',
+  'mcp.desktopDescription':
+    'Connect to HTTP servers or run trusted local stdio servers. Settings are saved in the OS secret store. Saving stops active responses and restarts the local host.'
+}

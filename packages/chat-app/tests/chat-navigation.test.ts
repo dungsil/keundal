@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { chatPath, settingsReturnTo, historyQuery, historySort, searchChatHistory, sidebarChats } from '../shared/utils/chat-navigation'
+import { chatPath, settingsReturnTo, historyQuery, historySort, searchChatHistory, sidebarChats } from '../../ui/app/utils/chat-navigation'
 
 const chats = Array.from({ length: 1000 }, (_, index) => ({
   id: String(index), label: `대화 ${index}`, createdAt: new Date(Date.UTC(2026, 0, 1, 0, index)).toISOString()
