@@ -15,7 +15,7 @@ import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
 await ctx.plugin(indexedDBStorePlugin, { databaseName: 'my-agent' })
 ```
 
-`session.commit()`은 별도 지정이 없을 때 메시지를 병합합니다. `mode: 'replace'`는 전체 메시지를
+`session.commit()`은 기본적으로 메시지를 병합합니다. `mode: 'replace'`는 전체 메시지를
 교체하며 `messages: []`로 모두 비울 수 있습니다. revision 검사와 종료 기록의 중복 적용
 방지는 그대로 유지됩니다.
 
