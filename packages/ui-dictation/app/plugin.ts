@@ -1,21 +1,10 @@
 import type { Context } from 'cordis'
 import type {} from '@keundal/ui-composer/slots'
 import type {} from '@keundal/ui-runtime'
-import { lazyView } from '@keundal/ui-slots'
+import DictateButton from './views/DictateButton.vue'
 
 export const name = 'ui-dictation'
 export const inject = ['slots', 'chatRuntime']
-
-const DictateButton = lazyView(() => import('./views/DictateButton.vue'), [
-  'state',
-  'setState',
-  'setPreview',
-  'disabled',
-  'appendTranscript',
-  'ensureConfigured',
-  'transcriptionSampleRate',
-  'transcribe'
-])
 
 /** Replace the composer's submit button with a microphone control while the prompt is empty. */
 export function apply(ctx: Context) {

@@ -1,17 +1,15 @@
 import type { Context } from 'cordis'
 import type {} from '@keundal/ui-layout/slots'
-import { lazyView } from '@keundal/ui-slots'
 import { localizedText } from '@keundal/ui/app/utils/locale.ts'
 
 import { messages } from './locale'
 import type {} from './slots'
+import AppearanceSection from './views/AppearanceSection.vue'
 import SettingsLink from './views/SettingsLink.vue'
 import SettingsPage from './views/SettingsPage.vue'
 
 export const name = 'ui-settings'
 export const inject = ['slots']
-
-const AppearanceSection = lazyView(() => import('./views/AppearanceSection.vue'), [])
 
 /** Render the settings page with its section navigation, the appearance section and the sidebar link. */
 export function apply(ctx: Context) {

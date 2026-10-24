@@ -2,16 +2,12 @@ import type { Context } from 'cordis'
 import type { McpRequestOptions } from '@keundal/mcp'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
-import { lazyView } from '@keundal/ui-slots'
 import { sharedText } from '@keundal/ui/app/utils/locale.ts'
+
+import McpSettingsSection from './views/McpSettings.vue'
 
 export const name = 'ui-mcp'
 export const inject = ['slots', 'chatRuntime']
-
-const McpSettingsSection = lazyView(
-  () => import('./views/McpSettings.vue'),
-  ['capabilities', 'remoteAgent', 'configuration', 'saveSettings', 'canProbe', 'probe']
-)
 
 /** Add the MCP server section to the settings page. */
 export function apply(ctx: Context) {
