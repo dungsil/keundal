@@ -3,6 +3,7 @@
 UI 플러그인이 Vue 컴포넌트를 등록하는 슬롯 레지스트리입니다. Cordis 서비스 `ctx.slots`와 렌더링 컴포넌트를 제공합니다.
 
 - `ctx.slots.register(options, Component)`: 선언된 슬롯에 컴포넌트를 등록하고, `children`에 적은 하위 슬롯을 선언합니다.
+- `lazyView(load, props)`: 컴포넌트를 첫 렌더링 때 불러오는 등록용 컴포넌트를 만듭니다. `props`에는 렌더러가 전달할 값의 이름을 적습니다.
 - `ctx.slots.inject(name, callback)`: 다른 플러그인이 선언하는 슬롯에 선언이 생길 때마다 등록합니다.
 - `ctx.slots.registerFactory(options, Component)`: 어느 항목에서나 그릴 수 있는 팩터리를 등록합니다.
 - `SlotRoot`, `SlotOutlet`, `SlotFactory`: 슬롯과 팩터리를 그립니다. 항목은 자신이 선언한 슬롯만 그릴 수 있습니다.

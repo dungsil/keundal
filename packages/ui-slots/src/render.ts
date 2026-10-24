@@ -1,5 +1,6 @@
 import {
   computed,
+  defineAsyncComponent,
   defineComponent,
   Fragment,
   h,
@@ -7,6 +8,7 @@ import {
   onErrorCaptured,
   provide,
   shallowRef,
+  Suspense,
   type Component,
   type InjectionKey,
   type PropType,
@@ -36,6 +38,29 @@ function propNames(component: Component): readonly string[] | undefined {
   const props: unknown = 'props' in component ? component.props : undefined
   if (Array.isArray(props)) return props
   return props && typeof props === 'object' ? Object.keys(props) : undefined
+}
+
+/** Views loaded on first render need a boundary that waits for the loader before hydration. */
+const LAZY: unique symbol = Symbol('lazy-slot-view')
+
+/**
+ * Load a view on first render. The loader keeps the view out of the first-screen bundle, so a page only downloads the
+ * views it shows. `props` names the values the entry receives, the same contract as a component's `defineProps`; the
+ * renderer filters by these names, so pass the union of the outlet owner values and the `inject` result the view reads.
+ */
+export function lazyView(load: () => Promise<{ default: Component }>, props: readonly string[]): Component {
+  const View = defineAsyncComponent(load)
+  return Object.assign(
+    defineComponent({
+      name: 'LazySlotView',
+      props: Object.fromEntries(props.map((name) => [name, null])),
+      setup(declared) {
+        return () => h(View, declared)
+      }
+    }),
+    // The host resolves the loaded view before hydrating it, so the server markup matches the browser.
+    { [LAZY]: true }
+  )
 }
 
 const SlotEntryHost = defineComponent({
@@ -72,7 +97,8 @@ const SlotEntryHost = defineComponent({
       const passed = accepted
         ? Object.fromEntries(accepted.filter((name) => name in values).map((name) => [name, values[name]]))
         : {}
-      return h(props.entry.component, passed)
+      const node = h(props.entry.component, passed)
+      return LAZY in props.entry.component ? h(Suspense, null, { default: () => node }) : node
     }
   }
 })

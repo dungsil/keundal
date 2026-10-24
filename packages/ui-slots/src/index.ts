@@ -14,4 +14,4 @@ export type {
   SlotOwner,
   SlotRegistration
 } from './registry'
-export { SlotFactory, SlotOutlet, SlotRoot, useSlotEntries } from './render'
+export { SlotFactory, SlotOutlet, SlotRoot, lazyView, useSlotEntries } from './render'

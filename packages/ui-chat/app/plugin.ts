@@ -3,12 +3,35 @@ import type { ChatStoreLike } from '@keundal/chat/chat-store'
 import type { Context } from 'cordis'
 import type {} from '@keundal/ui-layout/slots'
 import type {} from '@keundal/ui-runtime'
+import { lazyView } from '@keundal/ui-slots'
 
 import type {} from './slots'
-import ChatPage from './views/ChatPage.vue'
 
 export const name = 'ui-chat'
 export const inject = ['slots', 'chatRuntime']
+
+const ChatPage = lazyView(() => import('./views/ChatPage.vue'), [
+  'chatId',
+  'model',
+  'titleModel',
+  'webSearch',
+  'reasoning',
+  'chats',
+  'ensureConfigured',
+  'setPending',
+  'refreshChats',
+  'rename',
+  'remove',
+  'getChat',
+  'respond',
+  'steer',
+  'enqueue',
+  'dequeue',
+  'truncate',
+  'branch',
+  'saveVote',
+  'isBrowserOnly'
+])
 
 /** Render the conversation page and declare the slots that other plugins use to extend it. */
 export function apply(ctx: Context) {
@@ -23,6 +46,7 @@ export function apply(ctx: Context) {
     },
     // The store is read lazily inside each callback: it does not exist until the runtime connects in the browser.
     inject: ({ chatId }) => ({
+      chatId,
       model: runtime.model,
       titleModel: runtime.titleModel,
       webSearch: runtime.webSearch,

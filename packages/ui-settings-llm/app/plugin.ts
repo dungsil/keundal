@@ -2,11 +2,15 @@ import type { Context } from 'cordis'
 import type { LLMSettings } from '@keundal/llm-settings'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
-
-import LLMSettingsSection from './views/LLMSettings.vue'
+import { lazyView } from '@keundal/ui-slots'
 
 export const name = 'ui-settings-llm'
 export const inject = ['slots', 'chatRuntime']
+
+const LLMSettingsSection = lazyView(
+  () => import('./views/LLMSettings.vue'),
+  ['settings', 'model', 'capabilities', 'stop', 'saveSettings']
+)
 
 /** Add the LLM provider section to the settings page. */
 export function apply(ctx: Context) {

@@ -2,15 +2,19 @@ import type { Context } from 'cordis'
 import type {} from '@keundal/ui-layout/slots'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
+import { lazyView } from '@keundal/ui-slots'
 import { computed, reactive } from 'vue'
-
-import ChatActions from './views/ChatActions.vue'
-import ChatHistory from './views/ChatHistory.vue'
-import ChatSearch from './views/ChatSearch.vue'
-import HistoryPage from './views/HistoryPage.vue'
 
 export const name = 'ui-chat-list'
 export const inject = ['slots', 'chatRuntime']
+
+const ChatActions = lazyView(() => import('./views/ChatActions.vue'), ['collapsed', 'openSearch'])
+const ChatHistory = lazyView(() => import('./views/ChatHistory.vue'), ['collapsed', 'chats', 'rename', 'remove'])
+const ChatSearch = lazyView(
+  () => import('./views/ChatSearch.vue'),
+  ['chats', 'settingsSections', 'search', 'setSearchOpen', 'rename', 'remove']
+)
+const HistoryPage = lazyView(() => import('./views/HistoryPage.vue'), ['chats'])
 
 /** Render the new chat, search and history actions, the grouped chat history, the search dialog and the history page. */
 export function apply(ctx: Context) {
@@ -30,7 +34,8 @@ export function apply(ctx: Context) {
       name: 'layout.sidebar',
       id: 'actions',
       order: 0,
-      inject: () => ({
+      inject: ({ collapsed }) => ({
+        collapsed,
         openSearch: () => {
           search.open = true
         }
@@ -40,7 +45,8 @@ export function apply(ctx: Context) {
       name: 'layout.sidebar',
       id: 'history',
       order: 10,
-      inject: () => ({
+      inject: ({ collapsed }) => ({
+        collapsed,
         chats: runtime.chats,
         rename,
         remove

@@ -14,6 +14,7 @@
     "@keundal/ui-runtime": "workspace:*",
     "@keundal/ui-settings": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
+    "@vueuse/core": "^14.4.0",
     "cordis": "catalog:",
     "date-fns": "^4.4.0",
     "nuxt": "^4.6.2",

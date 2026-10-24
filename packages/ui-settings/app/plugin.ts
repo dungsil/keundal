@@ -1,15 +1,17 @@
 import type { Context } from 'cordis'
 import type {} from '@keundal/ui-layout/slots'
+import { lazyView } from '@keundal/ui-slots'
 import { localizedText } from '@keundal/ui/app/utils/locale.ts'
 
 import { messages } from './locale'
 import type {} from './slots'
-import AppearanceSection from './views/AppearanceSection.vue'
-import SettingsLink from './views/SettingsLink.vue'
-import SettingsPage from './views/SettingsPage.vue'
 
 export const name = 'ui-settings'
 export const inject = ['slots']
+
+const SettingsPage = lazyView(() => import('./views/SettingsPage.vue'), ['section'])
+const AppearanceSection = lazyView(() => import('./views/AppearanceSection.vue'), [])
+const SettingsLink = lazyView(() => import('./views/SettingsLink.vue'), ['collapsed', 'close'])
 
 /** Render the settings page with its section navigation, the appearance section and the sidebar link. */
 export function apply(ctx: Context) {
@@ -23,5 +25,10 @@ export function apply(ctx: Context) {
     order: 0,
     meta: { label: localizedText(messages, 'settings.appearance'), icon: 'i-lucide-palette', group: 'general' }
   }, AppearanceSection))
-  ctx.slots.inject('layout.sidebar.footer', () => ctx.slots.register({ name: 'layout.sidebar.footer', id: 'settings', order: 0 }, SettingsLink))
+  ctx.slots.inject('layout.sidebar.footer', () => ctx.slots.register({
+    name: 'layout.sidebar.footer',
+    id: 'settings',
+    order: 0,
+    inject: ({ collapsed, close }) => ({ collapsed, close })
+  }, SettingsLink))
 }

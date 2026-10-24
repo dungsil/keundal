@@ -2,15 +2,29 @@ import type { Context } from 'cordis'
 import type {} from '@keundal/ui-composer/slots'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
+import { lazyView } from '@keundal/ui-slots'
 import { localizedText } from '@keundal/ui/app/utils/locale.ts'
 
 import { messages } from './locale'
-import ModelSelect from './views/ModelSelect.vue'
-import ModelSettings from './views/ModelSettings.vue'
-import ReasoningSelect from './views/ReasoningSelect.vue'
 
 export const name = 'ui-model-selection'
 export const inject = ['slots', 'chatRuntime']
+
+const ModelSelect = lazyView(
+  () => import('./views/ModelSelect.vue'),
+  ['selectedModel', 'models', 'loading', 'switching', 'error', 'refresh']
+)
+const ReasoningSelect = lazyView(() => import('./views/ReasoningSelect.vue'), ['reasoning', 'reasoningLevels'])
+const ModelSettings = lazyView(() => import('./views/ModelSettings.vue'), [
+  'models',
+  'defaultModel',
+  'titleModel',
+  'saveDefaultModel',
+  'saveTitleModel',
+  'loading',
+  'modelError',
+  'refresh'
+])
 
 /** Add the model and reasoning pickers to the composer and the model section to the settings page. */
 export function apply(ctx: Context) {

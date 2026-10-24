@@ -2,12 +2,16 @@ import type { Context } from 'cordis'
 import type { SkillSettings } from '@keundal/chat/skills'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
+import { lazyView } from '@keundal/ui-slots'
 import { sharedText } from '@keundal/ui/app/utils/locale.ts'
-
-import SkillSettingsSection from './views/SkillSettings.vue'
 
 export const name = 'ui-skill'
 export const inject = ['slots', 'chatRuntime']
+
+const SkillSettingsSection = lazyView(
+  () => import('./views/SkillSettings.vue'),
+  ['capabilities', 'loadSettings', 'saveSettings', 'listFiles']
+)
 
 /** Add the skill management section to the settings page. */
 export function apply(ctx: Context) {

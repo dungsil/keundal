@@ -2,13 +2,18 @@ import type { Context } from 'cordis'
 import type { AgentPluginSettings } from '@keundal/chat/platform'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
+import { lazyView } from '@keundal/ui-slots'
 import { localizedText } from '@keundal/ui/app/utils/locale.ts'
 
 import { messages } from './locale'
-import AgentPluginSettingsSection from './views/AgentPluginSettings.vue'
 
 export const name = 'ui-agent-plugins'
 export const inject = ['slots', 'chatRuntime']
+
+const AgentPluginSettingsSection = lazyView(
+  () => import('./views/AgentPluginSettings.vue'),
+  ['isAvailable', 'list', 'importFiles', 'configure', 'remove']
+)
 
 /** Add the agent plugin section to the settings page. */
 export function apply(ctx: Context) {
