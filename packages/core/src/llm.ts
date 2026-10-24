@@ -27,13 +27,21 @@ export interface LLMModelInfo {
   readonly maxOutputTokens?: number
 }
 
-export type ReasoningLevel = 'low' | 'medium' | 'high'
+export type ReasoningLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 export type Reasoning = boolean | ReasoningLevel
 
 export function parseReasoning(value: unknown): Reasoning | undefined {
-  if (value === undefined || typeof value === 'boolean' || value === 'low' || value === 'medium' || value === 'high')
+  if (
+    value === undefined ||
+    typeof value === 'boolean' ||
+    value === 'low' ||
+    value === 'medium' ||
+    value === 'high' ||
+    value === 'xhigh' ||
+    value === 'max'
+  )
     return value
-  throw new Error('reasoning must be a boolean or low, medium, high')
+  throw new Error('reasoning must be a boolean or low, medium, high, xhigh, max')
 }
 
 export interface LLMRequest {

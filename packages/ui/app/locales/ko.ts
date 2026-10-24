@@ -128,6 +128,8 @@ export default {
   'prompt.reasoningLevel.low': '낮음',
   'prompt.reasoningLevel.medium': '중간',
   'prompt.reasoningLevel.high': '높음',
+  'prompt.reasoningLevel.xhigh': '매우 높음',
+  'prompt.reasoningLevel.max': '최대',
   'prompt.menu': '입력 옵션 열기',
   'prompt.commands': '스킬 및 MCP 도구',
   'prompt.commandsLoading': '스킬과 도구를 불러오는 중…',

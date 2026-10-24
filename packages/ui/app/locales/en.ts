@@ -127,6 +127,8 @@ export default {
   'prompt.reasoningLevel.low': 'Low',
   'prompt.reasoningLevel.medium': 'Medium',
   'prompt.reasoningLevel.high': 'High',
+  'prompt.reasoningLevel.xhigh': 'Extra high',
+  'prompt.reasoningLevel.max': 'Max',
   'prompt.menu': 'Open prompt menu',
   'prompt.commands': 'Skills and MCP tools',
   'prompt.commandsLoading': 'Loading skills and tools…',
