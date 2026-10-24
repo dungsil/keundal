@@ -44,10 +44,12 @@ const answer = computed(() => {
   const output = props.invocation.output
   return output && typeof output === 'object' && 'content' in output && typeof output.content === 'string' ? output.content : ''
 })
+const hasBody = computed(() => showLabel.value || !!task.value || !!answer.value || !!diagnostic.value || props.invocation.state === 'output-error')
 </script>
 
 <template>
   <UChatTool
+    v-if="hasBody"
     :text="t(labels[status])"
     :suffix="suffix"
     :streaming="status === 'queued' || status === 'running'"
@@ -73,4 +75,12 @@ const answer = computed(() => {
       </p>
     </div>
   </UChatTool>
+  <UChatTool
+    v-else
+    :text="t(labels[status])"
+    :suffix="suffix"
+    :streaming="status === 'queued' || status === 'running'"
+    icon="i-lucide-git-fork"
+    chevron="leading"
+  />
 </template>
