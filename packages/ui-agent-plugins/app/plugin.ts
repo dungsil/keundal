@@ -3,12 +3,17 @@ import type { AgentPluginSettings } from '@keundal/chat/platform'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
 import { localizedText } from '@keundal/ui/app/utils/locale.ts'
+import { lazyView } from '@keundal/ui-slots'
 
 import { messages } from './locale'
-import AgentPluginSettingsSection from './views/AgentPluginSettings.vue'
 
 export const name = 'ui-agent-plugins'
 export const inject = ['slots', 'chatRuntime']
+
+// 슬롯 등록은 유지하되, 정적 import로 설정 뷰를 초기 번들에 포함하지 않는다.
+const AgentPluginSettingsSection = lazyView(() => import('./views/AgentPluginSettings.vue'), [
+  'isAvailable', 'list', 'importFiles', 'configure', 'remove'
+])
 
 /** Add the agent plugin section to the settings page. */
 export function apply(ctx: Context) {

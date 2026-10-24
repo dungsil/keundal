@@ -14,7 +14,9 @@ stdio와 SSE는 진단을 표시하고 건너뜁니다. 설정을 바꾸면 진�
 업데이트하려면 기존 플러그인을 삭제한 뒤 폴더를 다시 가져옵니다.
 
 브라우저에 저장한 플러그인은 원격 에이전트에 전달하지 않습니다. 원격 연결에서는 아래의 호스트 설정을 사용합니다.
-`@keundal/agent-plugins/browser`의 `inspectAgentPlugin(files)`는 Node API 없이 같은 메타데이터 검증을 적용하며 네트워크 연결을 시작하지 않습니다.
+`@keundal/agent-plugins/browser`의 `inspectAgentPlugin(files)`는 Node API 없이 같은 메타데이터 검증을 적용하며 MCP 서버에 연결하지 않습니다.
+
+YAML 파서는 `SKILL.md`의 frontmatter를 검사할 때 불러옵니다. 스킬이 없는 플러그인의 매니페스트나 MCP 설정만 검사할 때는 파서를 불러오지 않습니다. YAML 구문 오류는 해당 스킬의 진단으로 기록하며, 다른 정상 스킬은 계속 제공합니다.
 
 ## 호스트에 연결
 

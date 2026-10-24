@@ -3,11 +3,15 @@ import type { SkillSettings } from '@keundal/chat/skills'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
 import { sharedText } from '@keundal/ui/app/utils/locale.ts'
-
-import SkillSettingsSection from './views/SkillSettings.vue'
+import { lazyView } from '@keundal/ui-slots'
 
 export const name = 'ui-skill'
 export const inject = ['slots', 'chatRuntime']
+
+// 슬롯 등록은 유지하되, 정적 import로 설정 뷰를 초기 번들에 포함하지 않는다.
+const SkillSettingsSection = lazyView(() => import('./views/SkillSettings.vue'), [
+  'capabilities', 'loadSettings', 'saveSettings', 'listFiles'
+])
 
 /** Add the skill management section to the settings page. */
 export function apply(ctx: Context) {

@@ -2,10 +2,15 @@ import type { Context } from 'cordis'
 import type { LLMSettings } from '@keundal/llm-settings'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
-import LLMSettingsSection from './views/LLMSettings.vue'
+import { lazyView } from '@keundal/ui-slots'
 
 export const name = 'ui-settings-llm'
 export const inject = ['slots', 'chatRuntime']
+
+// 슬롯 등록은 유지하되, 정적 import로 설정 뷰를 초기 번들에 포함하지 않는다.
+const LLMSettingsSection = lazyView(() => import('./views/LLMSettings.vue'), [
+  'settings', 'model', 'capabilities', 'stop', 'saveSettings'
+])
 
 /** Add the LLM provider section to the settings page. */
 export function apply(ctx: Context) {

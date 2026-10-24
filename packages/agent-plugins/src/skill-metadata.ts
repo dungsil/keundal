@@ -1,11 +1,12 @@
 import type { SkillDefinition } from '@keundal/core'
-import { parse } from 'yaml'
 
 import { object, strings } from './validation.js'
 
 export async function pluginSkill(content: string, directory: string): Promise<SkillDefinition> {
   const match = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)
   if (!match) throw new Error('YAML frontmatter is required')
+  // 정적 import는 브라우저 초기 번들에 YAML을 포함하므로 스킬을 검사할 때만 불러온다.
+  const { parse } = await import('yaml')
   const metadata: unknown = parse(match[1])
   if (!object(metadata)) throw new Error('skill metadata must be an object')
   const { name, description } = metadata

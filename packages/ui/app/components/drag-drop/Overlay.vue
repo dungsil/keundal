@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { usePreferredReducedMotion } from '@vueuse/core'
-import { Motion } from 'motion-v'
+import { defineAsyncComponent } from 'vue'
+
+// 정적 import 대신 비동기 컴포넌트를 사용해 첫 끌어놓기 때만 애니메이션 코드를 불러온다.
+const Motion = defineAsyncComponent(() => import('motion-v').then((module) => module.Motion))
 
 const { t } = useLocale()
 const prefersReducedMotion = usePreferredReducedMotion()

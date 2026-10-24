@@ -6,6 +6,7 @@ test('브라우저는 플러그인 스킬과 HTTP 서버를 읽고 지원하지 
     'plugin.json': JSON.stringify({ $schema: PLUGIN_SCHEMA, name: 'reports', version: '1.2.0' }),
     'skills/review/SKILL.md': '---\nname: review\ndescription: Review reports\n---\nRead the report.',
     'skills/broken/SKILL.md': 'invalid',
+    'skills/invalid-yaml/SKILL.md': '---\nname: [\n---\nInvalid metadata.',
     'mcp.json': JSON.stringify({
       $schema: MCP_SCHEMA,
       mcpServers: {
@@ -26,7 +27,7 @@ test('브라우저는 플러그인 스킬과 HTTP 서버를 읽고 지원하지 
   expect(plugin.servers).toEqual([
     { serverName: 'reports', transport: 'streamable-http', url: 'https://example.com/mcp', redirect: 'error' }
   ])
-  expect(plugin.diagnostics.map((d) => d.entry).sort()).toEqual(['broken', 'local', 'unsafe'])
+  expect(plugin.diagnostics.map((d) => d.entry).sort()).toEqual(['broken', 'invalid-yaml', 'local', 'unsafe'])
 })
 
 test('브라우저도 잘못된 매니페스트와 루트 밖 경로를 거부한다', async () => {
