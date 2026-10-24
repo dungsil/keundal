@@ -180,7 +180,7 @@ export default {
     '저장하면 이 공급자의 모델 목록을 자동으로 불러옵니다. 대화 입력창에서 사용할 모델을 선택하세요.',
   'llm.headers': '요청 헤더 (선택)',
   'llm.headersDescription':
-    '사용자 지정 헤더는 모델 목록 조회를 비롯한 HTTP 요청에서 공급자의 기본 헤더보다 우선합니다. 엔드포인트에서 CORS로 해당 헤더를 허용해야 하며, 브라우저가 금지한 헤더는 설정할 수 없습니다. WebSocket 연결에는 사용자 지정 헤더를 사용할 수 없습니다.',
+    '사용자 지정 헤더는 모델 목록 조회를 비롯한 HTTP 요청에서 공급자의 기본 헤더보다 우선합니다. 엔드포인트에서 CORS로 해당 헤더를 허용해야 하며, 브라우저가 금지한 헤더는 설정할 수 없습니다. WebSocket 연결에는 사용자 지정 헤더를 사용할 수 없습니다. 값은 기본으로 가립니다. 눈 아이콘 버튼을 누르면 표시됩니다.',
   'llm.addHeader': '헤더 추가',
   'llm.headerKeyRequired': '모든 요청 헤더 값에 키를 입력하세요.',
   'llm.duplicateHeaders': '요청 헤더 이름이 중복됩니다.',
@@ -264,6 +264,8 @@ export default {
   'seo.description': 'Cordis 플러그인으로 조합하는 AG-UI 프로토콜 기반 개인용 오픈소스 에이전트 도구입니다.',
   'llm.headerKey': '헤더 {index} 키',
   'llm.headerValue': '헤더 {index} 값',
+  'llm.showHeaderValue': '헤더 {index} 값 표시',
+  'llm.hideHeaderValue': '헤더 {index} 값 숨기기',
   'llm.removeHeader': '헤더 {index} 삭제',
   'skill.duplicate': '이름이 "{name}"인 스킬이 이미 있습니다.',
   'skill.deleteDescription': '{name} 스킬을 삭제하시겠습니까? 삭제한 스킬은 복구할 수 없습니다.',
