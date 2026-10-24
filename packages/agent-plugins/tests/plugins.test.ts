@@ -6,6 +6,17 @@ import { fileURLToPath } from 'node:url'
 import { loadAgentPlugin, PLUGIN_SCHEMA, MCP_SCHEMA, type LoadedAgentPlugin } from '@keundal/agent-plugins'
 import { expect, test, type TestContext } from 'vitest'
 
+async function createSymlink(t: TestContext, target: string, link: string) {
+  try {
+    await symlink(target, link)
+  } catch (error) {
+    if (process.platform === 'win32' && (error as NodeJS.ErrnoException).code === 'EPERM') {
+      t.skip('심볼릭 링크를 만들 권한이 없습니다.')
+    }
+    throw error
+  }
+}
+
 async function fixture(t: TestContext) {
   const base = await mkdtemp(join(tmpdir(), 'agent-plugins-'))
   const root = join(base, 'plugin')
@@ -106,7 +117,7 @@ test('루트 밖의 매니페스트 링크는 거부한다', async (t) => {
   const f = await fixture(t)
   await writeFile(join(f.base, 'outside.json'), await readFile(join(f.root, 'plugin.json')))
   await rm(join(f.root, 'plugin.json'))
-  await symlink(join(f.base, 'outside.json'), join(f.root, 'plugin.json'))
+  await createSymlink(t, join(f.base, 'outside.json'), join(f.root, 'plugin.json'))
   await expect(f.load()).rejects.toThrow('boundary')
 })
 
@@ -114,12 +125,12 @@ test('스킬 링크는 내부 대상만 허용하고 로드 직전 경계를 다
   const f = await fixture(t)
   await f.file('bundled/SKILL.md', '---\nname: hello\ndescription: test\n---\nbody')
   await mkdir(join(f.root, 'skills'))
-  await symlink('../bundled', join(f.root, 'skills/hello'))
+  await createSymlink(t, '../bundled', join(f.root, 'skills/hello'))
   const catalog = await (await f.load()).skillProvider.prepare()
   expect(catalog.skills).toHaveLength(1)
   await rm(join(f.root, 'bundled/SKILL.md'))
   await writeFile(join(f.base, 'outside.md'), 'secret')
-  await symlink(join(f.base, 'outside.md'), join(f.root, 'bundled/SKILL.md'))
+  await createSymlink(t, join(f.base, 'outside.md'), join(f.root, 'bundled/SKILL.md'))
   await expect(catalog.load('hello')).rejects.toThrow('boundary')
 })
 
@@ -129,7 +140,7 @@ test.for(['skills', 'mcp.json'])('외부 구성요소 링크 %s는 해당 종류
   const outside = join(f.base, 'outside')
   if (component === 'skills') await mkdir(outside)
   else await writeFile(outside, '{}')
-  await symlink(outside, join(f.root, component))
+  await createSymlink(t, outside, join(f.root, component))
   const p = await f.load(true)
   expect(p.diagnostics.some((d) => d.message.includes('boundary'))).toBe(true)
   if (component === 'mcp.json') expect((await p.skillProvider.prepare()).skills).toHaveLength(1)
