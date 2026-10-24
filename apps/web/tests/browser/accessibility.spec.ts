@@ -10,8 +10,11 @@ test('표시 설정 화면에 접근성 위반이 없다 @a11y:appearance', asyn
   await accessible(page)
 })
 
-test('공급자 설정 화면에 접근성 위반이 없다 @a11y:llm', async ({ page }) => {
+test('공급자와 시스템 프롬프트 설정 화면에 접근성 위반이 없다 @a11y:llm @a11y:system-prompt', async ({ page }) => {
   await ready(page, '/settings/llm')
+  await accessible(page)
+  await ready(page, '/settings/system-prompt')
+  await expect(page.getByRole('textbox')).toBeEnabled()
   await accessible(page)
 })
 

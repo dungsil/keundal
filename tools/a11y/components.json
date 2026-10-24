@@ -100,6 +100,10 @@
     "scenario": "@a11y:llm",
     "test": "apps/web/tests/browser/accessibility.spec.ts"
   },
+  "packages/ui-settings-llm/app/views/SystemPromptSettings.vue": {
+    "scenario": "@a11y:system-prompt",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
   "packages/ui-settings/app/views/AppearanceSection.vue": {
     "scenario": "@a11y:appearance",
     "test": "apps/web/tests/browser/accessibility.spec.ts"

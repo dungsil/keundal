@@ -130,8 +130,10 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   const user = { id: 'user', role: 'user' as const, parts: [{ type: 'text' as const, text: 'Review report' }] }
   await connection.store.create(id, user, 'openai/test')
   const events = []
-  for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user] })) events.push(event)
+  for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user], systemPrompt: 'Answer in two sentences.' })) events.push(event)
   expect(events.at(-1), JSON.stringify(events)).toMatchObject({ type: 'RUN_FINISHED' })
+  expect(JSON.stringify(requests[0]!.input)).toContain('Answer in two sentences.')
+  expect(JSON.stringify(requests[0]!.input)).toContain('You are a knowledgeable and helpful AI assistant.')
   expect(calls, JSON.stringify({ requests, events })).toEqual(['search'])
   expect(JSON.stringify(requests.map(request => request.tools))).not.toContain('__delete')
   if (deferred) {
@@ -142,6 +144,16 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   const followup = requests[deferred ? 2 : 1]!
   expect(JSON.stringify(followup.input)).toContain('Compare totals independently.')
   expect(JSON.stringify(followup.input)).toContain('Total: 37')
+  const changedStart = requests.length
+  for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user], systemPrompt: 'Use bullet points.' })) void event
+  const changedInput = JSON.stringify(requests[changedStart]!.input)
+  expect(changedInput).toContain('Use bullet points.')
+  expect(changedInput).not.toContain('Answer in two sentences.')
+  const clearedStart = requests.length
+  for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user], systemPrompt: ' \n ' })) void event
+  const clearedInput = JSON.stringify(requests[clearedStart]!.input)
+  expect(clearedInput).not.toContain('Use bullet points.')
+  expect(clearedInput).toContain('You are a knowledgeable and helpful AI assistant.')
   const answer = (await connection.store.get(id))!.messages[1]!
   expect(answer.parts).toContainEqual({ type: 'text', text: 'Checked: 37' })
   const run = await connection.store.getRun?.(answer.id)

@@ -22,6 +22,8 @@ export interface ChatStoreLike {
       messages: ChatMessage[]
       model: string
       titleModel?: string
+      /** Optional user-provided instructions for model responses; excluded from title generation. */
+      systemPrompt?: string
       reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void

@@ -24,6 +24,7 @@ const props = defineProps<{
   chatId: string
   model: Ref<string>
   titleModel: Ref<string>
+  systemPrompt: Ref<string>
   webSearch: Ref<boolean>
   reasoning: Ref<ReasoningLevel>
   chats: Ref<ChatSummary[] | undefined>
@@ -40,6 +41,7 @@ const props = defineProps<{
       titleModel?: string
       reasoning?: ReasoningLevel
       webSearch?: boolean
+      systemPrompt?: string
       onMessage?: (message: ChatMessage) => void
       onTitle?: (title: string) => void
     },
@@ -121,6 +123,7 @@ const observer = computed<ChatObserverOwner>(() => ({
 const { messages, queue, status, error, sendMessage, regenerate, stop, resumeQueue, removeQueued } = useKeundalChat({
   respond: (messages, onMessage, signal) => props.respond({
     messages, model: props.model.value, titleModel: props.titleModel.value || undefined, webSearch: props.webSearch.value, reasoning: props.reasoning.value,
+    systemPrompt: props.systemPrompt.value,
     onMessage,
     onTitle: (value) => {
       title.value = value

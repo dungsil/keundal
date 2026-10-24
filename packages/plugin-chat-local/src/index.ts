@@ -190,6 +190,7 @@ export class ChatStore implements ChatStoreLike {
       messages: ChatMessage[]
       model: string
       titleModel?: string
+      systemPrompt?: string
       reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void
@@ -274,7 +275,7 @@ export class ChatStore implements ChatStoreLike {
         onMessage: request.onMessage,
         instructions: `You are a knowledgeable and helpful AI assistant. Be clear, accurate and concise.
 Do not use markdown headings. Use bold text for section labels instead.
-${request.webSearch && !request.model.startsWith('google/') ? 'Use native web search when current information is needed and cite sources.' : 'Web search is disabled. Do not claim to have verified live information.'}`,
+${request.webSearch && !request.model.startsWith('google/') ? 'Use native web search when current information is needed and cite sources.' : 'Web search is disabled. Do not claim to have verified live information.'}${request.systemPrompt?.trim() ? `\n\n${request.systemPrompt.trim()}` : ''}`,
         steer: run.steer,
         onFinish: async (message, steered) => {
           // 종료를 확정하는 동안 도착한 지시와 대기 메시지는 이 실행에 붙이지 않고 다음 커밋으로 넘깁니다.
