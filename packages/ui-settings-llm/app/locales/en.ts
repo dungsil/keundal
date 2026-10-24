@@ -19,7 +19,7 @@ export default {
     'Models are loaded automatically from this provider after saving. Choose the active model in the chat composer.',
   'llm.headers': 'Request headers (optional)',
   'llm.headersDescription':
-    'Custom headers override provider defaults for HTTP requests, including model discovery. Your endpoint must allow them via CORS; browser-forbidden headers cannot be set. WebSocket connections cannot use custom headers.',
+    'Custom headers override provider defaults for HTTP requests, including model discovery. Your endpoint must allow them via CORS; browser-forbidden headers cannot be set. WebSocket connections cannot use custom headers. Values are masked by default; select the eye button to reveal one.',
   'llm.addHeader': 'Add header',
   'llm.headerKeyRequired': 'Enter a key for every request header value.',
   'llm.duplicateHeaders': 'Duplicate request header names',
@@ -41,6 +41,8 @@ export default {
   'llm.saveBrowser': 'Save in this browser',
   'llm.headerKey': 'Header {index} key',
   'llm.headerValue': 'Header {index} value',
+  'llm.showHeaderValue': 'Show header {index} value',
+  'llm.hideHeaderValue': 'Hide header {index} value',
   'llm.removeHeader': 'Remove header {index}',
   'llm.invalidKey': 'API key must contain at most 4096 characters and no line breaks.',
   'llm.invalidURL': 'Use an HTTPS API URL without credentials, query or fragment (HTTP is allowed for localhost)',

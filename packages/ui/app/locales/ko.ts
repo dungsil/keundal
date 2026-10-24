@@ -33,11 +33,13 @@ export default {
   'file.uploading': '업로드 중',
   'model.loadFailed': '모델 목록을 불러오지 못했습니다.',
   'model.switchFailed': '로컬 모델을 전환하지 못했습니다. LLM 설정을 확인한 뒤 다시 시도하세요.',
+
   'skill.title': '스킬',
   'error.notFound': '페이지를 찾을 수 없습니다',
   'error.notFoundDescription': '요청하신 페이지를 찾을 수 없습니다.',
   'seo.title': '큰달AI',
   'seo.description': 'Cordis 플러그인으로 조합하는 AG-UI 프로토콜 기반 개인용 오픈소스 에이전트 도구입니다.',
+
   'error.secureStorage': '보안 저장소를 사용할 수 없습니다',
   'error.secureStorageDescription':
     'LLM 설정을 불러오지 못했습니다. 운영체제 보안 저장소의 잠금을 해제한 뒤 앱을 다시 시작하세요. 브라우저 저장소에는 대신 저장하지 않습니다.',

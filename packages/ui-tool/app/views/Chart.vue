@@ -32,7 +32,8 @@ const message = computed(() => {
 const xFormatter = (invocation: ChartUIToolInvocation) => {
   return (tick: number, _i?: number, _ticks?: number[]): string => {
     if (!invocation.output?.data[tick]) return ''
-    return String(invocation.output.data[tick][invocation.output.xKey] ?? '')
+    const value = String(invocation.output.data[tick][invocation.output.xKey] ?? '')
+    return value.length > 24 ? `${value.slice(0, 9)}…` : value
   }
 }
 
@@ -75,7 +76,7 @@ const formatValue = (value: string | number | undefined): string => {
       </div>
     </div>
 
-    <div class="relative overflow-hidden [&_[data-vis-bullet-legend]]:flex-wrap">
+    <div class="relative overflow-hidden [&_[data-vis-bullet-legend]]:flex-wrap" :class="invocation.output.yLabel && invocation.output.yLabel.length > 20 && 'pl-6'">
       <div class="dot-pattern h-full -top-5 left-0 right-0" />
 
       <LineChart

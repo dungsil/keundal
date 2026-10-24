@@ -96,12 +96,14 @@ function save() {
           "
         />
       </UFormField>
-      <p v-if="mounted && modelError.value" role="alert" class="text-sm text-error">
-        {{ modelError.value }}
-      </p>
-      <p v-if="error" role="alert" class="text-sm text-error">
-        {{ error }}
-      </p>
+      <div class="min-h-[125px]">
+        <p v-if="mounted && modelError.value" role="alert" class="text-sm text-error">
+          {{ modelError.value }}
+        </p>
+        <p v-if="error" role="alert" class="text-sm text-error">
+          {{ error }}
+        </p>
+      </div>
       <div class="flex items-center justify-between gap-3">
         <UButton
           :label="t('model.refresh')"

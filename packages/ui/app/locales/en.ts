@@ -31,11 +31,13 @@ export default {
   'file.uploading': 'Uploading',
   'model.loadFailed': 'Could not load models',
   'model.switchFailed': 'Could not switch the local model. Check LLM settings and try again.',
+
   'skill.title': 'Skills',
   'error.notFound': 'Page not found',
   'error.notFoundDescription': 'We are sorry but this page could not be found.',
   'seo.title': 'Keundal',
   'seo.description': 'A personal open-source agent tool built on the AG-UI protocol and composed with Cordis plugins.',
+
   'error.secureStorage': 'Secure storage unavailable',
   'error.secureStorageDescription':
     'Could not load LLM settings. Unlock your OS secret store and restart the app. No browser storage fallback is used.',

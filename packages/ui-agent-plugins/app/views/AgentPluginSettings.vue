@@ -129,7 +129,7 @@ async function savePermissions() {
             @click="input?.click()"
           />
         </div>
-        <div v-if="!plugins.length && !busy" class="rounded-lg border border-dashed border-default px-4 py-8 text-center">
+        <div v-if="!plugins.length && !busy && !error" class="rounded-lg border border-dashed border-default px-4 py-8 text-center">
           <UIcon name="i-lucide-blocks" class="size-7 text-dimmed" />
           <p class="mt-2 text-sm font-medium">
             {{ t('plugin.empty') }}
@@ -138,7 +138,7 @@ async function savePermissions() {
             {{ t('plugin.emptyHelp') }}
           </p>
         </div>
-        <ul v-else class="space-y-4">
+        <ul v-else-if="plugins.length" class="space-y-4">
           <li v-for="plugin in plugins" :key="plugin.name" class="space-y-4 rounded-lg border border-default p-4">
             <div class="flex items-start gap-3">
               <div class="min-w-0 flex-1 space-y-1">

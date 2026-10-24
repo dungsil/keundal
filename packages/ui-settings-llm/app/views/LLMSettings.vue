@@ -45,8 +45,9 @@ const headerRows = ref<Record<string, { id: string, key: string, value: string }
 })
 const error = ref('')
 const errorField = ref<'' | 'name' | 'apiKey' | 'baseURL'>('')
-// Header values that usually carry credentials are masked like the API key.
-const SENSITIVE_HEADER = /authorization|cookie|api[-_]?key|token|secret|password|credential/i
+// Every header value is masked like the API key. Guessing which names carry credentials missed
+// headers named by the provider, so the row exposes a toggle instead.
+const revealedHeaders = ref<Record<string, boolean>>({})
 const saving = ref(false)
 const providers = computed(() => configuredProviders(draft.value).filter(item => visibleIds.value.includes(item.id)))
 const current = computed(() => providers.value.find(item => item.id === provider.value))
@@ -70,6 +71,7 @@ function addProvider() {
 
 function loadDraft() {
   draft.value = JSON.parse(JSON.stringify(saved.value))
+  revealedHeaders.value = {}
   visibleIds.value = registeredProviders(saved.value).map(item => item.id)
   for (const item of configuredProviders(draft.value))
     headerRows.value[item.id] = Object.entries(draft.value[item.id]!.headers ?? {}).map(([key, value]) => ({
@@ -279,7 +281,7 @@ async function save(forget = false) {
                 />
                 <UInput
                   v-model="row.value"
-                  :type="SENSITIVE_HEADER.test(row.key) ? 'password' : 'text'"
+                  :type="revealedHeaders[row.id] ? 'text' : 'password'"
                   :aria-label="t('llm.headerValue', { index: index + 1 })"
                   :placeholder="t('common.value')"
                   autocomplete="off"
@@ -287,6 +289,16 @@ async function save(forget = false) {
                   :spellcheck="false"
                   class="min-w-0 flex-1"
                   :disabled="!mounted || saving"
+                />
+                <UButton
+                  type="button"
+                  :icon="revealedHeaders[row.id] ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+                  :aria-label="t(revealedHeaders[row.id] ? 'llm.hideHeaderValue' : 'llm.showHeaderValue', { index: index + 1 })"
+                  :aria-pressed="!!revealedHeaders[row.id]"
+                  color="neutral"
+                  variant="ghost"
+                  :disabled="!mounted || saving"
+                  @click="revealedHeaders[row.id] = !revealedHeaders[row.id]"
                 />
                 <UButton
                   type="button"
