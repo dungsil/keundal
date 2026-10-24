@@ -5,7 +5,7 @@ import {
   type McpRequestOptions,
   type McpSettingsStorage
 } from '@keundal/mcp'
-import { McpClient } from '@keundal/plugin-mcp-client/browser'
+import type { McpClient } from '@keundal/plugin-mcp-client/browser'
 
 const storageKey = 'keundal:mcp-servers'
 
@@ -67,7 +67,11 @@ export class McpManager {
       signal.throwIfAborted()
       let pending = this.clients.get(server.serverName)
       if (!pending) {
-        pending = McpClient.connect(server, { signal: this.lifetime.signal })
+        const lifetime = this.lifetime.signal
+        // MCP SDK만 지연 로드하도록 허용한 예외다. 정적 import는 사용 전에도 SDK를 초기 번들에 포함한다.
+        pending = import('@keundal/plugin-mcp-client/browser').then(({ McpClient }) =>
+          McpClient.connect(server, { signal: lifetime })
+        )
         this.clients.set(server.serverName, pending)
         void pending.catch(() => {
           if (this.clients.get(server.serverName) === pending) this.clients.delete(server.serverName)
@@ -94,6 +98,8 @@ export class McpManager {
   async probe(value: unknown, options: McpRequestOptions = {}): Promise<McpProbeResult> {
     const [server] = parseMcpServers([value], this.options.allowStdio ?? false)
     if (server?.transport !== 'streamable-http') throw new Error('The connection check supports Streamable HTTP only')
+    // MCP SDK의 지연 로딩 예외를 연결 확인에도 적용한다.
+    const { McpClient } = await import('@keundal/plugin-mcp-client/browser')
     return McpClient.probe(server, options)
   }
 

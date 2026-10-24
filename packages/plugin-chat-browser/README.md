@@ -6,6 +6,8 @@
 
 `McpManager.probe(config, { signal })`는 저장하지 않은 설정을 검증한 뒤 임시 연결로 도구 목록을 조회합니다. 저장된 설정, 저장소, 진행 중인 응답의 연결에는 영향을 주지 않습니다. Streamable HTTP만 확인하며 stdio 설정은 연결하기 전에 거부합니다.
 
+MCP SDK는 도구를 조회하거나 연결을 확인할 때만 불러옵니다. 설정을 읽거나 MCP 설정 화면을 여는 작업은 SDK를 불러오지 않습니다. SDK를 불러오는 동안 관리자를 닫으면 대기 중인 연결도 취소합니다.
+
 `./skills`의 `SkillManager`는 스킬 설정 저장과 파일 로딩을 담당합니다. 스키마와 타입은 `@keundal/chat/skills`에서 가져옵니다.
 
 [플러그인 조립과 의존성 경계](../../docs/plugin-composition.md)를 참고합니다.
