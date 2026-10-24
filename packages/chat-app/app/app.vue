@@ -30,9 +30,6 @@ watch(
       cancelled = true
     })
     await nextTick()
-    // Force layout so fonts used by the hydrated first screen begin loading.
-    document.body.getBoundingClientRect()
-    await document.fonts.ready
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     if (!cancelled) startupReady.value = true
   },

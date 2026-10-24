@@ -264,3 +264,20 @@ test('이미 취소한 연결 확인은 서버에 요청하지 않는다', async
   await expect(manager.probe({ serverName: 'draft', transport: 'streamable-http', url }, { signal: controller.signal })).rejects.toThrow('cancelled')
   expect(calls).toEqual([])
 })
+
+test('연결 모듈을 불러오는 동안 닫으면 서버에 연결하지 않고 다음 요청에서는 새 연결을 사용한다', async (t) => {
+  const { calls, url } = await jsonRpcServer(t)
+  const manager = new McpManager(createBrowserMcpSettingsStorage(storage()))
+  t.onTestFinished(() => manager.close())
+  await manager.save([{ ...remote, url }], async () => {})
+
+  const pending = manager.tools()
+  const closing = manager.close()
+  await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+  await closing
+  expect(calls).toEqual([])
+
+  const tools = await manager.tools()
+  expect(tools.map(tool => tool.name)).toEqual(['mcp__docs__tool__search'])
+  expect(calls.filter(method => method === 'initialize')).toHaveLength(1)
+})
