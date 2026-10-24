@@ -25,7 +25,6 @@ export default {
   'dictation.listening': '듣는 중…',
   'dictation.transcribing': '음성을 텍스트로 변환 중…',
   'file.drop': '파일을 여기에 놓으세요',
-  'file.formats': '지원 형식: 8MB 이하 이미지',
   'file.imagesOnly': '현재 큰달AI는 이미지 첨부만 지원합니다.',
   'file.tooLarge': '파일 크기가 8MB를 초과합니다.',
   'file.failed': '파일 첨부 실패',

@@ -189,9 +189,6 @@ const dictationOwner = computed(() => ({
       class="absolute inset-x-0 bottom-full z-20 mb-2 flex flex-col overflow-hidden rounded-lg border border-default bg-default p-1 shadow-lg"
       :style="{ maxHeight: `max(0px, calc(${promptTop}px - var(--ui-header-height) - 2rem))` }"
     >
-      <div class="shrink-0 px-3 py-2 text-xs font-medium text-muted">
-        {{ t('prompt.commands') }}
-      </div>
       <div v-if="loadingCommands || commandsFailed || !matches.length" aria-hidden="true" class="px-3 py-3 text-sm text-muted">
         {{ t(loadingCommands ? 'prompt.commandsLoading' : commandsFailed ? 'prompt.commandsFailed' : 'prompt.commandsEmpty') }}
       </div>
@@ -220,7 +217,7 @@ const dictationOwner = computed(() => ({
             <span class="block truncate text-sm font-medium text-highlighted">/{{ command.name }}</span>
             <span class="line-clamp-2 block text-xs text-muted group-aria-selected:text-toned">{{ command.description }}</span>
           </span>
-          <span class="shrink-0 text-xs text-muted group-aria-selected:text-toned">{{ command.kind === 'skill' ? t('skill.title') : 'MCP' }}</span>
+          <span class="sr-only">{{ command.kind === 'skill' ? t('skill.title') : 'MCP' }}</span>
         </button>
       </div>
     </div>

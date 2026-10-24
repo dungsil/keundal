@@ -20,8 +20,6 @@ export default {
   'mcp.invalidJSON': '인자와 인증 정보를 올바른 JSON 형식으로 입력하세요.',
   'mcp.check': '연결 확인',
   'mcp.checkCancel': '확인 취소',
-  'mcp.checkDescription':
-    '위에 입력한 값으로 서버에 연결해 서버가 알려 주는 도구와 리소스를 조회하고 연결을 닫습니다. 도구는 실행하지 않습니다. 확인에 실패해도 저장할 수 있습니다.',
   'mcp.checkDesktopLimit':
     '데스크톱에서는 Streamable HTTP 서버만 확인할 수 있습니다. 확인은 앱 창에서 요청하므로 서버가 이 앱의 origin을 CORS로 허용해야 합니다. 대화에 응답하는 로컬 호스트는 거치지 않습니다. 확인은 stdio 명령을 실행하지 않습니다.',
   'mcp.checkStdioUnsupported': 'stdio 서버는 여기서 확인할 수 없습니다. 그대로 저장할 수 있습니다.',
@@ -31,17 +29,14 @@ export default {
   'mcp.checkDetail': '상세 내용: {message}',
   'mcp.checkTools': '서버가 알려 준 도구 ({count})',
   'mcp.checkNoTools': '서버가 알려 주는 도구가 없습니다.',
-  'mcp.checkPick': '도구를 선택하면 허용할 도구에 이름을 추가합니다. 이름을 직접 입력할 수도 있습니다.',
   'mcp.checkAllowAll': '*로 모든 도구를 허용 중입니다. 하나를 해제하면 나머지를 이름으로 나열합니다.',
   'mcp.checkUnknown': '허용했지만 서버가 알려 주지 않은 이름: {names}',
   'mcp.checkResources': '리소스: 사용 가능 ({count}개)',
   'mcp.checkNoResources': '리소스: 이 서버는 제공하지 않음',
   'mcp.hosted': '원격 에이전트를 사용 중입니다. 호스트의 KEUNDAL_MCP_SERVERS에서 MCP를 설정하세요.',
-  'mcp.webDescription':
-    'CORS로 이 브라우저의 origin을 허용한 Streamable HTTP 서버에 연결합니다. 인증 정보를 포함한 설정은 이 브라우저에 저장합니다. 저장하면 진행 중인 응답을 중단합니다.',
   'mcp.allowInsecureHttp': '이 서버의 HTTP 연결 허용',
-  'mcp.allowInsecureHttpDescription':
-    '신뢰하는 사내망이나 VPN에서만 사용하세요. HTTP는 인증 정보와 MCP 통신 내용을 암호화하지 않습니다.',
-  'mcp.desktopDescription':
-    'HTTP 서버에 연결하거나 신뢰하는 로컬 stdio 서버를 실행합니다. 설정은 OS 보안 저장소에 저장합니다. 저장하면 진행 중인 응답을 중단하고 로컬 호스트를 다시 시작합니다.'
+  'mcp.webOperation': '서버에서 이 브라우저의 origin을 CORS로 허용해야 합니다. 인증 정보는 브라우저에 저장되며 저장 시 진행 중인 응답이 중단됩니다.',
+  'mcp.desktopOperation': '설정은 OS 보안 저장소에 보관됩니다. 저장 시 진행 중인 응답이 중단되고 로컬 호스트가 다시 시작됩니다.',
+  'mcp.allowInsecureHttpWarning': '신뢰하는 사내망이나 VPN에서만 사용하세요. HTTP는 인증 정보와 MCP 통신 내용을 암호화하지 않습니다.',
+  'mcp.checkBehavior': '확인 중 도구를 실행하지 않으며, 확인에 실패해도 저장할 수 있습니다.'
 } satisfies Record<keyof typeof en, string>

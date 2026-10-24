@@ -30,6 +30,8 @@ pnpm --filter @keundal/web test:browser --project=chromium
 
 `test:browser`는 `@visual` 검사를 제외한다. 공통 검사 설정은 콘솔 오류, 페이지 오류, hydration 경고, CSP 위반과 준비되지 않은 외부 요청을 실패로 처리한다. 외부 요청이 필요한 검사는 응답 fixture를 명시해야 한다. 접근성 검사는 axe의 WCAG 2 A·AA와 WCAG 2.1 A·AA 규칙을 사용한다.
 
+웹 앱은 `features.inlineStyles: true`로 스타일을 HTML에 포함한다. `tests/preview.test.ts`는 프로덕션 경로, 언어 선택과 리다이렉트를 검사하며 별도 CSS 파일을 요구하지 않는다. 스타일 적용과 레이아웃은 실제 브라우저 화면에서 확인한다.
+
 브라우저 다운로드가 제한된 환경에서는 설치된 Chromium 경로를 명시할 수 있다. 이 설정은 자동으로 적용되지 않는다.
 
 ```sh

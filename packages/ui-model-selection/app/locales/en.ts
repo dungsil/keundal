@@ -9,10 +9,7 @@ export default {
   'model.select': 'Select model',
   'model.defaultTitle': 'Model settings',
   'model.defaultLabel': 'Chat model',
-  'model.defaultDescription':
-    'Used when the app opens and when you start a new chat. Saved on this device. Save your provider settings first to load its models.',
   'model.titleLabel': 'Title generation model',
-  'model.titleDescription': 'Used to automatically generate titles for new chats. Saved on this device.',
   'model.useChatModel': 'Use the chat model',
   'model.noDefault': 'Use the last selected model',
   'model.defaultSaved': 'Model settings saved.',

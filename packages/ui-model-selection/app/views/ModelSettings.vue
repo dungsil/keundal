@@ -64,7 +64,7 @@ function save() {
       {{ t('model.defaultTitle') }}
     </h2>
     <form class="space-y-4" @submit.prevent="save">
-      <UFormField :label="t('model.defaultLabel')" :description="t('model.defaultDescription')" name="defaultModel">
+      <UFormField :label="t('model.defaultLabel')" name="defaultModel">
         <USelectMenu
           v-model="defaultSelection"
           :items="items"
@@ -80,7 +80,7 @@ function save() {
           "
         />
       </UFormField>
-      <UFormField :label="t('model.titleLabel')" :description="t('model.titleDescription')" name="titleModel">
+      <UFormField :label="t('model.titleLabel')" name="titleModel">
         <USelectMenu
           v-model="titleSelection"
           :items="titleItems"
@@ -96,7 +96,7 @@ function save() {
           "
         />
       </UFormField>
-      <div class="min-h-[125px]">
+      <div class="space-y-2">
         <p v-if="mounted && modelError.value" role="alert" class="text-sm text-error">
           {{ modelError.value }}
         </p>

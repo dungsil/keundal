@@ -1,7 +1,4 @@
 export default {
-  'greeting.morning': 'Good morning',
-  'greeting.afternoon': 'Good afternoon',
-  'greeting.evening': 'Good evening',
   'suggestion.nuxt': 'Why use Nuxt UI?',
   'suggestion.vue': 'Help me create a Vue composable',
   'suggestion.unjs': 'Tell me more about UnJS',

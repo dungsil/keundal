@@ -10,7 +10,7 @@ export default defineNuxtConfig({
   alias: {
     '#agent-host-runtime': fileURLToPath(new URL('./server/agent/runtime-node.ts', import.meta.url))
   },
-  features: { inlineStyles: false },
+  features: { inlineStyles: true },
   nitro: {
     compressPublicAssets: true,
     externals: { inline: ['zod'] },

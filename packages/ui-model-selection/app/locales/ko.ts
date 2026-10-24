@@ -11,10 +11,7 @@ export default {
   'model.select': '모델 선택',
   'model.defaultTitle': '모델 설정',
   'model.defaultLabel': '채팅 모델',
-  'model.defaultDescription':
-    '앱을 열거나 새 대화를 시작할 때 사용할 모델입니다. 이 기기에 저장됩니다. 공급자 설정을 먼저 저장하면 모델 목록을 불러옵니다.',
   'model.titleLabel': '제목 생성 모델',
-  'model.titleDescription': '새 대화의 제목을 자동으로 생성할 모델입니다. 이 기기에 저장됩니다.',
   'model.useChatModel': '채팅 모델 사용',
   'model.noDefault': '마지막으로 선택한 모델 사용',
   'model.defaultSaved': '모델 설정을 저장했습니다.',

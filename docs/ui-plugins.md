@@ -60,6 +60,8 @@ ctx.slots.register({ name: 'page.chat', children: { 'chat.message.tool': 'keyed'
 
 각 패키지는 `app/locales/{en,ko}.ts`에 자신이 쓰는 문구를 둡니다. `app/locale.ts`의 `useText()`는 패키지의 키를 먼저 찾고, 없으면 `@keundal/ui`의 공유 사전에서 찾습니다. 패키지 둘 이상이 쓰는 문구와 셸의 문구는 공유 사전에 둡니다. 다른 컴포넌트가 읽는 메타데이터의 문구는 `localizedText()`나 `sharedText()`로 모든 언어의 값을 함께 넘깁니다.
 
+화면은 태그라인과 상시 도움말 대신 제목, 입력란 이름, 구분선과 컨트롤 배치로 구조를 전달합니다. 중복되는 보조 레이블은 표시하지 않습니다. 오류, 보안 경고, 사용자가 작성한 내용과 접근성 이름은 유지합니다.
+
 ## 패키지 구조
 
 ```text

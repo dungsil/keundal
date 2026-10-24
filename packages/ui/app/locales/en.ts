@@ -23,7 +23,6 @@ export default {
   'dictation.listening': 'Listening…',
   'dictation.transcribing': 'Transcribing…',
   'file.drop': 'Drop your files here',
-  'file.formats': 'Supported formats: Images up to 8 MB',
   'file.imagesOnly': 'Keundal currently supports image attachments only',
   'file.tooLarge': 'File exceeds 8MB',
   'file.failed': 'Upload failed',

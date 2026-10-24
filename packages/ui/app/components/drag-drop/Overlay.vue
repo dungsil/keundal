@@ -70,7 +70,6 @@ defineProps<{
         }"
       >
         <p class="text-lg/7 font-medium mt-4">{{ t('file.drop') }}</p>
-        <p class="text-sm/6 text-muted">{{ t('file.formats') }}</p>
       </Motion>
     </div>
   </div>
