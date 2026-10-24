@@ -179,7 +179,7 @@ export default {
     'Models are loaded automatically from this provider after saving. Choose the active model in the chat composer.',
   'llm.headers': 'Request headers (optional)',
   'llm.headersDescription':
-    'Custom headers override provider defaults for HTTP requests, including model discovery. Your endpoint must allow them via CORS; browser-forbidden headers cannot be set. WebSocket connections cannot use custom headers.',
+    'Custom headers override provider defaults for HTTP requests, including model discovery. Your endpoint must allow them via CORS; browser-forbidden headers cannot be set. WebSocket connections cannot use custom headers. Values are masked by default; select the eye button to reveal one.',
   'llm.addHeader': 'Add header',
   'llm.headerKeyRequired': 'Enter a key for every request header value.',
   'llm.duplicateHeaders': 'Duplicate request header names',
@@ -262,6 +262,8 @@ export default {
   'seo.description': 'A personal open-source agent tool built on the AG-UI protocol and composed with Cordis plugins.',
   'llm.headerKey': 'Header {index} key',
   'llm.headerValue': 'Header {index} value',
+  'llm.showHeaderValue': 'Show header {index} value',
+  'llm.hideHeaderValue': 'Hide header {index} value',
   'llm.removeHeader': 'Remove header {index}',
   'skill.duplicate': 'A skill named "{name}" already exists.',
   'skill.deleteDescription': 'Delete {name}? This cannot be undone.',
