@@ -14,7 +14,7 @@ const emit = defineEmits<{
 
 const isShared = computed(() => props.visibility === 'public')
 
-function onRadioKeydown(event: KeyboardEvent, index: number) {
+function onRadioKeydown(event: KeyboardEvent) {
   const radios = Array.from(
     (event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('button[role="radio"]:not([disabled])')
   )
