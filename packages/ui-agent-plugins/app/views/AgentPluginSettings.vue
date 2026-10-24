@@ -92,15 +92,13 @@ async function savePermissions() {
 
 <template>
   <ClientOnly>
-    <section class="space-y-6" aria-labelledby="plugin-settings-title">
-      <div class="space-y-2">
-        <h2 id="plugin-settings-title" class="text-lg font-semibold text-highlighted">
-          {{ t('plugin.title') }}
-        </h2>
-        <p class="text-sm text-muted">
-          {{ t(available ? 'plugin.description' : 'plugin.unavailable') }}
-        </p>
-      </div>
+    <section class="space-y-4" aria-labelledby="plugin-settings-title">
+      <h2 id="plugin-settings-title" class="text-lg font-semibold text-highlighted">
+        {{ t('plugin.title') }}
+      </h2>
+      <p v-if="!available" class="text-sm text-muted">
+        {{ t('plugin.unavailable') }}
+      </p>
       <template v-if="available">
         <UAlert
           color="neutral"
@@ -129,17 +127,11 @@ async function savePermissions() {
             @click="input?.click()"
           />
         </div>
-        <div v-if="!plugins.length && !busy && !error" class="rounded-lg border border-dashed border-default px-4 py-8 text-center">
-          <UIcon name="i-lucide-blocks" class="size-7 text-dimmed" />
-          <p class="mt-2 text-sm font-medium">
-            {{ t('plugin.empty') }}
-          </p>
-          <p class="mt-1 text-sm text-muted">
-            {{ t('plugin.emptyHelp') }}
-          </p>
-        </div>
-        <ul v-else-if="plugins.length" class="space-y-4">
-          <li v-for="plugin in plugins" :key="plugin.name" class="space-y-4 rounded-lg border border-default p-4">
+        <p v-if="!plugins.length && !busy && !error" class="text-sm text-muted">
+          {{ t('plugin.empty') }}
+        </p>
+        <ul v-else-if="plugins.length" class="space-y-3">
+          <li v-for="plugin in plugins" :key="plugin.name" class="space-y-3 rounded-lg border border-default p-3">
             <div class="flex items-start gap-3">
               <div class="min-w-0 flex-1 space-y-1">
                 <p class="text-sm font-semibold break-words">
@@ -218,7 +210,7 @@ async function savePermissions() {
             />
           </li>
         </ul>
-        <form v-if="selected" ref="permissionsForm" class="space-y-4 rounded-lg border border-default p-4" @submit.prevent="savePermissions">
+        <form v-if="selected" ref="permissionsForm" class="space-y-3 rounded-lg border border-default p-3" @submit.prevent="savePermissions">
           <h3 class="font-semibold break-words">
             {{ selected.name }} · {{ t('plugin.permissions') }}
           </h3>

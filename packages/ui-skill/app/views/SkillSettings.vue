@@ -158,16 +158,11 @@ function toggleFile(path: string, enabled: boolean) {
 </script>
 
 <template>
-  <section class="space-y-6" aria-labelledby="skill-settings-title">
-    <div class="space-y-2">
-      <h2 id="skill-settings-title" tabindex="-1" class="text-lg font-semibold text-highlighted">
-        {{ t('skill.title') }}
-      </h2>
-      <p class="text-sm text-muted">
-        {{ t('skill.description') }}
-      </p>
-    </div>
-    <div class="space-y-5">
+  <section class="space-y-4" aria-labelledby="skill-settings-title">
+    <h2 id="skill-settings-title" tabindex="-1" class="text-lg font-semibold text-highlighted">
+      {{ t('skill.title') }}
+    </h2>
+    <div class="space-y-4">
       <UAlert
         color="neutral"
         variant="subtle"
@@ -177,7 +172,7 @@ function toggleFile(path: string, enabled: boolean) {
       />
 
       <template v-if="editing">
-        <div class="flex items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
           <UButton
             :label="t('skill.back')"
             icon="i-lucide-arrow-left"
@@ -191,7 +186,6 @@ function toggleFile(path: string, enabled: boolean) {
             variant="subtle"
             color="neutral"
           />
-          <span v-else class="text-sm text-muted">{{ originalName ? t('skill.edit') : t('skill.new') }}</span>
         </div>
         <p v-if="selectedFile" class="text-xs text-muted break-all">
           {{ selectedFile.path }}
@@ -200,7 +194,6 @@ function toggleFile(path: string, enabled: boolean) {
           <UFormField
             :label="t('common.name')"
             name="skill-name"
-            :description="t('skill.nameDescription')"
             :error="errorField === 'name' ? error : undefined"
             :ui="{ error: 'break-words' }"
           >
@@ -216,14 +209,12 @@ function toggleFile(path: string, enabled: boolean) {
           <UFormField
             :label="t('common.description')"
             name="skill-description"
-            :description="t('skill.descriptionHelp')"
             :error="errorField === 'description' ? error : undefined"
           >
             <UTextarea
               id="skill-description"
               name="skill-description"
               v-model="draft.description"
-              :placeholder="t('skill.descriptionPlaceholder')"
               :rows="2"
               class="w-full"
               :readonly="!!selectedFile"
@@ -232,14 +223,12 @@ function toggleFile(path: string, enabled: boolean) {
           <UFormField
             :label="t('common.instructions')"
             name="skill-instructions"
-            :description="t('skill.instructionsHelp')"
             :error="errorField === 'content' ? error : undefined"
           >
             <UTextarea
               id="skill-instructions"
               name="skill-instructions"
               v-model="draft.content"
-              :placeholder="t('skill.instructionsPlaceholder')"
               :rows="8"
               class="w-full font-mono"
               :readonly="!!selectedFile"
@@ -291,19 +280,10 @@ function toggleFile(path: string, enabled: boolean) {
             <UButton :label="t('skill.new')" icon="i-lucide-plus" @click="edit()" />
           </div>
         </div>
-        <div
-          v-if="!settings.skills.length"
-          class="rounded-lg border border-dashed border-default px-4 py-8 text-center"
-        >
-          <UIcon name="i-lucide-book-open" class="size-7 text-dimmed" />
-          <p class="mt-2 text-sm font-medium">
-            {{ t('skill.empty') }}
-          </p>
-          <p class="mt-1 text-sm text-muted">
-            {{ t('skill.emptyHelp') }}
-          </p>
-        </div>
-        <ul v-else class="divide-y divide-default rounded-lg border border-default">
+        <p class="text-xs text-muted">
+          {{ t('skill.zipLimit') }}
+        </p>
+        <ul v-if="settings.skills.length" class="divide-y divide-default rounded-lg border border-default">
           <li v-for="skill in settings.skills" :key="skill.name" class="flex items-center gap-3 p-3">
             <div class="min-w-0 flex-1">
               <p class="truncate text-sm font-medium">
@@ -334,12 +314,6 @@ function toggleFile(path: string, enabled: boolean) {
             />
           </li>
         </ul>
-        <p class="text-xs text-muted">
-          {{ t('skill.importHelp') }}
-        </p>
-        <p class="text-xs text-muted">
-          {{ t('skill.persistence') }}
-        </p>
 
         <div v-if="localSkills" class="space-y-3 border-t border-default pt-5">
           <div class="flex flex-wrap items-center justify-between gap-3">
@@ -357,12 +331,6 @@ function toggleFile(path: string, enabled: boolean) {
               @click="refreshFiles"
             />
           </div>
-          <p class="text-xs text-muted">
-            {{ t('skill.localHelp') }}
-          </p>
-          <p v-for="root in roots" :key="root" class="text-xs text-muted break-all">
-            {{ root }}
-          </p>
           <UAlert
             v-if="fileError"
             color="error"
@@ -370,9 +338,6 @@ function toggleFile(path: string, enabled: boolean) {
             :description="fileError"
             role="alert"
           />
-          <p v-else-if="!loading && !files.length" class="text-sm text-muted">
-            {{ t('skill.localEmpty') }}
-          </p>
           <ul v-else-if="files.length" class="divide-y divide-default rounded-lg border border-default">
             <li v-for="file in files" :key="file.path" class="flex items-center gap-3 p-3">
               <div class="min-w-0 flex-1">
@@ -415,7 +380,7 @@ function toggleFile(path: string, enabled: boolean) {
       </p>
     </div>
 
-    <div class="flex flex-wrap items-center justify-between gap-3 w-full">
+    <div v-if="editing" class="flex flex-wrap items-center justify-between gap-3 w-full">
       <UButton
         v-if="editing && originalName && !selectedFile"
         id="skill-delete-button"
@@ -425,11 +390,9 @@ function toggleFile(path: string, enabled: boolean) {
         variant="ghost"
         @click="requestDelete"
       />
-      <span v-else class="text-xs text-muted">{{
-        editing && selectedFile
-          ? t('skill.editInEditor')
-          : t('skill.available')
-      }}</span>
+      <p v-if="editing && selectedFile" class="text-xs text-muted">
+        {{ t('skill.editInEditor') }}
+      </p>
       <div class="flex gap-2">
         <UButton
           v-if="editing"

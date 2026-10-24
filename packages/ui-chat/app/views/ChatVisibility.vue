@@ -18,13 +18,11 @@ const options = computed(() => [
   {
     value: 'private' as const,
     label: t('chat.private'),
-    description: t('chat.privateDescription'),
     icon: 'i-lucide-lock'
   },
   {
     value: 'public' as const,
     label: t('chat.shared'),
-    description: t('chat.sharedDescription'),
     icon: 'i-lucide-globe'
   }
 ])
@@ -56,14 +54,9 @@ const options = computed(() => [
         >
           <UIcon :name="option.icon" class="size-5 text-muted shrink-0" />
 
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-highlighted">
-              {{ option.label }}
-            </p>
-            <p class="text-sm text-muted">
-              {{ option.description }}
-            </p>
-          </div>
+          <span class="flex-1 min-w-0 text-sm font-medium text-highlighted">
+            {{ option.label }}
+          </span>
 
           <UIcon v-if="visibility === option.value" name="i-lucide-circle-check" class="size-5 text-primary shrink-0" />
         </button>

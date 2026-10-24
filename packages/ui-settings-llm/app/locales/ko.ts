@@ -8,7 +8,7 @@ export default {
   'llm.addProvider': '공급자 추가',
   'llm.invalidName': '공급자 이름은 100자 이내로 입력하세요.',
   'llm.providerName': '공급자 이름',
-  'llm.noProviders': '등록된 공급자가 없습니다. 사용할 공급자를 추가하세요.',
+  'llm.noProviders': '등록된 공급자가 없습니다.',
   'llm.registeredProviders': '등록된 공급자',
   'llm.configureProvider': '설정 계속하기',
   'llm.provider': '공급자',
@@ -17,11 +17,7 @@ export default {
   'llm.baseURL': 'API 기본 URL (선택)',
   'llm.baseURLDescription':
     '공식 엔드포인트를 사용하려면 비워 두세요. 사용자 지정 엔드포인트는 API 키를 전달받으며 브라우저 CORS를 지원해야 합니다.',
-  'llm.modelsDescription':
-    '저장하면 이 공급자의 모델 목록을 자동으로 불러옵니다. 대화 입력창에서 사용할 모델을 선택하세요.',
   'llm.headers': '요청 헤더 (선택)',
-  'llm.headersDescription':
-    '사용자 지정 헤더는 모델 목록 조회를 비롯한 HTTP 요청에서 공급자의 기본 헤더보다 우선합니다. 엔드포인트에서 CORS로 해당 헤더를 허용해야 하며, 브라우저가 금지한 헤더는 설정할 수 없습니다. WebSocket 연결에는 사용자 지정 헤더를 사용할 수 없습니다. 값은 기본으로 가립니다. 눈 아이콘 버튼을 누르면 표시됩니다.',
   'llm.addHeader': '헤더 추가',
   'llm.headerKeyRequired': '모든 요청 헤더 값에 키를 입력하세요.',
   'llm.duplicateHeaders': '요청 헤더 이름이 중복됩니다.',
@@ -31,8 +27,6 @@ export default {
   'llm.saveFailedOS':
     '설정을 저장하거나 적용하지 못했습니다. 운영체제 보안 저장소와 로컬 호스트를 확인한 뒤 다시 시도하세요.',
   'llm.saveFailedBrowser': '설정을 저장하지 못했습니다. 브라우저 저장소를 사용할 수 있는지 확인하세요.',
-  'llm.descriptionOS': '설정은 운영체제 보안 저장소에 저장됩니다. 요청은 공급자에게 직접 전송됩니다.',
-  'llm.descriptionBrowser': 'API 키는 이 브라우저에 저장됩니다. 요청은 공급자에게 직접 전송됩니다.',
   'llm.protectedOS': '운영체제 보안 저장소로 보호됩니다',
   'llm.browserWarning': '브라우저 저장소는 보안 저장소가 아닙니다',
   'llm.storageOS':

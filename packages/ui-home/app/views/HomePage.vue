@@ -4,7 +4,6 @@ import type { ComposerOwner } from '@keundal/ui-composer/slots'
 import { SlotFactory } from '@keundal/ui-slots'
 import type { Ref } from 'vue'
 
-import { getGreetingTime, greetingTimeScript } from '../lib/greeting'
 import { useText } from '../locale'
 
 const props = defineProps<{
@@ -18,21 +17,7 @@ const props = defineProps<{
 }>()
 
 const { t } = useText()
-// The script runs before hydration so the greeting matches the time of day without a flash.
-useHead(() => ({
-  title: t('chat.new'),
-  script: [
-    {
-      key: 'greeting-time',
-      tagPriority: 'critical',
-      innerHTML: greetingTimeScript
-    }
-  ]
-}))
-
-if (import.meta.client) {
-  document.documentElement.dataset.greetingTime = getGreetingTime()
-}
+useHead(() => ({ title: t('chat.new') }))
 
 const input = useState('new-chat-input', () => '')
 const loading = ref(false)
@@ -135,12 +120,8 @@ const quickChats = computed(() => [
       <div ref="dropzoneRef" class="flex flex-1">
         <DragDropOverlay :show="dragging" />
 
-        <UContainer class="flex-1 flex flex-col justify-center gap-4 sm:gap-6 pt-(--ui-header-height) pb-8">
-          <h1 class="text-3xl sm:text-4xl text-highlighted font-bold">
-            <span data-greeting="morning">{{ t('greeting.morning') }}</span>
-            <span data-greeting="afternoon">{{ t('greeting.afternoon') }}</span>
-            <span data-greeting="evening">{{ t('greeting.evening') }}</span>
-          </h1>
+        <UContainer class="flex-1 flex flex-col justify-center gap-4 pt-(--ui-header-height) pb-8">
+          <h1 class="sr-only">{{ t('chat.new') }}</h1>
 
           <SlotFactory name="composer" :owner="composer" />
 
@@ -163,15 +144,3 @@ const quickChats = computed(() => [
     </template>
   </UDashboardPanel>
 </template>
-
-<style scoped>
-[data-greeting] {
-  display: none;
-}
-
-html[data-greeting-time='morning'] [data-greeting='morning'],
-html[data-greeting-time='afternoon'] [data-greeting='afternoon'],
-html[data-greeting-time='evening'] [data-greeting='evening'] {
-  display: inline;
-}
-</style>

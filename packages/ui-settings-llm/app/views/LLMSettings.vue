@@ -180,15 +180,10 @@ async function save(forget = false) {
 </script>
 
 <template>
-  <section class="space-y-6" aria-labelledby="llm-settings-title">
-    <div class="space-y-2">
-      <h2 id="llm-settings-title" class="text-lg font-semibold text-highlighted">
-        LLM
-      </h2>
-      <p class="text-sm text-muted">
-        {{ secureSettings ? t('llm.descriptionOS') : t('llm.descriptionBrowser') }}
-      </p>
-    </div>
+  <section class="space-y-4" aria-labelledby="llm-settings-title">
+    <h2 id="llm-settings-title" class="text-lg font-semibold text-highlighted">
+      LLM
+    </h2>
     <div class="space-y-3">
       <p v-if="!providers.length" class="text-sm text-muted">
         {{ t('llm.noProviders') }}
@@ -210,10 +205,7 @@ async function save(forget = false) {
             :disabled="!mounted || saving"
             @click="provider = provider === item.id ? '' : item.id"
           >
-            <span class="min-w-0">
-              <span class="block break-words font-medium text-highlighted">{{ item.label }}</span>
-              <span class="block break-words text-sm text-muted">{{ LLM_PROVIDERS.find(preset => preset.id === item.providerType)?.label }}</span>
-            </span>
+            <span class="block break-words font-medium text-highlighted">{{ item.label }}</span>
             <UIcon name="i-lucide-chevron-down" class="shrink-0" :class="provider === item.id ? 'rotate-180' : ''" />
           </button>
           <form
@@ -233,9 +225,6 @@ async function save(forget = false) {
                 class="w-full"
               />
             </UFormField>
-            <p class="text-sm text-muted">
-              {{ t('llm.modelsDescription') }}
-            </p>
             <UFormField :label="t('llm.apiKey')" name="apiKey" :error="errorField === 'apiKey' ? error : undefined">
               <UInput
                 id="llm-api-key"
@@ -260,13 +249,10 @@ async function save(forget = false) {
                 :disabled="!mounted || saving"
               />
             </UFormField>
-            <fieldset class="space-y-3">
+            <fieldset class="space-y-2">
               <legend class="text-sm font-medium text-highlighted">
                 {{ t('llm.headers') }}
               </legend>
-              <p class="text-sm text-muted">
-                {{ t('llm.headersDescription') }}
-              </p>
               <div v-for="(row, index) in currentHeaders" :key="row.id" class="flex items-start gap-2">
                 <UInput
                   :id="row.id"

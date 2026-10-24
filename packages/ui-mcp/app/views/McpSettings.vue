@@ -192,12 +192,15 @@ const unknownAllowed = computed(() => {
 </script>
 
 <template>
-  <section class="mb-8 space-y-4" aria-labelledby="mcp-settings-title">
+  <section class="mb-6 space-y-3" aria-labelledby="mcp-settings-title">
     <h2 id="mcp-settings-title" class="text-lg font-semibold text-highlighted">
       MCP
     </h2>
-    <p class="text-sm text-muted">
-      {{ t(hosted ? 'mcp.hosted' : desktop ? 'mcp.desktopDescription' : 'mcp.webDescription') }}
+    <p v-if="hosted" class="text-sm text-muted">
+      {{ t('mcp.hosted') }}
+    </p>
+    <p v-if="!hosted" class="text-xs text-muted">
+      {{ t(desktop ? 'mcp.desktopOperation' : 'mcp.webOperation') }}
     </p>
     <template v-if="!hosted">
       <ul class="space-y-2">
@@ -246,7 +249,7 @@ const unknownAllowed = computed(() => {
           v-if="transport === 'streamable-http'"
           v-model="allowInsecureHttp"
           :label="t('mcp.allowInsecureHttp')"
-          :description="t('mcp.allowInsecureHttpDescription')"
+          :description="t('mcp.allowInsecureHttpWarning')"
           :disabled="saving"
         />
         <template v-if="transport === 'stdio'">
@@ -265,10 +268,13 @@ const unknownAllowed = computed(() => {
             autocomplete="off"
           />
         </UFormField>
-        <UFormField :label="t('mcp.tools')" name="tools" :description="t('mcp.permissions')">
+        <p class="text-xs text-muted">
+          {{ t('mcp.permissions') }}
+        </p>
+        <UFormField :label="t('mcp.tools')" name="tools">
           <UTextarea v-model="tools" class="w-full" :disabled="saving" />
         </UFormField>
-        <UFormField :label="t('mcp.resources')" name="resources" :description="t('mcp.permissions')">
+        <UFormField :label="t('mcp.resources')" name="resources">
           <UTextarea v-model="resources" class="w-full" :disabled="saving" />
         </UFormField>
         <UFormField :label="t('mcp.timeout')" name="timeoutMs">
@@ -281,8 +287,8 @@ const unknownAllowed = computed(() => {
           />
         </UFormField>
         <div class="space-y-3" aria-live="polite">
-          <p class="text-sm text-muted">
-            {{ t('mcp.checkDescription') }}
+          <p class="text-xs text-muted">
+            {{ t('mcp.checkBehavior') }}
           </p>
           <p v-if="desktop" class="text-sm text-muted">
             {{ t('mcp.checkDesktopLimit') }}
@@ -327,9 +333,6 @@ const unknownAllowed = computed(() => {
               <legend class="text-sm font-medium">
                 {{ t('mcp.checkTools', { count: checkResult.tools.length }) }}
               </legend>
-              <p class="text-sm text-muted">
-                {{ t(allowedTools === '*' ? 'mcp.checkAllowAll' : 'mcp.checkPick') }}
-              </p>
               <ul class="max-h-64 space-y-2 overflow-y-auto [overflow-wrap:anywhere]">
                 <li v-for="tool in checkResult.tools" :key="tool.name">
                   <UCheckbox

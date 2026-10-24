@@ -6,7 +6,7 @@ export default {
   'llm.addProvider': 'Add provider',
   'llm.invalidName': 'Use a provider name of up to 100 characters.',
   'llm.providerName': 'Provider name',
-  'llm.noProviders': 'No providers registered. Add a provider to get started.',
+  'llm.noProviders': 'No providers registered.',
   'llm.registeredProviders': 'Registered providers',
   'llm.configureProvider': 'Continue setup',
   'llm.provider': 'Provider',
@@ -15,11 +15,7 @@ export default {
   'llm.baseURL': 'API base URL (optional)',
   'llm.baseURLDescription':
     'Leave empty for the official endpoint. A custom endpoint receives your key and must support browser CORS.',
-  'llm.modelsDescription':
-    'Models are loaded automatically from this provider after saving. Choose the active model in the chat composer.',
   'llm.headers': 'Request headers (optional)',
-  'llm.headersDescription':
-    'Custom headers override provider defaults for HTTP requests, including model discovery. Your endpoint must allow them via CORS; browser-forbidden headers cannot be set. WebSocket connections cannot use custom headers. Values are masked by default; select the eye button to reveal one.',
   'llm.addHeader': 'Add header',
   'llm.headerKeyRequired': 'Enter a key for every request header value.',
   'llm.duplicateHeaders': 'Duplicate request header names',
@@ -28,8 +24,6 @@ export default {
   'llm.savedBrowser': 'Settings saved in this browser',
   'llm.saveFailedOS': 'Could not save or apply settings. Check your OS secret store and local host, then try again.',
   'llm.saveFailedBrowser': 'Could not save settings. Check that browser storage is available.',
-  'llm.descriptionOS': 'Your settings are saved in your OS secret store. Requests go directly to the provider.',
-  'llm.descriptionBrowser': 'Your keys stay in this browser. Requests go directly to the provider.',
   'llm.protectedOS': 'Protected by your OS secret store',
   'llm.browserWarning': 'Browser storage is not a secure vault',
   'llm.storageOS':

@@ -77,11 +77,8 @@ useHead(() => {
                 class="shrink-0 justify-start md:w-full"
               />
             </div>
-            <div v-if="groups[1]!.length" role="group" aria-labelledby="plugin-navigation-title" class="min-w-0 space-y-2">
-              <h2 id="plugin-navigation-title" class="px-3 text-sm font-semibold text-muted">
-                {{ t('plugin.title') }}
-              </h2>
-              <div class="flex flex-wrap gap-1 md:ml-3 md:flex-col md:border-l md:border-default md:pl-2">
+            <div v-if="groups[1]!.length" role="group" :aria-label="t('plugin.title')" class="min-w-0 border-t border-default pt-4">
+              <div class="flex flex-wrap gap-1 md:flex-col">
                 <UButton
                   v-for="item in groups[1]"
                   :key="item.id"
