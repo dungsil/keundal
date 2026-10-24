@@ -176,7 +176,13 @@ pnpm --filter @keundal/web lint
 
 대화 삭제와 전체 중단 시 에이전트와 준비 작업을 해제합니다. 모델·생성 설정이 바뀌면 해당 대화의 에이전트를 교체하며, 대기 중인 에이전트가 누적되지 않도록 최대 8개를 기준으로 오래된 유휴 에이전트부터 해제합니다. 실행 중인 다른 대화는 중단하지 않습니다. `createKeundalChat()`을 직접 사용하는 호출자는 작업을 마친 뒤 `dispose()`를 호출해야 합니다.
 
-브라우저는 `/keundal.plugins.json`에서 LLM·저장소·에이전트·도구 구성을 읽습니다. 배포한 JSON과 외부 ESM 파일을 수정하면 앱을 다시 빌드하지 않고 구현을 교체할 수 있습니다. `NUXT_PUBLIC_PLUGIN_CONFIG`로 설정 URL을 변경합니다. Node.js 호스트는 `KEUNDAL_PLUGIN_CONFIG`로 로컬 설정 파일을 선택합니다. 변경 후 브라우저는 새로고침하고 호스트는 다시 시작합니다. 형식과 신뢰 경계는 [플러그인 조립 문서](../../docs/plugin-composition.md#런타임-설정)를 참고합니다.
+브라우저는 `/keundal.plugins.json`에서 LLM·저장소·에이전트·도구 구성을 읽습니다. 배포한 JSON과 외부 ESM 파일을 수정하면 앱을 다시 빌드하지 않고 구현을 교체할 수 있습니다. `NUXT_PUBLIC_PLUGIN_CONFIG`로 설정 URL을 변경합니다.
+
+HTTP(S) 설정 URL은 서버 HTML의 `as="fetch"` preload로 미리 요청하며, 브라우저의 후속 fetch가 같은 요청을 재사용합니다. 상대 URL은 현재 페이지를 기준으로 해석합니다. preload는 플러그인을 실행하지 않습니다.
+
+외부 출처에는 쿠키나 인증 헤더를 추가하지 않으며, 같은 출처 fetch의 기본 자격 증명 동작은 유지합니다. 설정 URL이 없으면 번들 기본 manifest를 사용하고 별도 요청을 하지 않습니다. 해석할 수 없거나 HTTP(S)가 아닌 주소는 미리 요청하지 않으며, 원래 로더가 설정 오류를 처리합니다.
+
+Node.js 호스트는 `KEUNDAL_PLUGIN_CONFIG`로 로컬 설정 파일을 선택합니다. 변경 후 브라우저는 새로고침하고 호스트는 다시 시작합니다. 형식과 신뢰 경계는 [플러그인 조립 문서](../../docs/plugin-composition.md#런타임-설정)를 참고합니다.
 
 ## MCP
 

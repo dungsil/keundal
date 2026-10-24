@@ -49,7 +49,7 @@ const LAZY: unique symbol = Symbol('lazy-slot-view')
  * renderer filters by these names, so pass the union of the outlet owner values and the `inject` result the view reads.
  */
 export function lazyView(load: () => Promise<{ default: Component }>, props: readonly string[]): Component {
-  const View = defineAsyncComponent(load)
+  const View = defineAsyncComponent(async () => (await load()).default)
   return Object.assign(
     defineComponent({
       name: 'LazySlotView',

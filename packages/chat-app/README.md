@@ -12,6 +12,14 @@
 
 파일 끌어놓기의 Motion 코드는 오버레이를 처음 표시할 때 불러옵니다. 로딩 중에도 스크린 리더 안내는 표시하며, 끌어놓기를 취소하면 늦게 로드된 애니메이션을 표시하지 않습니다. 기존 애니메이션과 움직임 줄이기 설정은 유지합니다.
 
+## 글꼴 부분 집합
+
+초기 UI에는 `Keundal UI`의 라틴·기호와 한글 부분 집합을 사용합니다. 두 파일은 `unicode-range`로 구분하므로 필요한 문자 범위만 내려받습니다. 나머지 문자는 Pretendard의 동적 부분 집합에서 제공하며, 모든 글꼴은 `font-display: swap`을 사용합니다.
+
+재생성에는 Python 가상 환경을 사용합니다. Pretendard 1.3.9를 설치한 뒤 저장소 루트에서 `python -m pip install -r tools/fonts/requirements.txt`와 `python tools/fonts/generate_subset.py`를 실행합니다. 생성기는 UI 셸, 대화 목록, 홈, 입력창, 모델 선택의 영어·한국어 로케일 파일에서 문자열을 읽습니다.
+
+생성된 글꼴과 `LICENSE-Pretendard.txt`는 `app/assets/fonts/`에 있고, 문자 범위 선언은 `app/assets/css/ui-font.css`에 있습니다. 생성 도구의 버전은 `tools/fonts/requirements.txt`에 고정합니다. 앱 빌드에는 Python 도구가 필요하지 않습니다.
+
 ## 긴 제목 표시
 
 공유 대화의 상단 제목을 누르면 팝오버에서 전체 제목을 확인할 수 있습니다.

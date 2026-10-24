@@ -3,7 +3,7 @@ import { createSSRApp, defineComponent, h } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { describe, expect, test } from 'vitest'
 
-import { SlotFactory, SlotOutlet, SlotRoot, SlotService, useSlotEntries } from '../src/index'
+import { lazyView, SlotFactory, SlotOutlet, SlotRoot, SlotService, useSlotEntries } from '../src/index'
 
 declare module '../src/index' {
   interface SlotMap {
@@ -155,5 +155,19 @@ describe('슬롯 레지스트리', () => {
     await definition.dispose()
     expect(ctx.slots.declared('test.factory.action')).toBe(false)
     expect(await render(ctx)).toBe('<div><!----><!--[-->no composer<!--]--></div>')
+  })
+
+  test('지연 뷰의 일반 모듈 객체에서 default를 읽어 서버 본문을 렌더링한다', async () => {
+    const ctx = await setup()
+    ctx.slots.register({ name: 'root', children: { 'test.view': 'keyed' } }, defineComponent({
+      setup: () => () => h('main', h(SlotOutlet, { name: 'test.view', entryKey: 'settings', owner: { value: '설정 본문' } }))
+    }))
+    ctx.slots.register({
+      name: 'test.view',
+      key: 'settings',
+      inject: owner => ({ text: owner.value })
+    }, lazyView(async () => ({ default: Text }), ['text']))
+
+    expect(await render(ctx)).toContain('<span>설정 본문</span>')
   })
 })

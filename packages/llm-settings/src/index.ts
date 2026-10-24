@@ -111,7 +111,8 @@ export const llmSettingsSchema = z
   })
 
 export function defaultLLMSettings(): LLMSettings {
-  return llmSettingsSchema.parse({})
+  // Workers 요청에서는 문자열 코드 생성을 허용하지 않으므로 기본값도 해석 방식으로 검증한다.
+  return llmSettingsSchema.parse({}, { jitless: true })
 }
 
 export function providerCredentials(settings: LLMSettings, provider: string) {
