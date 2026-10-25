@@ -9,7 +9,7 @@
     "typecheck": "nuxt typecheck && tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@comark/nuxt": "^0.7.0",
+    "@comark/nuxt": "^0.8.1",
     "@iconify-json/logos": "^1.2.15",
     "@iconify-json/lucide": "^1.2.142",
     "@iconify-json/simple-icons": "^1.2.99",
