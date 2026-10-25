@@ -204,9 +204,10 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .turbo/cache
-          key: turbo-v4-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: turbo-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            turbo-v4-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
+            turbo-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
+            turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Linux 빌드 의존성 설치
         if: runner.os == 'Linux'
@@ -271,6 +272,7 @@ jobs:
           name: desktop-${{ matrix.name }}
           overwrite: true
           path: ${{ matrix.artifact-path }}
+          compression-level: ${{ runner.os == 'Windows' && 6 || 0 }}
           if-no-files-found: error
           retention-days: 7
 
