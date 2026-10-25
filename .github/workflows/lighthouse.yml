@@ -102,7 +102,8 @@ jobs:
     needs: preview
     if: needs.preview.outputs.url != ''
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # 프리뷰가 잠시 응답하지 않으면 표본을 다시 측정하므로 여유를 둔다.
+    timeout-minutes: 20
     outputs:
       report: ${{ steps.summary.outputs.report || steps.failure.outputs.report }}
     permissions:
@@ -136,17 +137,8 @@ jobs:
       - name: 결과 요약 로직 검사
         run: node --test tools/lighthouse/*.test.mjs
 
-      - name: 프리뷰 응답 대기
-        run: >-
-          curl --fail --silent --show-error --output /dev/null
-          --retry 12 --retry-all-errors --retry-delay 5 --max-time 10
-          "$LIGHTHOUSE_BASE_URL/"
-
-      - name: 배포된 프리뷰를 Unlighthouse로 3회 측정
-        run: |
-          for sample in 1 2 3; do
-            LIGHTHOUSE_RUN="$sample" pnpm dlx --allow-build=esbuild --allow-build=puppeteer --allow-build=vue-demi @unlighthouse/cli@0.19.1 --config-file tools/lighthouse/unlighthouse.config.mjs --site "$LIGHTHOUSE_BASE_URL"
-          done
+      - name: 프리뷰 응답 확인과 Unlighthouse 반복 측정
+        run: node tools/lighthouse/collect.mjs
 
       - name: Lighthouse 결과 요약
         id: summary
