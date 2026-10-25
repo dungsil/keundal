@@ -33,7 +33,7 @@ type Frame = { type: string; [key: string]: unknown }
 type Received = {
   path: string | undefined
   method: string | undefined
-  apiKey: string | string[] | undefined
+  authorization: string | string[] | undefined
   version: string | string[] | undefined
   body: Record<string, unknown>
 }
@@ -107,7 +107,7 @@ async function setup(
       const received: Received = {
         path: incoming.url,
         method: incoming.method,
-        apiKey: incoming.headers['x-api-key'],
+        authorization: incoming.headers['authorization'],
         version: incoming.headers['anthropic-version'],
         body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
       }
@@ -278,8 +278,8 @@ test('Messages 요청을 보내고 분할된 UTF-8 SSE를 실행 수명 이벤�
     {
       path: '/v1/messages',
       method: 'POST',
-      apiKey: 'test-api-key',
-      version: '2023-06-01',
+      authorization: 'Bearer test-api-key',
+      version: '2026-10-21',
       body: {
         model: 'test-model',
         messages: [{ role: 'user', content: [{ type: 'text', text: 'Hello' }] }],
