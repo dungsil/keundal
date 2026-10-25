@@ -1,6 +1,6 @@
 import { test, expect, ready, accessible } from './fixtures'
 
-test('큰달 플러그인을 설치하면 비활성이며 활성화·새로고침·비활성화·삭제가 실행 효과에 반영된다', async ({ page, baseURL }) => {
+test('큰달 플러그인을 설치하면 비활성이며 활성화·새로고침·비활성화·삭제가 실행 효과에 반영된다 @a11y:runtime-plugins', async ({ page, baseURL }) => {
   const module = `${baseURL}/test-runtime-plugin.mjs`
   await page.route('**/test-runtime-plugin.mjs', route => route.fulfill({
     contentType: 'text/javascript',
