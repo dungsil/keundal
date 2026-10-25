@@ -35,8 +35,7 @@ export function apply(ctx: Context) {
       name: 'layout.sidebar',
       id: 'actions',
       order: 0,
-      inject: ({ collapsed }) => ({
-        collapsed,
+      inject: () => ({
         openSearch: () => {
           search.open = true
         }
@@ -46,8 +45,7 @@ export function apply(ctx: Context) {
       name: 'layout.sidebar',
       id: 'history',
       order: 10,
-      inject: ({ collapsed }) => ({
-        collapsed,
+      inject: () => ({
         chats: runtime.chats,
         rename,
         remove
