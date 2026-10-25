@@ -62,7 +62,8 @@ type MetaOptions<K extends SlotName> = SlotMeta<K> extends undefined ? { meta?: 
  * Registration of one component into a declared slot.
  *
  * `inject` runs once when the entry mounts. It closes over the registering plugin's `ctx` and returns the plain
- * data and callbacks the component receives as props. Components never receive `ctx`.
+ * data and callbacks the component receives as props. Owner values take precedence when a name appears in both.
+ * Components never receive `ctx`.
  */
 export type SlotRegistration<K extends SlotName, I extends object = object> = {
   name: K

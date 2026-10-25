@@ -26,7 +26,6 @@ export function apply(ctx: Context) {
   ctx.slots.inject('layout.sidebar.footer', () => ctx.slots.register({
     name: 'layout.sidebar.footer',
     id: 'settings',
-    order: 0,
-    inject: ({ collapsed, close }) => ({ collapsed, close })
+    order: 0
   }, SettingsLink))
 }
