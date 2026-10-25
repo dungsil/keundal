@@ -89,7 +89,7 @@ function loadDraft() {
 
 onMounted(loadDraft)
 watch(provider, (id) => {
-  if (id && props.loadModels && fetchedModels.value[id] === undefined) void fetchModels(id)
+  if (id && saved.value[id] && props.loadModels && fetchedModels.value[id] === undefined) void fetchModels(id)
 })
 watch(
   [() => route.query.provider, () => props.model.value, mounted],
