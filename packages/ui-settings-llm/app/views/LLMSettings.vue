@@ -113,6 +113,12 @@ async function addHeader() {
 }
 
 async function fetchModels(providerId: string) {
+  const settings = draft.value[providerId]
+  if (!settings || (!settings.apiKey?.trim() && !settings.baseURL?.trim() && !Object.keys(settings.headers ?? {}).length)) {
+    fetchedModels.value[providerId] = []
+    modelError.value[providerId] = ''
+    return
+  }
   if (!props.loadModels) return
   modelLoading.value[providerId] = true
   modelError.value[providerId] = ''
