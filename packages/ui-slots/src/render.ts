@@ -89,9 +89,10 @@ const SlotEntryHost = defineComponent({
     })
     return () => {
       if (failed.value) return null
+      // Owner values update with every render; the mount-time face must not shadow them with stale copies.
       const values: Record<string, unknown> = {
-        ...props.owner,
         ...face,
+        ...props.owner,
         ...(props.matched === undefined ? {} : { matched: props.matched })
       }
       const passed = accepted

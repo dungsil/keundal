@@ -129,6 +129,24 @@ describe('슬롯 레지스트리', () => {
     )
   })
 
+  test('소유자와 inject가 같은 이름을 넘기면 현재 소유자 값을 쓴다', async () => {
+    const ctx = await setup()
+    ctx.slots.register({ name: 'root', children: { 'test.view': 'keyed' } }, defineComponent({
+      setup: () => () => h(SlotOutlet, { name: 'test.view', entryKey: 'b', owner: { value: 'current' } })
+    }))
+    // The face keeps the value captured at mount; the live owner value must not be shadowed by it.
+    ctx.slots.register({
+      name: 'test.view',
+      key: 'b',
+      inject: () => ({ text: 'mounted', value: 'mounted' })
+    }, defineComponent({
+      props: { text: { type: String, required: true }, value: { type: String, required: true } },
+      setup: props => () => h('span', `${props.text}:${props.value}`)
+    }))
+
+    expect(await render(ctx)).toBe('<span>mounted:current</span>')
+  })
+
   test('팩터리는 선언 없이 여러 소유자가 그리고, 정의를 해제하면 하위 슬롯도 접는다', async () => {
     const ctx = await setup()
     const Composer = defineComponent({

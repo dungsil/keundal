@@ -43,7 +43,7 @@ const current = computed(() => displayedModels.value.find(model => model.value =
     color="neutral"
     variant="ghost"
     value-key="value"
-    class="max-w-full data-[state=open]:bg-elevated"
+    class="min-w-0 max-w-full data-[state=open]:bg-elevated"
     :ui="{
       content: 'w-80 max-w-[calc(100vw-2rem)]',
       itemLabel: 'text-clip whitespace-normal wrap-anywhere',
