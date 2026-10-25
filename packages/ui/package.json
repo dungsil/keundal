@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@comark/nuxt": "^0.7.0",
-    "@comark/vue": "^0.7.0",
+    "@comark/vue": "^0.8.1",
     "@keundal/chat": "workspace:*",
     "@nuxt/ui": "^4.11.3",
     "@shikijs/langs": "^4.5.0",
