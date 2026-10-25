@@ -1,5 +1,14 @@
 export default defineAppConfig({
   ui: {
+    button: {
+      compoundVariants: [
+        {
+          color: 'primary',
+          variant: 'solid',
+          class: 'hover:bg-primary-700 active:bg-primary-700 dark:hover:bg-primary-300 dark:active:bg-primary-300'
+        }
+      ]
+    },
     chatMessage: {
       slots: {
         actions: 'focus-within:opacity-100'
