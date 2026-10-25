@@ -10,6 +10,7 @@ import {
   type LLMSettings
 } from '@keundal/llm-settings'
 import type { Ref } from 'vue'
+import type { ModelOption } from '@keundal/chat/models'
 
 import { useText } from '../locale'
 
@@ -22,6 +23,7 @@ const props = defineProps<{
   /** Stop active responses before the settings change. */
   stop: () => Promise<void>
   saveSettings: (next: LLMSettings) => Promise<void>
+  loadModels?: (provider: string, settings: LLMSettings) => Promise<ModelOption[]>
 }>()
 
 const { t } = useText()
@@ -49,6 +51,10 @@ const errorField = ref<'' | 'name' | 'apiKey' | 'baseURL'>('')
 // headers named by the provider, so the row exposes a toggle instead.
 const revealedHeaders = ref<Record<string, boolean>>({})
 const saving = ref(false)
+const fetchedModels = ref<Record<string, ModelOption[]>>({})
+const modelLoading = ref<Record<string, boolean>>({})
+const modelError = ref<Record<string, string>>({})
+const newModelId = ref('')
 const providers = computed(() => configuredProviders(draft.value).filter(item => visibleIds.value.includes(item.id)))
 const current = computed(() => providers.value.find(item => item.id === provider.value))
 const currentDraft = computed(() => draft.value[provider.value]!)
@@ -82,6 +88,9 @@ function loadDraft() {
 }
 
 onMounted(loadDraft)
+watch(provider, (id) => {
+  if (id && saved.value[id] && props.loadModels && fetchedModels.value[id] === undefined) void fetchModels(id)
+})
 watch(
   [() => route.query.provider, () => props.model.value, mounted],
   ([value, , ready]) => {
@@ -101,6 +110,64 @@ async function addHeader() {
   currentHeaders.value.push({ id, key: '', value: '' })
   await nextTick()
   document.getElementById(id)?.focus()
+}
+
+async function fetchModels(providerId: string) {
+  const settings = draft.value[providerId]
+  if (!settings || (!settings.apiKey?.trim() && !settings.baseURL?.trim() && !Object.keys(settings.headers ?? {}).length)) {
+    fetchedModels.value[providerId] = []
+    modelError.value[providerId] = ''
+    return
+  }
+  if (!props.loadModels) return
+  modelLoading.value[providerId] = true
+  modelError.value[providerId] = ''
+  try {
+    const result = await props.loadModels(providerId, draft.value)
+    fetchedModels.value[providerId] = result
+  } catch (cause) {
+    modelError.value[providerId] = cause instanceof Error ? cause.message : t('llm.modelLoadFailed')
+    fetchedModels.value[providerId] = []
+  } finally {
+    modelLoading.value[providerId] = false
+  }
+}
+
+function isModelEnabled(providerId: string, modelId: string): boolean {
+  const models = draft.value[providerId]?.models
+  if (!models?.length) return true
+  return models.includes(modelId)
+}
+
+function toggleModel(providerId: string, modelId: string, enabled: boolean) {
+  const current = draft.value[providerId]!
+  const fetched = fetchedModels.value[providerId]?.map(item => item.value.slice(providerId.length + 1)) ?? []
+  if (enabled) {
+    if (current.models?.length) {
+      if (!current.models.includes(modelId)) current.models = [...current.models, modelId]
+    }
+    // undefined means "all enabled"; nothing to store.
+  } else {
+    if (!current.models?.length) {
+      current.models = fetched.filter(id => id !== modelId)
+    } else {
+      current.models = current.models.filter(id => id !== modelId)
+    }
+  }
+}
+
+function addCustomModel(providerId: string) {
+  const id = newModelId.value.trim()
+  if (!id) return
+  const current = draft.value[providerId]!
+  const fetched = fetchedModels.value[providerId]?.map(item => item.value.slice(providerId.length + 1)) ?? []
+  if (!current.models?.length) current.models = [...fetched]
+  if (!current.models!.includes(id)) current.models!.push(id)
+  newModelId.value = ''
+}
+
+function resetModels(providerId: string) {
+  draft.value[providerId]!.models = undefined
 }
 
 async function save(forget = false) {
@@ -305,6 +372,65 @@ async function save(forget = false) {
                 :disabled="!mounted || saving"
                 @click="addHeader"
               />
+            </fieldset>
+            <fieldset class="space-y-2">
+              <legend class="text-sm font-medium text-highlighted">
+                {{ t('llm.availableModels') }}
+              </legend>
+              <div class="flex flex-wrap items-center gap-2">
+                <UButton
+                  type="button"
+                  :label="t('llm.loadModels')"
+                  icon="i-lucide-refresh-cw"
+                  color="neutral"
+                  variant="outline"
+                  :loading="modelLoading[provider]"
+                  :disabled="!mounted || saving || !props.loadModels"
+                  @click="fetchModels(provider)"
+                />
+                <UButton
+                  type="button"
+                  :label="t('llm.resetModels')"
+                  color="neutral"
+                  variant="ghost"
+                  :disabled="!mounted || saving"
+                  @click="resetModels(provider)"
+                />
+              </div>
+              <p v-if="modelError[provider]" role="alert" class="text-sm text-error">
+                {{ modelError[provider] }}
+              </p>
+              <ul v-if="fetchedModels[provider]?.length" class="space-y-1">
+                <li v-for="model in fetchedModels[provider]" :key="model.value" class="flex items-center gap-2">
+                  <UCheckbox
+                    :model-value="isModelEnabled(provider, model.value.slice(provider.length + 1))"
+                    :disabled="!mounted || saving"
+                    @update:model-value="toggleModel(provider, model.value.slice(provider.length + 1), !!$event)"
+                  />
+                  <span class="break-all text-sm">{{ model.label || model.value.slice(provider.length + 1) }}</span>
+                </li>
+              </ul>
+              <div class="flex gap-2">
+                <UInput
+                  v-model="newModelId"
+                  :placeholder="t('llm.addModel')"
+                  autocomplete="off"
+                  class="min-w-0 flex-1"
+                  :disabled="!mounted || saving"
+                />
+                <UButton
+                  type="button"
+                  :label="t('llm.addModel')"
+                  icon="i-lucide-plus"
+                  color="neutral"
+                  variant="outline"
+                  :disabled="!mounted || saving || !newModelId.trim()"
+                  @click="addCustomModel(provider)"
+                />
+              </div>
+              <p v-if="currentDraft?.models?.length" class="text-xs text-muted">
+                {{ currentDraft?.models?.join(', ') }}
+              </p>
             </fieldset>
             <UAlert
               :icon="secureSettings ? 'i-lucide-shield-check' : 'i-lucide-shield-alert'"
