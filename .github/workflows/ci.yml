@@ -421,18 +421,34 @@ jobs:
           cache: true
           require-lockfile: true
 
+      - name: Turbo 공유 캐시 설정
+        id: turbo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
+            turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-
+
       - name: 접근성 검사 목록 확인
         run: |
           node --test tools/a11y/*.test.mjs
           node tools/a11y/check.mjs
 
       - name: Chromium 설치
-        run: pnpm --filter @keundal/web exec playwright install --with-deps chromium
+        run: pnpm --filter @keundal/web exec playwright install --with-deps --only-shell chromium
 
       - name: 웹 빌드
         env:
           NITRO_PRESET: node-server
         run: pnpm exec turbo run build --filter=@keundal/web...
+
+      - name: Turbo 공유 캐시 저장
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: ${{ steps.turbo-cache.outputs.cache-primary-key }}
 
       - name: 브라우저 회귀 검사
         run: pnpm --filter @keundal/web test:browser --project=chromium
@@ -447,6 +463,16 @@ jobs:
             apps/web/test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Turbo 실행 요약 업로드
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: turbo-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}
+          path: .turbo/runs/*.json
+          if-no-files-found: ignore
+          retention-days: 3
+          overwrite: true
 
   lint:
     name: 린트 및 형식 검사
