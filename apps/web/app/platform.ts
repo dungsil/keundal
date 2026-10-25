@@ -10,7 +10,7 @@ import { RemoteChatStore } from '@keundal/plugin-chat-remote'
 import { browserLLMPlugin } from '@keundal/plugin-llm-browser'
 import { loadModels } from '@keundal/plugin-llm-browser/models'
 import { openaiTranscription } from '@keundal/plugin-transcription-browser'
-import { createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
+import { BrowserRuntimePluginManager, createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
 import { createChatTools } from '@keundal/plugin-tool-chat'
 import type { ChatPlatform } from '@keundal/chat/platform'
 import { loadWebRuntimePlugins } from './runtime-plugins'
@@ -18,9 +18,11 @@ import { loadWebRuntimePlugins } from './runtime-plugins'
 export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: string, agentToken?: string, pluginConfig?: string } = {}): ChatPlatform {
   const mcp = new McpManager(createBrowserMcpSettingsStorage(storage))
   const plugins = runtime.agentEndpoint ? undefined : new BrowserAgentPluginManager(storage)
+  const runtimePlugins = runtime.agentEndpoint ? undefined : new BrowserRuntimePluginManager(storage)
   const platform: ChatPlatform = {
     mcp,
     plugins,
+    runtimePlugins,
     settings: createBrowserSettingsStorage(storage),
     skills: new SkillManager(storage),
     loadModels,
@@ -51,6 +53,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         for (const service of ['llm', 'session', 'generation'] as const) {
           if (!root[service]) throw new Error(`Missing browser service: ${service}`)
         }
+        await runtimePlugins!.attach(root)
         store = new ChatStore(root, (ctx, config) => composition.mountAgent(ctx, {
           model: config.model,
           maxOutputTokens: config.maxOutputTokens,
@@ -70,6 +73,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
             try {
               await store!.stop()
             } finally {
+              await runtimePlugins?.close()
               await plugins?.close()
               await scope.dispose()
             }
@@ -79,6 +83,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         try {
           await store?.stop()
         } finally {
+          await runtimePlugins?.close()
           await plugins?.close()
           await scope.dispose()
         }

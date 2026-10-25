@@ -7,6 +7,7 @@ fn main() {
             "save_mcp_settings",
             "list_skill_files",
             "read_skill_file",
+            "runtime_plugins",
             "sidecar_info",
         ]),
     ))

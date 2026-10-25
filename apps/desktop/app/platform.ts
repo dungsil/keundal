@@ -1,7 +1,7 @@
 import { McpManager } from '@keundal/plugin-chat-browser/mcp'
 import { SkillManager } from '@keundal/plugin-chat-browser/skills'
 import { createNativeMcpSettingsStorage } from '@keundal/plugin-chat-desktop/mcp'
-import { createDesktopChatStore } from '@keundal/plugin-chat-desktop'
+import { createDesktopChatStore, createNativeRuntimePluginManager } from '@keundal/plugin-chat-desktop'
 import { createNativeSettingsStorage } from '@keundal/plugin-chat-desktop/settings'
 import { createNativeSkillSource } from '@keundal/plugin-chat-desktop/skills'
 import { loadModels } from '@keundal/plugin-llm-browser/models'
@@ -11,7 +11,9 @@ import { FALLBACK_MODEL } from '@keundal/llm-settings'
 import type { ChatPlatform, NativeInvoke } from '@keundal/chat/platform'
 
 export function createDesktopPlatform(storage: Storage, invoke: NativeInvoke): ChatPlatform {
+  let connected: Awaited<ReturnType<typeof createDesktopChatStore>> | undefined
   const platform: ChatPlatform = {
+    runtimePlugins: createNativeRuntimePluginManager(invoke, async () => { await connected?.reloadSettings() }),
     mcp: new McpManager(createNativeMcpSettingsStorage(invoke), { allowStdio: true }),
     settings: createNativeSettingsStorage(storage, invoke),
     skills: new SkillManager(storage, createNativeSkillSource(invoke)),
@@ -21,6 +23,7 @@ export function createDesktopPlatform(storage: Storage, invoke: NativeInvoke): C
       const store = await createDesktopChatStore(invoke, options.getModels, options.initialModel)
       try {
         await store.recover()
+        connected = store
         return {
           store,
           remoteAgent: true,
@@ -32,7 +35,10 @@ export function createDesktopPlatform(storage: Storage, invoke: NativeInvoke): C
             if (!next[resolveModel(store.selectedModel).configuration]) await store.selectModel(FALLBACK_MODEL, true)
             else await store.reloadSettings()
           },
-          dispose: () => store.stop()
+          dispose: async () => {
+            if (connected === store) connected = undefined
+            await store.stop()
+          }
         }
       } catch (error) {
         await store.stop()

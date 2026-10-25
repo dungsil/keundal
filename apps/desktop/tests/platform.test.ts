@@ -17,6 +17,7 @@ test('데스크톱 조립은 보안 저장소와 로컬 스킬을 제공하고 s
     if (command === 'save_llm_settings') return undefined as T
     if (command === 'list_skill_files') return { roots: [], files: [] } as T
     if (command === 'sidecar_info') return { endpoint: 'http://sidecar.test', token: 'test-token' } as T
+    if (command === 'runtime_plugins') return { previous: [], expected: [] } as T
     throw new Error(command)
   }
   vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
@@ -41,6 +42,11 @@ test('데스크톱 조립은 보안 저장소와 로컬 스킬을 제공하고 s
       await connection.selectModel?.('anthropic/test')
       expect(commands.filter(command => command === 'sidecar_info')).toHaveLength(2)
       expect(requests).toEqual(['http://sidecar.test/recover'])
+      expect(platform.runtimePlugins?.source).toBe('node')
+      await platform.runtimePlugins!.install({ module: 'example-plugin' })
+      expect(commands.filter(command => command === 'sidecar_info')).toHaveLength(2)
+      await platform.runtimePlugins!.setEnabled('example-plugin', false)
+      expect(commands.filter(command => command === 'sidecar_info')).toHaveLength(3)
     } finally {
       await connection.dispose()
     }

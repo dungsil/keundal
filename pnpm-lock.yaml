@@ -258,6 +258,9 @@ importers:
       '@keundal/plugin-llm-browser':
         specifier: workspace:*
         version: link:../../packages/plugin-llm-browser
+      '@keundal/plugin-runtime':
+        specifier: workspace:*
+        version: link:../../packages/plugin-runtime
       '@keundal/plugin-tool-chat':
         specifier: workspace:*
         version: link:../../packages/plugin-tool-chat
@@ -1136,9 +1139,15 @@ importers:
       '@keundal/plugin-mcp-client':
         specifier: workspace:*
         version: link:../plugin-mcp-client
+      '@keundal/plugin-runtime':
+        specifier: workspace:*
+        version: link:../plugin-runtime
       '@keundal/skill-markdown':
         specifier: workspace:*
         version: link:../skill-markdown
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
