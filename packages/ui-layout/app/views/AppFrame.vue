@@ -36,7 +36,7 @@ const close = () => {
       class="border-r-0 py-4 dark:[--ui-bg-elevated:var(--ui-color-neutral-900)]"
     >
       <template #header>
-        <UDashboardSidebarCollapse class="ms-auto" />
+        <UDashboardSidebarCollapse />
       </template>
 
       <template #default="{ collapsed }">

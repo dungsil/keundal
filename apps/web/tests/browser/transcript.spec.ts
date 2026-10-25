@@ -56,18 +56,35 @@ test('이전 메시지 링크를 열면 대상 메시지를 표시하고 전체 
   expect(content).toContain('Fixture message 84')
 })
 
-test('메시지 편집 화면에 접근성 위반이 없고 취소하면 원문을 보존한다 @a11y:message-edit', async ({ page }) => {
-  await seedChat(page)
-  await ready(page, '/chat/browser-fixture')
-  await page.getByRole('button', { name: 'Edit message', exact: true }).first().click()
-  const editor = page.getByRole('textbox', { name: 'Edit message', exact: true })
-  await expect(editor).toBeVisible()
-  const original = await editor.inputValue()
-  await editor.fill('Discarded draft')
-  await accessible(page)
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
-  await expect(page.getByText(original, { exact: true })).toBeVisible()
-  await expect(page.getByText('Discarded draft', { exact: true })).toHaveCount(0)
-  await page.reload()
-  await expect(page.getByText(original, { exact: true })).toBeVisible()
-})
+for (const colorScheme of ['light', 'dark'] as const) {
+  test.describe(`${colorScheme} 테마의 메시지 편집`, () => {
+    test.use({ colorScheme })
+
+    test('저장 버튼에 마우스를 올리거나 눌러도 접근성 위반이 없고 취소하면 원문을 보존한다 @a11y:message-edit', async ({ page }) => {
+      await page.addInitScript(() => { localStorage.setItem('nuxt-color-mode', 'system') })
+      await seedChat(page)
+      await ready(page, '/chat/browser-fixture')
+      await page.getByRole('button', { name: 'Edit message', exact: true }).first().click()
+      const editor = page.getByRole('textbox', { name: 'Edit message', exact: true })
+      await expect(editor).toBeVisible()
+      const original = await editor.inputValue()
+      await editor.fill('Discarded draft')
+      await page.mouse.move(0, 0)
+      await accessible(page)
+      await page.getByRole('button', { name: 'Save', exact: true }).hover()
+      await accessible(page)
+      await page.mouse.down()
+      try {
+        await accessible(page)
+      } finally {
+        await page.mouse.move(0, 0)
+        await page.mouse.up()
+      }
+      await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+      await expect(page.getByText(original, { exact: true })).toBeVisible()
+      await expect(page.getByText('Discarded draft', { exact: true })).toHaveCount(0)
+      await page.reload()
+      await expect(page.getByText(original, { exact: true })).toBeVisible()
+    })
+  })
+}
