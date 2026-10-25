@@ -86,7 +86,8 @@ export const providerSettingsSchema = z.object({
         return false
       }
     }, 'Use an HTTPS API URL without credentials, query or fragment (HTTP is allowed for localhost)'),
-  headers: headersSchema.optional()
+  headers: headersSchema.optional(),
+  models: z.array(z.string().trim().min(1).max(256)).optional()
 })
 
 export type ProviderSettings = z.infer<typeof providerSettingsSchema>

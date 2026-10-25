@@ -48,5 +48,10 @@ export default {
   'llm.invalidKey': 'API 키는 줄바꿈 없이 4096자 이내로 입력하세요.',
   'llm.invalidURL': '인증 정보, 쿼리, 프래그먼트가 없는 HTTPS API URL을 입력하세요. localhost는 HTTP도 허용됩니다.',
   'llm.invalidHeaders':
-    '중복되지 않는 HTTP 헤더 이름과 줄바꿈이 없는 ASCII 값을 입력하세요. 값은 각각 4096자 이내여야 합니다.'
+    '중복되지 않는 HTTP 헤더 이름과 줄바꿈이 없는 ASCII 값을 입력하세요. 값은 각각 4096자 이내여야 합니다.',
+  'llm.modelLoadFailed': '모델 목록을 불러오지 못했습니다.',
+  'llm.availableModels': '사용할 수 있는 모델',
+  'llm.loadModels': '모델 목록 불러오기',
+  'llm.addModel': '모델 추가',
+  'llm.resetModels': '모든 모델 사용'
 } satisfies Record<keyof typeof en, string>

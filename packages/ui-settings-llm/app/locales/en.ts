@@ -45,5 +45,10 @@ export default {
   'llm.invalidKey': 'API key must contain at most 4096 characters and no line breaks.',
   'llm.invalidURL': 'Use an HTTPS API URL without credentials, query or fragment (HTTP is allowed for localhost)',
   'llm.invalidHeaders':
-    'Use unique HTTP header names and ASCII values without line breaks (at most 4096 characters per value).'
+    'Use unique HTTP header names and ASCII values without line breaks (at most 4096 characters per value).',
+  'llm.modelLoadFailed': 'Could not load the model list.',
+  'llm.availableModels': 'Available models',
+  'llm.loadModels': 'Load models',
+  'llm.addModel': 'Add model',
+  'llm.resetModels': 'Use all models'
 }
