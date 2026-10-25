@@ -1,6 +1,6 @@
 import type { ModelOption } from '@keundal/chat/models'
 import type { ModelLoader } from '@keundal/chat/platform'
-import { configuredProviders, type LLMSettings } from '@keundal/llm-settings'
+import { configuredProviders, providerIcon, type LLMSettings } from '@keundal/llm-settings'
 import { onScopeDispose, ref, watch, type Ref } from 'vue'
 
 export interface ModelCatalog {
@@ -70,7 +70,20 @@ export function useModelCatalog(
         try {
           const available = await loadModels(provider.id, snapshot, localStorage, { force, signal: controller.signal })
           if (controller.signal.aborted) return
-          results.set(provider.id, available)
+          const configured = snapshot[provider.id]?.models
+          const filtered = configured?.length
+            ? available.filter((model) => configured.includes(model.value.slice(provider.id.length + 1)))
+            : available
+          const extras = (configured ?? [])
+            .filter((id) => !available.some((model) => model.value === `${provider.id}/${id}`))
+            .map((id) => ({
+              value: `${provider.id}/${id}`,
+              label: id,
+              icon: providerIcon(provider.id),
+              contextWindow: undefined,
+              maxOutputTokens: undefined
+            }))
+          results.set(provider.id, [...filtered, ...extras])
         } catch (cause) {
           if (controller.signal.aborted) return
           error.value += `${cause instanceof Error ? cause.message : loadErrorMessage()} `

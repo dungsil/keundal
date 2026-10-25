@@ -2586,6 +2586,9 @@ importers:
 
   packages/ui-settings-llm:
     dependencies:
+      '@keundal/chat':
+        specifier: workspace:*
+        version: link:../chat
       '@keundal/llm-settings':
         specifier: workspace:*
         version: link:../llm-settings

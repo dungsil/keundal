@@ -24,7 +24,8 @@ export function apply(ctx: Context) {
       capabilities: runtime.capabilities,
       // The store exists only in the browser, so it is read when a save starts.
       stop: () => runtime.store.stop(),
-      saveSettings: (next: LLMSettings) => runtime.saveSettings(next)
+      saveSettings: (next: LLMSettings) => runtime.saveSettings(next),
+      loadModels: (provider: string, settings: LLMSettings) => runtime.platform.loadModels(provider, settings, globalThis.localStorage as Storage)
     })
   }, LLMSettingsSection))
   ctx.slots.inject('settings.section', () => ctx.slots.register({

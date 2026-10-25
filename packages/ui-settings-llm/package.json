@@ -9,6 +9,7 @@
     "./plugin": "./app/plugin.ts"
   },
   "dependencies": {
+    "@keundal/chat": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
     "@keundal/ui": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
