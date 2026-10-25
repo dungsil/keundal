@@ -39,7 +39,7 @@ for (const file of files) {
     continue
   }
   const path = resolve(root, entry.test)
-  if (!relative(root, path).startsWith('apps/web/tests/browser/')) {
+  if (!relative(root, path).replaceAll('\\', '/').startsWith('apps/web/tests/browser/')) {
     errors.push(`Invalid test path: ${file}`)
     continue
   }
