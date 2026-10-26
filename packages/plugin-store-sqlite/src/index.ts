@@ -5,6 +5,14 @@ import { SqliteGenerationService } from './generation.js'
 import { SqliteSessionService } from './session.js'
 import { SqliteStore } from './store.js'
 
+export const metadata = {
+  name: { en: 'SQLite storage', ko: 'SQLite 저장소' },
+  description: {
+    en: 'Saves conversations and runs in a local SQLite database.',
+    ko: '로컬 SQLite 데이터베이스에 대화와 실행 기록을 저장합니다.'
+  }
+}
+
 export { sqliteStoreConfigSchema, type SqliteStoreConfig } from './config.js'
 export { SqliteGenerationService } from './generation.js'
 export { SqliteSessionService } from './session.js'

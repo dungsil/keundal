@@ -5,6 +5,14 @@ import { IndexedDBGenerationService } from './generation.js'
 import { IndexedDBSessionService } from './session.js'
 import { IndexedDBStore } from './store.js'
 
+export const metadata = {
+  name: { en: 'Browser storage', ko: '브라우저 저장소' },
+  description: {
+    en: 'Saves conversations and runs in this browser using IndexedDB.',
+    ko: 'IndexedDB를 사용해 이 브라우저에 대화와 실행 기록을 저장합니다.'
+  }
+}
+
 export { indexedDBStoreConfigSchema, type IndexedDBStoreConfig } from './config.js'
 export { IndexedDBGenerationService } from './generation.js'
 export { IndexedDBSessionService } from './session.js'

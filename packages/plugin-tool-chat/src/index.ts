@@ -5,6 +5,14 @@ import { chartTool } from './chart'
 import { markdownTool } from './markdown'
 import { weatherTool } from './weather'
 
+export const metadata = {
+  name: { en: 'Weather and charts', ko: '날씨와 차트' },
+  description: {
+    en: 'Adds weather lookup and chart tools to conversations.',
+    ko: '대화에서 날씨 조회와 차트 도구를 사용할 수 있습니다.'
+  }
+}
+
 export function createChatTools(): ExecutableTool[] {
   return Object.entries({ chart: chartTool, weather: weatherTool, markdown: markdownTool }).map(([name, tool]) => ({
     name,

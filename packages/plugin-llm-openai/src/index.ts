@@ -15,6 +15,14 @@ import { OpenAILLMConfigSchema, parseConfig, type OpenAILLMConfig } from './conf
 import { ResponseEvents } from './events.js'
 import { createInput } from './request.js'
 
+export const metadata = {
+  name: { en: 'OpenAI Responses', ko: 'OpenAI Responses' },
+  description: {
+    en: 'Connects models through the OpenAI Responses API.',
+    ko: 'OpenAI Responses API로 모델에 연결합니다.'
+  }
+}
+
 export { OpenAILLMConfigSchema, type OpenAILLMConfig } from './config.js'
 export { listOpenAIModels } from './models.js'
 

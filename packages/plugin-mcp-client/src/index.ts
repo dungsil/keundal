@@ -4,6 +4,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { McpClient as BrowserClient, type McpClientConfig, type McpRequestOptions } from './browser.js'
 import { createHttpTransport, transportByteLimit } from './http-transport.js'
 
+export { metadata } from './browser.js'
 export type { McpClientConfig, McpPermissions, McpProbeResult, McpRequestOptions, McpToolSummary } from './browser.js'
 
 export class McpClient extends BrowserClient {

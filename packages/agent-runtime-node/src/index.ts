@@ -7,7 +7,7 @@ import type { McpClientConfig } from '@keundal/mcp'
 import type { RuntimePluginManifest } from '@keundal/plugin-runtime'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 
-export { createNodeComposition, getRequiredNodePluginModules } from './default-composition.js'
+export { createNodeComposition, getRequiredNodePluginModules, nodePluginMetadata } from './default-composition.js'
 
 export type AgentHostProvider = 'openai' | 'gemini' | 'anthropic' | (string & {})
 export type BundledPluginModule = '@keundal/plugin-skill' | '@keundal/plugin-mcp-client' | '@keundal/plugin-tool-chat'

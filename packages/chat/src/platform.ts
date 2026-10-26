@@ -56,6 +56,11 @@ export interface AgentPluginManager {
 }
 export interface RuntimePluginInfo {
   module: string
+  /** Plugin-owned display copy; module remains the stable selection identifier. */
+  metadata?: {
+    name: { en: string; ko: string }
+    description: { en: string; ko: string }
+  }
   enabled: boolean
   /** Service capability used to bind related UI without depending on implementation packages. */
   feature?: 'skills' | 'mcp'
