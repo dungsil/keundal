@@ -17,7 +17,7 @@ concurrency:
 jobs:
   changes:
     name: UI 변경 확인
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -54,62 +54,21 @@ jobs:
               - 'packages/ui/nuxt.config.ts'
               - 'packages/ui/package.json'
 
-  preview:
-    name: 현재 커밋의 프리뷰 배포 대기
+  lighthouse:
+    name: 프로덕션 빌드 Lighthouse 검사
     needs: changes
     if: needs.changes.outputs.ui == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      url: ${{ steps.preview.outputs.url }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: 배포된 프리뷰 URL 확인
-        id: preview
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const { findPreview } = await import(`${process.env.GITHUB_WORKSPACE}/tools/lighthouse/preview.mjs`);
-            const source = context.payload.pull_request;
-            for (let attempt = 0; attempt < 60; attempt++) {
-              const { data: pr } = await github.rest.pulls.get({
-                ...context.repo, pull_number: source.number
-              });
-              if (pr.state !== 'open' || pr.head.sha !== source.head.sha) {
-                core.info('PR이 닫혔거나 최신 커밋이 변경되어 검사를 생략합니다.');
-                return;
-              }
-              const comments = await github.paginate(github.rest.issues.listComments, {
-                ...context.repo, issue_number: source.number, per_page: 100
-              });
-              const url = findPreview(comments, source.head.sha);
-              if (url) {
-                core.setOutput('url', url);
-                return;
-              }
-              await new Promise(resolve => setTimeout(resolve, 20000));
-            }
-            core.setFailed('현재 커밋의 프리뷰 배포를 20분 안에 확인하지 못했습니다.');
-
-  lighthouse:
-    name: 프리뷰 Lighthouse 검사
-    needs: preview
-    if: needs.preview.outputs.url != ''
-    runs-on: ubuntu-24.04
-    # 프리뷰가 잠시 응답하지 않으면 표본을 다시 측정하므로 여유를 둔다.
-    timeout-minutes: 20
+    runs-on: ubuntu-26.04
+    # 프로덕션 빌드와 반복 측정 시간을 포함한다.
+    timeout-minutes: 30
     outputs:
       report: ${{ steps.summary.outputs.report || steps.failure.outputs.report }}
     permissions:
       contents: read
     env:
-      LIGHTHOUSE_BASE_URL: ${{ needs.preview.outputs.url }}
+      LIGHTHOUSE_BASE_URL: http://127.0.0.1:3100
+      NITRO_HOST: 127.0.0.1
+      NITRO_PORT: '3100'
       SKIP_INSTALL_SIMPLE_GIT_HOOKS: '1'
       PUPPETEER_SKIP_DOWNLOAD: 'true'
       CHROME_PATH: /usr/bin/google-chrome
@@ -137,8 +96,28 @@ jobs:
       - name: 결과 요약 로직 검사
         run: node --test tools/lighthouse/*.test.mjs
 
-      - name: 프리뷰 응답 확인과 Unlighthouse 반복 측정
-        run: node tools/lighthouse/collect.mjs
+      - name: Turbo 공유 캐시 설정
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
+            turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: 웹 프로덕션 빌드
+        env:
+          NITRO_PRESET: node-server
+        run: pnpm exec turbo run build --filter=@keundal/web...
+
+      - name: 프로덕션 서버 실행과 Unlighthouse 반복 측정
+        shell: bash
+        run: |
+          mkdir -p .unlighthouse
+          node apps/web/.output/server/index.mjs > .unlighthouse/server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+          node tools/lighthouse/collect.mjs
 
       - name: Lighthouse 결과 요약
         id: summary
@@ -179,9 +158,9 @@ jobs:
 
   lighthouse-gate:
     name: Lighthouse 점수 기준
-    needs: [changes, preview, lighthouse]
+    needs: [changes, lighthouse]
     if: always()
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions: {}
     steps:
@@ -190,14 +169,13 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
           # UI 변경이 없거나 외부 포크 PR이면 검사를 생략한다.
-          # 검사 도중 PR이 닫히거나 커밋이 바뀌면 새 커밋의 실행이 검사를 담당한다.
-          allowed-skips: ${{ needs.changes.outputs.ui != 'true' && 'preview,lighthouse' || (needs.preview.result == 'success' && needs.preview.outputs.url == '' && 'lighthouse' || '') }}
+          allowed-skips: ${{ needs.changes.outputs.ui != 'true' && 'lighthouse' || '' }}
 
   lighthouse-comment:
     name: Lighthouse 결과 댓글 갱신
-    needs: [changes, preview, lighthouse]
+    needs: [changes, lighthouse]
     if: ${{ always() && !cancelled() && needs.changes.outputs.ui == 'true' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       pull-requests: write

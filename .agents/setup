@@ -30,43 +30,7 @@ EOF
 fi
 echo "Toolchain ready in ${SECONDS}s: $(node --version), pnpm $(pnpm --version)"
 
-echo 'Preparing Rust for desktop builds and tests'
-SECONDS=0
-export PATH="$HOME/.cargo/bin:$PATH"
-if ! command -v rustc >/dev/null 2>&1; then
-  bash .agents/install-rust
-fi
-profile_marker='# Keundal orb Rust toolchain'
-if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
-  cat >> "$HOME/.bash_profile" <<'EOF'
-
-# Keundal orb Rust toolchain
-export PATH="$HOME/.cargo/bin:$PATH"
-EOF
-fi
-echo "Rust ready in ${SECONDS}s: $(rustc --version)"
-
-echo 'Preparing Linux desktop build dependencies'
-SECONDS=0
-native_packages=(build-essential libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libdbus-1-dev patchelf)
-missing_packages=()
-for package in "${native_packages[@]}"; do
-  if [[ "$(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null || true)" != installed ]]; then
-    missing_packages+=("$package")
-  fi
-done
-if (( ${#missing_packages[@]} )); then
-  sudo -n apt-get update -qq
-  sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing_packages[@]}"
-fi
-echo "Desktop dependencies ready in ${SECONDS}s"
-
 echo 'Installing workspace dependencies from the lockfile'
 SECONDS=0
 pnpm install --frozen-lockfile
 echo "Dependencies ready in ${SECONDS}s"
-
-echo 'Building workspace packages'
-SECONDS=0
-pnpm build
-echo "Build ready in ${SECONDS}s"

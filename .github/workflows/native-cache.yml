@@ -1,0 +1,102 @@
+name: 네이티브 공통 캐시 예열
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-cache-${{ github.ref }}
+  # 새 push가 와도 첫 예열이 끝나도록 실행 중인 작업은 취소하지 않는다.
+  cancel-in-progress: false
+
+env:
+  SKIP_INSTALL_SIMPLE_GIT_HOOKS: '1'
+  TURBO_TELEMETRY_DISABLED: '1'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  warmup:
+    name: 캐시 예열 (${{ matrix.name }})
+    if: github.ref == 'refs/heads/main'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-26.04
+            name: linux-x64
+          - os: windows-2025
+            name: windows-x64
+          - os: macos-15
+            name: macos-arm64
+    steps:
+      - name: 저장소 가져오기
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust stable 설정
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+
+      - name: Rust 공통 캐시 확인
+        id: rust-cache
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+          shared-key: desktop-${{ matrix.name }}
+          cache-bin: false
+          lookup-only: true
+          save-if: false
+
+      - name: Rust 공통 캐시 복원
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+          shared-key: desktop-${{ matrix.name }}
+          cache-bin: false
+
+      - name: 개발 환경 준비
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        id: setup
+        continue-on-error: true
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+        with:
+          cache: true
+          require-lockfile: true
+
+      - name: 개발 환경 준비 재시도
+        if: ${{ !cancelled() && steps.rust-cache.outputs.cache-hit != 'true' && steps.setup.outcome == 'failure' }}
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+        with:
+          cache: true
+          require-lockfile: true
+
+      - name: Turbo 공유 캐시 설정
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Linux 빌드 의존성 설치
+        if: steps.rust-cache.outputs.cache-hit != 'true' && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev patchelf xdg-utils
+
+      - name: 설치 파일 없이 네이티브 빌드
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @keundal/desktop exec tauri build --no-bundle -- --locked

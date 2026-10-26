@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Dependencies and build outputs are restored with the orb; no services or
+# Dependencies are restored with the orb; no services or
 # authentication need reconnecting, and no install is needed on resume.
 node --version
 pnpm --version

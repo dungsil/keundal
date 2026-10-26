@@ -43,8 +43,8 @@ const defaultSelection = selection(draft)
 const titleSelection = selection(titleDraft)
 const items = computed(() => modelItems(draft.value, t('model.noDefault')))
 const titleItems = computed(() => modelItems(titleDraft.value, t('model.useChatModel')))
-// 모델 id는 공백이 없는 긴 문자열일 수 있어, 말줄임 대신 줄바꿈해 끝부분까지 보이게 합니다.
-const wrapUi = { value: 'whitespace-normal break-all', itemLabel: 'whitespace-normal break-all' }
+// 선택값은 한 줄로 줄이고, 펼친 목록에서는 긴 모델 id도 끝까지 읽을 수 있게 합니다.
+const selectUi = { value: 'min-w-0 truncate text-start', itemLabel: 'whitespace-normal break-all' }
 
 function save() {
   error.value = ''
@@ -72,7 +72,7 @@ function save() {
           :loading="mounted && loading.value"
           :disabled="!mounted"
           class="w-full"
-          :ui="wrapUi"
+          :ui="selectUi"
           @update:open="
             (open) => {
               if (open) refresh(false)
@@ -88,7 +88,7 @@ function save() {
           :loading="mounted && loading.value"
           :disabled="!mounted"
           class="w-full"
-          :ui="wrapUi"
+          :ui="selectUi"
           @update:open="
             (open) => {
               if (open) refresh(false)
@@ -104,7 +104,7 @@ function save() {
           {{ error }}
         </p>
       </div>
-      <div class="flex items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <UButton
           :label="t('model.refresh')"
           :icon="mounted && loading.value ? 'i-lucide-loader-circle' : 'i-lucide-refresh-cw'"
@@ -114,7 +114,7 @@ function save() {
           variant="ghost"
           @click="refresh()"
         />
-        <UButton type="submit" :disabled="!mounted" :label="t('common.save')" />
+        <UButton type="submit" :disabled="!mounted" :label="t('common.save')" class="ms-auto" />
       </div>
     </form>
   </section>

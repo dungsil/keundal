@@ -62,17 +62,17 @@ const { groups } = useChats(visibleChats)
         >
           <NuxtLink
             :to="chatPath(item.id)"
-            class="group relative w-full flex items-center gap-1.5 font-medium text-sm before:absolute before:z-[-1] before:rounded-md flex-row px-2.5 py-1.5 before:inset-y-px before:inset-x-0 text-default hover:before:bg-elevated/50 focus-visible:before:bg-elevated/50 [&.router-link-exact-active]:text-primary [&.router-link-exact-active]:before:bg-elevated overflow-hidden pe-14.5"
+            class="group relative w-full flex items-center gap-1.5 font-medium text-sm before:absolute before:z-[-1] before:rounded-md flex-row px-2.5 py-1.5 before:inset-y-px before:inset-x-0 text-default hover:before:bg-elevated/50 focus-visible:before:bg-elevated/50 [&.router-link-exact-active]:text-primary [&.router-link-exact-active]:before:bg-elevated overflow-hidden pe-14.5 pointer-coarse:min-h-[44px] pointer-coarse:pe-[100px]"
           >
             <span class="truncate" :class="item.untitled ? 'text-muted group-[.router-link-exact-active]:text-toned' : ''">{{ item.label }}</span>
           </NuxtLink>
-          <div class="absolute end-0 inset-y-0 flex items-center gap-0.5 pe-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+          <div class="absolute end-0 inset-y-0 flex items-center gap-0.5 pe-1.5 opacity-0 [@media(hover:none)]:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
             <UButton
               icon="i-lucide-pencil"
               color="neutral"
               variant="ghost"
               size="sm"
-              class="rounded-[5px]"
+              class="rounded-[5px] pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]"
               :aria-label="`${t('common.rename')}: ${item.label}`"
               :title="t('common.rename')"
               @click="renameChat(item.id, item.untitled ? '' : item.label)"
@@ -82,7 +82,7 @@ const { groups } = useChats(visibleChats)
               color="neutral"
               variant="ghost"
               size="sm"
-              class="rounded-[5px]"
+              class="rounded-[5px] pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]"
               :aria-label="`${t('common.delete')}: ${item.label}`"
               :title="t('common.delete')"
               @click="deleteChat(item.id)"
