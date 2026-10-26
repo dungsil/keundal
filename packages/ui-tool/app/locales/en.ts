@@ -1,5 +1,4 @@
 export default {
-  'common.unavailable': 'N/A',
   'tool.subagentPartial': 'Partial response (task not completed)',
   'tool.subagentQueued': 'Subagent queued',
   'tool.subagentRunning': 'Subagent running',
@@ -10,12 +9,5 @@ export default {
   'tool.skillLoading': 'Loading skill…',
   'tool.skillLoaded': 'Loaded skill',
   'tool.searching': 'Searching the web…',
-  'tool.searched': 'Searched the web',
-  'weather.loading': 'Loading weather data…',
-  'weather.failed': "Can't get weather data, please try again later",
-  'weather.noForecast': 'No forecast available',
-  'chart.generating': 'Generating chart…',
-  'chart.failed': "Can't generate chart, please try again",
-  'chart.loading': 'Loading chart data…',
-  'weather.range': 'H:{high}° L:{low}°'
+  'tool.searched': 'Searched the web'
 }

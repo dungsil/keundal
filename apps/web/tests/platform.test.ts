@@ -29,6 +29,7 @@ test('웹 조립은 네이티브 IPC 없이 IndexedDB 대화를 저장하고 재
   const id = crypto.randomUUID()
   try {
     expect(first.remoteAgent).toBe(false)
+    expect((await first.catalog!()).tools.map(tool => tool.name)).toEqual(['chart', 'weather'])
     await first.store.create(id, { id: 'user', role: 'user', parts: [{ type: 'text', text: 'Hello' }] }, 'openai/test')
   } finally {
     await first.dispose()
@@ -40,6 +41,32 @@ test('웹 조립은 네이티브 IPC 없이 IndexedDB 대화를 저장하고 재
   } finally {
     await second.dispose()
   }
+})
+
+test.for([
+  { modules: ['builtin:chart'], names: ['chart'] },
+  { modules: ['builtin:weather'], names: ['weather'] },
+  { modules: [], names: [] },
+  { modules: ['builtin:chat-tools'], names: ['chart', 'weather'] }
+])('웹 매니페스트의 $modules 도구만 제공하고 다른 기능은 포함하지 않는다', async ({ modules, names }, t) => {
+  const server = createServer((_, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
+      plugins: [{ module: 'builtin:llm' }, { module: 'builtin:store' }],
+      agent: { module: 'builtin:agent' },
+      tools: modules.map(module => ({ module }))
+    }))
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.onTestFinished(async () => {
+    server.closeAllConnections()
+    await new Promise<void>(resolve => server.close(() => resolve()))
+  })
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('No port')
+  const platform = createWebPlatform(storage(), { pluginConfig: `http://127.0.0.1:${address.port}/plugins.json` })
+  const connection = await platform.connect({ getSettings: defaultLLMSettings, getModels: () => [], skills: [] })
+  t.onTestFinished(() => connection.dispose())
+  expect((await connection.catalog!()).tools.map(tool => tool.name)).toEqual(names)
 })
 
 test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도구와 스킬을 실행하고 Journal을 저장한다', async (deferred, t) => {

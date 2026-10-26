@@ -83,7 +83,7 @@ root                               ui-layout
 ├─ page.home                       ui-home
 ├─ page.history                    ui-chat-list
 ├─ page.chat                       ui-chat
-│  ├─ chat.message.tool            ui-tool (항목이 없으면 기본 도구 카드)
+│  ├─ chat.message.tool            ui-tool, ui-chart, ui-weather (항목이 없으면 기본 도구 카드)
 │  ├─ chat.message.footer          ui-trace
 │  ├─ chat.indicator               ui-trace
 │  └─ chat.observer                ui-trace

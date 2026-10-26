@@ -1,14 +1,15 @@
 import { createServer } from 'node:http'
 
 import { createAgentRuntime, createNodeComposition } from '@keundal/agent-runtime-node'
-import { createChatTools } from '@keundal/plugin-tool-chat'
+import { createChartTools } from '@keundal/plugin-tool-chart'
+import { createWeatherTools } from '@keundal/plugin-tool-weather'
 
 const sidecar = process.env.KEUNDAL_SIDECAR === '1'
 const host = process.env.KEUNDAL_HOST ?? '127.0.0.1'
 const port = Number(process.env.PORT ?? (sidecar ? 0 : 8000))
 if (!host.trim()) throw new Error('KEUNDAL_HOST는 비어 있을 수 없습니다.')
 if (!Number.isSafeInteger(port) || port < 0 || port > 65_535) throw new Error('PORT가 올바르지 않습니다.')
-const agentHost = await createAgentRuntime(process.env, { defaultTools: createChatTools(), compose: createNodeComposition })
+const agentHost = await createAgentRuntime(process.env, { defaultTools: [...createChartTools(), ...createWeatherTools()], compose: createNodeComposition })
 const app = agentHost.app
 
 const server = createServer(app).listen(port, host, () => {

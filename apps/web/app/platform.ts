@@ -11,7 +11,8 @@ import { browserLLMPlugin } from '@keundal/plugin-llm-browser'
 import { loadModels } from '@keundal/plugin-llm-browser/models'
 import { openaiTranscription } from '@keundal/plugin-transcription-browser'
 import { createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
-import { createChatTools } from '@keundal/plugin-tool-chat'
+import { createChartTools } from '@keundal/plugin-tool-chart'
+import { createWeatherTools } from '@keundal/plugin-tool-weather'
 import type { ChatPlatform } from '@keundal/chat/platform'
 import { loadWebRuntimePlugins } from './runtime-plugins'
 
@@ -41,7 +42,9 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         'builtin:store': { exports: { default: indexedDBStorePlugin }, config: { databaseName: 'keundal-web' } },
         'builtin:skills': { exports: { default: skillPlugin }, config: { providers: [...options.skills, ...(plugins ? [plugins.provider] : [])] } },
         'builtin:agent': { exports: { default: agentPlugin }, config: { maxToolRounds: 4, subagents: true, parallelTools: true } },
-        'builtin:chat-tools': { exports: { default: createChatTools } }
+        'builtin:chart': { exports: { default: createChartTools } },
+        'builtin:weather': { exports: { default: createWeatherTools } },
+        'builtin:chat-tools': { exports: { default: () => [...createChartTools(), ...createWeatherTools()] } }
       }, undefined, async execution => [...await mcp.tools(execution), ...await plugins!.tools(execution)])
       const root = new Context()
       const scope = root.plugin(async (ctx: Context) => composition.setup(ctx))

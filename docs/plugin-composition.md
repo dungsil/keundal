@@ -27,7 +27,7 @@ web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도�
 - desktop은 `KEUNDAL_PLUGIN_CONFIG`로 설정 파일을 선택합니다. 환경 변수가 없으면 앱 데이터 디렉터리의 `keundal.plugins.json`을 우선합니다. 공통 UI에는 Tauri 의존성이 없습니다.
 - MCP 설정과 연결은 앱이 `ChatPlatform.mcp`로 제공합니다. Node.js의 MCP와 Agent Plugins 구성은 `@keundal/agent-runtime-node`가 담당합니다.
 - MCP 설정과 검증은 `@keundal/mcp`, SDK 연결은 `@keundal/plugin-mcp-client`가 담당합니다. 연결 관리자는 설정 저장소를 주입받으며, 브라우저와 네이티브 저장소 선택은 앱이 담당합니다.
-- `@keundal/chat`은 화면 계약과 데이터 변환을 제공합니다. 공급자 설정 정책은 `@keundal/llm-settings`, 날씨·차트 실행은 `@keundal/plugin-tool-chat`, 스킬 저장·로딩은 플랫폼 구현에 둡니다.
+- `@keundal/chat`은 화면 계약과 데이터 변환을 제공합니다. 공급자 설정 정책은 `@keundal/llm-settings`, 날씨 실행은 `@keundal/plugin-tool-weather`, 차트 실행은 `@keundal/plugin-tool-chart`, 스킬 저장·로딩은 플랫폼 구현에 둡니다. 날씨·차트 스키마와 결과 타입은 `@keundal/chat/tools/*`에 유지하고, 결과 카드는 `@keundal/ui-weather`와 `@keundal/ui-chart`가 각각 등록합니다.
 - 두 앱 모두 `loadModels`와 `transcription`을 교체할 수 있습니다. 기본 설정 화면은 기존 OpenAI·Anthropic·Gemini API 설정 형식을 유지합니다.
 - `createAgentHost()`에는 `setup(ctx)`와 `mountAgent(ctx, config)`를 전달합니다. 호스트 내부에는 LLM 공급자 목록, SQLite 등록, 기본 에이전트 선택이 없습니다.
 - 호스트의 `AgentMountConfig`는 모델과 출력 예산만 전달합니다. 도구와 반복 횟수는 각 조립 함수에서 구현 설정으로 연결합니다.
@@ -62,13 +62,15 @@ web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도�
 
 배포한 `/keundal.plugins.json`을 수정하면 앱을 다시 빌드하지 않아도 새 연결에 적용됩니다. 외부 모듈은 브라우저가 직접 실행할 수 있는 ESM 파일이어야 합니다. 상대 경로는 설정 응답 URL을 기준으로 해석합니다. 다른 origin의 설정과 모듈은 CORS를 허용해야 합니다. bare 패키지 이름과 Node.js 전용 모듈은 지원하지 않습니다.
 
-`builtin:llm`은 기존 공급자 설정을 읽고, `builtin:store`는 IndexedDB를 사용합니다. `builtin:skills`, `builtin:agent`, `builtin:chat-tools`도 제공합니다. `tools: []`는 기본 날씨·차트 도구를 제외합니다. 사용자가 별도로 활성화한 MCP와 Agent Plugins 도구는 유지합니다.
+`builtin:llm`은 기존 공급자 설정을 읽고, `builtin:store`는 IndexedDB를 사용합니다. `builtin:skills`, `builtin:agent`, `builtin:chart`, `builtin:weather`도 제공합니다. 기본 매니페스트는 차트와 날씨를 각각 등록하므로 한 항목만 남겨 해당 도구만 사용할 수 있습니다. 기존 `builtin:chat-tools`는 두 도구를 함께 제공하는 호환 별칭으로 유지합니다. `tools: []`는 기본 날씨·차트 도구를 제외합니다. 사용자가 별도로 활성화한 MCP와 Agent Plugins 도구는 유지합니다.
 
 ### Node.js와 desktop
 
 `KEUNDAL_PLUGIN_CONFIG`가 없으면 현재 디렉터리의 `keundal.plugins.json`을 찾습니다. desktop은 이 탐색 전에 앱 데이터 디렉터리의 설정을 선택합니다. 파일이 없으면 기존 기본 구성을 사용합니다. 명시한 파일을 읽지 못하거나 설정·모듈이 잘못됐으면 시작을 거부합니다.
 
 외부 모듈은 설정 파일 기준 상대 경로, 절대 경로, `file:` URL 또는 설치된 패키지 이름으로 지정합니다. 패키지도 설정 파일 디렉터리를 기준으로 찾으며 ESM `exports.import` 조건을 사용합니다. 외부 패키지는 별도로 설치해야 합니다. 앱은 실행 중 패키지를 설치하지 않습니다. `builtin:store`는 SQLite를 사용합니다.
+
+날씨·차트 도구는 `tools`에 `{ "module": "@keundal/plugin-tool-weather" }` 또는 `{ "module": "@keundal/plugin-tool-chart" }`로 각각 선택합니다. 두 패키지의 기본 내보내기는 도구 팩터리입니다. desktop의 기본 구성은 두 팩터리를 함께 사용하며, 매니페스트에 `tools`를 지정하면 이 기본 목록을 대체합니다. 기존 `@keundal/plugin-tool-chat`을 직접 가져오던 조립 코드는 필요한 팩터리인 `createWeatherTools()`와 `createChartTools()`로 바꿉니다.
 
 설정을 변경한 뒤 웹 호스트나 desktop sidecar를 다시 시작해야 합니다. 기존 저장소와 같은 경로를 선택하면 대화 기록을 유지합니다. 저장소를 바꿔도 데이터를 자동으로 이전하지 않습니다.
 

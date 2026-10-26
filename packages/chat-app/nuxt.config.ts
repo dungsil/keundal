@@ -13,13 +13,15 @@ export default defineNuxtConfig({
     '@keundal/ui-chat',
     '@keundal/ui-trace',
     '@keundal/ui-tool',
+    '@keundal/ui-chart',
+    '@keundal/ui-weather',
     '@keundal/ui-settings',
     '@keundal/ui-settings-llm',
     '@keundal/ui-skill',
     '@keundal/ui-mcp',
     '@keundal/ui-agent-plugins'
   ],
-  modules: ['@nuxt/ui', '@comark/nuxt', 'nuxt-charts'],
+  modules: ['@nuxt/ui', '@comark/nuxt'],
   app: { head: { style: [{ innerHTML: 'html.dark { --startup-bg: #09090b; --startup-fg: #fafafa; }' }] } },
   css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],
   ui: { fonts: false },
@@ -36,9 +38,6 @@ export default defineNuxtConfig({
     clientBundle: {
       scan: { globInclude: ['**/*.{vue,ts}'] },
       icons: [
-        'lucide:cloud',
-        'lucide:cloud-fog',
-        'lucide:cloud-rain',
         'lucide:image',
         'simple-icons:anthropic',
         'simple-icons:google',
