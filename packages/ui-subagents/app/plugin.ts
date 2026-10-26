@@ -2,10 +2,12 @@ import type { Context } from 'cordis'
 import type { SubagentRole } from '@keundal/core'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
+import { lazyView } from '@keundal/ui-slots'
 import { localizedText } from '@keundal/ui/app/utils/locale.ts'
 
 import { messages } from './locale'
-import SubagentSettings from './views/SubagentSettings.vue'
+
+const SubagentSettings = lazyView(() => import('./views/SubagentSettings.vue'), ['subagentRoles', 'saveSubagentRoles'])
 
 export const name = 'ui-subagents'
 export const inject = ['slots', 'chatRuntime']
