@@ -5,6 +5,7 @@ import {
   type AGUIEvent,
   type LLMEvent,
   type LLMRequest,
+  type PromptPreset,
   type RunAgentInput
 } from '@keundal/core'
 import agentPlugin from '@keundal/plugin-agent-chat'
@@ -112,4 +113,55 @@ test('빈 시스템 지침과 기본값이 아닌 형식은 설정을 거부한�
     })
     expect(result.issues).toBeDefined()
   }
+})
+
+test('프리셋은 준비된 세션 기록 앞뒤에 조립하고 다음 실행에서 바꾸거나 해제할 수 있다', async (t) => {
+  const { ctx, requests } = await setup(t, 'Base rules')
+  await ctx.session.commit({
+    threadId: 'thread',
+    expectedRevision: 0,
+    state: {},
+    messages: [
+      { id: 'old-user', role: 'user', content: 'Earlier question' },
+      { id: 'old-answer', role: 'assistant', content: 'Earlier answer' }
+    ]
+  })
+  const preset: PromptPreset = {
+    id: 'review',
+    name: 'Review',
+    variables: { language: 'Korean' },
+    blocks: [
+      { id: 'before', type: 'text', name: 'Before', enabled: true, role: 'system', content: 'Use {{language}}' },
+      { id: 'history', type: 'history', name: 'History', enabled: true },
+      { id: 'after', type: 'text', name: 'After', enabled: true, role: 'user', content: 'Check the risks' }
+    ]
+  }
+  await collect(ctx.agent.run({ ...input, forwardedProps: { keundalPromptPreset: preset } }))
+  expect(requests[0].input.messages.map(({ role, content }) => [role, content])).toEqual([
+    ['system', 'Base rules'],
+    ['system', 'Use Korean'],
+    ['user', 'Earlier question'],
+    ['assistant', 'Earlier answer'],
+    ['user', 'review'],
+    ['user', 'Check the risks']
+  ])
+  preset.variables.language = 'English'
+  await collect(ctx.agent.run({ ...input, runId: 'changed', forwardedProps: { keundalPromptPreset: preset } }))
+  expect(
+    requests[1].input.messages.filter(({ id }) => id.startsWith('keundal:prompt:')).map(({ content }) => content)
+  ).toEqual(['Use English', 'Check the risks'])
+  await collect(ctx.agent.run({ ...input, runId: 'disabled' }))
+  expect(requests[2].input.messages.some(({ id }) => id.startsWith('keundal:prompt:'))).toBe(false)
+  expect((await ctx.session.get('thread'))?.messages.some(({ id }) => id.startsWith('keundal:prompt:'))).toBe(false)
+})
+
+test('잘못된 프리셋과 예약 블록 ID는 모델 호출 전에 거부한다', async (t) => {
+  const { ctx, requests } = await setup(t)
+  await expect(
+    collect(ctx.agent.run({ ...input, forwardedProps: { keundalPromptPreset: { blocks: [] } } }))
+  ).rejects.toThrow()
+  await expect(
+    collect(ctx.agent.run({ ...input, messages: [{ id: 'keundal:prompt:spoof', role: 'user', content: 'Invalid' }] }))
+  ).rejects.toThrow('message id is reserved for prompt presets')
+  expect(requests).toHaveLength(0)
 })

@@ -10,12 +10,14 @@ import {
   type Reasoning,
   EventType,
   parseAGUIEvent,
+  parsePromptPreset,
   STREAM_LIMITS,
   type AGUIEvent,
   type GenerationSnapshot,
   type SessionSnapshot,
   type ExecutionOptions,
-  type SubagentRole
+  type SubagentRole,
+  type PromptPreset
 } from '@keundal/core'
 
 import { boundRemoteResponse, RemoteResponseLimitError, RemoteStreamBudget } from './response-budget'
@@ -354,6 +356,7 @@ export class RemoteChatStore implements ChatStoreLike {
       model: string
       titleModel?: string
       systemPrompt?: string
+      promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
       reasoning?: Reasoning
       webSearch?: boolean
@@ -363,6 +366,7 @@ export class RemoteChatStore implements ChatStoreLike {
     signal?: AbortSignal
   ): AsyncGenerator<AGUIEvent> {
     if (this.active.has(id)) throw new Error('A response is already running')
+    const promptPreset = request.promptPreset === undefined ? undefined : parsePromptPreset(request.promptPreset)
     const abort = new AbortController()
     const combined = signal ? AbortSignal.any([signal, abort.signal]) : abort.signal
     let release!: () => void
@@ -443,6 +447,7 @@ export class RemoteChatStore implements ChatStoreLike {
             },
             context: [],
             tools: [],
+            forwardedProps: { keundalPromptPreset: promptPreset },
             messages: [
               {
                 id: 'keundal:web-instructions',

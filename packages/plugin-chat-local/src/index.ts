@@ -4,11 +4,13 @@ import type { ChatStoreLike, ChatSummary, LocalChat } from '@keundal/chat/chat-s
 import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
 import {
   SteerQueue,
+  parsePromptPreset,
   type Reasoning,
   type AGUIEvent,
   type SessionSnapshot,
   type ExecutionOptions,
-  type SubagentRole
+  type SubagentRole,
+  type PromptPreset
 } from '@keundal/core'
 import type { Context } from 'cordis'
 
@@ -198,6 +200,7 @@ export class ChatStore implements ChatStoreLike {
       model: string
       titleModel?: string
       systemPrompt?: string
+      promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
       reasoning?: Reasoning
       webSearch?: boolean
@@ -207,6 +210,7 @@ export class ChatStore implements ChatStoreLike {
     signal?: AbortSignal
   ): AsyncGenerator<AGUIEvent> {
     if (this.active.has(id)) throw new Error('A response is already running')
+    const promptPreset = request.promptPreset === undefined ? undefined : parsePromptPreset(request.promptPreset)
     const abort = new AbortController()
     const combined = signal ? AbortSignal.any([signal, abort.signal]) : abort.signal
     let release!: () => void
@@ -278,6 +282,7 @@ export class ChatStore implements ChatStoreLike {
         threadId: id,
         runId,
         messages: request.messages,
+        promptPreset,
         signal: combined,
         state: { web: chat, ...(request.subagentRoles === undefined ? {} : { subagentRoles: request.subagentRoles }) },
         onMessage: request.onMessage,

@@ -4,6 +4,9 @@ import type {} from '@keundal/context'
 import {
   CONTEXT_MESSAGE_EVENT,
   CONTEXT_MESSAGE_PREFIX,
+  PROMPT_MESSAGE_PREFIX,
+  assemblePrompt,
+  parsePromptPreset,
   EventType,
   isContextOverflow,
   LLM_USAGE_EVENT,
@@ -457,6 +460,8 @@ export class Agent extends AgentService {
     try {
       signal.throwIfAborted()
       const request = parseRunAgentInput(input)
+      const presetValue: unknown = request.forwardedProps?.keundalPromptPreset
+      const promptPreset = presetValue === undefined ? undefined : parsePromptPreset(presetValue)
       const trace = new TraceRecorder(request.runId, traceParent, this.config.pricing)
       failedTrace = trace
       for (const reserved of [SKILL_CATALOG_ID, SYSTEM_PROMPT_ID]) {
@@ -466,6 +471,9 @@ export class Agent extends AgentService {
       }
       if (request.messages.some((message) => message.id.startsWith(CONTEXT_MESSAGE_PREFIX))) {
         throw new Error('message id is reserved for request context')
+      }
+      if (request.messages.some((message) => message.id.startsWith(PROMPT_MESSAGE_PREFIX))) {
+        throw new Error('message id is reserved for prompt presets')
       }
       const options = { signal }
       const prepared = await this.ctx.session.prepare(request, options)
@@ -502,10 +510,12 @@ export class Agent extends AgentService {
           : []),
         ...(deferredSession ? [deferredSession.searchTool] : [])
       ]
-      const preparedInput = addTools(
+      let preparedInput = addTools(
         withSystemPrompt(withSkillCatalog(parseRunAgentInput(prepared.input), catalog), this.systemPrompt()),
         tools
       )
+      if (promptPreset)
+        preparedInput = { ...preparedInput, messages: assemblePrompt(preparedInput.messages, promptPreset) }
       if (preparedInput.threadId !== request.threadId || preparedInput.runId !== request.runId) {
         throw new Error('session preparation must preserve threadId and runId')
       }

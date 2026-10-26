@@ -4,7 +4,14 @@ import { ChatMessageAssembly, type ChatMessage } from '@keundal/chat/chat-messag
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
 import { validateChatTitle } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
-import { type Reasoning, EventType, type AGUIEvent, type AgentMessage, type SteerQueue } from '@keundal/core'
+import {
+  type Reasoning,
+  EventType,
+  type AGUIEvent,
+  type AgentMessage,
+  type SteerQueue,
+  type PromptPreset
+} from '@keundal/core'
 import type { Fiber } from 'cordis'
 import type { Context } from 'cordis'
 export { toMessages } from '@keundal/chat/messages'
@@ -18,6 +25,7 @@ export interface KeundalChatRequest {
   threadId: string
   messages: ChatMessage[]
   instructions: string
+  promptPreset?: PromptPreset
   signal?: AbortSignal
   runId?: string
   state?: unknown
@@ -122,15 +130,18 @@ export async function createKeundalChat(
       try {
         for await (const event of request.events ??
           ctx.agent.run(
-            input(
-              [
-                { id: 'keundal:web-instructions', role: 'system', content: request.instructions },
-                ...toMessages(request.messages, name)
-              ],
-              request.threadId,
-              runId,
-              request.state
-            ),
+            {
+              ...input(
+                [
+                  { id: 'keundal:web-instructions', role: 'system', content: request.instructions },
+                  ...toMessages(request.messages, name)
+                ],
+                request.threadId,
+                runId,
+                request.state
+              ),
+              forwardedProps: { keundalPromptPreset: request.promptPreset }
+            },
             { signal: request.signal, steer: request.steer }
           )) {
           projection.apply(event)
