@@ -25,6 +25,7 @@ vi.mock('@keundal/ui-model-selection/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-settings/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-settings-llm/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-skill/plugin', () => ({ apply() {} }))
+vi.mock('@keundal/ui-subagents/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-tool/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-trace/plugin', () => ({ apply() {} }))
 

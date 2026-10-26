@@ -4,7 +4,8 @@ import {
   readTraceSpans,
   type AGUIEvent,
   type ExecutionOptions,
-  type RunAgentInput
+  type RunAgentInput,
+  type SubagentRole
 } from '@keundal/core'
 
 import type { ExecutableTool } from './tools.js'
@@ -16,18 +17,31 @@ export function subagentTool(
     input: RunAgentInput,
     options: ExecutionOptions & { traceId?: string; parentSpanId?: string }
   ) => AsyncIterable<AGUIEvent>,
-  maxActive: number
+  maxActive: number,
+  roles: readonly SubagentRole[] = []
 ): ExecutableTool {
   // One tool instance belongs to one parent run. Reserve before any async work.
   let active = 0
   return {
     name: SUBAGENT_TOOL_NAME,
     description:
-      'Delegate a self-contained task to a subagent and wait for its final answer. It has the same model and tools but no parent conversation. Include all necessary context in the task. It cannot delegate further. Independent calls can run in parallel. Check the returned status: failed or rejected tasks are not complete. At capacity, retry in a later round after current tasks finish.',
+      'Delegate a self-contained task to a subagent and wait for its final answer. It has the same model and tools but no parent conversation. Include all necessary context in the task. It cannot delegate further. Independent calls can run in parallel. Check the returned status: failed or rejected tasks are not complete. At capacity, retry in a later round after current tasks finish.' +
+      (roles.length
+        ? ` Available roles (name and description): ${JSON.stringify(roles.map(({ name, description }) => ({ name, description })))}`
+        : ''),
     parameters: {
       type: 'object',
       properties: {
         task: { type: 'string', description: 'Complete task instructions and necessary context.' },
+        ...(roles.length
+          ? {
+              role: {
+                type: 'string',
+                enum: roles.map((role) => role.name),
+                description: 'Optional role whose instructions the subagent follows. Omit for a general task.'
+              }
+            }
+          : {}),
         label: {
           type: 'string',
           minLength: 1,
@@ -43,7 +57,7 @@ export function subagentTool(
       if (
         typeof args.task !== 'string' ||
         !args.task.trim() ||
-        Object.keys(args).some((key) => key !== 'task' && key !== 'label')
+        Object.keys(args).some((key) => key !== 'task' && key !== 'label' && key !== 'role')
       ) {
         throw new Error('delegate_task requires a non-empty task and no additional arguments')
       }
@@ -53,7 +67,9 @@ export function subagentTool(
       ) {
         throw new Error('delegate_task label must be a non-empty string of at most 80 characters')
       }
-      const label = typeof args.label === 'string' ? args.label.trim() : undefined
+      const role = roles.find((role) => role.name === args.role)
+      if (args.role !== undefined && !role) throw new Error('delegate_task role must name a configured role')
+      const label = typeof args.label === 'string' ? args.label.trim() : role?.name
       if (active >= maxActive) {
         const error = {
           code: 'ACTIVE_LIMIT_REACHED',
@@ -85,12 +101,18 @@ export function subagentTool(
                   parentThreadId: context.threadId,
                   parentRunId: context.runId,
                   toolCallId: context.toolCallId,
+                  ...(role ? { role: role.name } : {}),
                   ...(label ? { label } : {})
                 }
               },
               context: [],
               tools: [],
-              messages: [{ id: globalThis.crypto.randomUUID(), role: 'user', content: args.task }]
+              messages: [
+                ...(role
+                  ? [{ id: globalThis.crypto.randomUUID(), role: 'system' as const, content: role.instructions }]
+                  : []),
+                { id: globalThis.crypto.randomUUID(), role: 'user', content: args.task }
+              ]
             },
             {
               signal: context.signal,

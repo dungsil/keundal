@@ -10,6 +10,7 @@ import * as modelSelection from '@keundal/ui-model-selection/plugin'
 import * as settings from '@keundal/ui-settings/plugin'
 import * as settingsLlm from '@keundal/ui-settings-llm/plugin'
 import * as skill from '@keundal/ui-skill/plugin'
+import * as subagents from '@keundal/ui-subagents/plugin'
 import * as tool from '@keundal/ui-tool/plugin'
 import * as trace from '@keundal/ui-trace/plugin'
 import type { RuntimePluginInfo, RuntimePluginManager } from '@keundal/chat/platform'
@@ -36,6 +37,7 @@ export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-tool', plugin: tool },
   { module: '@keundal/ui-settings', plugin: settings },
   { module: '@keundal/ui-settings-llm', plugin: settingsLlm },
+  { module: '@keundal/ui-subagents', plugin: subagents },
   { module: '@keundal/ui-agent-plugins', plugin: agentPlugins },
   { module: '@keundal/ui-skill', plugin: skill, feature: 'skills' },
   { module: '@keundal/ui-mcp', plugin: mcp, feature: 'mcp' }

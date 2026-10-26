@@ -30,6 +30,7 @@
     "@keundal/ui-settings-llm": "workspace:*",
     "@keundal/ui-skill": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
+    "@keundal/ui-subagents": "workspace:*",
     "@keundal/ui-tool": "workspace:*",
     "@keundal/ui-trace": "workspace:*",
     "@nuxt/ui": "^4.11.3",

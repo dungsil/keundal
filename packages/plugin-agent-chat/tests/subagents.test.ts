@@ -92,7 +92,10 @@ test('서브에이전트는 독립된 대화에서 도구를 실행하고 최종
   const { ctx, requests } = await setup(
     t,
     [call('delegate', JSON.stringify({ task: 'inspect' }), 'delegate_task'), call('child-lookup'), answer, answer],
-    { subagents: true }
+    {
+      subagents: true,
+      subagentRoles: [{ name: 'reviewer', description: 'Review changes', instructions: 'Check correctness.' }]
+    }
   )
   const events = await collect(ctx.agent.run(input))
   expect(requests).toHaveLength(4)
@@ -129,6 +132,71 @@ test('설정을 생략하면 위임 도구를 등록하지 않는다', async (t)
   const { ctx, requests } = await setup(t, [answer])
   await collect(ctx.agent.run(input))
   expect(requests[0].input.tools.map((tool) => tool.name)).toEqual(['lookup'])
+})
+
+test.for(['config', 'request'] as const)(
+  '역할을 %s에 정의하면 선택한 역할 지침만 독립된 서브에이전트에 전달한다',
+  async (source, t) => {
+    const roles = [
+      { name: 'researcher', description: 'Find relevant facts', instructions: 'Gather sources, do not review code.' },
+      { name: 'reviewer', description: 'Review changes', instructions: 'Report correctness risks and missing tests.' }
+    ]
+    const { ctx, requests } = await setup(
+      t,
+      [
+        call('delegate', JSON.stringify({ task: 'inspect the diff', role: 'reviewer' }), 'delegate_task'),
+        answer,
+        answer
+      ],
+      { subagents: true, ...(source === 'config' ? { subagentRoles: roles } : {}) }
+    )
+    await collect(ctx.agent.run({ ...input, state: source === 'request' ? { subagentRoles: roles } : input.state }))
+    const definition = requests[0].input.tools.find((tool) => tool.name === 'delegate_task')!
+    expect(definition.description).toContain('Review changes')
+    expect(definition.description).not.toContain(roles[1].instructions)
+    expect(definition.parameters).toMatchObject({ properties: { role: { enum: ['researcher', 'reviewer'] } } })
+    expect(requests[0].input.messages).not.toContainEqual(expect.objectContaining({ content: roles[1].instructions }))
+    const child = requests[1].input
+    expect(child.messages.map(({ role, content }) => ({ role, content }))).toEqual([
+      { role: 'system', content: roles[1].instructions },
+      { role: 'user', content: 'inspect the diff' }
+    ])
+    expect(child.context).toEqual([])
+    expect(child.tools.map((tool) => tool.name)).toEqual(['lookup'])
+    expect(child.state).toMatchObject({ subagent: { role: 'reviewer', label: 'reviewer' } })
+    expect(child.state).not.toHaveProperty('subagentRoles')
+  }
+)
+
+test('다음 요청의 역할 변경과 삭제는 이전 세션이나 설정의 역할을 남기지 않는다', async (t) => {
+  const roles = [{ name: 'reviewer', description: 'Review changes', instructions: 'Review carefully.' }]
+  const replies = ['first', 'second', 'third'].map((messageId) =>
+    answer.map((event) => ('messageId' in event ? { ...event, messageId } : event))
+  )
+  const { ctx, requests } = await setup(t, replies, { subagents: true, subagentRoles: roles })
+  await collect(ctx.agent.run(input))
+  await collect(
+    ctx.agent.run({ ...input, runId: 'changed', state: { subagentRoles: [{ ...roles[0], name: 'writer' }] } })
+  )
+  await collect(ctx.agent.run({ ...input, runId: 'cleared', state: { subagentRoles: [] } }))
+  const definitions = requests.map((request) => request.input.tools.find((tool) => tool.name === 'delegate_task')!)
+  expect(definitions[0].parameters).toMatchObject({ properties: { role: { enum: ['reviewer'] } } })
+  expect(definitions[1].parameters).toMatchObject({ properties: { role: { enum: ['writer'] } } })
+  expect(definitions[2].parameters.properties).not.toHaveProperty('role')
+  expect(definitions[2].description).not.toContain('Review changes')
+})
+
+test('등록하지 않은 역할은 서브에이전트를 시작하지 않는다', async (t) => {
+  const { ctx, requests } = await setup(
+    t,
+    [call('delegate', JSON.stringify({ task: 'inspect', role: 'missing' }), 'delegate_task')],
+    {
+      subagents: true,
+      subagentRoles: [{ name: 'reviewer', description: 'Review changes', instructions: 'Review carefully.' }]
+    }
+  )
+  await expect(collect(ctx.agent.run(input))).rejects.toThrow('delegate_task role must name a configured role')
+  expect(requests).toHaveLength(1)
 })
 
 test.for([{}, { task: '' }, { task: '  ' }, { task: 1 }, { task: 'inspect', extra: true }])(

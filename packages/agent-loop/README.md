@@ -241,6 +241,27 @@ OpenAI, Anthropic, Gemini 공급자는 확인한 토큰 사용량을 `keundal.ll
 모델은 `{ "task": "작업 지침과 필요한 문맥", "label": "작업 이름" }`으로 위임합니다.
 `label`은 선택 사항이며 1~80자의 이름을 상태 표시와 자식 기록에 사용합니다.
 
+`subagentRoles`로 역할의 `name`, `description`, `instructions`를 정의합니다.
+모델에는 이름과 설명만 도구 정의로 제공하며, `delegate_task`의 선택 인자 `role`로 역할을 고르면
+해당 지침을 서브에이전트의 시스템 메시지에 추가합니다. `role`을 생략하면 기존 일반 위임을 유지합니다.
+등록하지 않은 역할은 실행 전에 거부합니다. `label`을 생략하면 역할 이름을 진행 상태에 표시합니다.
+
+```ts
+subagentRoles: [
+  {
+    name: 'reviewer',
+    description: 'Review code changes for correctness.',
+    instructions: 'Check the supplied diff for bugs and missing tests. Report concrete risks.'
+  }
+]
+// delegate_task({ task: 'Review this diff: ...', role: 'reviewer' })
+```
+
+이름은 영문자·숫자·밑줄·하이픈으로 1~64자이며 대소문자를 구분하고 중복할 수 없습니다.
+설명은 1~500자, 지침은 1~20,000자이며 역할은 최대 32개입니다. 앞뒤 공백은 제거합니다.
+`RunAgentInput.state.subagentRoles`를 전달하면 해당 실행에서는 설정의 목록 대신 사용합니다.
+빈 배열은 설정의 역할도 제공하지 않습니다. 실행이 시작된 뒤에는 역할 목록이 바뀌지 않습니다.
+
 자식은 같은 모델, 시스템 지침, 등록된 도구, 스킬과 축약 정책을 사용합니다.
 부모의 대화 기록, 요청 도구, 상태와 문맥은 복사하지 않으므로 필요한 정보는 `task`에 넣어야 합니다.
 자식의 대화와 실행 기록은 별도 ID로 저장하며, 상태의 `subagent`에 부모의 `threadId`, `runId`와
