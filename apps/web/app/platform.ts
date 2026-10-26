@@ -12,7 +12,8 @@ import { loadModels } from '@keundal/plugin-llm-browser/models'
 import { openaiTranscription } from '@keundal/plugin-transcription-browser'
 import { BrowserRuntimePluginManager, createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
 import { mountRuntimePlugin, type RuntimeModuleRegistry } from '@keundal/plugin-runtime'
-import { createChatTools, metadata as toolsMetadata } from '@keundal/plugin-tool-chat'
+import { createChartTools, metadata as chartMetadata } from '@keundal/plugin-tool-chart'
+import { createWeatherTools, metadata as weatherMetadata } from '@keundal/plugin-tool-weather'
 import type { ChatPlatform } from '@keundal/chat/platform'
 import { loadWebRuntimePlugins } from './runtime-plugins'
 import { metadata as mcpMetadata } from '@keundal/plugin-chat-browser/mcp'
@@ -39,12 +40,16 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         }
       }
       let manager: BrowserRuntimePluginManager
+      const chartTools = () => manager.isEnabled('@keundal/plugin-tool-chart') ? createChartTools() : []
+      const weatherTools = () => manager.isEnabled('@keundal/plugin-tool-weather') ? createWeatherTools() : []
       const builtins: RuntimeModuleRegistry = {
         'builtin:llm': { exports: { default: browserLLMPlugin }, config: { getSettings: options.getSettings, getModels: options.getModels } },
         'builtin:store': { exports: { default: indexedDBStorePlugin }, config: { databaseName: 'keundal-web' } },
         'builtin:skills': { exports: { default: skillPlugin }, config: { providers: [...options.skills, ...(plugins ? [plugins.provider] : [])] } },
         'builtin:agent': { exports: { default: agentPlugin }, config: { maxToolRounds: 4, subagents: true, parallelTools: true } },
-        'builtin:chat-tools': { exports: { default: () => manager.isEnabled('@keundal/plugin-tool-chat') ? createChatTools() : [] } }
+        'builtin:chart': { exports: { default: chartTools } },
+        'builtin:weather': { exports: { default: weatherTools } },
+        'builtin:chat-tools': { exports: { default: () => [...chartTools(), ...weatherTools()] } }
       }
       const composition = await loadWebRuntimePlugins(runtime.pluginConfig, builtins, undefined,
         async execution => manager.isEnabled('@keundal/plugin-mcp-client')
@@ -64,12 +69,22 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
           })
         }
       }
+      const saved: unknown = JSON.parse(storage.getItem('keundal:bundled-plugins') ?? '{}')
+      if (saved && typeof saved === 'object' && '@keundal/plugin-tool-chat' in saved && typeof saved['@keundal/plugin-tool-chat'] === 'boolean') {
+        const selection = saved as Record<string, unknown>
+        storage.setItem('keundal:bundled-plugins', JSON.stringify({
+          ...selection,
+          '@keundal/plugin-tool-chart': typeof selection['@keundal/plugin-tool-chart'] === 'boolean' ? selection['@keundal/plugin-tool-chart'] : selection['@keundal/plugin-tool-chat'],
+          '@keundal/plugin-tool-weather': typeof selection['@keundal/plugin-tool-weather'] === 'boolean' ? selection['@keundal/plugin-tool-weather'] : selection['@keundal/plugin-tool-chat']
+        }))
+      }
       manager = new BrowserRuntimePluginManager(storage, [
         { module: '@keundal/plugin-llm-browser', metadata: llmMetadata, enabled: true, required: true },
         { module: '@keundal/plugin-store-indexeddb', metadata: storeMetadata, enabled: true, required: true },
         { module: '@keundal/plugin-agent-chat', metadata: agentMetadata, enabled: true, required: true },
         { module: '@keundal/plugin-skill', metadata: skillMetadata, enabled: !!composition.skills, feature: 'skills' },
-        { module: '@keundal/plugin-tool-chat', metadata: toolsMetadata, enabled: true },
+        { module: '@keundal/plugin-tool-chart', metadata: chartMetadata, enabled: true },
+        { module: '@keundal/plugin-tool-weather', metadata: weatherMetadata, enabled: true },
         { module: '@keundal/plugin-mcp-client', metadata: mcpMetadata, enabled: true, feature: 'mcp' }
       ], async (module, enabled) => {
         if (!connected) throw new Error('The browser plugin runtime is not connected')

@@ -13,7 +13,7 @@
 
 스킬·MCP와 해당 화면의 수명은 셸이 함께 관리합니다. `@keundal/plugin-skill`을 끄면 `@keundal/ui-skill`, `@keundal/plugin-mcp-client`를 끄면 `@keundal/ui-mcp`도 해제합니다. 다시 켜면 해당 UI를 등록하며, 스킬·MCP 탐색 항목도 함께 복원합니다. 이 관리 화면을 포함한 나머지 UI는 항상 등록합니다.
 
-`@keundal/plugin-tool-chat`을 끄면 이후 실행 목록에서 날씨·차트 도구를 제외하지만 `@keundal/ui-tool`은 유지합니다. 이 UI는 `@keundal/ui-chat`처럼 공유 메시지 표시를 담당하며, 날씨·차트뿐 아니라 `delegate_task`, `skill`, `web_search`, `google_search` 결과도 표시합니다. 기존 대화 기록과 다른 선택 기능의 결과를 계속 표시해야 하므로 별도로 끄고 켜는 UI 스위치는 제공하지 않습니다.
+`@keundal/plugin-tool-chart`와 `@keundal/plugin-tool-weather`는 각각 끄고 켤 수 있습니다. 끄면 이후 실행 목록에서 해당 도구만 제외하지만 `@keundal/ui-chart`와 `@keundal/ui-weather`는 기존 결과를 계속 표시합니다. `delegate_task`, `skill`, `web_search`, `google_search` 결과를 표시하는 `@keundal/ui-tool`도 유지합니다. 기존 대화 기록을 계속 표시해야 하므로 세 UI를 별도로 끄고 켜는 스위치는 제공하지 않습니다.
 
 선택 저장은 실행 방식의 관리자가 담당합니다. web의 `BrowserRuntimePluginManager`는 기존 `keundal:bundled-plugins` localStorage를 사용하고 desktop은 기존 네이티브 저장소를 사용합니다. `keundal-ui-plugins` 쿠키는 선택에 영향을 주지 않습니다. 서버 렌더링과 최초 하이드레이션은 기본 UI를 등록하며, 앱이 마운트된 뒤 실제 기능 선택과 동기화합니다.
 

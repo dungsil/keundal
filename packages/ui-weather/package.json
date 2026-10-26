@@ -1,0 +1,20 @@
+{
+  "name": "@keundal/ui-weather",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./nuxt.config.ts",
+  "exports": {
+    ".": "./nuxt.config.ts",
+    "./plugin": "./app/plugin.ts"
+  },
+  "dependencies": {
+    "@keundal/chat": "workspace:*",
+    "@keundal/ui": "workspace:*",
+    "@keundal/ui-chat": "workspace:*",
+    "@keundal/ui-slots": "workspace:*",
+    "cordis": "catalog:",
+    "nuxt": "^4.6.2",
+    "vue": "3.5.44"
+  }
+}

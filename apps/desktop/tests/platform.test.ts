@@ -9,7 +9,10 @@ test('데스크톱 조립은 보안 저장소와 로컬 스킬을 제공하고 s
   const storage: Storage = { length: 0, key: () => null, getItem: () => null, setItem: () => {
     throw new Error('No plaintext settings')
   }, removeItem: () => {}, clear: () => {} }
-  const invoke: NativeInvoke = async <T>(command: string) => {
+  const selection = new Map([
+    ['@keundal/plugin-tool-chart', true], ['@keundal/plugin-tool-weather', true]
+  ])
+  const invoke: NativeInvoke = async <T>(command: string, args?: Record<string, unknown>) => {
     commands.push(command)
     if (command === 'load_mcp_settings') return null as T
     if (command === 'save_mcp_settings') return undefined as T
@@ -17,7 +20,14 @@ test('데스크톱 조립은 보안 저장소와 로컬 스킬을 제공하고 s
     if (command === 'save_llm_settings') return undefined as T
     if (command === 'list_skill_files') return { roots: [], files: [] } as T
     if (command === 'sidecar_info') return { endpoint: 'http://sidecar.test', token: 'test-token' } as T
-    if (command === 'runtime_plugins') return { previous: [], expected: [] } as T
+    if (command === 'runtime_plugins') {
+      const request = args?.request as { action: string; module: string; enabled: boolean }
+      const entries = () => [...selection].map(([module, enabled]) => ({ module, enabled }))
+      if (request.action === 'list') return entries() as T
+      const previous = entries()
+      selection.set(request.module, request.enabled)
+      return { previous, expected: entries() } as T
+    }
     throw new Error(command)
   }
   vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
@@ -44,8 +54,20 @@ test('데스크톱 조립은 보안 저장소와 로컬 스킬을 제공하고 s
       expect(requests).toEqual(['http://sidecar.test/recover'])
       expect(platform.runtimePlugins?.install).toBeTypeOf('function')
       expect(platform.runtimePlugins?.remove).toBeTypeOf('function')
-      await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chat', false)
+      await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chart', false)
       expect(commands.filter(command => command === 'sidecar_info')).toHaveLength(3)
+      expect(await platform.runtimePlugins!.list()).toEqual([
+        { module: '@keundal/plugin-tool-chart', enabled: false },
+        { module: '@keundal/plugin-tool-weather', enabled: true }
+      ])
+      await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-weather', false)
+      await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chart', true)
+      expect(await platform.runtimePlugins!.list()).toEqual([
+        { module: '@keundal/plugin-tool-chart', enabled: true },
+        { module: '@keundal/plugin-tool-weather', enabled: false }
+      ])
+      await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-weather', true)
+      expect(commands.filter(command => command === 'sidecar_info')).toHaveLength(6)
     } finally {
       await connection.dispose()
     }

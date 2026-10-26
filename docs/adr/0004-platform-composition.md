@@ -10,7 +10,7 @@ desktop은 npm을 앱에 포함하고 설치 스크립트를 실행하지 않는
 
 선택 기능의 목록은 배포 매니페스트와 분리한다. 번들 목록에는 필수 서비스인 LLM·저장소·에이전트와 선택 기능인 스킬·MCP·날씨·차트 도구를 표시하고, desktop에서는 사용자가 설치한 외부 항목을 추가한다. 필수 서비스는 끌 수 없다. `ui-*`는 목록이나 별도 스위치를 제공하지 않는다. `@keundal/plugin-skill`은 `@keundal/ui-skill`, `@keundal/plugin-mcp-client`는 `@keundal/ui-mcp`의 수명을 결정한다. 스킬·MCP를 끄면 대응하는 화면의 Cordis 등록 범위와 탐색 항목도 해제하며, 다시 켜면 함께 등록한다. 나머지 UI는 항상 등록하고 Nuxt 레이어도 빌드에 유지한다.
 
-`@keundal/ui-tool`은 `@keundal/ui-chat`처럼 공유 메시지 표시를 담당하므로 항상 등록한다. 날씨·차트뿐 아니라 `delegate_task`, `skill`, `web_search`, `google_search` 결과도 표시한다. `@keundal/plugin-tool-chat`을 끄면 이후 실행 목록에서 날씨·차트 도구를 제외하지만, 기존 대화 기록과 다른 선택 기능의 결과를 표시하는 UI는 해제하지 않는다.
+`@keundal/ui-tool`은 `delegate_task`, `skill`, `web_search`, `google_search` 결과를, `@keundal/ui-chart`와 `@keundal/ui-weather`는 차트와 날씨 결과를 표시한다. 세 UI는 기존 대화 기록을 표시해야 하므로 `@keundal/ui-chat`처럼 항상 등록한다. `@keundal/plugin-tool-chart`와 `@keundal/plugin-tool-weather`를 각각 끄면 이후 실행 목록에서 해당 도구만 제외하며, 기존 결과를 표시하는 UI는 해제하지 않는다.
 
 선택의 저장은 실행 방식의 관리자가 맡는다. web의 `BrowserRuntimePluginManager`는 기존 `keundal:bundled-plugins` localStorage를 사용하고 desktop은 기존 네이티브 저장소를 사용한다. 이전 `keundal-ui-plugins` 쿠키는 읽거나 선택에 반영하지 않는다. 서버 렌더링과 최초 하이드레이션은 기본 UI를 등록하며, 앱이 마운트된 뒤 실제 실행 방식의 선택과 화면을 동기화한다.
 

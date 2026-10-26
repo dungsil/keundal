@@ -4,7 +4,8 @@ import { EventType, LLMService, type LLMRequest, type LLMEvent } from '@keundal/
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { createKeundalChat } from '@keundal/plugin-chat-local/keundal'
 import agentPlugin from '@keundal/plugin-agent-chat'
-import { createChatTools } from '@keundal/plugin-tool-chat'
+import { createChartTools } from '@keundal/plugin-tool-chart'
+import { createWeatherTools } from '@keundal/plugin-tool-weather'
 import type { invoke } from '@tauri-apps/api/core'
 import { expect, test, vi, type TestContext } from 'vitest'
 import { McpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-chat-browser/mcp'
@@ -137,7 +138,7 @@ test('웹 대화의 에이전트는 MCP 도구를 실행하고 결과를 모델�
     await llm.dispose()
   })
   const tools = vi.fn(async () => [{ name: 'mcp__docs__tool__search', description: 'Search', parameters: { type: 'object' }, execute: async () => JSON.stringify({ content: [{ type: 'text', text: 'MCP search result' }] }) }])
-  const runtime = await createKeundalChat(ctx, 'openai/gpt-5-nano', {}, async (ctx, config) => ctx.plugin(agentPlugin, { ...config, tools: async () => [...createChatTools(), ...await tools()] }))
+  const runtime = await createKeundalChat(ctx, 'openai/gpt-5-nano', {}, async (ctx, config) => ctx.plugin(agentPlugin, { ...config, tools: async () => [...createChartTools(), ...createWeatherTools(), ...await tools()] }))
   t.onTestFinished(() => runtime.dispose())
   const events = []
   for await (const event of runtime.respond({ threadId: 'chat', instructions: 'Be helpful.', messages: [{ id: 'question', role: 'user', parts: [{ type: 'text', text: 'Review my code.' }] }] })) events.push(event)

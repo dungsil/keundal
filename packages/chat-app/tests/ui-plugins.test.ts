@@ -16,6 +16,7 @@ declare module '@keundal/ui-slots' {
 vi.mock('@keundal/ui-agent-plugins/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-chat/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-chat-list/plugin', () => ({ apply() {} }))
+vi.mock('@keundal/ui-chart/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-composer/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-dictation/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-home/plugin', () => ({ apply() {} }))
@@ -28,6 +29,7 @@ vi.mock('@keundal/ui-skill/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-subagents/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-tool/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-trace/plugin', () => ({ apply() {} }))
+vi.mock('@keundal/ui-weather/plugin', () => ({ apply() {} }))
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -39,7 +41,8 @@ function platform() {
     { module: '@keundal/plugin-agent-chat', enabled: true, required: true },
     { module: '@keundal/plugin-skill', enabled: true, feature: 'skills' },
     { module: '@keundal/plugin-mcp-client', enabled: true, feature: 'mcp' },
-    { module: '@keundal/plugin-tool-chat', enabled: true }
+    { module: '@keundal/plugin-tool-chart', enabled: true },
+    { module: '@keundal/plugin-tool-weather', enabled: true }
   ]
   const manager: RuntimePluginManager = {
     list: async () => records,
@@ -119,7 +122,8 @@ test('기능을 끄고 켜면 대응 UI만 제거하고 복원하며 나중에 �
 test('서버와 클라이언트의 초기 UI는 같고 동기화 후 저장된 기능 선택만 반영한다', async () => {
   const runtime = platform()
   await runtime.manager.setEnabled('@keundal/plugin-skill', false)
-  await runtime.manager.setEnabled('@keundal/plugin-tool-chat', false)
+  await runtime.manager.setEnabled('@keundal/plugin-tool-chart', false)
+  await runtime.manager.setEnabled('@keundal/plugin-tool-weather', false)
   const server = await fixture({ platform: null })
   const browser = await fixture({ platform: runtime.manager })
   for (const slot of ['page.feature', 'page.mcp', 'page.tool'] as const) {
@@ -136,7 +140,8 @@ test('서버와 클라이언트의 초기 UI는 같고 동기화 후 저장된 �
   await reopened.manager.sync()
   expect(reopened.ctx.slots.describe('page.feature')).toHaveLength(1)
   expect(reopened.ctx.slots.describe('page.tool')).toHaveLength(1)
-  expect((await reopened.manager.list()).find(entry => entry.module === '@keundal/plugin-tool-chat')?.enabled).toBe(false)
+  expect((await reopened.manager.list()).find(entry => entry.module === '@keundal/plugin-tool-chart')?.enabled).toBe(false)
+  expect((await reopened.manager.list()).find(entry => entry.module === '@keundal/plugin-tool-weather')?.enabled).toBe(false)
   // A remote connection without a selection API keeps the default views, not local UI switches.
   await server.manager.sync()
   expect(await server.manager.list()).toEqual([])
@@ -152,13 +157,13 @@ test('기능 변경이 실패하면 대응 UI를 유지하고 UI 활성화 실�
   } })
   const change = runtime.manager.setEnabled
   runtime.manager.setEnabled = async () => { throw new Error('runtime failed') }
-  await expect(manager.setEnabled('@keundal/plugin-tool-chat', false)).rejects.toThrow('runtime failed')
+  await expect(manager.setEnabled('@keundal/plugin-tool-chart', false)).rejects.toThrow('runtime failed')
   expect(ctx.slots.describe('page.tool')).toHaveLength(1)
-  expect((await manager.list()).find(entry => entry.module === '@keundal/plugin-tool-chat')?.enabled).toBe(true)
+  expect((await manager.list()).find(entry => entry.module === '@keundal/plugin-tool-chart')?.enabled).toBe(true)
   runtime.manager.setEnabled = change
-  await manager.setEnabled('@keundal/plugin-tool-chat', false)
-  expect((await manager.list()).find(entry => entry.module === '@keundal/plugin-tool-chat')).toMatchObject({ enabled: false })
-  expect((await manager.list()).find(entry => entry.module === '@keundal/plugin-tool-chat')?.error).toBeUndefined()
+  await manager.setEnabled('@keundal/plugin-tool-chart', false)
+  expect((await manager.list()).find(entry => entry.module === '@keundal/plugin-tool-chart')).toMatchObject({ enabled: false })
+  expect((await manager.list()).find(entry => entry.module === '@keundal/plugin-tool-chart')?.error).toBeUndefined()
   expect(ctx.slots.describe('page.tool')).toHaveLength(1)
   await manager.setEnabled('@keundal/plugin-skill', false)
   fail = true

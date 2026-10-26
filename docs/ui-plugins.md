@@ -23,7 +23,7 @@
 
 선택 기능을 끄기 전에는 진행 중인 응답을 중단합니다. 스킬·MCP를 끄면 대응하는 UI 범위도 해제하고, 켜면 다시 등록합니다. 해당 설정 화면·탐색 항목도 함께 사라지거나 복원됩니다. 나머지 UI는 화면 셸·설정·관리 화면을 포함해 항상 등록합니다. Nuxt 레이어는 정적으로 빌드하며, 외부 모듈을 내려받거나 빌드하지 않습니다.
 
-`@keundal/ui-tool`은 `@keundal/ui-chat`처럼 공유 메시지 표시를 담당하므로 항상 등록합니다. 날씨·차트뿐 아니라 `delegate_task`, `skill`, `web_search`, `google_search` 결과도 표시합니다. `@keundal/plugin-tool-chat`을 끄면 이후 실행 목록에서 날씨·차트 도구를 제외하지만, 기존 대화 기록과 다른 선택 기능의 결과를 표시하는 UI는 해제하지 않습니다. 공유 UI를 별도로 끄고 켜는 스위치는 없습니다.
+`@keundal/ui-tool`은 `delegate_task`, `skill`, `web_search`, `google_search` 결과를, `@keundal/ui-chart`와 `@keundal/ui-weather`는 차트와 날씨 결과를 표시합니다. 세 UI는 기존 대화 기록을 표시해야 하므로 `@keundal/ui-chat`처럼 항상 등록합니다. `@keundal/plugin-tool-chart`와 `@keundal/plugin-tool-weather`를 각각 끄면 이후 실행 목록에서 해당 도구만 제외하며, 기존 결과를 표시하는 UI는 해제하지 않습니다. 공유 UI를 별도로 끄고 켜는 스위치는 없습니다.
 
 선택은 실행 방식의 관리자가 저장합니다. web의 `BrowserRuntimePluginManager`는 기존 `keundal:bundled-plugins` localStorage를 사용하고 desktop은 기존 네이티브 저장소를 사용합니다. UI 관리자는 선택을 별도로 저장하지 않습니다.
 
@@ -110,7 +110,7 @@ root                               ui-layout
 ├─ page.home                       ui-home
 ├─ page.history                    ui-chat-list
 ├─ page.chat                       ui-chat
-│  ├─ chat.message.tool            ui-tool (항목이 없으면 기본 도구 카드)
+│  ├─ chat.message.tool            ui-tool, ui-chart, ui-weather (항목이 없으면 기본 도구 카드)
 │  ├─ chat.message.footer          ui-trace
 │  ├─ chat.indicator               ui-trace
 │  └─ chat.observer                ui-trace

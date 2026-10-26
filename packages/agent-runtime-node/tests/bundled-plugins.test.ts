@@ -100,9 +100,13 @@ test('createAgentRuntime은 번들 기본 도구 선택만 전달하고 명시�
     {
       compose: createNodeComposition,
       bundledPlugins: { '@keundal/plugin-tool-chat': false },
-      defaultTools: async () => {
-        throw new Error('Disabled provider must not run')
-      },
+      defaultTools: async () =>
+        ['chart', 'weather', 'unrelated'].map((name) => ({
+          name,
+          description: name,
+          parameters: { type: 'object' },
+          execute: async () => 'ok'
+        })),
       tools: [
         { name: 'operator_tool', description: 'Operator', parameters: { type: 'object' }, execute: async () => 'ok' }
       ]
@@ -111,8 +115,80 @@ test('createAgentRuntime은 번들 기본 도구 선택만 전달하고 명시�
   onTestFinished(() => host.dispose())
   expect(await host.services.catalog!()).toEqual({
     skills: [],
-    tools: [{ name: 'operator_tool', description: 'Operator' }]
+    tools: [
+      { name: 'unrelated', description: 'unrelated' },
+      { name: 'operator_tool', description: 'Operator' }
+    ]
   })
+})
+
+test.each([
+  { chart: false, weather: true },
+  { chart: true, weather: false },
+  { chart: false, weather: false },
+  { chart: true, weather: true }
+])('번들 chart=$chart weather=$weather 선택은 기본 도구와 명시적 모듈을 독립적으로 제어한다', async (selection) => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-split-tools-'))
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
+  const tool = (name: string) => ({
+    name,
+    description: name,
+    parameters: { type: 'object' },
+    execute: async () => 'ok'
+  })
+  // Resolve package-shaped fixtures from the deployment root, just like operator modules.
+  for (const name of ['chart', 'weather', 'operator']) {
+    const root = join(directory, 'node_modules', '@keundal', `plugin-tool-${name}`)
+    mkdirSync(root, { recursive: true })
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ type: 'module', exports: './index.js' }))
+    writeFileSync(
+      join(root, 'index.js'),
+      `export default () => [{ name: '${name}', description: '${name}', parameters: { type: 'object' }, execute: async () => 'ok' }]`
+    )
+  }
+  const expected = [
+    ...(selection.chart ? ['chart'] : []),
+    ...(selection.weather ? ['weather'] : []),
+    'operator',
+    'explicit'
+  ]
+  for (const mode of ['array', 'provider', 'modules', 'legacy-modules'] as const) {
+    const defaults = [tool('chart'), tool('weather'), tool('operator')]
+    const host = await createNodeAgentHost(
+      {
+        provider: 'openai',
+        apiKey: '',
+        model: 'test',
+        sqlitePath: ':memory:',
+        bundledPlugins: {
+          '@keundal/plugin-tool-chat': false,
+          '@keundal/plugin-tool-chart': selection.chart,
+          '@keundal/plugin-tool-weather': selection.weather
+        },
+        defaultTools: mode === 'provider' ? async () => defaults : defaults,
+        tools: [tool('explicit')],
+        runtimePluginBasePath: directory,
+        ...(mode === 'modules' || mode === 'legacy-modules'
+          ? {
+              runtimePlugins: {
+                plugins: [{ module: 'builtin:llm' }, { module: 'builtin:store' }],
+                agent: { module: 'builtin:agent' },
+                tools: [
+                  ...(mode === 'modules'
+                    ? [{ module: '@keundal/plugin-tool-chart' }, { module: '@keundal/plugin-tool-weather' }]
+                    : [{ module: '@keundal/plugin-tool-chat' }]),
+                  { module: '@keundal/plugin-tool-operator' }
+                ]
+              }
+            }
+          : {})
+      },
+      createNodeComposition
+    )
+    onTestFinished(() => host.dispose())
+    expect((await host.services.catalog!()).tools.map(({ name }) => name)).toEqual(expected)
+    await host.dispose()
+  }
 })
 
 test('스킬을 끄면 명시적 builtin:skills 매니페스트와 Agent Plugins가 충돌하지 않는다', async () => {
