@@ -23,6 +23,13 @@ const groups = computed(() => [
   sections.value.filter(section => section.group === 'general'),
   sections.value.filter(section => section.group === 'plugins')
 ])
+const currentSection = computed(() => sections.value.find(section => section.id === props.section))
+const mobileItems = computed(() => groups.value.map(group => group.map(item => ({
+  label: item.label,
+  icon: item.icon,
+  to: { path: `/settings/${item.id}`, query: { returnTo: route.query.returnTo } },
+  'aria-current': props.section === item.id ? 'page' as const : undefined
+}))))
 
 useHead(() => {
   const current = sections.value.find(section => section.id === props.section)
@@ -56,12 +63,29 @@ useHead(() => {
           icon="i-lucide-arrow-left"
           color="neutral"
           variant="ghost"
-          class="mb-6"
+          class="mb-4 md:mb-6"
         />
-        <div class="flex flex-col gap-8 md:flex-row md:gap-10 lg:gap-14">
+        <div class="flex flex-col gap-6 md:flex-row md:gap-10 lg:gap-14">
+          <UDropdownMenu
+            :items="mobileItems"
+            :modal="false"
+            :content="{ align: 'start' }"
+            :ui="{ content: 'w-(--reka-dropdown-menu-trigger-width)', item: 'min-h-[44px]' }"
+          >
+            <UButton
+              :label="currentSection?.label"
+              :icon="currentSection?.icon"
+              :aria-label="`${t('settings.title')}: ${currentSection?.label ?? ''}`"
+              trailing-icon="i-lucide-chevron-down"
+              color="neutral"
+              variant="outline"
+              class="min-h-[44px] w-full md:hidden"
+              :ui="{ trailingIcon: 'ms-auto' }"
+            />
+          </UDropdownMenu>
           <nav
             :aria-label="t('settings.title')"
-            class="flex shrink-0 flex-col gap-4 border-b border-default pb-4 md:sticky md:top-(--ui-header-height) md:w-48 md:self-start md:border-0 md:pb-0"
+            class="hidden shrink-0 flex-col gap-4 md:sticky md:top-(--ui-header-height) md:flex md:w-48 md:self-start"
           >
             <div v-if="groups[0]!.length" class="flex flex-wrap gap-1 md:flex-col">
               <UButton

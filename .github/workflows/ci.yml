@@ -27,7 +27,7 @@ defaults:
 jobs:
   changes:
     name: 변경사항 확인
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -86,7 +86,7 @@ jobs:
     name: 빌드
     needs: [changes, build-web, build-platforms]
     if: always()
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions: {}
     steps:
@@ -100,7 +100,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.web == 'true'
     name: 웹 및 패키지 빌드
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: 저장소 가져오기
@@ -168,7 +168,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-26.04
             name: linux-x64
             artifact-path: |
               apps/desktop/src-tauri/target/release/bundle/deb/*.deb
@@ -290,7 +290,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.source == 'true'
     name: 타입 검사
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: 저장소 가져오기
@@ -348,7 +348,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.source == 'true'
     name: 테스트
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: 저장소 가져오기
@@ -409,7 +409,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.web == 'true'
     name: 브라우저 회귀 검사
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - name: 저장소 가져오기
@@ -478,7 +478,7 @@ jobs:
 
   lint:
     name: 린트 및 형식 검사
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: 저장소 가져오기
@@ -533,7 +533,7 @@ jobs:
   codeql:
     # 병합 규칙이 CodeQL 분석 결과를 요구하므로 변경 경로와 관계없이 실행한다.
     name: CodeQL 보안 검사
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       contents: read
