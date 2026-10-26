@@ -1,10 +1,9 @@
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { createServer } from 'node:net'
-import { Parser } from 'htmlparser2'
 import { expect, onTestFinished, test } from 'vitest'
 
-test('프로덕션 서버는 압축된 CSS와 홈·대화 경로를 오류 없이 제공한다', async () => {
+test('프로덕션 서버는 화면을 렌더링하고 공통 스타일을 압축된 정적 파일로 제공한다', async () => {
   const listener = createServer().listen(0, '127.0.0.1')
   await once(listener, 'listening')
   const address = listener.address()
@@ -46,22 +45,17 @@ test('프로덕션 서버는 압축된 CSS와 홈·대화 경로를 오류 없�
     expect(html).toContain('id="__nuxt"')
     expect(html.match(/<button\b[^>]*aria-label="Skills"/), path).toBeNull()
     expect(html.match(/<a\b[^>]*aria-label="Settings"/), path).not.toBeNull()
-    if (path === '/') {
-      const stylesheets: string[] = []
-      new Parser({
-        onopentag(name, attributes) {
-          if (name === 'link' && attributes.rel === 'stylesheet' && attributes.href) stylesheets.push(attributes.href)
-        }
-      }).end(html)
-      expect(stylesheets.length).toBeGreaterThan(0)
-      for (const stylesheet of stylesheets) {
-        const css = await fetch(new URL(stylesheet, origin), { headers: { 'accept-encoding': 'br' } })
-        expect(css.status).toBe(200)
-        expect(css.headers.get('content-type')).toContain('text/css')
-        expect(css.headers.get('content-encoding')).toBe('br')
-        expect(await css.text()).not.toBe('')
-      }
-    }
+  }
+  const html = await (await fetch(new URL('/settings/appearance', origin))).text()
+  const stylesheets = [...html.matchAll(/<link\b[^>]*rel="stylesheet"[^>]*href="([^"]+)"/g)]
+  expect(stylesheets.length).toBeGreaterThan(0)
+  for (const [, href] of stylesheets) {
+    const stylesheet = await fetch(new URL(href!, origin), { headers: { 'accept-encoding': 'gzip' } })
+    expect(stylesheet.status).toBe(200)
+    expect(stylesheet.headers.get('content-type')).toContain('text/css')
+    expect(stylesheet.headers.get('content-encoding')).toBe('gzip')
+    expect(stylesheet.headers.get('cache-control')).toContain('immutable')
+    expect(await stylesheet.text()).toContain('--font-sans')
   }
   const localizedRequests: { headers: Record<string, string>, language: string, label: string }[] = [
     { headers: { 'accept-language': 'ko-KR,ko;q=0.9,en;q=0.8' }, language: 'ko', label: '새 대화' },

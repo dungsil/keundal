@@ -42,6 +42,50 @@ test('웹 조립은 네이티브 IPC 없이 IndexedDB 대화를 저장하고 재
   }
 })
 
+test('번들 스킬과 도구의 on/off를 실제 목록에 반영하고 재연결해도 선택과 대화를 보존한다', async () => {
+  const saved = storage()
+  saved.setItem('keundal:runtime-plugins', JSON.stringify([{ module: 'https://not-requested.invalid/plugin.mjs', enabled: true }]))
+  const platform = createWebPlatform(saved)
+  const settings = defaultLLMSettings()
+  const options = {
+    getSettings: () => settings, getModels: () => [],
+    skills: [{ name: 'reports', prepare: async () => ({
+      skills: [{ name: 'review', description: 'Review reports' }],
+      load: async () => ({ name: 'review', description: 'Review reports', content: 'Check the totals.' })
+    }) }]
+  }
+  const connection = await platform.connect(options)
+  const id = crypto.randomUUID()
+  try {
+    expect((await platform.runtimePlugins!.list()).map(entry => entry.module)).toEqual([
+      '@keundal/plugin-llm-browser', '@keundal/plugin-store-indexeddb', '@keundal/plugin-agent-chat',
+      '@keundal/plugin-skill', '@keundal/plugin-tool-chat', '@keundal/plugin-mcp-client'
+    ])
+    await expect(platform.runtimePlugins!.setEnabled('https://not-requested.invalid/plugin.mjs', true)).rejects.toThrow('Unknown bundled')
+    await expect(platform.runtimePlugins!.setEnabled('@keundal/plugin-store-indexeddb', false)).rejects.toThrow('Required')
+    expect(await connection.catalog!()).toMatchObject({ skills: [{ name: 'review' }], tools: [{ name: 'chart' }, { name: 'weather' }] })
+    await connection.store.create(id, { id: 'retained', role: 'user', parts: [{ type: 'text', text: 'Keep this chat' }] }, 'openai/test')
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-skill', false)
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chat', false)
+    expect(await connection.catalog!()).toEqual({ skills: [], tools: [] })
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-skill', true)
+    expect((await connection.catalog!()).skills).toEqual([{ name: 'review', description: 'Review reports' }])
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-skill', false)
+  } finally {
+    await connection.dispose()
+  }
+  const restored = await platform.connect(options)
+  try {
+    expect(await restored.catalog!()).toEqual({ skills: [], tools: [] })
+    expect((await restored.store.get(id))?.messages[0]?.id).toBe('retained')
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chat', true)
+    expect((await restored.catalog!()).tools.map(tool => tool.name)).toEqual(['chart', 'weather'])
+    await restored.store.delete(id)
+  } finally {
+    await restored.dispose()
+  }
+})
+
 test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도구와 스킬을 실행하고 Journal을 저장한다', async (deferred, t) => {
   const requests: Record<string, unknown>[] = []
   const calls: string[] = []

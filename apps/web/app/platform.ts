@@ -1,7 +1,7 @@
 import { McpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-chat-browser/mcp'
 import { SkillManager } from '@keundal/plugin-chat-browser/skills'
 import { BrowserAgentPluginManager } from '@keundal/plugin-chat-browser/plugins'
-import { Context } from 'cordis'
+import { Context, type Fiber } from 'cordis'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
 import skillPlugin from '@keundal/plugin-skill'
@@ -10,7 +10,8 @@ import { RemoteChatStore } from '@keundal/plugin-chat-remote'
 import { browserLLMPlugin } from '@keundal/plugin-llm-browser'
 import { loadModels } from '@keundal/plugin-llm-browser/models'
 import { openaiTranscription } from '@keundal/plugin-transcription-browser'
-import { createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
+import { BrowserRuntimePluginManager, createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
+import { mountRuntimePlugin, type RuntimeModuleRegistry } from '@keundal/plugin-runtime'
 import { createChatTools } from '@keundal/plugin-tool-chat'
 import type { ChatPlatform } from '@keundal/chat/platform'
 import { loadWebRuntimePlugins } from './runtime-plugins'
@@ -36,16 +37,52 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
           throw error
         }
       }
-      const composition = await loadWebRuntimePlugins(runtime.pluginConfig, {
+      let manager: BrowserRuntimePluginManager
+      const builtins: RuntimeModuleRegistry = {
         'builtin:llm': { exports: { default: browserLLMPlugin }, config: { getSettings: options.getSettings, getModels: options.getModels } },
         'builtin:store': { exports: { default: indexedDBStorePlugin }, config: { databaseName: 'keundal-web' } },
         'builtin:skills': { exports: { default: skillPlugin }, config: { providers: [...options.skills, ...(plugins ? [plugins.provider] : [])] } },
         'builtin:agent': { exports: { default: agentPlugin }, config: { maxToolRounds: 4, subagents: true, parallelTools: true } },
-        'builtin:chat-tools': { exports: { default: createChatTools } }
-      }, undefined, async execution => [...await mcp.tools(execution), ...await plugins!.tools(execution)])
+        'builtin:chat-tools': { exports: { default: () => manager.isEnabled('@keundal/plugin-tool-chat') ? createChatTools() : [] } }
+      }
+      const composition = await loadWebRuntimePlugins(runtime.pluginConfig, builtins, undefined,
+        async execution => manager.isEnabled('@keundal/plugin-mcp-client')
+          ? [...await mcp.tools(execution), ...await plugins!.tools(execution)] : [])
       const root = new Context()
-      const scope = root.plugin(async (ctx: Context) => composition.setup(ctx))
       let store: ChatStore | undefined
+      let skillFiber: Fiber | undefined
+      let connected = false
+      const selectSkills = async (enabled: boolean) => {
+        if (!enabled) {
+          await skillFiber?.dispose()
+          skillFiber = undefined
+        } else if (!skillFiber) {
+          skillFiber = await mountRuntimePlugin(root, composition.skills ?? { module: 'builtin:skills' }, {
+            builtins,
+            importModule: async () => { throw new Error('Only bundled plugins are selectable') }
+          })
+        }
+      }
+      manager = new BrowserRuntimePluginManager(storage, [
+        { module: '@keundal/plugin-llm-browser', enabled: true, required: true },
+        { module: '@keundal/plugin-store-indexeddb', enabled: true, required: true },
+        { module: '@keundal/plugin-agent-chat', enabled: true, required: true },
+        { module: '@keundal/plugin-skill', enabled: !!composition.skills, feature: 'skills' },
+        { module: '@keundal/plugin-tool-chat', enabled: true },
+        { module: '@keundal/plugin-mcp-client', enabled: true, feature: 'mcp' }
+      ], async (module, enabled) => {
+        if (!connected) throw new Error('The browser plugin runtime is not connected')
+        await store!.stop()
+        if (module === '@keundal/plugin-skill') await selectSkills(enabled)
+        if (module === '@keundal/plugin-mcp-client' && !enabled) {
+          await mcp.close()
+          await plugins?.close()
+        }
+      })
+      const scope = root.plugin(async (ctx: Context) => {
+        await selectSkills(manager.isEnabled('@keundal/plugin-skill'))
+        await composition.setup(ctx)
+      })
       try {
         await scope
         for (const service of ['llm', 'session', 'generation'] as const) {
@@ -59,6 +96,8 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
           skills: config.skills
         }))
         await store.recover()
+        connected = true
+        platform.runtimePlugins = manager
         return {
           store,
           remoteAgent: false,
@@ -67,9 +106,11 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
             tools: (await composition.tools?.(execution ?? {}) ?? []).map(({ name, description }) => ({ name, description }))
           }),
           dispose: async () => {
+            connected = false
             try {
               await store!.stop()
             } finally {
+              await skillFiber?.dispose()
               await plugins?.close()
               await scope.dispose()
             }
@@ -79,6 +120,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         try {
           await store?.stop()
         } finally {
+          await skillFiber?.dispose()
           await plugins?.close()
           await scope.dispose()
         }

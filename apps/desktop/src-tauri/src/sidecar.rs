@@ -179,7 +179,7 @@ fn model_for(provider: &str) -> String {
     }
 }
 
-fn sidecar_command() -> Result<(PathBuf, Vec<String>), String> {
+pub(crate) fn sidecar_command() -> Result<(PathBuf, Vec<String>), String> {
     if cfg!(debug_assertions) {
         let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let entry = manifest
@@ -205,7 +205,7 @@ fn sidecar_command() -> Result<(PathBuf, Vec<String>), String> {
     Ok((binary, Vec::new()))
 }
 
-fn resource_entry(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn resource_entry(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     use tauri::Manager;
     app.path()
         .resource_dir()
@@ -288,6 +288,7 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
     if let Ok(data) = app.path().app_data_dir() {
         std::fs::create_dir_all(&data).ok();
         command.env("KEUNDAL_SQLITE_PATH", data.join("keundal.sqlite"));
+        command.env("KEUNDAL_MANAGED_PLUGINS", data.join("runtime-plugins"));
         if std::env::var_os("KEUNDAL_PLUGIN_CONFIG").is_none() {
             let config = data.join("keundal.plugins.json");
             if config.exists() {

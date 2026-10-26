@@ -1,7 +1,14 @@
 import type en from './en'
 
 export default {
-  'plugin.manage': '설치된 플러그인',
+  'runtime.title': '큰달 플러그인',
+  'runtime.unavailable': '이 연결에서는 선택 기능을 관리할 수 없습니다.',
+  'runtime.bundled': '앱에 포함된 기능 플러그인을 선택합니다. 관련 화면은 기능을 따라 켜지고 꺼지며, UI 플러그인은 따로 전환하지 않습니다. 외부 다운로드는 지원하지 않습니다. 필수 항목은 항상 켜져 있습니다.',
+  'runtime.required': '필수',
+  'runtime.enabled': '활성',
+  'runtime.disabled': '비활성',
+  'runtime.failed': '활성화 실패',
+  'runtime.enable': '{name} 활성화',
   'plugin.unavailable':
     '이 연결에서는 브라우저로 플러그인을 가져올 수 없습니다. 에이전트 호스트에서 플러그인을 설정하세요.',
   'plugin.trustTitle': '신뢰하는 플러그인만 활성화하세요',

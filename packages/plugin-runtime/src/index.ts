@@ -60,7 +60,7 @@ function validateConfig(value: unknown, label: string): Readonly<Record<string, 
   return value
 }
 
-function parseModuleSpec(value: unknown, label: string): RuntimeModuleSpec {
+function parseRuntimeModuleSpec(value: unknown, label = 'plugin'): RuntimeModuleSpec {
   if (!isRecord(value)) throw new TypeError(`${label} must be an object`)
   for (const key of Object.keys(value)) {
     if (key !== 'module' && key !== 'export' && key !== 'config')
@@ -95,10 +95,10 @@ export function parseRuntimePluginManifest(value: unknown): RuntimePluginManifes
   if (hasOwn(value, 'tools') && !Array.isArray(value.tools)) {
     throw new TypeError('runtime plugin manifest.tools must be an array')
   }
-  const plugins = value.plugins.map((entry, index) => parseModuleSpec(entry, `plugins[${index}]`))
-  const agent = parseModuleSpec(value.agent, 'agent')
+  const plugins = value.plugins.map((entry, index) => parseRuntimeModuleSpec(entry, `plugins[${index}]`))
+  const agent = parseRuntimeModuleSpec(value.agent, 'agent')
   const tools = hasOwn(value, 'tools')
-    ? (value.tools as unknown[]).map((entry, index) => parseModuleSpec(entry, `tools[${index}]`))
+    ? (value.tools as unknown[]).map((entry, index) => parseRuntimeModuleSpec(entry, `tools[${index}]`))
     : undefined
   return {
     plugins,
@@ -148,6 +148,22 @@ async function resolveExport(
 async function resolveModule(spec: RuntimeModuleSpec, options: LoadRuntimePluginsOptions): Promise<ResolvedModule> {
   const { selected, config } = await resolveExport(spec, options)
   return { plugin: asPlugin(selected, spec.module, spec.export ?? 'default'), config }
+}
+
+/** Mounts one optional module, releasing its effects if activation fails. */
+export async function mountRuntimePlugin(
+  ctx: Context,
+  spec: RuntimeModuleSpec,
+  options: LoadRuntimePluginsOptions
+): Promise<Fiber> {
+  const { plugin, config } = await resolveModule(spec, options)
+  const fiber = ctx.plugin(plugin, config)
+  try {
+    return await fiber
+  } catch (error) {
+    await fiber.dispose()
+    throw error
+  }
 }
 
 async function resolveToolFactory(

@@ -209,6 +209,15 @@ jobs:
             turbo-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
             turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-
 
+      # 네이티브 캐시가 적중해도 main에서 갱신한 JavaScript 캐시를 함께 복원한다.
+      - name: 데스크톱 JavaScript 캐시 복원
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-desktop-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            turbo-desktop-js-v1-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Linux 빌드 의존성 설치
         if: runner.os == 'Linux'
         run: |

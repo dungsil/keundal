@@ -8,7 +8,7 @@ import {
   saveTitleModel
 } from '@keundal/chat/model-preferences'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
-import type { ChatConnection, ChatPlatform } from '@keundal/chat/platform'
+import type { ChatConnection, ChatPlatform, RuntimePluginManager } from '@keundal/chat/platform'
 import {
   parseSubagentRoles,
   type ExecutionOptions,
@@ -87,6 +87,8 @@ const unavailable = (name: string) => new Error(`${name} is not available until 
  */
 export class ChatRuntime extends Service {
   readonly capabilities: ChatCapabilities
+  /** The shell's bundled UI catalog combined with the platform catalog, including on remote connections. */
+  pluginManager?: RuntimePluginManager
   readonly settings: Ref<LLMSettings> = ref(defaultLLMSettings())
   readonly model = ref(FALLBACK_MODEL)
   readonly titleModel = ref('')
@@ -321,6 +323,11 @@ export class ChatRuntime extends Service {
   /** Save MCP settings and restart the connection's tools. */
   async saveMcpSettings(value: unknown): Promise<void> {
     await this.platform.mcp.save(value, () => this.connection?.mcpChanged?.() ?? this.store.stop())
+  }
+
+  /** Stop active responses before changing plugins. Safe before a browser connection exists. */
+  async stopResponses(): Promise<void> {
+    await this.connection?.store.stop()
   }
 
   /** Reload the conversation list. */

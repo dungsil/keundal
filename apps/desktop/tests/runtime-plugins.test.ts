@@ -1,0 +1,206 @@
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { createNodeAgentHost } from '@keundal/agent-runtime-node'
+import type { NativeInvoke } from '@keundal/chat/platform'
+import { createNativeRuntimePluginManager } from '@keundal/plugin-chat-desktop'
+import { createChatTools } from '@keundal/plugin-tool-chat'
+import { expect, onTestFinished, test, vi } from 'vitest'
+
+import { manageRuntimePlugins, createDesktopComposition, type PluginRequest } from '../sidecar/runtime-plugins'
+
+const chat = '@keundal/plugin-tool-chat'
+const skills = '@keundal/plugin-skill'
+const mcp = '@keundal/plugin-mcp-client'
+
+function fixture() {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-bundled-'))
+  onTestFinished(() => rmSync(directory, { force: true, recursive: true }))
+  const options = { provider: 'openai', model: 'test', apiKey: '', sqlitePath: join(directory, 'chats.sqlite'), defaultTools: createChatTools() }
+  const compose = createDesktopComposition(directory)
+  const open = async (provider = 'openai') => {
+    const host = await createNodeAgentHost({ ...options, provider }, compose)
+    onTestFinished(() => host.dispose())
+    return host
+  }
+  const invoke: NativeInvoke = async <T>(_command: string, args?: Record<string, unknown>) =>
+    (await manageRuntimePlugins(directory, args!.request as PluginRequest)) as T
+  return { directory, options, compose, open, invoke }
+}
+
+test('번들 목록은 선택한 LLM과 저장소 및 에이전트를 잠그고 선택 기능은 기본 활성화한다', async () => {
+  const { directory, open } = fixture()
+  const host = await open()
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toEqual([
+    { module: '@keundal/plugin-llm-openai', enabled: true, required: true },
+    { module: '@keundal/plugin-store-sqlite', enabled: true, required: true },
+    { module: '@keundal/plugin-agent-chat', enabled: true, required: true },
+    { module: skills, enabled: true, feature: 'skills' }, { module: mcp, enabled: true, feature: 'mcp' }, { module: chat, enabled: true }
+  ])
+  expect((await host.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart', 'weather'])
+  await host.dispose()
+  const switched = await open('gemini')
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual({
+    module: '@keundal/plugin-llm-gemini', enabled: true, required: true
+  })
+  expect(switched.services.models()).toMatchObject([{ id: 'test', provider: 'gemini' }])
+})
+
+test('선택을 별도 파일에 보존하고 실제 도구 목록을 바꾸면서 SQLite 대화를 유지한다', async () => {
+  const { directory, open } = fixture()
+  const before = await open()
+  await before.services.session.commit({ threadId: 'saved', expectedRevision: 0, state: {}, messages: [{ id: 'user', role: 'user', content: 'keep me' }] })
+  await before.dispose()
+  await manageRuntimePlugins(directory, { action: 'enable', module: chat, enabled: false })
+  expect(JSON.parse(readFileSync(join(directory, 'bundled-selection.json'), 'utf8'))).toContainEqual({ module: chat, enabled: false })
+  const disabled = await open()
+  expect(await disabled.services.catalog!()).toEqual({ skills: [], tools: [] })
+  expect((await disabled.services.session.get('saved'))?.messages).toEqual([{ id: 'user', role: 'user', content: 'keep me' }])
+  await disabled.dispose()
+  await manageRuntimePlugins(directory, { action: 'enable', module: chat, enabled: true })
+  const enabled = await open()
+  expect((await enabled.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart', 'weather'])
+  expect((await enabled.services.session.get('saved'))?.revision).toBe(1)
+})
+
+test('이전 외부 설치는 import하지 않고 알려진 boolean만 안전하게 옮긴다', async () => {
+  const { directory, open } = fixture()
+  const external = join(directory, 'external.mjs')
+  const marker = join(directory, 'imported')
+  writeFileSync(external, `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'bad'); throw new Error('external import')`)
+  const legacy = [
+    { module: external, resolvedModule: external, enabled: true },
+    { module: chat, resolvedModule: external, enabled: false, config: { arbitrary: true }, export: 'activate' },
+    { module: skills, enabled: 'false' }
+  ]
+  writeFileSync(join(directory, 'managed.json'), JSON.stringify(legacy))
+  const host = await open()
+  expect(await host.services.catalog!()).toEqual({ skills: [], tools: [] })
+  expect(existsSync(marker)).toBe(false)
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).not.toContainEqual(expect.objectContaining({ module: external }))
+  await manageRuntimePlugins(directory, { action: 'enable', module: mcp, enabled: false })
+  expect(JSON.parse(readFileSync(join(directory, 'managed.json'), 'utf8'))).toEqual(legacy)
+  expect(readFileSync(join(directory, 'bundled-selection.json'), 'utf8')).not.toContain('resolvedModule')
+  expect(existsSync(external)).toBe(true)
+})
+
+test('알 수 없는 모듈과 필수 서비스 및 외부 설치 작업은 선택을 변경하지 않는다', async () => {
+  const { directory } = fixture()
+  await manageRuntimePlugins(directory, { action: 'enable', module: chat, enabled: false })
+  const path = join(directory, 'bundled-selection.json')
+  const before = readFileSync(path, 'utf8')
+  const invalid: unknown[] = [
+    null, {}, { action: 'install', spec: { module: 'example-plugin' } }, { action: 'remove', module: chat },
+    ...['example-plugin', 'https://example.com/plugin.mjs', '/tmp/plugin.mjs', './plugin.mjs', '@keundal/plugin-store-sqlite', '@keundal/plugin-agent-chat', '@keundal/plugin-llm-openai'].map((module) => ({ action: 'enable', module, enabled: false })),
+    { action: 'enable', module: chat, enabled: 'false' },
+    { action: 'enable', module: chat, enabled: true, config: {} },
+    { action: 'list', spec: { module: '/tmp/plugin.mjs' } }
+  ]
+  for (const request of invalid) {
+    await expect(manageRuntimePlugins(directory, request as PluginRequest)).rejects.toThrow()
+    expect(readFileSync(path, 'utf8')).toBe(before)
+  }
+})
+
+test('복구 요청도 알려진 모듈과 boolean만 허용하고 오래된 선택을 덮어쓰지 않는다', async () => {
+  const { directory } = fixture()
+  const transaction = await manageRuntimePlugins(directory, { action: 'enable', module: chat, enabled: false })
+  if (Array.isArray(transaction)) throw new Error('Expected transaction')
+  for (const previous of [
+    [],
+    transaction.previous.map((entry, index) => index ? entry : { ...entry, module: '/tmp/external.mjs' }),
+    transaction.previous.map((entry) => ({ ...entry, config: {} })),
+    transaction.previous.map((entry) => ({ ...entry, enabled: 'true' }))
+  ]) {
+    await expect(manageRuntimePlugins(directory, { action: 'restore', ...transaction, previous } as PluginRequest)).rejects.toThrow('Invalid bundled selection')
+  }
+  await manageRuntimePlugins(directory, { action: 'enable', module: skills, enabled: false })
+  await expect(manageRuntimePlugins(directory, { action: 'restore', ...transaction })).rejects.toThrow('changed before rollback')
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual({ module: skills, enabled: false, feature: 'skills' })
+})
+
+test('재시작 실패는 이전 선택을 복구하고 다음 작업을 허용한다', async () => {
+  const { directory, invoke } = fixture()
+  const reload = vi.fn().mockRejectedValueOnce(new Error('restart failed')).mockResolvedValue(undefined)
+  const manager = createNativeRuntimePluginManager(invoke, reload)
+  expect(Object.keys(manager).sort()).toEqual(['list', 'setEnabled'])
+  await expect(manager.setEnabled(chat, false)).rejects.toThrow('restart failed')
+  expect(await manager.list()).toContainEqual({ module: chat, enabled: true })
+  await manager.setEnabled(chat, false)
+  expect(await manager.list()).toContainEqual({ module: chat, enabled: false })
+  expect(reload).toHaveBeenCalledTimes(2)
+  expect(existsSync(join(directory, 'bundled-selection.json'))).toBe(true)
+})
+
+test('활성화 진단 실패는 선택과 이미 교체한 호스트를 함께 복구한다', async () => {
+  const { invoke } = fixture()
+  const diagnosticInvoke: NativeInvoke = async <T>(command: string, args?: Record<string, unknown>) => {
+    const result = await invoke<T>(command, args)
+    return (Array.isArray(result) ? result.map((entry) => entry.module === chat && entry.enabled ? { ...entry, error: 'activation failed' } : entry) : result) as T
+  }
+  const reload = vi.fn().mockResolvedValue(undefined)
+  const manager = createNativeRuntimePluginManager(diagnosticInvoke, reload)
+  await manager.setEnabled(chat, false)
+  await expect(manager.setEnabled(chat, true)).rejects.toThrow('activation failed')
+  expect(await manager.list()).toContainEqual({ module: chat, enabled: false })
+  expect(reload).toHaveBeenCalledTimes(3)
+})
+
+test('재시작과 복구가 모두 실패하면 두 원인을 숨기지 않는다', async () => {
+  const { invoke } = fixture()
+  const brokenInvoke: NativeInvoke = async <T>(command: string, args?: Record<string, unknown>) => {
+    if ((args?.request as PluginRequest)?.action === 'restore') throw new Error('restore failed')
+    return invoke<T>(command, args)
+  }
+  const manager = createNativeRuntimePluginManager(brokenInvoke, async () => { throw new Error('restart failed') })
+  await expect(manager.setEnabled(chat, false)).rejects.toMatchObject({
+    errors: [expect.objectContaining({ message: 'restart failed' }), expect.objectContaining({ message: 'restore failed' })]
+  })
+})
+
+test('배포 매니페스트와 상대 경로 및 필수 서비스를 선택 변경 이후에도 유지한다', async () => {
+  const { directory, options, compose } = fixture()
+  const path = join(directory, 'deployment.json')
+  const deployment = {
+    plugins: [{ module: 'builtin:llm', config: { provider: 'gemini' } }, { module: 'builtin:store' }, { module: './deployment.mjs' }],
+    agent: { module: 'builtin:agent', config: { maxToolRounds: 2 } }, tools: []
+  }
+  writeFileSync(path, JSON.stringify(deployment))
+  writeFileSync(join(directory, 'deployment.mjs'), 'export default ctx => { ctx.provide("deploymentMarker", true) }')
+  await manageRuntimePlugins(directory, { action: 'enable', module: skills, enabled: false })
+  const host = await createNodeAgentHost({ ...options, pluginConfigPath: path }, compose)
+  onTestFinished(() => host.dispose())
+  expect(await host.services.catalog!()).toEqual({ skills: [], tools: [] })
+  expect(host.ctx.get('deploymentMarker')).toBe(true)
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual({ module: '@keundal/plugin-llm-gemini', enabled: true, required: true })
+  expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(deployment)
+})
+
+test('저장소 밖으로 옮긴 번들 IPC는 외부 설치를 거부하고 선택 기능만 영속화한다', async () => {
+  const { directory } = fixture()
+  const bundle = join(directory, 'sidecar')
+  cpSync('dist-sidecar', bundle, { recursive: true })
+  const command = async (request: unknown) => {
+    const child = spawn(process.execPath, [join(bundle, 'main.js'), '--manage-runtime-plugins'], {
+      cwd: directory,
+      env: { ...process.env, KEUNDAL_MANAGED_PLUGINS: directory, KEUNDAL_PROVIDER: 'openai' }, signal: AbortSignal.timeout(10_000)
+    })
+    let output = ''
+    let errors = ''
+    child.stdout.on('data', (chunk) => { output += String(chunk) })
+    child.stderr.on('data', (chunk) => { errors += String(chunk) })
+    child.stdin.end(JSON.stringify(request))
+    const [status] = await once(child, 'close')
+    return { status, output, errors }
+  }
+  expect((await command({ action: 'install', spec: { module: '/tmp/external.mjs' } })).status).toBe(1)
+  const disabled = await command({ action: 'enable', module: chat, enabled: false })
+  expect(disabled.status, disabled.errors).toBe(0)
+  const listed = await command({ action: 'list' })
+  expect(listed.status, listed.errors).toBe(0)
+  expect(JSON.parse(listed.output)).toContainEqual({ module: chat, enabled: false })
+  expect(JSON.parse(listed.output)).toContainEqual({ module: '@keundal/plugin-store-sqlite', enabled: true, required: true })
+})

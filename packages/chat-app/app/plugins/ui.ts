@@ -4,7 +4,7 @@ import { ChatRuntime, SettingsLoadError } from '@keundal/ui-runtime'
 import { SlotService } from '@keundal/ui-slots'
 import { Context } from 'cordis'
 
-import { uiPlugins } from '../ui-plugins'
+import { UIPluginManager } from '../ui-plugins'
 
 declare module '#app' {
   interface NuxtApp {
@@ -54,15 +54,29 @@ export default defineNuxtPlugin({
         throw error instanceof SettingsLoadError ? error.cause : error
       }
     }
-    for (const plugin of uiPlugins) fibers.push(ctx.plugin(plugin))
-    await Promise.all(fibers)
+    const pluginManager = new UIPluginManager(ctx, {
+      stop: () => ctx.chatRuntime.stopResponses(),
+      platform: import.meta.client ? nuxtApp.$chatPlatform?.runtimePlugins : undefined
+    })
+    ctx.chatRuntime.pluginManager = nuxtApp.$chatPlatform?.runtimePlugins ? pluginManager : undefined
+    if (import.meta.client) nuxtApp.hook('app:mounted', () => pluginManager.sync())
 
     let disposal: Promise<void> | undefined
     const dispose = () => disposal ??= (async () => {
-      for (const fiber of fibers.toReversed()) await fiber.dispose()
+      try {
+        await pluginManager.close()
+      } finally {
+        for (const fiber of fibers.toReversed()) await fiber.dispose()
+      }
     })()
     nuxtApp.vueApp.onUnmount(() => void dispose())
     if (import.meta.hot) import.meta.hot.dispose(dispose)
+    try {
+      await pluginManager.mount()
+    } catch (error) {
+      await dispose()
+      throw error
+    }
     return { provide: { ui: ctx } }
   }
 })
