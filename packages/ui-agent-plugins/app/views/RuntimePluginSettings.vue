@@ -53,7 +53,14 @@ onMounted(() => {
                 <p v-if="plugin.metadata" class="text-sm text-muted break-words">{{ plugin.metadata.description[locale] }}</p>
                 <p class="text-xs text-muted" role="status">{{ t(plugin.required ? 'runtime.required' : plugin.error ? 'runtime.failed' : plugin.enabled ? 'runtime.enabled' : 'runtime.disabled') }}</p>
               </div>
-              <USwitch :model-value="plugin.enabled" :disabled="busy || plugin.required" :aria-label="t('runtime.enable', { name: plugin.metadata?.name[locale] || plugin.module })" @update:model-value="run(() => setEnabled(plugin.module, $event))" />
+              <USwitch
+                :model-value="plugin.enabled"
+                :disabled="busy || plugin.required"
+                :checked-icon="plugin.required ? 'i-lucide-lock-keyhole' : undefined"
+                :aria-label="t('runtime.enable', { name: plugin.metadata?.name[locale] || plugin.module })"
+                :aria-description="plugin.required ? t('runtime.requiredDescription') : undefined"
+                @update:model-value="run(() => setEnabled(plugin.module, $event))"
+              />
             </div>
             <UAlert v-if="plugin.error" color="error" :title="plugin.error" :ui="{ title: 'break-words' }" />
           </li>

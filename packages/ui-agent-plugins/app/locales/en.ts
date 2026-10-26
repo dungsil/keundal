@@ -3,6 +3,7 @@ export default {
   'runtime.unavailable': 'Plugin selection is unavailable for this connection.',
   'runtime.bundled': 'Choose from the functional plugins bundled with this app. Related views follow each feature automatically, without separate UI switches. External downloads are not supported. Required plugins stay enabled.',
   'runtime.required': 'Required',
+  'runtime.requiredDescription': 'Required plugin. Always enabled and cannot be turned off.',
   'runtime.enabled': 'Enabled',
   'runtime.disabled': 'Disabled',
   'runtime.failed': 'Activation failed',
