@@ -20,7 +20,7 @@ function onRadioKeydown(event: KeyboardEvent) {
   )
   if (radios.length === 0) return
   const currentIndex = radios.indexOf(event.target as HTMLButtonElement)
-  let nextIndex = currentIndex
+  let nextIndex: number
 
   if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
     nextIndex = (currentIndex + 1) % radios.length
