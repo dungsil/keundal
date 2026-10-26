@@ -4,10 +4,17 @@ import { join } from 'node:path'
 import {
   createNodeComposition,
   getRequiredNodePluginModules,
+  nodePluginMetadata,
   type BundledPluginModule,
   type HostCompositionFactory
 } from '@keundal/agent-runtime-node'
 import type { RuntimePluginInfo } from '@keundal/chat/platform'
+import { metadata as toolsMetadata } from '@keundal/plugin-tool-chat'
+
+const metadata: Record<string, RuntimePluginInfo['metadata']> = {
+  ...nodePluginMetadata,
+  '@keundal/plugin-tool-chat': toolsMetadata
+}
 
 const optionalModules: readonly BundledPluginModule[] = [
   '@keundal/plugin-skill',
@@ -86,6 +93,7 @@ export async function manageRuntimePlugins(directory: string, request: PluginReq
       ...previous.filter((entry) => !required.includes(entry.module))
     ].map((entry): RuntimePluginInfo => ({
       ...entry,
+      metadata: metadata[entry.module],
       feature: entry.module === '@keundal/plugin-skill' ? 'skills'
         : entry.module === '@keundal/plugin-mcp-client' ? 'mcp' : undefined
     }))

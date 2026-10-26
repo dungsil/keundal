@@ -7,6 +7,14 @@ import {
 } from '@keundal/core'
 import type { Context } from 'cordis'
 
+export const metadata = {
+  name: { en: 'Skills', ko: '스킬' },
+  description: {
+    en: 'Provides reusable instructions for the agent to load when needed.',
+    ko: '에이전트가 필요할 때 불러올 수 있는 재사용 가능한 지침을 제공합니다.'
+  }
+}
+
 export interface SkillConfig {
   readonly providers?: readonly SkillProvider[]
 }

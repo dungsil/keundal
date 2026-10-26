@@ -2,19 +2,20 @@ import { McpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-cha
 import { SkillManager } from '@keundal/plugin-chat-browser/skills'
 import { BrowserAgentPluginManager } from '@keundal/plugin-chat-browser/plugins'
 import { Context, type Fiber } from 'cordis'
-import agentPlugin from '@keundal/plugin-agent-chat'
-import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
-import skillPlugin from '@keundal/plugin-skill'
+import agentPlugin, { metadata as agentMetadata } from '@keundal/plugin-agent-chat'
+import indexedDBStorePlugin, { metadata as storeMetadata } from '@keundal/plugin-store-indexeddb'
+import skillPlugin, { metadata as skillMetadata } from '@keundal/plugin-skill'
 import { ChatStore } from '@keundal/plugin-chat-local'
 import { RemoteChatStore } from '@keundal/plugin-chat-remote'
-import { browserLLMPlugin } from '@keundal/plugin-llm-browser'
+import { browserLLMPlugin, metadata as llmMetadata } from '@keundal/plugin-llm-browser'
 import { loadModels } from '@keundal/plugin-llm-browser/models'
 import { openaiTranscription } from '@keundal/plugin-transcription-browser'
 import { BrowserRuntimePluginManager, createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
 import { mountRuntimePlugin, type RuntimeModuleRegistry } from '@keundal/plugin-runtime'
-import { createChatTools } from '@keundal/plugin-tool-chat'
+import { createChatTools, metadata as toolsMetadata } from '@keundal/plugin-tool-chat'
 import type { ChatPlatform } from '@keundal/chat/platform'
 import { loadWebRuntimePlugins } from './runtime-plugins'
+import { metadata as mcpMetadata } from '@keundal/plugin-chat-browser/mcp'
 
 export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: string, agentToken?: string, pluginConfig?: string } = {}): ChatPlatform {
   const mcp = new McpManager(createBrowserMcpSettingsStorage(storage))
@@ -64,12 +65,12 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         }
       }
       manager = new BrowserRuntimePluginManager(storage, [
-        { module: '@keundal/plugin-llm-browser', enabled: true, required: true },
-        { module: '@keundal/plugin-store-indexeddb', enabled: true, required: true },
-        { module: '@keundal/plugin-agent-chat', enabled: true, required: true },
-        { module: '@keundal/plugin-skill', enabled: !!composition.skills, feature: 'skills' },
-        { module: '@keundal/plugin-tool-chat', enabled: true },
-        { module: '@keundal/plugin-mcp-client', enabled: true, feature: 'mcp' }
+        { module: '@keundal/plugin-llm-browser', metadata: llmMetadata, enabled: true, required: true },
+        { module: '@keundal/plugin-store-indexeddb', metadata: storeMetadata, enabled: true, required: true },
+        { module: '@keundal/plugin-agent-chat', metadata: agentMetadata, enabled: true, required: true },
+        { module: '@keundal/plugin-skill', metadata: skillMetadata, enabled: !!composition.skills, feature: 'skills' },
+        { module: '@keundal/plugin-tool-chat', metadata: toolsMetadata, enabled: true },
+        { module: '@keundal/plugin-mcp-client', metadata: mcpMetadata, enabled: true, feature: 'mcp' }
       ], async (module, enabled) => {
         if (!connected) throw new Error('The browser plugin runtime is not connected')
         await store!.stop()

@@ -10,6 +10,14 @@ import { createHttpTransport } from './http-transport.js'
 import { boundedMcpPages, DEFAULT_MAX_RESULT_BYTES, McpResultBudget, resultBytes } from './result-budget.js'
 export type { McpPermissions, McpClientConfig, McpProbeResult, McpRequestOptions, McpToolSummary } from '@keundal/mcp'
 
+export const metadata = {
+  name: { en: 'MCP connections', ko: 'MCP 연결' },
+  description: {
+    en: 'Connects external MCP servers to use permitted tools and resources.',
+    ko: '외부 MCP 서버에 연결해 허용된 도구와 리소스를 사용합니다.'
+  }
+}
+
 function allows(scope: '*' | readonly string[] | undefined, name: string): boolean {
   return scope === '*' || (scope?.includes(name) ?? false)
 }

@@ -7,6 +7,8 @@ import {
 } from '@keundal/mcp'
 import type { McpClient } from '@keundal/plugin-mcp-client/browser'
 
+export { metadata } from '@keundal/plugin-mcp-client/browser'
+
 const storageKey = 'keundal:mcp-servers'
 
 export function createBrowserMcpSettingsStorage(

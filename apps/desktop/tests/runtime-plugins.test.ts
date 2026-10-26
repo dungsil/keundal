@@ -34,18 +34,34 @@ function fixture() {
 test('번들 목록은 선택한 LLM과 저장소 및 에이전트를 잠그고 선택 기능은 기본 활성화한다', async () => {
   const { directory, open } = fixture()
   const host = await open()
-  expect(await manageRuntimePlugins(directory, { action: 'list' })).toEqual([
+  const entries = await manageRuntimePlugins(directory, { action: 'list' })
+  expect(entries).toMatchObject([
     { module: '@keundal/plugin-llm-openai', enabled: true, required: true },
     { module: '@keundal/plugin-store-sqlite', enabled: true, required: true },
     { module: '@keundal/plugin-agent-chat', enabled: true, required: true },
     { module: skills, enabled: true, feature: 'skills' }, { module: mcp, enabled: true, feature: 'mcp' }, { module: chat, enabled: true }
   ])
+  if (!Array.isArray(entries)) throw new Error('Expected plugin list')
+  expect(entries.find(entry => entry.module === skills)?.metadata).toEqual({
+    name: { en: 'Skills', ko: '스킬' },
+    description: {
+      en: 'Provides reusable instructions for the agent to load when needed.',
+      ko: '에이전트가 필요할 때 불러올 수 있는 재사용 가능한 지침을 제공합니다.'
+    }
+  })
+  for (const entry of entries) {
+    for (const locale of ['en', 'ko'] as const) {
+      expect(entry.metadata?.name[locale]).toBeTruthy()
+      expect(entry.metadata?.description[locale]).toBeTruthy()
+    }
+  }
   expect((await host.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart', 'weather'])
   await host.dispose()
   const switched = await open('gemini')
-  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual({
-    module: '@keundal/plugin-llm-gemini', enabled: true, required: true
-  })
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual(expect.objectContaining({
+    module: '@keundal/plugin-llm-gemini', enabled: true, required: true,
+    metadata: expect.objectContaining({ name: { en: 'Gemini', ko: 'Gemini' } })
+  }))
   expect(switched.services.models()).toMatchObject([{ id: 'test', provider: 'gemini' }])
 })
 
@@ -119,7 +135,7 @@ test('복구 요청도 알려진 모듈과 boolean만 허용하고 오래된 선
   }
   await manageRuntimePlugins(directory, { action: 'enable', module: skills, enabled: false })
   await expect(manageRuntimePlugins(directory, { action: 'restore', ...transaction })).rejects.toThrow('changed before rollback')
-  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual({ module: skills, enabled: false, feature: 'skills' })
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual(expect.objectContaining({ module: skills, enabled: false, feature: 'skills' }))
 })
 
 test('재시작 실패는 이전 선택을 복구하고 다음 작업을 허용한다', async () => {
@@ -128,9 +144,9 @@ test('재시작 실패는 이전 선택을 복구하고 다음 작업을 허용�
   const manager = createNativeRuntimePluginManager(invoke, reload)
   expect(Object.keys(manager).sort()).toEqual(['list', 'setEnabled'])
   await expect(manager.setEnabled(chat, false)).rejects.toThrow('restart failed')
-  expect(await manager.list()).toContainEqual({ module: chat, enabled: true })
+  expect(await manager.list()).toContainEqual(expect.objectContaining({ module: chat, enabled: true }))
   await manager.setEnabled(chat, false)
-  expect(await manager.list()).toContainEqual({ module: chat, enabled: false })
+  expect(await manager.list()).toContainEqual(expect.objectContaining({ module: chat, enabled: false }))
   expect(reload).toHaveBeenCalledTimes(2)
   expect(existsSync(join(directory, 'bundled-selection.json'))).toBe(true)
 })
@@ -145,7 +161,7 @@ test('활성화 진단 실패는 선택과 이미 교체한 호스트를 함께 
   const manager = createNativeRuntimePluginManager(diagnosticInvoke, reload)
   await manager.setEnabled(chat, false)
   await expect(manager.setEnabled(chat, true)).rejects.toThrow('activation failed')
-  expect(await manager.list()).toContainEqual({ module: chat, enabled: false })
+  expect(await manager.list()).toContainEqual(expect.objectContaining({ module: chat, enabled: false }))
   expect(reload).toHaveBeenCalledTimes(3)
 })
 
@@ -175,7 +191,7 @@ test('배포 매니페스트와 상대 경로 및 필수 서비스를 선택 변
   onTestFinished(() => host.dispose())
   expect(await host.services.catalog!()).toEqual({ skills: [], tools: [] })
   expect(host.ctx.get('deploymentMarker')).toBe(true)
-  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual({ module: '@keundal/plugin-llm-gemini', enabled: true, required: true })
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual(expect.objectContaining({ module: '@keundal/plugin-llm-gemini', enabled: true, required: true }))
   expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(deployment)
 })
 
@@ -201,6 +217,6 @@ test('저장소 밖으로 옮긴 번들 IPC는 외부 설치를 거부하고 선
   expect(disabled.status, disabled.errors).toBe(0)
   const listed = await command({ action: 'list' })
   expect(listed.status, listed.errors).toBe(0)
-  expect(JSON.parse(listed.output)).toContainEqual({ module: chat, enabled: false })
-  expect(JSON.parse(listed.output)).toContainEqual({ module: '@keundal/plugin-store-sqlite', enabled: true, required: true })
+  expect(JSON.parse(listed.output)).toContainEqual(expect.objectContaining({ module: chat, enabled: false }))
+  expect(JSON.parse(listed.output)).toContainEqual(expect.objectContaining({ module: '@keundal/plugin-store-sqlite', enabled: true, required: true }))
 })
