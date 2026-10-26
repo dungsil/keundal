@@ -38,7 +38,7 @@ test('모든 화면을 측정하면 재시도 없이 끝난다', async () => {
   assert.deepEqual(calls, ['run'])
 })
 
-test('누락된 화면이 있으면 프리뷰를 기다린 뒤 다시 측정한다', async () => {
+test('누락된 화면이 있으면 서버를 기다린 뒤 다시 측정한다', async () => {
   const calls = []
   let remaining = ['/settings/llm']
   await collectSample({

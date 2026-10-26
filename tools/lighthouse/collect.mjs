@@ -7,7 +7,7 @@ import config from './lighthouserc.cjs'
 const routes = config.ci.collect.url.map((url) => new URL(url).pathname)
 const samples = config.ci.collect.numberOfRuns
 
-// Unlighthouse는 프리뷰가 503을 돌려주면 해당 화면을 건너뛰고도 성공으로 종료한다.
+// Unlighthouse는 서버가 503을 돌려주면 해당 화면을 건너뛰고도 성공으로 종료한다.
 // 보고서 파일 존재 여부로 측정 완료를 판단해야 누락된 표본이 요약 단계에서 드러난다.
 export function reportPaths(files) {
   return files.flatMap((file) => {
@@ -64,7 +64,7 @@ function runUnlighthouse(sample, site) {
   if (error || status !== 0) console.warn(`${sample}번째 Unlighthouse 실행이 실패했습니다: ${error ?? status}`)
 }
 
-async function waitForPreview(site, { attempts = 12, delayMs = 5000 } = {}) {
+async function waitForServer(site, { attempts = 12, delayMs = 5000 } = {}) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const responses = await Promise.all(
       routes.map(async (route) => {
@@ -78,13 +78,13 @@ async function waitForPreview(site, { attempts = 12, delayMs = 5000 } = {}) {
     if (responses.every(Boolean)) return
     await new Promise((resolve) => setTimeout(resolve, delayMs))
   }
-  throw new Error(`프리뷰 ${site}가 모든 화면에서 응답하지 않아 측정을 다시 시도할 수 없습니다.`)
+  throw new Error(`서버 ${site}가 모든 화면에서 응답하지 않아 측정을 다시 시도할 수 없습니다.`)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const site = process.env.LIGHTHOUSE_BASE_URL
   if (!site) throw new Error('LIGHTHOUSE_BASE_URL 환경 변수가 필요합니다.')
-  await waitForPreview(site)
+  await waitForServer(site)
   for (let sample = 1; sample <= samples; sample += 1) {
     const directory = `.unlighthouse/run-${sample}`
     await collectSample({
@@ -94,7 +94,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         runUnlighthouse(sample, site)
       },
       check: () => readMissing(directory),
-      wait: () => waitForPreview(site)
+      wait: () => waitForServer(site)
     })
   }
 }
