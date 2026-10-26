@@ -1,3 +1,9 @@
+import {
+  loadPromptPresets,
+  parsePromptPresetSettings,
+  PROMPT_PRESETS_KEY,
+  type PromptPresetSettings
+} from '@keundal/chat'
 import { listChatSummaries, type ChatStoreLike, type ChatSummary } from '@keundal/chat/chat-store'
 import {
   DEFAULT_MODEL_KEY,
@@ -93,7 +99,10 @@ export class ChatRuntime extends Service {
   readonly model = ref(FALLBACK_MODEL)
   readonly titleModel = ref('')
   readonly defaultModel = ref('')
-  readonly systemPrompt = ref('')
+  readonly promptPresets = ref<PromptPresetSettings>({ activePresetId: null, presets: [] })
+  readonly promptPreset = computed(() =>
+    this.promptPresets.value.presets.find((preset) => preset.id === this.promptPresets.value.activePresetId)
+  )
   readonly subagentRoles = ref<SubagentRole[]>([])
   readonly switching = ref(false)
   readonly webSearch = computed<boolean>({
@@ -190,13 +199,13 @@ export class ChatRuntime extends Service {
     const storage = this.options.storage
     if (!storage) throw unavailable('Browser storage')
     await platform.mcp.load()
-    this.systemPrompt.value = storage.getItem('keundal:system-prompt') ?? ''
     const preferences = loadModelPreferences(storage)
     this.defaultModel.value = preferences.defaultModel
     this.titleModel.value = readModelPreference(storage, TITLE_MODEL_KEY) ?? ''
     const initialModel = preferences.model
     this.model.value = initialModel || FALLBACK_MODEL
     try {
+      this.promptPresets.value = loadPromptPresets(storage)
       this.subagentRoles.value = parseSubagentRoles(JSON.parse(storage.getItem('keundal:subagent-roles') ?? '[]'))
       this.settings.value = await platform.settings.load()
     } catch (error) {
@@ -286,13 +295,12 @@ export class ChatRuntime extends Service {
     if (this.options.storage) this.titleModel.value = saveTitleModel(this.options.storage, value)
   }
 
-  saveSystemPrompt(value: string): void {
+  savePromptPresets(value: PromptPresetSettings): void {
     const storage = this.options.storage
     if (!storage) throw unavailable('Browser storage')
-    const prompt = value.trim()
-    if (prompt) storage.setItem('keundal:system-prompt', prompt)
-    else storage.removeItem('keundal:system-prompt')
-    this.systemPrompt.value = prompt
+    const settings = parsePromptPresetSettings(value)
+    storage.setItem(PROMPT_PRESETS_KEY, JSON.stringify(settings))
+    this.promptPresets.value = settings
   }
 
   saveSubagentRoles(value: readonly SubagentRole[]): void {

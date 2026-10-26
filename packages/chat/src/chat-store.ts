@@ -1,4 +1,11 @@
-import type { ExecutionOptions, GenerationSnapshot, Reasoning, AGUIEvent, SubagentRole } from '@keundal/core'
+import type {
+  ExecutionOptions,
+  GenerationSnapshot,
+  Reasoning,
+  AGUIEvent,
+  SubagentRole,
+  PromptPreset
+} from '@keundal/core'
 
 import type { ChatMessage } from './chat-message'
 export interface ChatStoreLike {
@@ -24,6 +31,8 @@ export interface ChatStoreLike {
       titleModel?: string
       /** Optional user-provided instructions for model responses; excluded from title generation. */
       systemPrompt?: string
+      /** Ordered prompt recipe, captured for this response only. */
+      promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
       reasoning?: Reasoning
       webSearch?: boolean

@@ -98,17 +98,25 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
     : new RemoteChatStore({ endpoint, token })
   await chats.create('chat', user, model)
   const roles = [{ name: 'reviewer', description: 'Review changes', instructions: 'Check correctness.' }]
-  const events = await collect(chats.respond('chat', { model, titleModel: 'anthropic/title', messages: [user], systemPrompt: 'First system prompt.', subagentRoles: roles }))
+  const promptPreset = {
+    id: 'review', name: 'Review', variables: { focus: 'risks' }, blocks: [
+      { id: 'history', type: 'history' as const, name: 'History', enabled: true },
+      { id: 'focus', type: 'text' as const, name: 'Focus', enabled: true, role: 'user' as const, content: 'Preset focus: {{focus}}' }
+    ]
+  }
+  const events = await collect(chats.respond('chat', { model, titleModel: 'anthropic/title', messages: [user], systemPrompt: 'First system prompt.', promptPreset, subagentRoles: roles }))
   expect(events.some(event => event.type === EventType.RUN_FINISHED)).toBe(true)
   expect(inputs[0]!.tools.find(tool => tool.name === 'delegate_task')?.parameters).toMatchObject({ properties: { role: { enum: ['reviewer'] } } })
   const firstInput = JSON.stringify(inputs[0])
   expect(firstInput).toContain('First system prompt.')
   expect(firstInput).toContain('You are a knowledgeable and helpful AI assistant.')
+  expect(inputs[0]!.messages.at(-1)).toMatchObject({ role: 'user', content: 'Preset focus: risks' })
   await collect(chats.respond('chat', { model, messages: [user], systemPrompt: 'Changed system prompt.', subagentRoles: [] }))
   expect(inputs[1]!.tools.find(tool => tool.name === 'delegate_task')?.parameters.properties).not.toHaveProperty('role')
   const changedInput = JSON.stringify(inputs[1])
   expect(changedInput).toContain('Changed system prompt.')
   expect(changedInput).not.toContain('First system prompt.')
+  expect(inputs[1]!.messages.some(message => message.id.startsWith('keundal:prompt:'))).toBe(false)
   expect(changedInput).toContain('keundal:web-instructions')
   expect(changedInput.match(/keundal:web-instructions/g)).toHaveLength(1)
   await collect(chats.respond('chat', { model, messages: [user], systemPrompt: ' \n ' }))

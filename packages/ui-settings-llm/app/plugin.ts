@@ -1,4 +1,5 @@
 import type { Context } from 'cordis'
+import type { PromptPresetSettings } from '@keundal/chat'
 import type { LLMSettings } from '@keundal/llm-settings'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
@@ -34,8 +35,8 @@ export function apply(ctx: Context) {
     order: 25,
     meta: { label: localizedText(messages, 'prompt.title'), icon: 'i-lucide-text-cursor-input', group: 'general' },
     inject: () => ({
-      systemPrompt: runtime.systemPrompt,
-      saveSystemPrompt: (value: string) => runtime.saveSystemPrompt(value)
+      promptPresets: runtime.promptPresets,
+      savePromptPresets: (value: PromptPresetSettings) => runtime.savePromptPresets(value)
     })
   }, SystemPromptSettings))
 }

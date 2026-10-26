@@ -10,11 +10,14 @@ test('표시 설정 화면에 접근성 위반이 없다 @a11y:appearance', asyn
   await accessible(page)
 })
 
-test('공급자와 시스템 프롬프트 설정 화면에 접근성 위반이 없다 @a11y:llm @a11y:system-prompt', async ({ page }) => {
+test('공급자와 프롬프트 프리셋 설정 화면에 접근성 위반이 없다 @a11y:llm @a11y:system-prompt', async ({ page }) => {
   await ready(page, '/settings/llm')
   await accessible(page)
   await ready(page, '/settings/system-prompt')
-  await expect(page.getByRole('textbox')).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Create preset', exact: true })).toBeEnabled()
+  await accessible(page)
+  await page.getByRole('button', { name: 'Create preset', exact: true }).click()
+  await expect(page.getByLabel('Preset name', { exact: true })).toBeEnabled()
   await accessible(page)
 })
 
@@ -123,14 +126,15 @@ test.describe('모바일 설정 탐색', () => {
   test('설정 선택 메뉴로 이동해도 돌아갈 대화와 작성 중인 내용을 보존한다', async ({ page, context, baseURL }) => {
     await context.addCookies([{ name: 'keundal-locale', value: 'en', url: baseURL! }])
     await ready(page, '/settings/system-prompt?returnTo=/chat/mobile-fixture')
-    await page.getByRole('textbox').fill('Unsaved mobile draft')
-    const picker = page.getByRole('button', { name: 'Settings: System prompt', exact: true })
+    await page.getByRole('button', { name: 'Create preset', exact: true }).tap()
+    await page.getByLabel('Content', { exact: true }).fill('Unsaved mobile draft')
+    const picker = page.getByRole('button', { name: 'Settings: Prompt presets', exact: true })
     await picker.tap()
     await expect(page.getByRole('menuitem')).toHaveCount(9)
     await expect(page.getByRole('menuitem', { name: 'Subagents', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Keundal plugins', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Agent plugins', exact: true })).toBeVisible()
-    await expect(page.getByRole('menuitem', { name: 'System prompt', exact: true })).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByRole('menuitem', { name: 'Prompt presets', exact: true })).toHaveAttribute('aria-current', 'page')
     await accessible(page)
     await page.keyboard.press('Escape')
     await expect(picker).toBeFocused()
@@ -143,8 +147,8 @@ test.describe('모바일 설정 탐색', () => {
     expect(heading!.y).toBeLessThan(400)
     await accessible(page)
     await page.getByRole('button', { name: 'Settings: Appearance', exact: true }).tap()
-    await page.getByRole('menuitem', { name: 'System prompt', exact: true }).tap()
-    await expect(page.getByRole('textbox')).toHaveValue('Unsaved mobile draft')
+    await page.getByRole('menuitem', { name: 'Prompt presets', exact: true }).tap()
+    await expect(page.getByLabel('Content', { exact: true })).toHaveValue('Unsaved mobile draft')
   })
 })
 

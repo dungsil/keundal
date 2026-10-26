@@ -231,10 +231,17 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   await connection.store.create(id, user, 'openai/test')
   const events = []
   const subagentRoles = [{ name: 'reviewer', description: 'Review changes', instructions: 'Check correctness.' }]
-  for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user], systemPrompt: 'Answer in two sentences.', subagentRoles })) events.push(event)
+  const promptPreset = {
+    id: 'review', name: 'Review', variables: { focus: 'totals' }, blocks: [
+      { id: 'history', type: 'history' as const, name: 'History', enabled: true },
+      { id: 'focus', type: 'text' as const, name: 'Focus', enabled: true, role: 'user' as const, content: 'Preset focus: {{focus}}' }
+    ]
+  }
+  for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user], systemPrompt: 'Answer in two sentences.', promptPreset, subagentRoles })) events.push(event)
   expect(events.at(-1), JSON.stringify(events)).toMatchObject({ type: 'RUN_FINISHED' })
   expect(requests[0]!.tools).toContainEqual(expect.objectContaining({ name: 'delegate_task', parameters: expect.objectContaining({ properties: expect.objectContaining({ role: expect.objectContaining({ enum: ['reviewer'] }) }) }) }))
   expect(JSON.stringify(requests[0]!.input)).toContain('Answer in two sentences.')
+  expect(JSON.stringify(requests[0]!.input)).toContain('Preset focus: totals')
   expect(JSON.stringify(requests[0]!.input)).toContain('You are a knowledgeable and helpful AI assistant.')
   expect(calls, JSON.stringify({ requests, events })).toEqual(['search'])
   expect(JSON.stringify(requests.map(request => request.tools))).not.toContain('__delete')
@@ -246,6 +253,7 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   const followup = requests[deferred ? 2 : 1]!
   expect(JSON.stringify(followup.input)).toContain('Compare totals independently.')
   expect(JSON.stringify(followup.input)).toContain('Total: 37')
+  expect(JSON.stringify(followup.input)).toContain('Preset focus: totals')
   const changedStart = requests.length
   for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user], systemPrompt: 'Use bullet points.', subagentRoles: [] })) void event
   expect(JSON.stringify(requests[changedStart]!.tools)).not.toContain('Review changes')
@@ -256,6 +264,7 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user], systemPrompt: ' \n ' })) void event
   const clearedInput = JSON.stringify(requests[clearedStart]!.input)
   expect(clearedInput).not.toContain('Use bullet points.')
+  expect(clearedInput).not.toContain('Preset focus: totals')
   expect(clearedInput).toContain('You are a knowledgeable and helpful AI assistant.')
   const answer = (await connection.store.get(id))!.messages[1]!
   expect(answer.parts).toContainEqual({ type: 'text', text: 'Checked: 37' })

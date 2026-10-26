@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import type { LocalChat } from '@keundal/chat/chat-store'
-import type { AGUIEvent, ReasoningLevel, SubagentRole } from '@keundal/core'
+import type { AGUIEvent, ReasoningLevel, SubagentRole, PromptPreset } from '@keundal/core'
 import type { ComposerOwner, DeliveryMode } from '@keundal/ui-composer/slots'
 import type { ChatSummary } from '@keundal/ui-runtime'
 import { SlotFactory, SlotOutlet } from '@keundal/ui-slots'
@@ -24,7 +24,7 @@ const props = defineProps<{
   chatId: string
   model: Ref<string>
   titleModel: Ref<string>
-  systemPrompt: Ref<string>
+  promptPreset: Ref<PromptPreset | undefined>
   subagentRoles: Ref<SubagentRole[]>
   webSearch: Ref<boolean>
   reasoning: Ref<ReasoningLevel>
@@ -42,7 +42,7 @@ const props = defineProps<{
       titleModel?: string
       reasoning?: ReasoningLevel
       webSearch?: boolean
-      systemPrompt?: string
+      promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
       onMessage?: (message: ChatMessage) => void
       onTitle?: (title: string) => void
@@ -125,7 +125,7 @@ const observer = computed<ChatObserverOwner>(() => ({
 const { messages, queue, status, error, sendMessage, regenerate, stop, resumeQueue, removeQueued } = useKeundalChat({
   respond: (messages, onMessage, signal) => props.respond({
     messages, model: props.model.value, titleModel: props.titleModel.value || undefined, webSearch: props.webSearch.value, reasoning: props.reasoning.value,
-    systemPrompt: props.systemPrompt.value,
+    promptPreset: props.promptPreset.value,
     subagentRoles: props.subagentRoles.value,
     onMessage,
     onTitle: (value) => {
