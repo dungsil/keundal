@@ -1,5 +1,5 @@
 import type { Context } from 'cordis'
-import type { AgentPluginSettings } from '@keundal/chat/platform'
+import type { AgentPluginSettings, RuntimePluginSource } from '@keundal/chat/platform'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
 import { localizedText, sharedText } from '@keundal/ui/app/utils/locale.ts'
@@ -25,8 +25,19 @@ export function apply(ctx: Context) {
     meta: { label: localizedText(messages, 'runtime.title'), icon: 'i-lucide-puzzle', group: 'plugins' },
     inject: () => ({
       isAvailable: () => runtime.pluginManager !== undefined,
+      isInstallAvailable: () => typeof runtime.pluginManager?.install === 'function',
       list: () => modules().list(),
-      setEnabled: (module: string, enabled: boolean) => modules().setEnabled(module, enabled)
+      setEnabled: (module: string, enabled: boolean) => modules().setEnabled(module, enabled),
+      install: (source: RuntimePluginSource) => {
+        const manager = modules()
+        if (!manager.install) throw new Error('Plugin installation is unavailable for this connection.')
+        return manager.install(source)
+      },
+      remove: (module: string) => {
+        const manager = modules()
+        if (!manager.remove) throw new Error('Plugin removal is unavailable for this connection.')
+        return manager.remove(module)
+      }
     })
   }, RuntimePluginSettings))
   ctx.slots.inject('settings.section', () => ctx.slots.register({

@@ -1,13 +1,16 @@
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import { createNodeAgentHost } from '@keundal/agent-runtime-node'
 import type { NativeInvoke } from '@keundal/chat/platform'
 import { createNativeRuntimePluginManager } from '@keundal/plugin-chat-desktop'
 import { createChatTools } from '@keundal/plugin-tool-chat'
+import { strToU8, zipSync } from 'fflate'
 import { expect, onTestFinished, test, vi } from 'vitest'
 
 import { manageRuntimePlugins, createDesktopComposition, type PluginRequest } from '../sidecar/runtime-plugins'
@@ -142,7 +145,7 @@ test('재시작 실패는 이전 선택을 복구하고 다음 작업을 허용�
   const { directory, invoke } = fixture()
   const reload = vi.fn().mockRejectedValueOnce(new Error('restart failed')).mockResolvedValue(undefined)
   const manager = createNativeRuntimePluginManager(invoke, reload)
-  expect(Object.keys(manager).sort()).toEqual(['list', 'setEnabled'])
+  expect(Object.keys(manager).sort()).toEqual(['install', 'list', 'remove', 'setEnabled'])
   await expect(manager.setEnabled(chat, false)).rejects.toThrow('restart failed')
   expect(await manager.list()).toContainEqual(expect.objectContaining({ module: chat, enabled: true }))
   await manager.setEnabled(chat, false)
@@ -195,14 +198,14 @@ test('배포 매니페스트와 상대 경로 및 필수 서비스를 선택 변
   expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(deployment)
 })
 
-test('저장소 밖으로 옮긴 번들 IPC는 외부 설치를 거부하고 선택 기능만 영속화한다', async () => {
+test('저장소 밖으로 옮긴 번들 IPC는 시스템 npm 없이 ZIP을 설치하고 선택 기능도 영속화한다', async () => {
   const { directory } = fixture()
   const bundle = join(directory, 'sidecar')
   cpSync('dist-sidecar', bundle, { recursive: true })
   const command = async (request: unknown) => {
     const child = spawn(process.execPath, [join(bundle, 'main.js'), '--manage-runtime-plugins'], {
       cwd: directory,
-      env: { ...process.env, KEUNDAL_MANAGED_PLUGINS: directory, KEUNDAL_PROVIDER: 'openai' }, signal: AbortSignal.timeout(10_000)
+      env: { ...process.env, PATH: '', KEUNDAL_MANAGED_PLUGINS: directory, KEUNDAL_PROVIDER: 'openai' }, signal: AbortSignal.timeout(10_000)
     })
     let output = ''
     let errors = ''
@@ -219,4 +222,164 @@ test('저장소 밖으로 옮긴 번들 IPC는 외부 설치를 거부하고 선
   expect(listed.status, listed.errors).toBe(0)
   expect(JSON.parse(listed.output)).toContainEqual(expect.objectContaining({ module: chat, enabled: false }))
   expect(JSON.parse(listed.output)).toContainEqual(expect.objectContaining({ module: '@keundal/plugin-store-sqlite', enabled: true, required: true }))
+  const zip = join(directory, 'plugin.zip')
+  writeFileSync(zip, zipSync({
+    'package/package.json': strToU8(JSON.stringify({ name: 'portable-plugin', version: '1.0.0', type: 'module', exports: './index.js' })),
+    'package/index.js': strToU8('export default ctx => { ctx.provide("portable", true) }')
+  }))
+  const installed = await command({ action: 'install', source: { type: 'zip', value: zip } })
+  expect(installed.status, installed.errors).toBe(0)
+  expect(JSON.parse((await command({ action: 'list' })).output)).toContainEqual(expect.objectContaining({
+    enabled: false, source: { type: 'zip', value: zip }, version: '1.0.0'
+  }))
+}, 20_000)
+
+test('로컬 패키지와 ZIP은 설치 스크립트와 import 없이 등록하고 활성화할 때 ESM 진입점을 실행한다', async () => {
+  const { directory, open, invoke } = fixture()
+  const source = join(directory, 'source')
+  const marker = join(directory, 'imported')
+  const scriptMarker = join(directory, 'script-ran')
+  mkdirSync(source)
+  const script = `node -e "require('fs').writeFileSync('${scriptMarker.replaceAll('\\', '/')}', 'bad')"`
+  const manifest = { name: 'local-plugin', version: '1.2.3', type: 'module', exports: { import: './plugin.mjs', require: './wrong.cjs' },
+    scripts: { preinstall: script, prepare: script, postinstall: script } }
+  const code = `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'yes'); export default ctx => { ctx.provide('externalMarker', 'loaded') }`
+  writeFileSync(join(source, 'package.json'), JSON.stringify(manifest))
+  writeFileSync(join(source, 'plugin.mjs'), code)
+  const zip = join(directory, 'source.zip')
+  writeFileSync(zip, zipSync({ 'package.json': strToU8(JSON.stringify(manifest)), 'plugin.mjs': strToU8(code) }))
+  const prefix = join(directory, 'outside-prefix')
+  vi.stubEnv('npm_config_prefix', prefix)
+  vi.stubEnv('npm_config_global', 'true')
+  onTestFinished(() => { vi.unstubAllEnvs() })
+  for (const input of [{ type: 'path', value: source }, { type: 'zip', value: zip }] as const) {
+    const manager = createNativeRuntimePluginManager(invoke, async () => {})
+    await manager.install!(input)
+    const entry = (await manager.list()).find(entry => entry.source?.type === input.type)!
+    expect(entry).toMatchObject({ enabled: false, version: '1.2.3' })
+    expect(existsSync(scriptMarker)).toBe(false)
+    expect(existsSync(prefix)).toBe(false)
+    expect(existsSync(marker)).toBe(false)
+    const disabled = await open()
+    expect(disabled.ctx.get('externalMarker')).toBeUndefined()
+    await disabled.dispose()
+    await manager.setEnabled(entry.module, true)
+    const host = await open()
+    expect(host.ctx.get('externalMarker')).toBe('loaded')
+    expect(readFileSync(marker, 'utf8')).toBe('yes')
+    await host.dispose()
+    const managed = join(directory, 'installed', entry.module.slice('external:'.length))
+    await manager.remove!(entry.module)
+    expect(await manager.list()).not.toContainEqual(expect.objectContaining({ module: entry.module }))
+    expect(existsSync(managed)).toBe(false)
+    expect(existsSync(source)).toBe(true)
+    rmSync(marker)
+  }
+}, 20_000)
+
+test('로컬 파일의 활성화 오류는 앱 시작을 막지 않고 재시작 후 선택과 부분 효과를 복구한다', async () => {
+  const { directory, open, invoke } = fixture()
+  const path = join(directory, 'broken.mjs')
+  writeFileSync(path, `export default ctx => { ctx.effect(() => { ctx.provide('partialMarker', true); return () => ctx.provide('partialMarker', false) }); throw new Error('broken plugin') }`)
+  let host = await open()
+  const manager = createNativeRuntimePluginManager(invoke, async () => {
+    await host.dispose()
+    host = await open()
+  })
+  await manager.install!({ type: 'path', value: path })
+  const entry = (await manager.list()).find(entry => entry.source)!
+  await expect(manager.setEnabled(entry.module, true)).rejects.toThrow('broken plugin')
+  expect((await manager.list()).find(item => item.module === entry.module)).toMatchObject({ enabled: false })
+  expect(host.ctx.get('partialMarker')).toBeUndefined()
+  await manager.setEnabled(entry.module, false)
+  await manager.remove!(entry.module)
+  expect(existsSync(path)).toBe(true)
 })
+
+test('설치 및 삭제 후 재시작이 실패하면 선택과 복구에 필요한 파일을 보존한다', async () => {
+  const { directory, invoke } = fixture()
+  const path = join(directory, 'plugin.mjs')
+  writeFileSync(path, 'export default () => {}')
+  const reload = vi.fn().mockRejectedValueOnce(new Error('restart failed')).mockResolvedValue(undefined)
+  const manager = createNativeRuntimePluginManager(invoke, reload)
+  await expect(manager.install!({ type: 'path', value: path })).rejects.toThrow('restart failed')
+  expect((await manager.list()).some(entry => entry.source)).toBe(false)
+  expect(readdirSync(join(directory, 'installed'))).toEqual([])
+  await manager.install!({ type: 'path', value: path })
+  const entry = (await manager.list()).find(entry => entry.source)!
+  reload.mockRejectedValueOnce(new Error('restart failed'))
+  await expect(manager.remove!(entry.module)).rejects.toThrow('restart failed')
+  expect(await manager.list()).toContainEqual(expect.objectContaining({ module: entry.module }))
+  expect(existsSync(join(directory, 'installed', entry.module.slice('external:'.length)))).toBe(true)
+})
+
+test('ZIP 경로 탈출과 URL 패키지 및 상대 경로는 선택과 원본 파일을 변경하지 않는다', async () => {
+  const { directory } = fixture()
+  const zip = join(directory, 'unsafe.zip')
+  writeFileSync(zip, zipSync({ '../escaped': strToU8('bad') }))
+  for (const source of [
+    { type: 'zip', value: zip }, { type: 'path', value: './relative.mjs' },
+    { type: 'npm', value: 'https://example.com/plugin.tgz' }, { type: 'npm', value: 'git+https://example.com/plugin' },
+    { type: 'jsr', value: 'not-scoped' }
+  ]) {
+    await expect(manageRuntimePlugins(directory, { action: 'install', source } as PluginRequest)).rejects.toThrow()
+    expect((await manageRuntimePlugins(directory, { action: 'list' }) as unknown[])).toHaveLength(6)
+  }
+  expect(existsSync(join(directory, 'escaped'))).toBe(false)
+  expect(readdirSync(join(directory, 'installed'))).toEqual([])
+})
+
+test('npm과 JSR은 버전 지정과 실제 패키지 의존성 설치를 지원한다', async () => {
+  const { directory, open } = fixture()
+  const source = join(directory, 'registry-source')
+  mkdirSync(source)
+  const manifest = { name: '@jsr/test__plugin', version: '1.2.3', type: 'module', exports: './index.js', dependencies: { 'fixture-dependency': '2.3.4' } }
+  writeFileSync(join(source, 'package.json'), JSON.stringify(manifest))
+  writeFileSync(join(source, 'index.js'), 'import value from "fixture-dependency"; export default ctx => { ctx.provide("registryMarker", value) }')
+  const npm = join(dirname(createRequire(import.meta.url).resolve('desktop-npm/package.json')), 'bin/npm-cli.js')
+  const packed = spawnSync(process.execPath, [npm, 'pack', '--ignore-scripts', '--json'], { cwd: source, encoding: 'utf8' })
+  expect(packed.status, packed.stderr).toBe(0)
+  const archive = readFileSync(join(source, JSON.parse(packed.stdout)[0].filename))
+  const dependency = { name: 'fixture-dependency', version: '2.3.4', type: 'module', exports: './index.js' }
+  const dep = join(directory, 'dependency')
+  mkdirSync(dep)
+  writeFileSync(join(dep, 'package.json'), JSON.stringify(dependency))
+  writeFileSync(join(dep, 'index.js'), 'export default 123')
+  const packedDep = spawnSync(process.execPath, [npm, 'pack', '--ignore-scripts', '--json'], { cwd: dep, encoding: 'utf8' })
+  expect(packedDep.status, packedDep.stderr).toBe(0)
+  const depArchive = readFileSync(join(dep, JSON.parse(packedDep.stdout)[0].filename))
+  const requests: string[] = []
+  const server = createServer((req, res) => {
+    requests.push(decodeURIComponent(req.url!))
+    if (req.url === '/package.tgz') res.end(archive)
+    else if (req.url === '/dependency.tgz') res.end(depArchive)
+    else {
+      const pkg = req.url === '/fixture-dependency' ? dependency : manifest
+      res.setHeader('content-type', 'application/json')
+      res.end(JSON.stringify({ name: pkg.name, 'dist-tags': { latest: pkg.version }, versions: { [pkg.version]: {
+        ...pkg, dist: { tarball: `http://127.0.0.1:${(server.address() as { port: number }).port}/${pkg === manifest ? 'package' : 'dependency'}.tgz` }
+      } } }))
+    }
+  }).listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  onTestFinished(() => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())))
+  const registry = `http://127.0.0.1:${(server.address() as { port: number }).port}/`
+  vi.stubEnv('npm_config_registry', registry)
+  vi.stubEnv('npm_config_@jsr:registry', registry)
+  vi.stubEnv('npm_config_cache', join(directory, 'npm-cache'))
+  onTestFinished(() => { vi.unstubAllEnvs() })
+  for (const source of [{ type: 'npm', value: '@jsr/test__plugin@1.2.3' }, { type: 'jsr', value: '@test/plugin@1.2.3' }] as const) {
+    const transaction = await manageRuntimePlugins(directory, { action: 'install', source })
+    if (Array.isArray(transaction)) throw new Error('Expected transaction')
+    const entry = transaction.expected.at(-1)!
+    expect(entry).toMatchObject({ enabled: false, version: '1.2.3', source })
+    await manageRuntimePlugins(directory, { action: 'enable', module: entry.module, enabled: true })
+    const host = await open()
+    expect(host.ctx.get('registryMarker')).toBe(123)
+    await host.dispose()
+    await manageRuntimePlugins(directory, { action: 'enable', module: entry.module, enabled: false })
+  }
+  expect(requests).toContain('/@jsr/test__plugin')
+  expect(requests).toContain('/package.tgz')
+  expect(requests).toContain('/fixture-dependency')
+}, 20_000)

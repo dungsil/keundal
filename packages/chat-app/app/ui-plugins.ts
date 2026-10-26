@@ -53,6 +53,8 @@ export class UIPluginManager implements RuntimePluginManager {
   private pending: Promise<unknown> = Promise.resolve()
   private closing = false
   private disposal?: Promise<void>
+  readonly install?: RuntimePluginManager['install']
+  readonly remove?: RuntimePluginManager['remove']
 
   constructor(
     private readonly ctx: Context,
@@ -61,7 +63,17 @@ export class UIPluginManager implements RuntimePluginManager {
       platform?: RuntimePluginManager
     },
     private readonly catalog: readonly UIPluginEntry[] = uiPluginCatalog
-  ) {}
+  ) {
+    if (options.platform?.install) this.install = source => this.change(async () => {
+      await options.stop()
+      await options.platform!.install!(source)
+    })
+    if (options.platform?.remove) this.remove = module => this.change(async () => {
+      await options.stop()
+      await options.platform!.remove!(module)
+      this.errors.delete(module)
+    })
+  }
 
   private change(action: () => Promise<void>): Promise<void> {
     if (this.closing) return Promise.reject(new Error('UI plugin manager is closed'))
