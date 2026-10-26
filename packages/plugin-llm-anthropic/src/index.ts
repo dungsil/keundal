@@ -15,6 +15,14 @@ import { AnthropicLLMConfigSchema, parseConfig, type AnthropicLLMConfig } from '
 import { MessageEvents } from './events.js'
 import { createInput } from './request.js'
 
+export const metadata = {
+  name: { en: 'Anthropic', ko: 'Anthropic' },
+  description: {
+    en: 'Connects Claude models through the Anthropic Messages API.',
+    ko: 'Anthropic Messages API로 Claude 모델에 연결합니다.'
+  }
+}
+
 export { AnthropicLLMConfigSchema, type AnthropicLLMConfig } from './config.js'
 export { listAnthropicModels } from './models.js'
 

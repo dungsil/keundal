@@ -7,7 +7,7 @@ const props = defineProps<{
   list: () => Promise<RuntimePluginInfo[]>
   setEnabled: (module: string, enabled: boolean) => Promise<void>
 }>()
-const { t } = useText()
+const { t, locale } = useText()
 const available = ref(false)
 const plugins = ref<RuntimePluginInfo[]>([])
 const busy = ref(false)
@@ -49,10 +49,11 @@ onMounted(() => {
           <li v-for="plugin in plugins" :key="plugin.module" class="space-y-2 p-3">
             <div class="flex items-center gap-3">
               <div class="min-w-0 flex-1 space-y-1">
-                <p class="text-sm font-medium break-all">{{ plugin.module }}</p>
+                <p class="text-sm font-medium break-words">{{ plugin.metadata?.name[locale] || plugin.module }}</p>
+                <p v-if="plugin.metadata" class="text-sm text-muted break-words">{{ plugin.metadata.description[locale] }}</p>
                 <p class="text-xs text-muted" role="status">{{ t(plugin.required ? 'runtime.required' : plugin.error ? 'runtime.failed' : plugin.enabled ? 'runtime.enabled' : 'runtime.disabled') }}</p>
               </div>
-              <USwitch :model-value="plugin.enabled" :disabled="busy || plugin.required" :aria-label="t('runtime.enable', { name: plugin.module })" @update:model-value="run(() => setEnabled(plugin.module, $event))" />
+              <USwitch :model-value="plugin.enabled" :disabled="busy || plugin.required" :aria-label="t('runtime.enable', { name: plugin.metadata?.name[locale] || plugin.module })" @update:model-value="run(() => setEnabled(plugin.module, $event))" />
             </div>
             <UAlert v-if="plugin.error" color="error" :title="plugin.error" :ui="{ title: 'break-words' }" />
           </li>

@@ -15,9 +15,9 @@ test('스킬·MCP 선택에 따라 해당 화면을 해제하고 새로고침 �
     globalThis.document.cookie = `keundal-ui-plugins=${encodeURIComponent(JSON.stringify(legacySelections))}; path=/`
   })
   await ready(page, '/settings/runtime-plugins')
-  const skills = page.getByRole('switch', { name: 'Enable @keundal/plugin-skill', exact: true })
-  const mcp = page.getByRole('switch', { name: 'Enable @keundal/plugin-mcp-client', exact: true })
-  const tools = page.getByRole('switch', { name: 'Enable @keundal/plugin-tool-chat', exact: true })
+  const skills = page.getByRole('switch', { name: 'Enable Skills', exact: true })
+  const mcp = page.getByRole('switch', { name: 'Enable MCP connections', exact: true })
+  const tools = page.getByRole('switch', { name: 'Enable Weather and charts', exact: true })
   const skillsLink = page.getByRole('link', { name: 'Skills', exact: true })
   const mcpLink = page.getByRole('link', { name: 'MCP servers', exact: true })
   await expect(skills).toBeEnabled()
@@ -33,8 +33,8 @@ test('스킬·MCP 선택에 따라 해당 화면을 해제하고 새로고침 �
   await expect(page.getByText(/@keundal\/ui-/)).toHaveCount(0)
   await expect(page.getByRole('textbox')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Install|Add plugin/ })).toHaveCount(0)
-  for (const module of ['@keundal/plugin-llm-browser', '@keundal/plugin-store-indexeddb', '@keundal/plugin-agent-chat']) {
-    const required = page.getByRole('switch', { name: `Enable ${module}`, exact: true })
+  for (const name of ['Browser model connection', 'Browser storage', 'Chat agent']) {
+    const required = page.getByRole('switch', { name: `Enable ${name}`, exact: true })
     await expect(required).toBeDisabled()
     await expect(required).toBeChecked()
   }
@@ -78,4 +78,18 @@ test('스킬·MCP 선택에 따라 해당 화면을 해제하고 새로고침 �
   await accessible(page)
   await tools.click()
   await expect(tools).toBeChecked()
+})
+
+test('선택한 언어로 기능 이름과 설명 및 스위치 이름을 표시한다', async ({ page, context }) => {
+  await ready(page, '/settings/runtime-plugins')
+  await expect(page.getByText('Skills', { exact: true }).last()).toBeVisible()
+  await expect(page.getByText('Provides reusable instructions for the agent to load when needed.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('switch', { name: 'Enable Skills', exact: true })).toBeChecked()
+  await context.addCookies([{ name: 'keundal-locale', value: 'ko', url: page.url() }])
+  await page.reload()
+  await expect(page.getByText('스킬', { exact: true }).last()).toBeVisible()
+  await expect(page.getByText('에이전트가 필요할 때 불러올 수 있는 재사용 가능한 지침을 제공합니다.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('switch', { name: '스킬 활성화', exact: true })).toBeChecked()
+  await expect(page.getByRole('switch', { name: '브라우저 저장소 활성화', exact: true })).toBeDisabled()
+  await expect(page.getByText('@keundal/plugin-skill', { exact: true })).toHaveCount(0)
 })

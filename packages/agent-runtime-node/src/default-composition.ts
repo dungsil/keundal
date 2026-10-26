@@ -6,15 +6,15 @@ import { pathToFileURL } from 'node:url'
 import { loadAgentPlugin, type LoadedAgentPlugin } from '@keundal/agent-plugins'
 import type { ExecutionOptions, SkillProvider } from '@keundal/core'
 import { parseMcpServers } from '@keundal/mcp'
-import agentPlugin from '@keundal/plugin-agent-chat'
-import anthropic from '@keundal/plugin-llm-anthropic'
-import gemini from '@keundal/plugin-llm-gemini'
-import openai from '@keundal/plugin-llm-openai'
-import openaiChat from '@keundal/plugin-llm-openai-chat'
-import { McpClient } from '@keundal/plugin-mcp-client'
+import agentPlugin, { metadata as agentMetadata } from '@keundal/plugin-agent-chat'
+import anthropic, { metadata as anthropicMetadata } from '@keundal/plugin-llm-anthropic'
+import gemini, { metadata as geminiMetadata } from '@keundal/plugin-llm-gemini'
+import openai, { metadata as openaiMetadata } from '@keundal/plugin-llm-openai'
+import openaiChat, { metadata as openaiChatMetadata } from '@keundal/plugin-llm-openai-chat'
+import { McpClient, metadata as mcpMetadata } from '@keundal/plugin-mcp-client'
 import { loadRuntimePlugins, parseRuntimePluginManifest, type RuntimePluginManifest } from '@keundal/plugin-runtime'
-import skillPlugin from '@keundal/plugin-skill'
-import sqlite from '@keundal/plugin-store-sqlite'
+import skillPlugin, { metadata as skillMetadata } from '@keundal/plugin-skill'
+import sqlite, { metadata as storeMetadata } from '@keundal/plugin-store-sqlite'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 import type { Context, Fiber } from 'cordis'
 import { resolve as resolveModule } from 'import-meta-resolve'
@@ -22,6 +22,18 @@ import { resolve as resolveModule } from 'import-meta-resolve'
 import type { HostCompositionFactory, NodeHostOptions } from './index.js'
 
 const providerPlugins = { openai, 'openai-chat': openaiChat, anthropic, gemini }
+
+/** Display metadata for the statically bundled Node implementations, without loading external modules. */
+export const nodePluginMetadata = {
+  '@keundal/plugin-llm-openai': openaiMetadata,
+  '@keundal/plugin-llm-openai-chat': openaiChatMetadata,
+  '@keundal/plugin-llm-anthropic': anthropicMetadata,
+  '@keundal/plugin-llm-gemini': geminiMetadata,
+  '@keundal/plugin-store-sqlite': storeMetadata,
+  '@keundal/plugin-agent-chat': agentMetadata,
+  '@keundal/plugin-skill': skillMetadata,
+  '@keundal/plugin-mcp-client': mcpMetadata
+}
 
 interface LoadedNodePlugins {
   setup(ctx: Context): Promise<void>
