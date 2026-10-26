@@ -53,6 +53,7 @@ export async function ready(page: Page, path: string) {
     '/settings/llm': '#llm-settings-title',
     '/settings/models': '#model-settings-title',
     '/settings/system-prompt': '#system-prompt-settings-title',
+    '/settings/subagents': '#subagent-settings-title',
     '/settings/mcp': '#mcp-settings-title',
     '/settings/skills': '#skill-settings-title',
     '/settings/plugins': '#plugin-settings-title',

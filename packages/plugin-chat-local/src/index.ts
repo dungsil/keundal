@@ -2,7 +2,14 @@ import type { ChatMessage, ChatMessageAssembly } from '@keundal/chat/chat-messag
 import { branchChat, chatSummary, validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, ChatSummary, LocalChat } from '@keundal/chat/chat-store'
 import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
-import { SteerQueue, type Reasoning, type AGUIEvent, type SessionSnapshot, type ExecutionOptions } from '@keundal/core'
+import {
+  SteerQueue,
+  type Reasoning,
+  type AGUIEvent,
+  type SessionSnapshot,
+  type ExecutionOptions,
+  type SubagentRole
+} from '@keundal/core'
 import type { Context } from 'cordis'
 
 import { createKeundalChat, toMessages, type KeundalChatRuntime, type MountAgent } from './keundal'
@@ -191,6 +198,7 @@ export class ChatStore implements ChatStoreLike {
       model: string
       titleModel?: string
       systemPrompt?: string
+      subagentRoles?: readonly SubagentRole[]
       reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void
@@ -271,7 +279,7 @@ export class ChatStore implements ChatStoreLike {
         runId,
         messages: request.messages,
         signal: combined,
-        state: { web: chat },
+        state: { web: chat, ...(request.subagentRoles === undefined ? {} : { subagentRoles: request.subagentRoles }) },
         onMessage: request.onMessage,
         instructions: `You are a knowledgeable and helpful AI assistant. Be clear, accurate and concise.
 Do not use markdown headings. Use bold text for section labels instead.

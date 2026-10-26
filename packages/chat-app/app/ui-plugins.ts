@@ -10,6 +10,7 @@ import * as modelSelection from '@keundal/ui-model-selection/plugin'
 import * as settings from '@keundal/ui-settings/plugin'
 import * as settingsLlm from '@keundal/ui-settings-llm/plugin'
 import * as skill from '@keundal/ui-skill/plugin'
+import * as subagents from '@keundal/ui-subagents/plugin'
 import * as tool from '@keundal/ui-tool/plugin'
 import * as trace from '@keundal/ui-trace/plugin'
 
@@ -29,6 +30,7 @@ export const uiPlugins = [
   tool,
   settings,
   settingsLlm,
+  subagents,
   agentPlugins,
   skill,
   mcp

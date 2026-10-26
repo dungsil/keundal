@@ -10,6 +10,7 @@ import {
   TRACE_EVENT,
   parseRunAgentInput,
   parseReasoning,
+  parseSubagentRoles,
   traceEvent,
   type AGUIEvent,
   type CompactionResult,
@@ -303,6 +304,8 @@ export function parseAgentConfig(value: unknown): AgentConfig {
   if (typeof maxActiveSubagents !== 'number' || !Number.isSafeInteger(maxActiveSubagents) || maxActiveSubagents <= 0)
     throw new Error('maxActiveSubagents must be a positive integer')
   const subagents = 'subagents' in value ? (value.subagents as boolean | undefined) : undefined
+  const subagentRoles =
+    'subagentRoles' in value && value.subagentRoles !== undefined ? parseSubagentRoles(value.subagentRoles) : undefined
   if (subagents && typeof tools !== 'function' && tools.some((tool) => tool.name === SUBAGENT_TOOL_NAME))
     throw new Error('delegate_task tool name is reserved when subagents are enabled')
   const skills = 'skills' in value ? (value.skills as boolean | undefined) : undefined
@@ -334,6 +337,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     ...(deferredToolProvider === undefined ? {} : { deferredToolProvider: deferredToolProvider as ToolProvider }),
     subagents,
     maxActiveSubagents,
+    ...(subagentRoles === undefined ? {} : { subagentRoles }),
     skills,
     ...('context' in value ? { context: value.context as boolean | undefined } : {}),
     ...(systemPrompt === undefined ? {} : { systemPrompt }),
@@ -489,7 +493,10 @@ export class Agent extends AgentService {
           ? [
               subagentTool(
                 (child, execution) => this.runInternal(child, execution, false),
-                this.config.maxActiveSubagents ?? 8
+                this.config.maxActiveSubagents ?? 8,
+                request.state?.subagentRoles === undefined
+                  ? this.config.subagentRoles
+                  : parseSubagentRoles(request.state.subagentRoles)
               )
             ]
           : []),

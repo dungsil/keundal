@@ -1,0 +1,26 @@
+import type { Context } from 'cordis'
+import type { SubagentRole } from '@keundal/core'
+import type {} from '@keundal/ui-runtime'
+import type {} from '@keundal/ui-settings/slots'
+import { localizedText } from '@keundal/ui/app/utils/locale.ts'
+
+import { messages } from './locale'
+import SubagentSettings from './views/SubagentSettings.vue'
+
+export const name = 'ui-subagents'
+export const inject = ['slots', 'chatRuntime']
+
+/** Add subagent roles to the settings page. */
+export function apply(ctx: Context) {
+  const runtime = ctx.chatRuntime
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    key: 'subagents',
+    order: 30,
+    meta: { label: localizedText(messages, 'subagents.title'), icon: 'i-lucide-users', group: 'general' },
+    inject: () => ({
+      subagentRoles: runtime.subagentRoles,
+      saveSubagentRoles: (value: readonly SubagentRole[]) => runtime.saveSubagentRoles(value)
+    })
+  }, SubagentSettings))
+}
