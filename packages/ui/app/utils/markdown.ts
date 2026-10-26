@@ -20,6 +20,8 @@ import sql from '@shikijs/langs/sql'
 import swift from '@shikijs/langs/swift'
 import toml from '@shikijs/langs/toml'
 import xml from '@shikijs/langs/xml'
+import githubDark from 'shiki/themes/github-dark-high-contrast.mjs'
+import githubLight from 'shiki/themes/github-light-high-contrast.mjs'
 
 const markdownAttributes = new Set([
   'class',
@@ -51,6 +53,8 @@ const markdownAttributes = new Set([
 export const chatMarkdownOptions = {
   plugins: [
     shiki({
+      registerDefaultThemes: false,
+      themes: { light: githubLight, dark: githubDark },
       languages: [
         html,
         css,

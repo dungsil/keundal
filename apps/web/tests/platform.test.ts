@@ -63,7 +63,7 @@ test('번들 스킬과 도구의 on/off를 실제 목록에 반영하고 재연�
     ])
     await expect(platform.runtimePlugins!.setEnabled('https://not-requested.invalid/plugin.mjs', true)).rejects.toThrow('Unknown bundled')
     await expect(platform.runtimePlugins!.setEnabled('@keundal/plugin-store-indexeddb', false)).rejects.toThrow('Required')
-    expect(await connection.catalog!()).toMatchObject({ skills: [{ name: 'review' }], tools: [{ name: 'chart' }, { name: 'weather' }] })
+    expect(await connection.catalog!()).toMatchObject({ skills: [{ name: 'review' }], tools: [{ name: 'chart' }, { name: 'weather' }, { name: 'markdown' }] })
     await connection.store.create(id, { id: 'retained', role: 'user', parts: [{ type: 'text', text: 'Keep this chat' }] }, 'openai/test')
     await platform.runtimePlugins!.setEnabled('@keundal/plugin-skill', false)
     await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chat', false)
@@ -79,7 +79,7 @@ test('번들 스킬과 도구의 on/off를 실제 목록에 반영하고 재연�
     expect(await restored.catalog!()).toEqual({ skills: [], tools: [] })
     expect((await restored.store.get(id))?.messages[0]?.id).toBe('retained')
     await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chat', true)
-    expect((await restored.catalog!()).tools.map(tool => tool.name)).toEqual(['chart', 'weather'])
+    expect((await restored.catalog!()).tools.map(tool => tool.name)).toEqual(['chart', 'weather', 'markdown'])
     await restored.store.delete(id)
   } finally {
     await restored.dispose()

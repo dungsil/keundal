@@ -40,7 +40,7 @@ test('번들 목록은 선택한 LLM과 저장소 및 에이전트를 잠그고 
     { module: '@keundal/plugin-agent-chat', enabled: true, required: true },
     { module: skills, enabled: true, feature: 'skills' }, { module: mcp, enabled: true, feature: 'mcp' }, { module: chat, enabled: true }
   ])
-  expect((await host.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart', 'weather'])
+  expect((await host.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart', 'weather', 'markdown'])
   await host.dispose()
   const switched = await open('gemini')
   expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual({
@@ -62,7 +62,7 @@ test('선택을 별도 파일에 보존하고 실제 도구 목록을 바꾸면�
   await disabled.dispose()
   await manageRuntimePlugins(directory, { action: 'enable', module: chat, enabled: true })
   const enabled = await open()
-  expect((await enabled.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart', 'weather'])
+  expect((await enabled.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart', 'weather', 'markdown'])
   expect((await enabled.services.session.get('saved'))?.revision).toBe(1)
 })
 

@@ -57,7 +57,7 @@ test('이전 메시지 링크를 열면 대상 메시지를 표시하고 전체 
   expect(content).toContain('Fixture message 84')
 })
 
-test('일반 응답은 원문으로 표시하고 markdown 도구만 서식을 적용하며 재접속과 복사·내보내기에 보존한다', async ({ page, context, browserName }) => {
+test('일반 응답은 원문으로 표시하고 markdown 도구만 서식을 적용하며 재접속과 복사·내보내기에 보존한다 @a11y:markdown', async ({ page, context, browserName }) => {
   const plain = '**Plain text**\n# Not a heading\n<img src=x onerror="alert(1)">'
   const markdown = '## Formatted report\n\n**Markdown content**\n\n| Item | Total |\n| --- | --- |\n| A | 37 |\n\n```js\nconst total = 37\n```\n\n![picture](https://example.com/a.png)'
   await seedChat(page, [{
@@ -68,8 +68,10 @@ test('일반 응답은 원문으로 표시하고 markdown 도구만 서식을 �
       { type: 'tool-markdown', toolCallId: 'formatted', state: 'output-available', input: { content: markdown }, output: { displayed: true } }
     ]
   }])
-  for (let visit = 0; visit < 2; visit++) {
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(theme => localStorage.setItem('nuxt-color-mode', theme), theme)
     await ready(page, '/chat/browser-fixture')
+    await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${theme}\\b`))
     const message = page.locator('#message-formats')
     await expect(message.getByText(plain, { exact: true })).toBeVisible()
     await expect(message.getByRole('heading', { name: 'Not a heading' })).toHaveCount(0)
@@ -82,6 +84,7 @@ test('일반 응답은 원문으로 표시하고 markdown 도구만 서식을 �
     await expect(message.getByRole('link', { name: 'Report source' })).toHaveAttribute('href', 'https://example.com/report')
     await expect(message.getByRole('link', { name: 'Unsafe source' })).toHaveCount(0)
     await expect(message.getByRole('link', { name: 'picture' })).toHaveAttribute('href', 'https://example.com/a.png')
+    await accessible(page)
   }
   if (browserName === 'chromium') {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])

@@ -127,6 +127,10 @@
   "packages/ui-tool/app/views/Chart.vue": {
     "exemption": "Requires generated tool output or source citations; browser generation fixtures are not implemented yet."
   },
+  "packages/ui-tool/app/views/Markdown.vue": {
+    "scenario": "@a11y:markdown",
+    "test": "apps/web/tests/browser/transcript.spec.ts"
+  },
   "packages/ui-tool/app/views/SearchTool.vue": {
     "exemption": "Requires generated tool output or source citations; browser generation fixtures are not implemented yet."
   },

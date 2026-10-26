@@ -115,7 +115,7 @@ test('완료된 코드 블록을 재사용하는 스트리밍에서도 강조 �
     const document = await parse('```python\n# comment\nprint("safe")\n```\n\n![picture](https://example.com/a.png)' + suffix, { streaming: true })
     const html = await renderToString(createSSRApp(MarkdownDocument, { value: document }))
     expect(html).toContain('<span style=')
-    expect(html).toContain('--shiki-dark-font-style:italic')
+    expect(html).toMatch(/--shiki-dark:#[0-9a-f]+/i)
     expect(html).toContain('href="https://example.com/a.png"')
     expect(html).toContain('picture')
     expect(html).not.toContain('<img')
