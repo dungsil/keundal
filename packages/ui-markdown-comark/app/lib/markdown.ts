@@ -21,6 +21,7 @@ import swift from '@shikijs/langs/swift'
 import toml from '@shikijs/langs/toml'
 import xml from '@shikijs/langs/xml'
 
+// Comark-specific attributes are confined to this renderer implementation.
 const markdownAttributes = new Set([
   'class',
   'classname',

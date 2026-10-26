@@ -5,6 +5,7 @@ import * as composer from '@keundal/ui-composer/plugin'
 import * as dictation from '@keundal/ui-dictation/plugin'
 import * as home from '@keundal/ui-home/plugin'
 import * as layout from '@keundal/ui-layout/plugin'
+import * as markdown from '@keundal/ui-markdown-comark/plugin'
 import * as mcp from '@keundal/ui-mcp/plugin'
 import * as modelSelection from '@keundal/ui-model-selection/plugin'
 import * as settings from '@keundal/ui-settings/plugin'
@@ -25,6 +26,7 @@ export interface UIPluginEntry {
 
 /** Static build registry; core views stay mounted and feature views follow their runtime services. */
 export const uiPluginCatalog: readonly UIPluginEntry[] = [
+  { module: '@keundal/ui-markdown-comark', plugin: markdown },
   { module: '@keundal/ui-layout', plugin: layout },
   { module: '@keundal/ui-chat-list', plugin: chatList },
   { module: '@keundal/ui-home', plugin: home },

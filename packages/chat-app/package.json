@@ -9,7 +9,6 @@
     "typecheck": "nuxt typecheck && tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@comark/nuxt": "^0.8.1",
     "@iconify-json/logos": "^1.2.15",
     "@iconify-json/lucide": "^1.2.142",
     "@iconify-json/simple-icons": "^1.2.99",
@@ -23,6 +22,7 @@
     "@keundal/ui-dictation": "workspace:*",
     "@keundal/ui-home": "workspace:*",
     "@keundal/ui-layout": "workspace:*",
+    "@keundal/ui-markdown-comark": "workspace:*",
     "@keundal/ui-mcp": "workspace:*",
     "@keundal/ui-model-selection": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
@@ -34,13 +34,11 @@
     "@keundal/ui-tool": "workspace:*",
     "@keundal/ui-trace": "workspace:*",
     "@nuxt/ui": "^4.11.3",
-    "@shikijs/langs": "^4.5.0",
     "cordis": "catalog:",
     "motion-v": "^2.6.0",
     "nuxt": "^4.6.2",
     "nuxt-charts": "^2.2.3",
     "pretendard": "1.3.9",
-    "shiki": "^4.5.0",
     "striptags": "3.2.0",
     "tailwindcss": "^4.3.3",
     "vue": "3.5.44"

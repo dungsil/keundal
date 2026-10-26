@@ -31,7 +31,7 @@ function isToolStreaming(part: ToolPart): boolean {
       :streaming="part.state === 'streaming'"
       chevron="leading"
     >
-      <LazyChatComark dir="auto" class="wrap-break-word" :value="part.text" :streaming="part.state === 'streaming'" />
+      <ChatMarkdown dir="auto" class="wrap-break-word" :value="part.text" :streaming="part.state === 'streaming'" />
     </UChatReasoning>
 
     <template v-else-if="'toolCallId' in part">
@@ -51,7 +51,7 @@ function isToolStreaming(part: ToolPart): boolean {
     </template>
 
     <template v-else-if="part.type === 'text'">
-      <LazyChatComark v-if="message.role === 'assistant'" dir="auto" class="wrap-break-word" :value="part.text" :streaming="part.state === 'streaming'" />
+      <ChatMarkdown v-if="message.role === 'assistant'" dir="auto" class="wrap-break-word" :value="part.text" :streaming="part.state === 'streaming'" :sources="part.sources" />
       <template v-else-if="message.role === 'user'">
         <MessageEdit
           v-if="editing"
