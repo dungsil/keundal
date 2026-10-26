@@ -3,7 +3,7 @@ import type { SkillSummary } from '@keundal/core'
 import type { ChatStatus } from '@keundal/chat/chat-message'
 import type { FileWithStatus } from '@keundal/chat/file'
 import { SlotOutlet } from '@keundal/ui-slots'
-import { useElementBounding } from '@vueuse/core'
+import { useElementBounding, useMediaQuery } from '@vueuse/core'
 import type { Ref } from 'vue'
 
 import { useText } from '../locale'
@@ -50,6 +50,7 @@ const props = withDefaults(
 
 const running = computed(() => props.status === 'submitted' || props.status === 'streaming')
 const busy = computed(() => props.uploading || props.disabled)
+const touchInput = useMediaQuery('(pointer: coarse)')
 const deliveryModes = computed(() => [
   { value: 'queue' as const, label: t('chat.deliveryQueue'), description: t('chat.deliveryQueueDescription'), icon: 'i-lucide-list-ordered' },
   { value: 'steer' as const, label: t('chat.deliverySteer'), description: t('chat.deliverySteerDescription'), icon: 'i-lucide-corner-down-right' }
@@ -227,6 +228,8 @@ const dictationOwner = computed(() => ({
       :id="inputId"
       name="prompt"
       :autofocus="false"
+      :submit-on-enter="!touchInput"
+      :maxrows="touchInput ? 6 : undefined"
       :model-value="input"
       :status="status"
       :error="error"
