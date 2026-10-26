@@ -2,10 +2,11 @@ import type { Context } from 'cordis'
 import type { AgentPluginSettings } from '@keundal/chat/platform'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
-import { localizedText } from '@keundal/ui/app/utils/locale.ts'
+import { localizedText, sharedText } from '@keundal/ui/app/utils/locale.ts'
 
 import { messages } from './locale'
 import AgentPluginSettingsSection from './views/AgentPluginSettings.vue'
+import RuntimePluginSettings from './views/RuntimePluginSettings.vue'
 
 export const name = 'ui-agent-plugins'
 export const inject = ['slots', 'chatRuntime']
@@ -16,11 +17,23 @@ export function apply(ctx: Context) {
   // The platform and store exist only in the browser, so each callback reads them when it runs.
   const manager = () => runtime.platform.plugins!
   const stop = () => runtime.store.stop()
+  const modules = () => runtime.pluginManager!
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    key: 'runtime-plugins',
+    order: 90,
+    meta: { label: localizedText(messages, 'runtime.title'), icon: 'i-lucide-puzzle', group: 'plugins' },
+    inject: () => ({
+      isAvailable: () => runtime.pluginManager !== undefined,
+      list: () => modules().list(),
+      setEnabled: (module: string, enabled: boolean) => modules().setEnabled(module, enabled)
+    })
+  }, RuntimePluginSettings))
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
     key: 'plugins',
     order: 100,
-    meta: { label: localizedText(messages, 'plugin.manage'), icon: 'i-lucide-blocks', group: 'plugins' },
+    meta: { label: sharedText('plugin.title'), icon: 'i-lucide-blocks', group: 'plugins' },
     inject: () => ({
       isAvailable: () => runtime.platform.plugins !== undefined,
       list: () => manager().list(),

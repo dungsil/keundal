@@ -40,6 +40,12 @@
           "description": "Allow the local main window to read direct SKILL.md files in the fixed skill roots",
           "windows": ["main"],
           "permissions": ["allow-list-skill-files", "allow-read-skill-file"]
+        },
+        {
+          "identifier": "runtime-plugins",
+          "description": "Allow the local main window to manage optional Cordis plugins in app data",
+          "windows": ["main"],
+          "permissions": ["allow-runtime-plugins"]
         }
       ]
     }

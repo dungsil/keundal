@@ -1,14 +1,32 @@
 import { createServer } from 'node:http'
 
-import { createAgentRuntime, createNodeComposition } from '@keundal/agent-runtime-node'
+import { createAgentRuntime } from '@keundal/agent-runtime-node'
 import { createChatTools } from '@keundal/plugin-tool-chat'
+import { manageRuntimePlugins, createDesktopComposition } from './runtime-plugins.js'
+
+if (process.argv[2] === '--manage-runtime-plugins') {
+  try {
+    let input = ''
+    for await (const chunk of process.stdin) input += String(chunk)
+    const directory = process.env.KEUNDAL_MANAGED_PLUGINS
+    if (!directory) throw new Error('Managed plugin directory is missing')
+    console.log(JSON.stringify(await manageRuntimePlugins(directory, JSON.parse(input))))
+    process.exit(0)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exit(1)
+  }
+}
 
 const sidecar = process.env.KEUNDAL_SIDECAR === '1'
 const host = process.env.KEUNDAL_HOST ?? '127.0.0.1'
 const port = Number(process.env.PORT ?? (sidecar ? 0 : 8000))
 if (!host.trim()) throw new Error('KEUNDAL_HOST는 비어 있을 수 없습니다.')
 if (!Number.isSafeInteger(port) || port < 0 || port > 65_535) throw new Error('PORT가 올바르지 않습니다.')
-const agentHost = await createAgentRuntime(process.env, { defaultTools: createChatTools(), compose: createNodeComposition })
+const agentHost = await createAgentRuntime(process.env, {
+  defaultTools: createChatTools(),
+  compose: createDesktopComposition(process.env.KEUNDAL_MANAGED_PLUGINS)
+})
 const app = agentHost.app
 
 const server = createServer(app).listen(port, host, () => {
