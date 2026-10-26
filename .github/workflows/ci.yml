@@ -204,9 +204,10 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .turbo/cache
-          key: turbo-v4-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: turbo-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            turbo-v4-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
+            turbo-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
+            turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Linux 빌드 의존성 설치
         if: runner.os == 'Linux'
@@ -225,7 +226,7 @@ jobs:
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: apps/desktop/src-tauri -> target
-          key: desktop-${{ matrix.name }}
+          shared-key: desktop-${{ matrix.name }}
           cache-bin: false
 
       - name: 데스크톱 설치 파일 빌드
@@ -271,6 +272,7 @@ jobs:
           name: desktop-${{ matrix.name }}
           overwrite: true
           path: ${{ matrix.artifact-path }}
+          compression-level: ${{ runner.os == 'Windows' && 6 || 0 }}
           if-no-files-found: error
           retention-days: 7
 
@@ -421,18 +423,34 @@ jobs:
           cache: true
           require-lockfile: true
 
+      - name: Turbo 공유 캐시 설정
+        id: turbo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
+            turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-
+
       - name: 접근성 검사 목록 확인
         run: |
           node --test tools/a11y/*.test.mjs
           node tools/a11y/check.mjs
 
       - name: Chromium 설치
-        run: pnpm --filter @keundal/web exec playwright install --with-deps chromium
+        run: pnpm --filter @keundal/web exec playwright install --with-deps --only-shell chromium
 
       - name: 웹 빌드
         env:
           NITRO_PRESET: node-server
         run: pnpm exec turbo run build --filter=@keundal/web...
+
+      - name: Turbo 공유 캐시 저장
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: ${{ steps.turbo-cache.outputs.cache-primary-key }}
 
       - name: 브라우저 회귀 검사
         run: pnpm --filter @keundal/web test:browser --project=chromium
@@ -447,6 +465,16 @@ jobs:
             apps/web/test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Turbo 실행 요약 업로드
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: turbo-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}
+          path: .turbo/runs/*.json
+          if-no-files-found: ignore
+          retention-days: 3
+          overwrite: true
 
   lint:
     name: 린트 및 형식 검사

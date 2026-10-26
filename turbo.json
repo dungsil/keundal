@@ -89,7 +89,10 @@
       "outputs": [
         "src-tauri/target/release/keundal-desktop",
         "src-tauri/target/release/keundal-desktop.exe",
-        "src-tauri/target/release/bundle/**",
+        "src-tauri/target/release/bundle/deb/*.deb",
+        "src-tauri/target/release/bundle/appimage/*.AppImage",
+        "src-tauri/target/release/bundle/dmg/*.dmg",
+        "src-tauri/target/release/bundle/macos/*.app/**",
         "src-tauri/sidecar/**",
         "src-tauri/binaries/**"
       ]
