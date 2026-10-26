@@ -13,7 +13,8 @@ export default defineConfig({
     'src/messages.ts',
     'src/index.ts',
     'src/tools/chart.ts',
-    'src/tools/weather.ts'
+    'src/tools/weather.ts',
+    'src/tools/markdown.ts'
   ],
   format: 'esm',
   fixedExtension: false,

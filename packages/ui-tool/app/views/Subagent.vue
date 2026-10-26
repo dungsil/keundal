@@ -68,7 +68,7 @@ const hasBody = computed(() => showLabel.value || !!task.value || !!answer.value
       <p v-if="answer && status === 'failed'" class="text-muted">
         {{ t('tool.subagentPartial') }}
       </p>
-      <LazyChatComark v-if="answer" :value="answer" />
+      <p v-if="answer" dir="auto" class="whitespace-pre-wrap break-words">{{ answer }}</p>
       <p v-if="diagnostic" class="text-error whitespace-pre-wrap break-words">
         {{ diagnostic }}
       </p>

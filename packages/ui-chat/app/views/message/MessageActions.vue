@@ -2,7 +2,9 @@
 import { useClipboard } from '@vueuse/core'
 
 import type { ChatMessage } from '@keundal/chat/chat-message'
+import { getMarkdownContent } from '@keundal/chat/tools/markdown'
 import { messagePermalink } from '../../lib/chat-transcript'
+import { getMergedParts } from '../../lib/messages'
 import { useText } from '../../locale'
 
 const { t, intlLocale } = useText()
@@ -54,10 +56,13 @@ async function copyLink() {
 async function copy() {
   try {
     await clipboard.copy(
-      props.message.parts
-        .filter(part => part.type === 'text')
-        .map(part => part.text)
-        .join('')
+      getMergedParts(props.message.parts)
+        .flatMap(part => {
+          if (part.type === 'text') return [part.text]
+          if ('toolCallId' in part && part.state === 'output-available') return getMarkdownContent(part) ?? []
+          return []
+        })
+        .join('\n\n')
     )
 
     copied.value = true

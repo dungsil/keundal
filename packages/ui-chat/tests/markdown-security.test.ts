@@ -2,10 +2,9 @@ import { createMarkdownParser } from '@comark/nuxt/parse'
 import { visit } from '@comark/nuxt/utils'
 import { MarkdownDocument } from '@comark/vue'
 import { describe, expect, test } from 'vitest'
-import { createSSRApp, defineComponent, h } from 'vue'
+import { createSSRApp } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { chatMarkdownOptions } from '@keundal/ui/app/utils/markdown.ts'
-import { sourceToInlineMdc } from '../app/lib/source'
 
 async function render(markdown: string, streaming = false) {
   const parse = createMarkdownParser(chatMarkdownOptions)
@@ -89,21 +88,6 @@ describe('공통 채팅 Markdown 렌더러의 보안 경계', () => {
     expect(html).toContain('<pre')
     expect(html).toContain('shiki')
     expect(html).toContain('<span style=')
-  })
-
-  test('생성된 출처 링크는 허용된 컴포넌트와 속성으로 전달한다', async () => {
-    const parse = createMarkdownParser(chatMarkdownOptions)
-    const document = await parse(sourceToInlineMdc('https://example.com/source'))
-    const SourceLink = defineComponent({
-      inheritAttrs: false,
-      props: ['url', 'label', 'favicon'],
-      setup: props => () => h('a', { href: props.url }, props.label)
-    })
-    const html = await renderToString(createSSRApp(MarkdownDocument, {
-      value: document, components: { 'source-link': SourceLink }
-    }))
-    expect(html).toContain('href="https://example.com/source"')
-    expect(html).toContain('example.com')
   })
 })
 

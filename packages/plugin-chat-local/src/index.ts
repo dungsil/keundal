@@ -274,7 +274,9 @@ export class ChatStore implements ChatStoreLike {
         state: { web: chat },
         onMessage: request.onMessage,
         instructions: `You are a knowledgeable and helpful AI assistant. Be clear, accurate and concise.
-Do not use markdown headings. Use bold text for section labels instead.
+Write normal responses in plain text, without Markdown formatting.
+When formatting is useful (documents, tables, or code blocks), use the markdown tool if available. Otherwise use plain text.
+Do not repeat content already displayed by the markdown tool in your subsequent response.
 ${request.webSearch && !request.model.startsWith('google/') ? 'Use native web search when current information is needed and cite sources.' : 'Web search is disabled. Do not claim to have verified live information.'}${request.systemPrompt?.trim() ? `\n\n${request.systemPrompt.trim()}` : ''}`,
         steer: run.steer,
         onFinish: async (message, steered) => {

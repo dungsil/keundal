@@ -46,6 +46,7 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   const requests: Record<string, unknown>[] = []
   const calls: string[] = []
   let generations = 0
+  const formatted = '## Report\n\n| Item | Total |\n| --- | --- |\n| A | 37 |'
   const mcp = new Server({ name: 'reports', version: '1' }, { capabilities: { tools: {} } })
   mcp.setRequestHandler('tools/list', () => ({ tools: [
     { name: 'search', description: 'Search reports', inputSchema: { type: 'object' } },
@@ -93,7 +94,8 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
       : !title && round === (deferred ? 1 : 0)
         ? [
             { type: 'function_call', id: 'fc_skill', call_id: 'skill_call', name: 'skill', arguments: '{"name":"review"}' },
-            { type: 'function_call', id: 'fc_mcp', call_id: 'mcp_call', name: tool?.name ?? 'missing-plugin-tool', arguments: '{}' }
+            { type: 'function_call', id: 'fc_mcp', call_id: 'mcp_call', name: tool?.name ?? 'missing-plugin-tool', arguments: '{}' },
+            { type: 'function_call', id: 'fc_markdown', call_id: 'markdown_call', name: 'markdown', arguments: JSON.stringify({ content: formatted }) }
           ]
         : [{ type: 'message', id: 'answer', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: 'Checked: 37', annotations: [] }] }]
     const frames: Record<string, unknown>[] = outputs.flatMap((item, output_index) => [
@@ -134,6 +136,8 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   expect(events.at(-1), JSON.stringify(events)).toMatchObject({ type: 'RUN_FINISHED' })
   expect(JSON.stringify(requests[0]!.input)).toContain('Answer in two sentences.')
   expect(JSON.stringify(requests[0]!.input)).toContain('You are a knowledgeable and helpful AI assistant.')
+  expect(JSON.stringify(requests[0]!.input)).toContain('Write normal responses in plain text')
+  expect(JSON.stringify(requests[0]!.input)).toContain('use the markdown tool if available')
   expect(calls, JSON.stringify({ requests, events })).toEqual(['search'])
   expect(JSON.stringify(requests.map(request => request.tools))).not.toContain('__delete')
   if (deferred) {
@@ -144,6 +148,13 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   const followup = requests[deferred ? 2 : 1]!
   expect(JSON.stringify(followup.input)).toContain('Compare totals independently.')
   expect(JSON.stringify(followup.input)).toContain('Total: 37')
+  const toolResult = (followup.input as { type?: string, call_id?: string, output?: string }[])
+    .find(item => item.type === 'function_call_output' && item.call_id === 'markdown_call')
+  expect(JSON.parse(toolResult!.output!)).toEqual({ displayed: true })
+  expect((await connection.store.get(id))!.messages[1]!.parts).toContainEqual({
+    type: 'tool-markdown', toolCallId: 'markdown_call', state: 'output-available',
+    input: { content: formatted }, output: { displayed: true }
+  })
   const changedStart = requests.length
   for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user], systemPrompt: 'Use bullet points.' })) void event
   const changedInput = JSON.stringify(requests[changedStart]!.input)

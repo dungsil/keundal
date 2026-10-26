@@ -1,4 +1,5 @@
 import type { ChatMessage } from '@keundal/chat/chat-message'
+import { getMarkdownContent } from '@keundal/chat/tools/markdown'
 
 export const TRANSCRIPT_PAGE_SIZE = 40
 
@@ -43,6 +44,7 @@ export function chatMarkdown(title: string, messages: readonly ChatMessage[]): s
   const sections = messages.map(message => {
     const parts = message.parts.flatMap(part => {
       if (part.type === 'text') return [part.text]
+      if ('toolCallId' in part && part.state === 'output-available') return getMarkdownContent(part) ?? []
       // Local/blob URLs expire and attachment URLs may contain credentials.
       if (part.type === 'file') return [`[Attachment: ${plainLabel(part.filename || part.mediaType)}]`]
       return []

@@ -1,5 +1,8 @@
 export default {
   'common.unavailable': 'N/A',
+  'tool.markdownLoading': 'Preparing Markdown…',
+  'tool.markdownFailed': 'Markdown failed',
+  'tool.markdownFinished': 'Markdown',
   'tool.subagentPartial': 'Partial response (task not completed)',
   'tool.subagentQueued': 'Subagent queued',
   'tool.subagentRunning': 'Subagent running',

@@ -2,6 +2,9 @@ import type en from './en'
 
 export default {
   'common.unavailable': '정보 없음',
+  'tool.markdownLoading': 'Markdown 준비 중…',
+  'tool.markdownFailed': 'Markdown 표시 실패',
+  'tool.markdownFinished': 'Markdown',
   'tool.subagentPartial': '부분 응답 (작업 미완료)',
   'tool.subagentQueued': '서브에이전트 대기 중',
   'tool.subagentRunning': '서브에이전트 실행 중',

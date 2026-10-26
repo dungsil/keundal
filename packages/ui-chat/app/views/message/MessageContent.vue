@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ChatMessage, ToolPart } from '@keundal/chat/chat-message'
 import { SlotOutlet } from '@keundal/ui-slots'
+import { getDomain } from '@keundal/ui/app/utils/url.ts'
 
 import { getMergedParts } from '../../lib/messages'
 import { useText } from '../../locale'
@@ -31,7 +32,7 @@ function isToolStreaming(part: ToolPart): boolean {
       :streaming="part.state === 'streaming'"
       chevron="leading"
     >
-      <LazyChatComark dir="auto" class="wrap-break-word" :value="part.text" :streaming="part.state === 'streaming'" />
+      <p dir="auto" class="whitespace-pre-wrap wrap-break-word">{{ part.text }}</p>
     </UChatReasoning>
 
     <template v-else-if="'toolCallId' in part">
@@ -50,8 +51,12 @@ function isToolStreaming(part: ToolPart): boolean {
       </SlotOutlet>
     </template>
 
+    <div v-else-if="part.type === 'source-url'" class="my-1">
+      <ChatSourceLink :url="part.url" :label="part.title || getDomain(part.url)" />
+    </div>
+
     <template v-else-if="part.type === 'text'">
-      <LazyChatComark v-if="message.role === 'assistant'" dir="auto" class="wrap-break-word" :value="part.text" :streaming="part.state === 'streaming'" />
+      <p v-if="message.role === 'assistant'" dir="auto" class="whitespace-pre-wrap wrap-break-word">{{ part.text }}</p>
       <template v-else-if="message.role === 'user'">
         <MessageEdit
           v-if="editing"

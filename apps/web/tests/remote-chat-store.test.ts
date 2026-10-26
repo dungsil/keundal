@@ -102,6 +102,8 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
   const firstInput = JSON.stringify(inputs[0])
   expect(firstInput).toContain('First system prompt.')
   expect(firstInput).toContain('You are a knowledgeable and helpful AI assistant.')
+  expect(firstInput).toContain('Write normal responses in plain text')
+  expect(firstInput).toContain('use the markdown tool if available')
   await collect(chats.respond('chat', { model, messages: [user], systemPrompt: 'Changed system prompt.' }))
   const changedInput = JSON.stringify(inputs[1])
   expect(changedInput).toContain('Changed system prompt.')

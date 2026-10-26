@@ -47,7 +47,6 @@ const markdownAttributes = new Set([
   'highlights',
   'meta'
 ])
-const sourceAttributes = new Set(['url', 'label'])
 
 export const chatMarkdownOptions = {
   plugins: [
@@ -129,8 +128,7 @@ export const chatMarkdownOptions = {
         'sup',
         'sub',
         'kbd',
-        'mark',
-        'source-link'
+        'mark'
       ],
       allowedProtocols: ['http', 'https', 'mailto'],
       allowDataImages: false
@@ -167,10 +165,7 @@ export const chatMarkdownOptions = {
                 }
                 // Nuxt prose components also consume props such as `to`, `as`, and `copy`.
                 // Allow only static Markdown attributes, not arbitrary component props.
-                const allowed =
-                  node[0] === 'source-link'
-                    ? sourceAttributes.has(name)
-                    : markdownAttributes.has(name) || name.startsWith('aria-') || name.startsWith('data-')
+                const allowed = markdownAttributes.has(name) || name.startsWith('aria-') || name.startsWith('data-')
                 if (!allowed) {
                   return []
                 }

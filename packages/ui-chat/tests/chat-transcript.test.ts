@@ -38,6 +38,11 @@ test('Markdown은 숨겨진 메시지와 본문 서식을 보존하고 내부 �
   const full: ChatMessage[] = [...messages, {
     id: 'last', role: 'assistant', parts: [
       { type: 'text', text: '**서식**\n\n```ts\nconst a = 1\n```' },
+      { type: 'tool-markdown', toolCallId: 'formatted', state: 'output-available', input: { content: '## 문서\n\n**도구 본문**' }, output: { displayed: true } },
+      { type: 'tool-markdown', toolCallId: 'failed', state: 'output-error', input: { content: '실패한 본문' }, errorText: 'failed' },
+      { type: 'tool-markdown', toolCallId: 'partial', state: 'input-streaming', input: { content: '미완성 본문' } },
+      { type: 'tool-markdown', toolCallId: 'invalid', state: 'output-available', input: { content: 42 }, output: { displayed: true } },
+      { type: 'tool-shell', toolCallId: 'private', state: 'output-available', input: { content: '다른 도구' }, output: '내부 결과' },
       { type: 'file', filename: 'file[1].png', mediaType: 'image/png', url: 'https://example.com/private?token=secret' },
       { type: 'reasoning', text: '비공개 추론' },
       { type: 'data-keundal', data: { model: 'internal', messages: [] } }
@@ -47,6 +52,8 @@ test('Markdown은 숨겨진 메시지와 본문 서식을 보존하고 내부 �
   expect(markdown).toContain('내용 0')
   expect(markdown).toContain('내용 124')
   expect(markdown).toContain('**서식**\n\n```ts\nconst a = 1\n```')
+  expect(markdown).toContain('## 문서\n\n**도구 본문**')
+  for (const excluded of ['실패한 본문', '미완성 본문', '다른 도구', '내부 결과', 'displayed']) expect(markdown).not.toContain(excluded)
   expect(markdown).toContain('Attachment: file\\[1\\].png')
   expect(markdown).not.toContain('secret')
   expect(markdown).not.toContain('비공개 추론')

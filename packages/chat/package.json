@@ -50,6 +50,10 @@
       "types": "./dist/tools/weather.d.ts",
       "import": "./dist/tools/weather.js"
     },
+    "./tools/markdown": {
+      "types": "./dist/tools/markdown.d.ts",
+      "import": "./dist/tools/markdown.js"
+    },
     "./chat-message-publisher": {
       "types": "./dist/chat-message-publisher.d.ts",
       "import": "./dist/chat-message-publisher.js"

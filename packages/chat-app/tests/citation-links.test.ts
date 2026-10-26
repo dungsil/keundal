@@ -5,7 +5,6 @@ import { compileScript, parse } from 'vue/compiler-sfc'
 import { renderToString } from 'vue/server-renderer'
 import ts from 'typescript'
 import * as urls from '../../ui/app/utils/url'
-import { sourceToInlineMdc } from '../../ui-chat/app/lib/source'
 import { getSources } from '../../ui-tool/app/lib/tool'
 
 // Compile the actual SFCs, including their attribute inheritance and templates.
@@ -46,7 +45,6 @@ const unsafe = [
 describe('인용 링크의 URL 검증', () => {
   test.each(unsafe)('안전하지 않은 %s URL은 링크로 렌더링하지 않는다', async (url) => {
     expect(urls.getCitationUrl(url)).toBeUndefined()
-    expect(sourceToInlineMdc(url)).toBe('')
     const inline = await render(SourceLink, { url, label: '출처', favicon: '' })
     expect(inline).toContain('<span class="break-words">출처</span>')
     expect(inline).not.toContain('<a')
@@ -67,7 +65,6 @@ describe('인용 링크의 URL 검증', () => {
 
   test.each(['https://example.com/source?q=1#section', 'http://example.com/source'])('정상 %s 인용은 유지한다', async (url) => {
     expect(urls.getCitationUrl(url)).toBe(url)
-    expect(sourceToInlineMdc(url)).toContain(`url="${url}"`)
     expect(await render(SourceLink, { url, label: '출처', favicon: '' })).toContain(`href="${url}"`)
     expect(await render(Sources, { sources: [{ url, title: '출처' }] })).toContain(`href="${url}"`)
   })

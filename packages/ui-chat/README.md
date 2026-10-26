@@ -36,8 +36,9 @@ import * as chat from '@keundal/ui-chat/plugin'
 - `app/views/ChatTitle.vue`, `ChatVisibility.vue`, `ChatSkeleton.vue`, `ChatIndicator.vue`, `ChatQueue.vue`: 화면의 구성 요소입니다.
 - `app/views/message/`: 메시지 내용, 동작 버튼, 편집 양식입니다.
 - `app/lib/use-keundal-chat.ts`: 전송·중단·편집·재생성·대기열 상태를 관리하는 컴포저블입니다. Nuxt 자동 가져오기에 의존하지 않으므로 단위 테스트에서 그대로 사용합니다.
-- `app/lib/messages.ts`: 인접한 텍스트 조각과 출처를 합칩니다.
-- `app/lib/source.ts`: 출처 URL을 `:source-link` MDC로 바꿉니다. 안전하지 않은 URL은 빈 문자열입니다.
+- `app/lib/messages.ts`: 인접한 텍스트 조각을 합치고 출처는 별도 항목으로 유지합니다.
 - `tests/markdown-security.test.ts`: 공통 Markdown 렌더러(`@keundal/ui`의 `chatMarkdownOptions`)의 보안 경계를 검증합니다.
 
-Markdown 렌더링(`ChatComark`, `SourceLink`, `chatMarkdownOptions`)은 여러 플러그인이 쓰므로 `@keundal/ui`에 있습니다.
+일반 응답과 추론은 줄바꿈을 보존한 일반 텍스트로 표시합니다. 출처는 공통 `SourceLink` 컴포넌트로 표시하고, 안전하지 않은 URL은 링크로 만들지 않습니다. Markdown 서식은 `@keundal/ui-tool`의 `markdown` 도구 화면에서만 적용합니다. 기존 대화의 텍스트도 일반 텍스트로 표시합니다.
+
+복사와 대화 내보내기는 일반 텍스트와 성공한 `markdown` 도구의 본문을 순서대로 포함합니다. 추론과 다른 도구의 내부 데이터는 포함하지 않습니다. Markdown 렌더러(`ChatComark`, `chatMarkdownOptions`)와 출처 링크(`SourceLink`)는 `@keundal/ui`에 있습니다.
