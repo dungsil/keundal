@@ -14,20 +14,17 @@ import * as tool from '@keundal/ui-tool/plugin'
 import * as trace from '@keundal/ui-trace/plugin'
 import type { RuntimePluginInfo, RuntimePluginManager } from '@keundal/chat/platform'
 import type { Context, Fiber, Plugin } from 'cordis'
-import type { Ref } from 'vue'
 
 export interface UIPluginEntry {
   module: string
-  required?: boolean
-  /** Infrastructure services are mounted by the shell before the catalog. */
-  plugin?: Plugin
+  plugin: Plugin
+  /** Follow the functional plugin, never an independent UI preference. */
+  feature?: RuntimePluginInfo['feature']
 }
 
-/** Static build registry: cookie values can select bundled plugins, never import arbitrary modules. */
+/** Static build registry; core views stay mounted and feature views follow their runtime services. */
 export const uiPluginCatalog: readonly UIPluginEntry[] = [
-  { module: '@keundal/ui-slots', required: true },
-  { module: '@keundal/ui-runtime', required: true },
-  { module: '@keundal/ui-layout', plugin: layout, required: true },
+  { module: '@keundal/ui-layout', plugin: layout },
   { module: '@keundal/ui-chat-list', plugin: chatList },
   { module: '@keundal/ui-home', plugin: home },
   { module: '@keundal/ui-chat', plugin: chat },
@@ -35,21 +32,19 @@ export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-model-selection', plugin: modelSelection },
   { module: '@keundal/ui-dictation', plugin: dictation },
   { module: '@keundal/ui-trace', plugin: trace },
+  // Shared rendering also covers search, skills, subagents and previously saved tool results.
   { module: '@keundal/ui-tool', plugin: tool },
-  { module: '@keundal/ui-settings', plugin: settings, required: true },
+  { module: '@keundal/ui-settings', plugin: settings },
   { module: '@keundal/ui-settings-llm', plugin: settingsLlm },
-  { module: '@keundal/ui-agent-plugins', plugin: agentPlugins, required: true },
-  { module: '@keundal/ui-skill', plugin: skill },
-  { module: '@keundal/ui-mcp', plugin: mcp }
+  { module: '@keundal/ui-agent-plugins', plugin: agentPlugins },
+  { module: '@keundal/ui-skill', plugin: skill, feature: 'skills' },
+  { module: '@keundal/ui-mcp', plugin: mcp, feature: 'mcp' }
 ]
 
 /** Kept for consumers that inspect the bundled plugin registrations. */
-export const uiPlugins = uiPluginCatalog.flatMap(entry => entry.plugin ? [entry.plugin] : [])
+export const uiPlugins = uiPluginCatalog.map(entry => entry.plugin)
 
-export type UIPluginSelections = Record<string, boolean>
-export const uiPluginCookie = 'keundal-ui-plugins'
-
-/** Owns live fibers, including those enabled after startup, and merges the platform's bundled catalog. */
+/** Owns UI fibers while exposing only the platform's functional plugin selections. */
 export class UIPluginManager implements RuntimePluginManager {
   private readonly fibers = new Map<string, Fiber>()
   private readonly errors = new Map<string, string>()
@@ -60,7 +55,6 @@ export class UIPluginManager implements RuntimePluginManager {
   constructor(
     private readonly ctx: Context,
     private readonly options: {
-      selections: Ref<UIPluginSelections | null | undefined>
       stop(): Promise<void>
       platform?: RuntimePluginManager
     },
@@ -74,25 +68,34 @@ export class UIPluginManager implements RuntimePluginManager {
     return result
   }
 
-  /** Same cookie-backed selection is used on the server and during hydration. Missing entries default to on. */
+  /** Mount identical defaults on the server and during hydration; sync saved functional state afterward. */
   mount(): Promise<void> {
-    return this.change(async () => {
-      for (const entry of this.catalog) {
-        if (!entry.plugin || this.fibers.has(entry.module)) continue
-        if (!entry.required && this.options.selections.value?.[entry.module] === false) continue
-        try {
-          await this.activate(entry)
-        } catch (error) {
-          this.errors.set(entry.module, String(error))
-          if (entry.required) throw error
-          // A failed optional view must not hide the management page.
+    return this.change(() => this.reconcile([], true))
+  }
+
+  sync(): Promise<void> {
+    return this.change(async () => this.reconcile(await this.options.platform?.list() ?? [], true))
+  }
+
+  private async reconcile(plugins: RuntimePluginInfo[], startup = false): Promise<void> {
+    for (const entry of this.catalog) {
+      const enabled = !entry.feature || plugins.find(plugin => plugin.feature === entry.feature)?.enabled !== false
+      try {
+        if (enabled && !this.fibers.has(entry.module)) await this.activate(entry)
+        if (!enabled) {
+          await this.fibers.get(entry.module)?.dispose()
+          this.fibers.delete(entry.module)
         }
+        if (entry.feature) this.errors.delete(entry.feature)
+      } catch (error) {
+        if (entry.feature) this.errors.set(entry.feature, String(error))
+        // A broken feature view must not hide management during startup. User changes are transactional.
+        if (!entry.feature || !startup) throw error
       }
-    })
+    }
   }
 
   private async activate(entry: UIPluginEntry): Promise<void> {
-    if (!entry.plugin) return
     const fiber = this.ctx.plugin(entry.plugin)
     try {
       this.fibers.set(entry.module, await fiber)
@@ -104,57 +107,40 @@ export class UIPluginManager implements RuntimePluginManager {
 
   async list(): Promise<RuntimePluginInfo[]> {
     await this.pending
-    const local = this.catalog.map(entry => ({
-      module: entry.module,
-      enabled: !entry.plugin || this.fibers.has(entry.module),
-      ...(entry.required ? { required: true } : {}),
-      ...(this.errors.has(entry.module) ? { error: this.errors.get(entry.module) } : {})
-    }))
     const platform = await this.options.platform?.list() ?? []
-    return [...local, ...platform.filter(entry => !this.catalog.some(local => local.module === entry.module))]
+    return platform.map(entry => ({
+      ...entry,
+      ...(this.errors.has(entry.feature ?? entry.module) ? { error: this.errors.get(entry.feature ?? entry.module) } : {})
+    }))
   }
 
   setEnabled(module: string, enabled: boolean): Promise<void> {
     return this.change(async () => {
-      const entry = this.catalog.find(entry => entry.module === module)
-      if (!entry) {
-        const remote = (await this.options.platform?.list())?.find(entry => entry.module === module)
-        if (!remote) throw new Error(`Unknown bundled plugin: ${module}`)
-        if (remote.required && !enabled) throw new Error(`Required plugin cannot be disabled: ${module}`)
-        if (remote.enabled === enabled) return
-        await this.options.stop()
-        await this.options.platform!.setEnabled(module, enabled)
-        return
-      }
+      const plugins = (await this.options.platform?.list() ?? []).map(entry => ({ ...entry }))
+      const entry = plugins.find(entry => entry.module === module)
+      if (!entry) throw new Error(`Unknown bundled plugin: ${module}`)
       if (entry.required && !enabled) throw new Error(`Required plugin cannot be disabled: ${module}`)
-      const previous = !entry.plugin || this.fibers.has(module)
-      if (previous === enabled && !this.errors.has(module)) return
+      if (entry.enabled === enabled && !this.errors.has(entry.feature ?? module)) return
       await this.options.stop()
-      const saved = this.options.selections.value
+      let changed = false
       try {
-        if (enabled && !previous) await this.activate(entry)
-        if (!enabled) {
-          await this.fibers.get(module)?.dispose()
-          this.fibers.delete(module)
-        }
-        this.options.selections.value = { ...saved, [module]: enabled }
-        this.errors.delete(module)
+        await this.options.platform!.setEnabled(module, enabled)
+        changed = true
+        await this.reconcile(await this.options.platform!.list())
+        this.errors.delete(entry.feature ?? module)
       } catch (error) {
-        // Restore both the selection and the registration, even when a setter wrote before throwing.
         const rollback: unknown[] = []
         try {
-          this.options.selections.value = saved
+          if (changed) await this.options.platform!.setEnabled(module, entry.enabled)
         } catch (failure) {
           rollback.push(failure)
         }
         try {
-          await this.fibers.get(module)?.dispose()
-          this.fibers.delete(module)
-          if (previous) await this.activate(entry)
+          await this.reconcile(plugins)
         } catch (failure) {
           rollback.push(failure)
         }
-        this.errors.set(module, String(error))
+        this.errors.set(entry.feature ?? module, String(error))
         if (rollback.length) throw new AggregateError([error, ...rollback], 'UI plugin change and rollback failed')
         throw error
       }

@@ -84,7 +84,11 @@ export async function manageRuntimePlugins(directory: string, request: PluginReq
     return [
       ...required.map((module): RuntimePluginInfo => ({ module, enabled: true, required: true })),
       ...previous.filter((entry) => !required.includes(entry.module))
-    ]
+    ].map((entry): RuntimePluginInfo => ({
+      ...entry,
+      feature: entry.module === '@keundal/plugin-skill' ? 'skills'
+        : entry.module === '@keundal/plugin-mcp-client' ? 'mcp' : undefined
+    }))
   }
   let next: Entry[]
   if (request.action === 'restore') {

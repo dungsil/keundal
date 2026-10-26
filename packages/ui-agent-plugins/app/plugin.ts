@@ -2,7 +2,7 @@ import type { Context } from 'cordis'
 import type { AgentPluginSettings } from '@keundal/chat/platform'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
-import { localizedText } from '@keundal/ui/app/utils/locale.ts'
+import { localizedText, sharedText } from '@keundal/ui/app/utils/locale.ts'
 
 import { messages } from './locale'
 import AgentPluginSettingsSection from './views/AgentPluginSettings.vue'
@@ -33,7 +33,7 @@ export function apply(ctx: Context) {
     name: 'settings.section',
     key: 'plugins',
     order: 100,
-    meta: { label: localizedText(messages, 'plugin.manage'), icon: 'i-lucide-blocks', group: 'plugins' },
+    meta: { label: sharedText('plugin.title'), icon: 'i-lucide-blocks', group: 'plugins' },
     inject: () => ({
       isAvailable: () => runtime.platform.plugins !== undefined,
       list: () => manager().list(),

@@ -4,7 +4,7 @@ import { ChatRuntime, SettingsLoadError } from '@keundal/ui-runtime'
 import { SlotService } from '@keundal/ui-slots'
 import { Context } from 'cordis'
 
-import { UIPluginManager, uiPluginCookie, type UIPluginSelections } from '../ui-plugins'
+import { UIPluginManager } from '../ui-plugins'
 
 declare module '#app' {
   interface NuxtApp {
@@ -54,29 +54,12 @@ export default defineNuxtPlugin({
         throw error instanceof SettingsLoadError ? error.cause : error
       }
     }
-    const maxAge = 60 * 60 * 24 * 365
-    const selections = useCookie<UIPluginSelections | null | undefined>(uiPluginCookie, {
-      sameSite: 'lax', maxAge, watch: false
-    })
     const pluginManager = new UIPluginManager(ctx, {
-      selections: computed({
-        get: () => selections.value,
-        set: value => {
-          if (import.meta.client) {
-            // useCookie's watcher saves asynchronously. Write and verify here so denied cookie writes reject the
-            // transaction instead of leaving live fibers different from the next SSR render.
-            const encoded = value == null ? undefined : encodeURIComponent(JSON.stringify(value))
-            document.cookie = `${uiPluginCookie}=${encoded ?? ''}; Path=/; SameSite=Lax; Max-Age=${encoded === undefined ? 0 : maxAge}`
-            const saved = document.cookie.split('; ').find(cookie => cookie.startsWith(`${uiPluginCookie}=`))?.slice(uiPluginCookie.length + 1)
-            if (saved !== encoded) throw new Error('Could not save UI plugin selections')
-          }
-          selections.value = value
-        }
-      }),
       stop: () => ctx.chatRuntime.stopResponses(),
       platform: import.meta.client ? nuxtApp.$chatPlatform?.runtimePlugins : undefined
     })
-    ctx.chatRuntime.pluginManager = pluginManager
+    ctx.chatRuntime.pluginManager = nuxtApp.$chatPlatform?.runtimePlugins ? pluginManager : undefined
+    if (import.meta.client) nuxtApp.hook('app:mounted', () => pluginManager.sync())
 
     let disposal: Promise<void> | undefined
     const dispose = () => disposal ??= (async () => {

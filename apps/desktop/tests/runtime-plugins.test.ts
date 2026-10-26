@@ -38,7 +38,7 @@ test('번들 목록은 선택한 LLM과 저장소 및 에이전트를 잠그고 
     { module: '@keundal/plugin-llm-openai', enabled: true, required: true },
     { module: '@keundal/plugin-store-sqlite', enabled: true, required: true },
     { module: '@keundal/plugin-agent-chat', enabled: true, required: true },
-    { module: skills, enabled: true }, { module: mcp, enabled: true }, { module: chat, enabled: true }
+    { module: skills, enabled: true, feature: 'skills' }, { module: mcp, enabled: true, feature: 'mcp' }, { module: chat, enabled: true }
   ])
   expect((await host.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart', 'weather'])
   await host.dispose()
@@ -119,7 +119,7 @@ test('복구 요청도 알려진 모듈과 boolean만 허용하고 오래된 선
   }
   await manageRuntimePlugins(directory, { action: 'enable', module: skills, enabled: false })
   await expect(manageRuntimePlugins(directory, { action: 'restore', ...transaction })).rejects.toThrow('changed before rollback')
-  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual({ module: skills, enabled: false })
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual({ module: skills, enabled: false, feature: 'skills' })
 })
 
 test('재시작 실패는 이전 선택을 복구하고 다음 작업을 허용한다', async () => {

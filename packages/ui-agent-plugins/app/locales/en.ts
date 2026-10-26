@@ -1,15 +1,12 @@
 export default {
   'runtime.title': 'Keundal plugins',
   'runtime.unavailable': 'Plugin selection is unavailable for this connection.',
-  'runtime.bundled': 'Choose from the plugins bundled with this app. External downloads are not supported. Required plugins keep the app and its settings available.',
-  'runtime.interface': 'Interface',
-  'runtime.execution': 'Agent execution',
+  'runtime.bundled': 'Choose from the functional plugins bundled with this app. Related views follow each feature automatically, without separate UI switches. External downloads are not supported. Required plugins stay enabled.',
   'runtime.required': 'Required',
   'runtime.enabled': 'Enabled',
   'runtime.disabled': 'Disabled',
   'runtime.failed': 'Activation failed',
   'runtime.enable': 'Enable {name}',
-  'plugin.manage': 'Installed plugins',
   'plugin.unavailable':
     'Browser plugin imports are unavailable for this connection. Configure plugins on the agent host instead.',
   'plugin.trustTitle': 'Enable only plugins you trust',

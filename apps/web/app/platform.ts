@@ -67,9 +67,9 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         { module: '@keundal/plugin-llm-browser', enabled: true, required: true },
         { module: '@keundal/plugin-store-indexeddb', enabled: true, required: true },
         { module: '@keundal/plugin-agent-chat', enabled: true, required: true },
-        { module: '@keundal/plugin-skill', enabled: !!composition.skills },
+        { module: '@keundal/plugin-skill', enabled: !!composition.skills, feature: 'skills' },
         { module: '@keundal/plugin-tool-chat', enabled: true },
-        { module: '@keundal/plugin-mcp-client', enabled: true }
+        { module: '@keundal/plugin-mcp-client', enabled: true, feature: 'mcp' }
       ], async (module, enabled) => {
         if (!connected) throw new Error('The browser plugin runtime is not connected')
         await store!.stop()

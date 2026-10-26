@@ -33,10 +33,18 @@ test('스킬 설정 화면에 접근성 위반이 없다 @a11y:skills', async ({
   await accessible(page)
 })
 
-test('에이전트 설정 화면에 접근성 위반이 없다 @a11y:plugins', async ({ page }) => {
-  await ready(page, '/settings/plugins')
-  await accessible(page)
-})
+for (const [locale, label] of [['en', 'Agent plugins'], ['ko', '에이전트 플러그인']] as const) {
+  test.describe(`${locale} 언어`, () => {
+    test('에이전트 플러그인 메뉴와 화면 제목이 일치하고 접근성 위반이 없다 @a11y:plugins', async ({ page, context, baseURL }) => {
+      await context.addCookies([{ name: 'keundal-locale', value: locale, url: baseURL! }])
+      await ready(page, '/settings/plugins')
+      await expect(page.getByRole('link', { name: label, exact: true })).toBeVisible()
+      await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible()
+      await expect(page.getByRole('link', { name: /Installed plugins|설치된 플러그인/ })).toHaveCount(0)
+      await accessible(page)
+    })
+  })
+}
 
 test('대화 기록 화면에 접근성 위반이 없다 @a11y:history', async ({ page }) => {
   await ready(page, '/history')

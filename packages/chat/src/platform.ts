@@ -57,6 +57,8 @@ export interface AgentPluginManager {
 export interface RuntimePluginInfo {
   module: string
   enabled: boolean
+  /** Service capability used to bind related UI without depending on implementation packages. */
+  feature?: 'skills' | 'mcp'
   required?: boolean
   error?: string
 }
