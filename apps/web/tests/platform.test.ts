@@ -29,6 +29,7 @@ test('웹 조립은 네이티브 IPC 없이 IndexedDB 대화를 저장하고 재
   const id = crypto.randomUUID()
   try {
     expect(first.remoteAgent).toBe(false)
+    expect((await first.catalog!()).tools.map(tool => tool.name)).toEqual(['chart', 'weather'])
     await first.store.create(id, { id: 'user', role: 'user', parts: [{ type: 'text', text: 'Hello' }] }, 'openai/test')
   } finally {
     await first.dispose()
@@ -40,6 +41,32 @@ test('웹 조립은 네이티브 IPC 없이 IndexedDB 대화를 저장하고 재
   } finally {
     await second.dispose()
   }
+})
+
+test.for([
+  { modules: ['builtin:chart'], names: ['chart'] },
+  { modules: ['builtin:weather'], names: ['weather'] },
+  { modules: [], names: [] },
+  { modules: ['builtin:chat-tools'], names: ['chart', 'weather'] }
+])('웹 매니페스트의 $modules 도구만 제공하고 다른 기능은 포함하지 않는다', async ({ modules, names }, t) => {
+  const server = createServer((_, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
+      plugins: [{ module: 'builtin:llm' }, { module: 'builtin:store' }],
+      agent: { module: 'builtin:agent' },
+      tools: modules.map(module => ({ module }))
+    }))
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.onTestFinished(async () => {
+    server.closeAllConnections()
+    await new Promise<void>(resolve => server.close(() => resolve()))
+  })
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('No port')
+  const platform = createWebPlatform(storage(), { pluginConfig: `http://127.0.0.1:${address.port}/plugins.json` })
+  const connection = await platform.connect({ getSettings: defaultLLMSettings, getModels: () => [], skills: [] })
+  t.onTestFinished(() => connection.dispose())
+  expect((await connection.catalog!()).tools.map(tool => tool.name)).toEqual(names)
 })
 
 test('번들 스킬과 도구의 on/off를 실제 목록에 반영하고 재연결해도 선택과 대화를 보존한다', async () => {
@@ -59,14 +86,16 @@ test('번들 스킬과 도구의 on/off를 실제 목록에 반영하고 재연�
   try {
     expect((await platform.runtimePlugins!.list()).map(entry => entry.module)).toEqual([
       '@keundal/plugin-llm-browser', '@keundal/plugin-store-indexeddb', '@keundal/plugin-agent-chat',
-      '@keundal/plugin-skill', '@keundal/plugin-tool-chat', '@keundal/plugin-mcp-client'
+      '@keundal/plugin-skill', '@keundal/plugin-tool-chart', '@keundal/plugin-tool-weather', '@keundal/plugin-mcp-client'
     ])
     await expect(platform.runtimePlugins!.setEnabled('https://not-requested.invalid/plugin.mjs', true)).rejects.toThrow('Unknown bundled')
     await expect(platform.runtimePlugins!.setEnabled('@keundal/plugin-store-indexeddb', false)).rejects.toThrow('Required')
     expect(await connection.catalog!()).toMatchObject({ skills: [{ name: 'review' }], tools: [{ name: 'chart' }, { name: 'weather' }] })
     await connection.store.create(id, { id: 'retained', role: 'user', parts: [{ type: 'text', text: 'Keep this chat' }] }, 'openai/test')
     await platform.runtimePlugins!.setEnabled('@keundal/plugin-skill', false)
-    await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chat', false)
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chart', false)
+    expect((await connection.catalog!()).tools.map(tool => tool.name)).toEqual(['weather'])
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-weather', false)
     expect(await connection.catalog!()).toEqual({ skills: [], tools: [] })
     await platform.runtimePlugins!.setEnabled('@keundal/plugin-skill', true)
     expect((await connection.catalog!()).skills).toEqual([{ name: 'review', description: 'Review reports' }])
@@ -78,11 +107,38 @@ test('번들 스킬과 도구의 on/off를 실제 목록에 반영하고 재연�
   try {
     expect(await restored.catalog!()).toEqual({ skills: [], tools: [] })
     expect((await restored.store.get(id))?.messages[0]?.id).toBe('retained')
-    await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chat', true)
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chart', true)
+    expect((await restored.catalog!()).tools.map(tool => tool.name)).toEqual(['chart'])
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-weather', true)
     expect((await restored.catalog!()).tools.map(tool => tool.name)).toEqual(['chart', 'weather'])
     await restored.store.delete(id)
   } finally {
     await restored.dispose()
+  }
+})
+
+test('이전 통합 도구 선택을 개별 도구로 옮기고 명시한 선택을 재연결 뒤에도 보존한다', async () => {
+  const saved = storage()
+  saved.setItem('keundal:bundled-plugins', JSON.stringify({
+    '@keundal/plugin-tool-chat': false,
+    '@keundal/plugin-tool-chart': true
+  }))
+  const options = { getSettings: defaultLLMSettings, getModels: () => [], skills: [] }
+  const platform = createWebPlatform(saved)
+  const first = await platform.connect(options)
+  try {
+    expect((await first.catalog!()).tools.map(tool => tool.name)).toEqual(['chart'])
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chart', false)
+  } finally {
+    await first.dispose()
+  }
+  const second = await platform.connect(options)
+  try {
+    expect((await second.catalog!()).tools).toEqual([])
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-weather', true)
+    expect((await second.catalog!()).tools.map(tool => tool.name)).toEqual(['weather'])
+  } finally {
+    await second.dispose()
   }
 })
 

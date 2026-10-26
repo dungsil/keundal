@@ -128,7 +128,7 @@
     "scenario": "@a11y:subagents",
     "test": "apps/web/tests/browser/subagents.spec.ts"
   },
-  "packages/ui-tool/app/views/Chart.vue": {
+  "packages/ui-chart/app/views/Chart.vue": {
     "exemption": "Requires generated tool output or source citations; browser generation fixtures are not implemented yet."
   },
   "packages/ui-tool/app/views/SearchTool.vue": {
@@ -143,7 +143,7 @@
   "packages/ui-tool/app/views/Subagent.vue": {
     "exemption": "Requires generated tool output or source citations; browser generation fixtures are not implemented yet."
   },
-  "packages/ui-tool/app/views/Weather.vue": {
+  "packages/ui-weather/app/views/Weather.vue": {
     "exemption": "Requires generated tool output or source citations; browser generation fixtures are not implemented yet."
   },
   "packages/ui-trace/app/views/TraceFooter.vue": {

@@ -1,5 +1,5 @@
 {
-  "name": "@keundal/plugin-tool-chat",
+  "name": "@keundal/plugin-tool-weather",
   "private": true,
   "files": [
     "dist"

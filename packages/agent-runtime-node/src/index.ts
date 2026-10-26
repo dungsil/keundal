@@ -10,7 +10,13 @@ import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 export { createNodeComposition, getRequiredNodePluginModules, nodePluginMetadata } from './default-composition.js'
 
 export type AgentHostProvider = 'openai' | 'gemini' | 'anthropic' | (string & {})
-export type BundledPluginModule = '@keundal/plugin-skill' | '@keundal/plugin-mcp-client' | '@keundal/plugin-tool-chat'
+export type BundledPluginModule =
+  | '@keundal/plugin-skill'
+  | '@keundal/plugin-mcp-client'
+  | '@keundal/plugin-tool-chart'
+  | '@keundal/plugin-tool-weather'
+  /** Legacy preference used only as a fallback for the split tool selections. */
+  | '@keundal/plugin-tool-chat'
 export type BundledPluginSelection = Readonly<Partial<Record<BundledPluginModule, boolean>>>
 
 export interface NodeHostOptions {

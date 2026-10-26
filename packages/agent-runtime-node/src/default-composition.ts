@@ -126,7 +126,9 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
   const skillProviders: SkillProvider[] = []
   const skillsEnabled = options.bundledPlugins?.['@keundal/plugin-skill'] !== false
   const mcpEnabled = options.bundledPlugins?.['@keundal/plugin-mcp-client'] !== false
-  const chatToolsEnabled = options.bundledPlugins?.['@keundal/plugin-tool-chat'] !== false
+  const legacyToolsEnabled = options.bundledPlugins?.['@keundal/plugin-tool-chat'] ?? true
+  const chartEnabled = options.bundledPlugins?.['@keundal/plugin-tool-chart'] ?? legacyToolsEnabled
+  const weatherEnabled = options.bundledPlugins?.['@keundal/plugin-tool-weather'] ?? legacyToolsEnabled
   const mcpServers = mcpEnabled ? parseMcpServers(options.mcpServers ?? []) : []
   const mcpClients = new Map<string, Promise<McpClient>>()
   const mcpLifetime = new globalThis.AbortController()
@@ -139,9 +141,36 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
     ...(selection.manifest.tools === undefined
       ? {}
       : {
-          tools: selection.manifest.tools.filter(
-            (spec) => chatToolsEnabled || spec.module !== '@keundal/plugin-tool-chat'
-          )
+          tools: selection.manifest.tools.flatMap((spec) => {
+            if (spec.module === '@keundal/plugin-tool-chat') {
+              return [
+                ...(chartEnabled
+                  ? [
+                      {
+                        ...spec,
+                        module: '@keundal/plugin-tool-chart',
+                        export: spec.export === 'createChatTools' ? 'createChartTools' : spec.export
+                      }
+                    ]
+                  : []),
+                ...(weatherEnabled
+                  ? [
+                      {
+                        ...spec,
+                        module: '@keundal/plugin-tool-weather',
+                        export: spec.export === 'createChatTools' ? 'createWeatherTools' : spec.export
+                      }
+                    ]
+                  : [])
+              ]
+            }
+            if (
+              (!chartEnabled && spec.module === '@keundal/plugin-tool-chart') ||
+              (!weatherEnabled && spec.module === '@keundal/plugin-tool-weather')
+            )
+              return []
+            return [spec]
+          })
         })
   }
   const basePath = selection.basePath
@@ -178,11 +207,13 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       exports: { default: agentPlugin }
     }
   }
-  const defaultTools = chatToolsEnabled && manifest.tools === undefined ? options.defaultTools : undefined
+  const defaultTools = manifest.tools === undefined ? options.defaultTools : undefined
   const suppliedTools: ToolProvider | undefined =
     defaultTools || options.tools
       ? async (execution) => [
-          ...(typeof defaultTools === 'function' ? await defaultTools(execution) : (defaultTools ?? [])),
+          ...(typeof defaultTools === 'function' ? await defaultTools(execution) : (defaultTools ?? [])).filter(
+            (tool) => (chartEnabled || tool.name !== 'chart') && (weatherEnabled || tool.name !== 'weather')
+          ),
           ...(typeof options.tools === 'function' ? await options.tools(execution) : (options.tools ?? []))
         ]
       : undefined

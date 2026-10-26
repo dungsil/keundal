@@ -10,20 +10,24 @@ import {
 } from '@keundal/agent-runtime-node'
 import type { RuntimePluginInfo } from '@keundal/chat/platform'
 import { mountRuntimePlugin } from '@keundal/plugin-runtime'
-import { metadata as toolsMetadata } from '@keundal/plugin-tool-chat'
+import { metadata as chartMetadata } from '@keundal/plugin-tool-chart'
+import { metadata as weatherMetadata } from '@keundal/plugin-tool-weather'
 
 import { installPlugin, installedDirectory, validateSource, type InstalledPlugin } from './install-plugin.js'
 
 const metadata: Record<string, RuntimePluginInfo['metadata']> = {
   ...nodePluginMetadata,
-  '@keundal/plugin-tool-chat': toolsMetadata
+  '@keundal/plugin-tool-chart': chartMetadata,
+  '@keundal/plugin-tool-weather': weatherMetadata
 }
 
 const optionalModules: readonly BundledPluginModule[] = [
   '@keundal/plugin-skill',
   '@keundal/plugin-mcp-client',
-  '@keundal/plugin-tool-chat'
+  '@keundal/plugin-tool-chart',
+  '@keundal/plugin-tool-weather'
 ]
+const legacyToolsModule = '@keundal/plugin-tool-chat'
 type Entry = { module: BundledPluginModule; enabled: boolean } | InstalledPlugin
 export type PluginRequest =
   | { action: 'list' }
@@ -46,8 +50,11 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 function validateEntries(value: unknown): Entry[] {
-  if (!Array.isArray(value) || value.length < optionalModules.length) throw new Error('Invalid bundled selection')
-  const bundled = optionalModules.map((module) => {
+  const modules = Array.isArray(value) && value.some(entry => record(entry) && entry.module === legacyToolsModule)
+    ? ['@keundal/plugin-skill', '@keundal/plugin-mcp-client', legacyToolsModule] as const
+    : optionalModules
+  if (!Array.isArray(value) || value.length < modules.length) throw new Error('Invalid bundled selection')
+  const entries = modules.map((module) => {
     const matches = value.filter((entry) => record(entry) && entry.module === module)
     const entry = matches[0]
     if (matches.length !== 1 || !record(entry) || typeof entry.enabled !== 'boolean' ||
@@ -56,7 +63,12 @@ function validateEntries(value: unknown): Entry[] {
     }
     return { module, enabled: entry.enabled }
   })
-  const external = value.filter(entry => !record(entry) || !optionalModules.includes(entry.module as BundledPluginModule))
+  const bundled = optionalModules.map((module) => ({
+    module,
+    enabled: entries.find((entry) => entry.module === module)?.enabled
+      ?? entries.find((entry) => entry.module === legacyToolsModule)!.enabled
+  }))
+  const external = value.filter(entry => !record(entry) || !modules.includes(entry.module as BundledPluginModule))
   const seen = new Set<string>()
   for (const entry of external) {
     if (!record(entry) || typeof entry.module !== 'string' || !/^external:[a-f0-9-]{36}$/.test(entry.module) ||
@@ -87,7 +99,11 @@ function readEntries(directory: string): Entry[] {
     if (existsSync(legacyPath)) legacy = JSON.parse(readFileSync(legacyPath, 'utf8'))
   } catch { /* Ignore obsolete installer state. */ }
   return optionalModules.map((module) => {
-    const entry = Array.isArray(legacy) ? legacy.find((entry) => record(entry) && entry.module === module) : undefined
+    const entries = Array.isArray(legacy) ? legacy : []
+    const entry = entries.find((entry) => record(entry) && entry.module === module && typeof entry.enabled === 'boolean')
+      ?? (module === '@keundal/plugin-tool-chart' || module === '@keundal/plugin-tool-weather'
+        ? entries.find((entry) => record(entry) && entry.module === legacyToolsModule)
+        : undefined)
     return { module, enabled: record(entry) && typeof entry.enabled === 'boolean' ? entry.enabled : true }
   })
 }

@@ -1,6 +1,7 @@
 import * as agentPlugins from '@keundal/ui-agent-plugins/plugin'
 import * as chat from '@keundal/ui-chat/plugin'
 import * as chatList from '@keundal/ui-chat-list/plugin'
+import * as chart from '@keundal/ui-chart/plugin'
 import * as composer from '@keundal/ui-composer/plugin'
 import * as dictation from '@keundal/ui-dictation/plugin'
 import * as home from '@keundal/ui-home/plugin'
@@ -13,6 +14,7 @@ import * as skill from '@keundal/ui-skill/plugin'
 import * as subagents from '@keundal/ui-subagents/plugin'
 import * as tool from '@keundal/ui-tool/plugin'
 import * as trace from '@keundal/ui-trace/plugin'
+import * as weather from '@keundal/ui-weather/plugin'
 import type { RuntimePluginInfo, RuntimePluginManager } from '@keundal/chat/platform'
 import type { Context, Fiber, Plugin } from 'cordis'
 
@@ -35,6 +37,8 @@ export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-trace', plugin: trace },
   // Shared rendering also covers search, skills, subagents and previously saved tool results.
   { module: '@keundal/ui-tool', plugin: tool },
+  { module: '@keundal/ui-chart', plugin: chart },
+  { module: '@keundal/ui-weather', plugin: weather },
   { module: '@keundal/ui-settings', plugin: settings },
   { module: '@keundal/ui-settings-llm', plugin: settingsLlm },
   { module: '@keundal/ui-subagents', plugin: subagents },
