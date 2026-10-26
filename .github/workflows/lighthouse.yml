@@ -17,7 +17,7 @@ concurrency:
 jobs:
   changes:
     name: UI 변경 확인
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -58,7 +58,7 @@ jobs:
     name: 프로덕션 빌드 Lighthouse 검사
     needs: changes
     if: needs.changes.outputs.ui == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # 프로덕션 빌드와 반복 측정 시간을 포함한다.
     timeout-minutes: 30
     outputs:
@@ -160,7 +160,7 @@ jobs:
     name: Lighthouse 점수 기준
     needs: [changes, lighthouse]
     if: always()
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions: {}
     steps:
@@ -175,7 +175,7 @@ jobs:
     name: Lighthouse 결과 댓글 갱신
     needs: [changes, lighthouse]
     if: ${{ always() && !cancelled() && needs.changes.outputs.ui == 'true' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       pull-requests: write
