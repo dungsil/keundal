@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -179,10 +179,13 @@ test('배포 매니페스트와 상대 경로 및 필수 서비스를 선택 변
   expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(deployment)
 })
 
-test('번들 IPC는 외부 설치를 거부하고 선택 기능만 영속화한다', async () => {
+test('저장소 밖으로 옮긴 번들 IPC는 외부 설치를 거부하고 선택 기능만 영속화한다', async () => {
   const { directory } = fixture()
+  const bundle = join(directory, 'sidecar')
+  cpSync('dist-sidecar', bundle, { recursive: true })
   const command = async (request: unknown) => {
-    const child = spawn(process.execPath, ['dist-sidecar/main.js', '--manage-runtime-plugins'], {
+    const child = spawn(process.execPath, [join(bundle, 'main.js'), '--manage-runtime-plugins'], {
+      cwd: directory,
       env: { ...process.env, KEUNDAL_MANAGED_PLUGINS: directory, KEUNDAL_PROVIDER: 'openai' }, signal: AbortSignal.timeout(10_000)
     })
     let output = ''
@@ -194,7 +197,8 @@ test('번들 IPC는 외부 설치를 거부하고 선택 기능만 영속화한�
     return { status, output, errors }
   }
   expect((await command({ action: 'install', spec: { module: '/tmp/external.mjs' } })).status).toBe(1)
-  expect((await command({ action: 'enable', module: chat, enabled: false })).status).toBe(0)
+  const disabled = await command({ action: 'enable', module: chat, enabled: false })
+  expect(disabled.status, disabled.errors).toBe(0)
   const listed = await command({ action: 'list' })
   expect(listed.status, listed.errors).toBe(0)
   expect(JSON.parse(listed.output)).toContainEqual({ module: chat, enabled: false })

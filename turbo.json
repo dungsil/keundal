@@ -50,7 +50,7 @@
       "dependsOn": ["^build"]
     },
     "@keundal/desktop#build:sidecar": {
-      "dependsOn": ["@keundal/agent-runtime-node#build"],
+      "dependsOn": ["^build"],
       "outputs": ["dist-sidecar/**"],
       "inputs": ["sidecar/**", "tsdown.sidecar.config.ts", "tsconfig.sidecar.json", "package.json"]
     },
