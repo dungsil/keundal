@@ -1,0 +1,294 @@
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { createNodeAgentHost } from '@keundal/agent-runtime-node'
+import type { NativeInvoke } from '@keundal/chat/platform'
+import { createNativeRuntimePluginManager } from '@keundal/plugin-chat-desktop'
+import { createChartTools, metadata as chartMetadata } from '@keundal/plugin-tool-chart'
+import { createWeatherTools, metadata as weatherMetadata } from '@keundal/plugin-tool-weather'
+import { expect, onTestFinished, test, vi } from 'vitest'
+
+import { manageRuntimePlugins, createDesktopComposition, type PluginRequest } from '../sidecar/runtime-plugins'
+
+const chart = '@keundal/plugin-tool-chart'
+const weather = '@keundal/plugin-tool-weather'
+const skills = '@keundal/plugin-skill'
+const mcp = '@keundal/plugin-mcp-client'
+
+function fixture() {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-bundled-'))
+  onTestFinished(() => rmSync(directory, { force: true, recursive: true }))
+  const options = { provider: 'openai', model: 'test', apiKey: '', sqlitePath: join(directory, 'chats.sqlite'), defaultTools: [...createChartTools(), ...createWeatherTools()] }
+  const compose = createDesktopComposition(directory)
+  const open = async (provider = 'openai') => {
+    const host = await createNodeAgentHost({ ...options, provider }, compose)
+    onTestFinished(() => host.dispose())
+    return host
+  }
+  const invoke: NativeInvoke = async <T>(_command: string, args?: Record<string, unknown>) =>
+    (await manageRuntimePlugins(directory, args!.request as PluginRequest)) as T
+  return { directory, options, compose, open, invoke }
+}
+
+test('번들 목록은 선택한 LLM과 저장소 및 에이전트를 잠그고 선택 기능은 기본 활성화한다', async () => {
+  const { directory, open } = fixture()
+  const host = await open()
+  const entries = await manageRuntimePlugins(directory, { action: 'list' })
+  expect(entries).toMatchObject([
+    { module: '@keundal/plugin-llm-openai', enabled: true, required: true },
+    { module: '@keundal/plugin-store-sqlite', enabled: true, required: true },
+    { module: '@keundal/plugin-agent-chat', enabled: true, required: true },
+    { module: skills, enabled: true, feature: 'skills' }, { module: mcp, enabled: true, feature: 'mcp' },
+    { module: chart, enabled: true }, { module: weather, enabled: true }
+  ])
+  if (!Array.isArray(entries)) throw new Error('Expected plugin list')
+  expect(entries.find(entry => entry.module === chart)?.metadata).toEqual(chartMetadata)
+  expect(entries.find(entry => entry.module === weather)?.metadata).toEqual(weatherMetadata)
+  expect(entries.find(entry => entry.module === skills)?.metadata).toEqual({
+    name: { en: 'Skills', ko: '스킬' },
+    description: {
+      en: 'Provides reusable instructions for the agent to load when needed.',
+      ko: '에이전트가 필요할 때 불러올 수 있는 재사용 가능한 지침을 제공합니다.'
+    }
+  })
+  for (const entry of entries) {
+    for (const locale of ['en', 'ko'] as const) {
+      expect(entry.metadata?.name[locale]).toBeTruthy()
+      expect(entry.metadata?.description[locale]).toBeTruthy()
+    }
+  }
+  expect((await host.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart', 'weather'])
+  await host.dispose()
+  const switched = await open('gemini')
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual(expect.objectContaining({
+    module: '@keundal/plugin-llm-gemini', enabled: true, required: true,
+    metadata: expect.objectContaining({ name: { en: 'Gemini', ko: 'Gemini' } })
+  }))
+  expect(switched.services.models()).toMatchObject([{ id: 'test', provider: 'gemini' }])
+})
+
+test('선택을 별도 파일에 보존하고 실제 도구 목록을 바꾸면서 SQLite 대화를 유지한다', async () => {
+  const { directory, open } = fixture()
+  const before = await open()
+  await before.services.session.commit({ threadId: 'saved', expectedRevision: 0, state: {}, messages: [{ id: 'user', role: 'user', content: 'keep me' }] })
+  await before.dispose()
+  for (const [module, enabled, names] of [
+    [chart, false, ['weather']],
+    [weather, false, []],
+    [chart, true, ['chart']],
+    [weather, true, ['chart', 'weather']]
+  ] as const) {
+    await manageRuntimePlugins(directory, { action: 'enable', module, enabled })
+    expect(JSON.parse(readFileSync(join(directory, 'bundled-selection.json'), 'utf8'))).toContainEqual({ module, enabled })
+    const reopened = await open()
+    expect((await reopened.services.catalog!()).tools.map(({ name }) => name)).toEqual(names)
+    expect((await reopened.services.session.get('saved'))?.messages).toEqual([{ id: 'user', role: 'user', content: 'keep me' }])
+    await reopened.dispose()
+  }
+  const enabled = await open()
+  expect((await enabled.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart', 'weather'])
+  expect((await enabled.services.session.get('saved'))?.revision).toBe(1)
+})
+
+test('이전 외부 설치는 import하지 않고 알려진 boolean만 안전하게 옮긴다', async () => {
+  const { directory, open } = fixture()
+  const external = join(directory, 'external.mjs')
+  const marker = join(directory, 'imported')
+  writeFileSync(external, `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'bad'); throw new Error('external import')`)
+  const legacy = [
+    { module: external, resolvedModule: external, enabled: true },
+    { module: '@keundal/plugin-tool-chat', resolvedModule: external, enabled: false, config: { arbitrary: true }, export: 'activate' },
+    { module: skills, enabled: 'false' }
+  ]
+  writeFileSync(join(directory, 'managed.json'), JSON.stringify(legacy))
+  const host = await open()
+  expect(await host.services.catalog!()).toEqual({ skills: [], tools: [] })
+  expect(existsSync(marker)).toBe(false)
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).not.toContainEqual(expect.objectContaining({ module: external }))
+  await manageRuntimePlugins(directory, { action: 'enable', module: mcp, enabled: false })
+  expect(JSON.parse(readFileSync(join(directory, 'managed.json'), 'utf8'))).toEqual(legacy)
+  expect(readFileSync(join(directory, 'bundled-selection.json'), 'utf8')).not.toContain('resolvedModule')
+  expect(existsSync(external)).toBe(true)
+})
+
+test.each([true, false])('이전 bundled-selection.json의 결합 선택 $0을 분리하고 독립 변경을 저장한다', async (enabled) => {
+  const { directory, open } = fixture()
+  const legacy = [
+    { module: skills, enabled: true },
+    { module: mcp, enabled: true },
+    { module: '@keundal/plugin-tool-chat', enabled }
+  ]
+  const path = join(directory, 'bundled-selection.json')
+  writeFileSync(path, JSON.stringify(legacy))
+  const host = await open()
+  expect((await host.services.catalog!()).tools.map(({ name }) => name)).toEqual(enabled ? ['chart', 'weather'] : [])
+  await host.dispose()
+  const transaction = await manageRuntimePlugins(directory, { action: 'enable', module: chart, enabled: !enabled })
+  expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual([
+    { module: skills, enabled: true }, { module: mcp, enabled: true },
+    { module: chart, enabled: !enabled }, { module: weather, enabled }
+  ])
+  const reopened = await open()
+  expect((await reopened.services.catalog!()).tools.map(({ name }) => name)).toEqual(enabled ? ['weather'] : ['chart'])
+  if (Array.isArray(transaction)) throw new Error('Expected transaction')
+  await manageRuntimePlugins(directory, { action: 'restore', previous: legacy, expected: transaction.expected } as PluginRequest)
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toEqual(expect.arrayContaining([
+    expect.objectContaining({ module: chart, enabled }), expect.objectContaining({ module: weather, enabled })
+  ]))
+})
+
+test('이전 선택 파일도 중복 모듈과 boolean 이외의 값 및 외부 설정을 거부한다', async () => {
+  const { directory } = fixture()
+  const legacy = [
+    { module: skills, enabled: true }, { module: mcp, enabled: true },
+    { module: '@keundal/plugin-tool-chat', enabled: false }
+  ]
+  const path = join(directory, 'bundled-selection.json')
+  for (const entries of [
+    legacy.slice(1),
+    [legacy[0], legacy[0], legacy[2]],
+    [...legacy.slice(0, 2), { ...legacy[2], enabled: 'false' }],
+    [...legacy.slice(0, 2), { ...legacy[2], config: {} }],
+    [...legacy, { module: chart, enabled: true }]
+  ]) {
+    const contents = JSON.stringify(entries)
+    writeFileSync(path, contents)
+    await expect(manageRuntimePlugins(directory, { action: 'list' })).rejects.toThrow('Invalid bundled selection')
+    expect(readFileSync(path, 'utf8')).toBe(contents)
+  }
+})
+
+test('managed.json의 분리된 boolean은 이전 결합 선택보다 우선한다', async () => {
+  const { directory, open } = fixture()
+  const legacy = [
+    { module: '@keundal/plugin-tool-chat', enabled: false },
+    { module: chart, enabled: true }, { module: weather, enabled: 'true' }
+  ]
+  writeFileSync(join(directory, 'managed.json'), JSON.stringify(legacy))
+  const host = await open()
+  expect((await host.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart'])
+  await manageRuntimePlugins(directory, { action: 'enable', module: weather, enabled: true })
+  expect(JSON.parse(readFileSync(join(directory, 'managed.json'), 'utf8'))).toEqual(legacy)
+})
+
+test('알 수 없는 모듈과 필수 서비스 및 외부 설치 작업은 선택을 변경하지 않는다', async () => {
+  const { directory } = fixture()
+  await manageRuntimePlugins(directory, { action: 'enable', module: chart, enabled: false })
+  const path = join(directory, 'bundled-selection.json')
+  const before = readFileSync(path, 'utf8')
+  const invalid: unknown[] = [
+    null, {}, { action: 'install', spec: { module: 'example-plugin' } }, { action: 'remove', module: chart },
+    ...['example-plugin', 'https://example.com/plugin.mjs', '/tmp/plugin.mjs', './plugin.mjs', '@keundal/plugin-store-sqlite', '@keundal/plugin-agent-chat', '@keundal/plugin-llm-openai'].map((module) => ({ action: 'enable', module, enabled: false })),
+    { action: 'enable', module: chart, enabled: 'false' },
+    { action: 'enable', module: chart, enabled: true, config: {} },
+    { action: 'list', spec: { module: '/tmp/plugin.mjs' } }
+  ]
+  for (const request of invalid) {
+    await expect(manageRuntimePlugins(directory, request as PluginRequest)).rejects.toThrow()
+    expect(readFileSync(path, 'utf8')).toBe(before)
+  }
+})
+
+test('복구 요청도 알려진 모듈과 boolean만 허용하고 오래된 선택을 덮어쓰지 않는다', async () => {
+  const { directory } = fixture()
+  const transaction = await manageRuntimePlugins(directory, { action: 'enable', module: chart, enabled: false })
+  if (Array.isArray(transaction)) throw new Error('Expected transaction')
+  for (const previous of [
+    [],
+    transaction.previous.map((entry, index) => index ? entry : { ...entry, module: '/tmp/external.mjs' }),
+    transaction.previous.map((entry) => ({ ...entry, config: {} })),
+    transaction.previous.map((entry) => ({ ...entry, enabled: 'true' }))
+  ]) {
+    await expect(manageRuntimePlugins(directory, { action: 'restore', ...transaction, previous } as PluginRequest)).rejects.toThrow('Invalid bundled selection')
+  }
+  await manageRuntimePlugins(directory, { action: 'enable', module: skills, enabled: false })
+  await expect(manageRuntimePlugins(directory, { action: 'restore', ...transaction })).rejects.toThrow('changed before rollback')
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual(expect.objectContaining({ module: skills, enabled: false, feature: 'skills' }))
+})
+
+test('재시작 실패는 이전 선택을 복구하고 다음 작업을 허용한다', async () => {
+  const { directory, invoke } = fixture()
+  const reload = vi.fn().mockRejectedValueOnce(new Error('restart failed')).mockResolvedValue(undefined)
+  const manager = createNativeRuntimePluginManager(invoke, reload)
+  expect(Object.keys(manager).sort()).toEqual(['list', 'setEnabled'])
+  await expect(manager.setEnabled(chart, false)).rejects.toThrow('restart failed')
+  expect(await manager.list()).toContainEqual(expect.objectContaining({ module: chart, enabled: true }))
+  await manager.setEnabled(chart, false)
+  expect(await manager.list()).toContainEqual(expect.objectContaining({ module: chart, enabled: false }))
+  expect(reload).toHaveBeenCalledTimes(2)
+  expect(existsSync(join(directory, 'bundled-selection.json'))).toBe(true)
+})
+
+test('활성화 진단 실패는 선택과 이미 교체한 호스트를 함께 복구한다', async () => {
+  const { invoke } = fixture()
+  const diagnosticInvoke: NativeInvoke = async <T>(command: string, args?: Record<string, unknown>) => {
+    const result = await invoke<T>(command, args)
+    return (Array.isArray(result) ? result.map((entry) => entry.module === weather && entry.enabled ? { ...entry, error: 'activation failed' } : entry) : result) as T
+  }
+  const reload = vi.fn().mockResolvedValue(undefined)
+  const manager = createNativeRuntimePluginManager(diagnosticInvoke, reload)
+  await manager.setEnabled(weather, false)
+  await expect(manager.setEnabled(weather, true)).rejects.toThrow('activation failed')
+  expect(await manager.list()).toContainEqual(expect.objectContaining({ module: weather, enabled: false }))
+  expect(reload).toHaveBeenCalledTimes(3)
+})
+
+test('재시작과 복구가 모두 실패하면 두 원인을 숨기지 않는다', async () => {
+  const { invoke } = fixture()
+  const brokenInvoke: NativeInvoke = async <T>(command: string, args?: Record<string, unknown>) => {
+    if ((args?.request as PluginRequest)?.action === 'restore') throw new Error('restore failed')
+    return invoke<T>(command, args)
+  }
+  const manager = createNativeRuntimePluginManager(brokenInvoke, async () => { throw new Error('restart failed') })
+  await expect(manager.setEnabled(chart, false)).rejects.toMatchObject({
+    errors: [expect.objectContaining({ message: 'restart failed' }), expect.objectContaining({ message: 'restore failed' })]
+  })
+})
+
+test('배포 매니페스트와 상대 경로 및 필수 서비스를 선택 변경 이후에도 유지한다', async () => {
+  const { directory, options, compose } = fixture()
+  const path = join(directory, 'deployment.json')
+  const deployment = {
+    plugins: [{ module: 'builtin:llm', config: { provider: 'gemini' } }, { module: 'builtin:store' }, { module: './deployment.mjs' }],
+    agent: { module: 'builtin:agent', config: { maxToolRounds: 2 } }, tools: []
+  }
+  writeFileSync(path, JSON.stringify(deployment))
+  writeFileSync(join(directory, 'deployment.mjs'), 'export default ctx => { ctx.provide("deploymentMarker", true) }')
+  await manageRuntimePlugins(directory, { action: 'enable', module: skills, enabled: false })
+  const host = await createNodeAgentHost({ ...options, pluginConfigPath: path }, compose)
+  onTestFinished(() => host.dispose())
+  expect(await host.services.catalog!()).toEqual({ skills: [], tools: [] })
+  expect(host.ctx.get('deploymentMarker')).toBe(true)
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual(expect.objectContaining({ module: '@keundal/plugin-llm-gemini', enabled: true, required: true }))
+  expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(deployment)
+})
+
+test('저장소 밖으로 옮긴 번들 IPC는 외부 설치를 거부하고 선택 기능만 영속화한다', async () => {
+  const { directory } = fixture()
+  const bundle = join(directory, 'sidecar')
+  cpSync('dist-sidecar', bundle, { recursive: true })
+  const command = async (request: unknown) => {
+    const child = spawn(process.execPath, [join(bundle, 'main.js'), '--manage-runtime-plugins'], {
+      cwd: directory,
+      env: { ...process.env, KEUNDAL_MANAGED_PLUGINS: directory, KEUNDAL_PROVIDER: 'openai' }, signal: AbortSignal.timeout(10_000)
+    })
+    let output = ''
+    let errors = ''
+    child.stdout.on('data', (chunk) => { output += String(chunk) })
+    child.stderr.on('data', (chunk) => { errors += String(chunk) })
+    child.stdin.end(JSON.stringify(request))
+    const [status] = await once(child, 'close')
+    return { status, output, errors }
+  }
+  expect((await command({ action: 'install', spec: { module: '/tmp/external.mjs' } })).status).toBe(1)
+  const disabled = await command({ action: 'enable', module: chart, enabled: false })
+  expect(disabled.status, disabled.errors).toBe(0)
+  const listed = await command({ action: 'list' })
+  expect(listed.status, listed.errors).toBe(0)
+  expect(JSON.parse(listed.output)).toContainEqual(expect.objectContaining({ module: chart, enabled: false }))
+  expect(JSON.parse(listed.output)).toContainEqual(expect.objectContaining({ module: weather, enabled: true }))
+  expect(JSON.parse(listed.output)).toContainEqual(expect.objectContaining({ module: '@keundal/plugin-store-sqlite', enabled: true, required: true }))
+})

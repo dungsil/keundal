@@ -31,7 +31,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-26.04
             name: linux-x64
           - os: windows-2025
             name: windows-x64
@@ -67,7 +67,6 @@ jobs:
           cache-bin: false
 
       - name: 개발 환경 준비
-        if: steps.rust-cache.outputs.cache-hit != 'true'
         id: setup
         continue-on-error: true
         uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
@@ -76,20 +75,32 @@ jobs:
           require-lockfile: true
 
       - name: 개발 환경 준비 재시도
-        if: ${{ !cancelled() && steps.rust-cache.outputs.cache-hit != 'true' && steps.setup.outcome == 'failure' }}
+        if: ${{ !cancelled() && steps.setup.outcome == 'failure' }}
         uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
         with:
           cache: true
           require-lockfile: true
 
-      - name: Turbo 공유 캐시 설정
-        if: steps.rust-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: 데스크톱 JavaScript 캐시 복원
+        id: desktop-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .turbo/cache
-          key: turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: turbo-desktop-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
           restore-keys: |
+            turbo-desktop-js-v1-${{ runner.os }}-${{ runner.arch }}-
             turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-
+
+      # Rust 의존성이 그대로여도 UI와 sidecar는 바뀔 수 있다.
+      - name: 데스크톱 JavaScript 빌드
+        run: pnpm exec turbo run build:sidecar build:ui --filter=@keundal/desktop
+
+      - name: 데스크톱 JavaScript 캐시 저장
+        if: steps.desktop-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: ${{ steps.desktop-cache.outputs.cache-primary-key }}
 
       - name: Linux 빌드 의존성 설치
         if: steps.rust-cache.outputs.cache-hit != 'true' && runner.os == 'Linux'

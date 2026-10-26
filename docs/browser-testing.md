@@ -30,7 +30,7 @@ pnpm --filter @keundal/web test:browser --project=chromium
 
 `test:browser`는 `@visual` 검사를 제외한다. 공통 검사 설정은 콘솔 오류, 페이지 오류, hydration 경고, CSP 위반과 준비되지 않은 외부 요청을 실패로 처리한다. 외부 요청이 필요한 검사는 응답 fixture를 명시해야 한다. 접근성 검사는 axe의 WCAG 2 A·AA와 WCAG 2.1 A·AA 규칙을 사용한다.
 
-웹 앱은 `features.inlineStyles: false`로 공통 CSS를 HTML과 분리해 압축 전송하고 화면 간에 캐시를 재사용한다. `tests/preview.test.ts`는 프로덕션 경로, 언어 선택과 리다이렉트뿐 아니라 연결된 CSS의 응답, Brotli 압축과 캐시 헤더를 검사한다. 스타일 적용과 레이아웃은 실제 브라우저 화면에서 확인한다.
+웹 앱은 `features.inlineStyles: false`로 공통 CSS를 HTML에서 분리한다. 해시가 붙은 정적 CSS는 압축하고 캐시하므로 페이지마다 같은 스타일을 HTML로 다시 전송하지 않는다. `tests/preview.test.ts`는 프로덕션 경로, 언어 선택과 리다이렉트뿐 아니라 스타일시트의 제공·압축·캐시를 검사한다. 스타일 적용과 레이아웃은 실제 브라우저 화면에서 확인한다.
 
 브라우저 다운로드가 제한된 환경에서는 설치된 Chromium 경로를 명시할 수 있다. 이 설정은 자동으로 적용되지 않는다.
 

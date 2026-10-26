@@ -1,6 +1,7 @@
 mod settings;
 mod sidecar;
 mod skills;
+mod runtime_plugins;
 
 pub fn run() {
     let app = tauri::Builder::default()
@@ -12,6 +13,7 @@ pub fn run() {
             settings::save_mcp_settings,
             skills::list_skill_files,
             skills::read_skill_file,
+            runtime_plugins::runtime_plugins,
             sidecar::sidecar_info
         ])
         .build(tauri::generate_context!())

@@ -2,6 +2,14 @@ import { chartSchema } from '@keundal/chat/tools/chart'
 import type { ExecutableTool } from '@keundal/tools'
 import { z } from 'zod'
 
+export const metadata = {
+  name: { en: 'Charts', ko: '차트' },
+  description: {
+    en: 'Adds chart visualizations to conversations.',
+    ko: '대화에서 데이터를 차트로 표시할 수 있습니다.'
+  }
+}
+
 export function createChartTools(): ExecutableTool[] {
   return [
     {

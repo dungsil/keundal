@@ -15,6 +15,11 @@ import { GeminiLLMConfigSchema, parseConfig, type GeminiLLMConfig } from './conf
 import { ContentsEvents } from './events.js'
 import { createCountInput, createInput } from './request.js'
 
+export const metadata = {
+  name: { en: 'Gemini', ko: 'Gemini' },
+  description: { en: 'Connects models through the Google Gemini API.', ko: 'Google Gemini API로 모델에 연결합니다.' }
+}
+
 export { GeminiLLMConfigSchema, type GeminiLLMConfig } from './config.js'
 export { listGeminiModels } from './models.js'
 

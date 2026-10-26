@@ -3,6 +3,14 @@ import { LLMService, type LLMRequest, type ExecutionOptions, type LLMEvent } fro
 import { providerCredentials, providerError, type LLMSettings } from '@keundal/llm-settings'
 import { Context, type Fiber } from 'cordis'
 
+export const metadata = {
+  name: { en: 'Browser model connection', ko: '브라우저 모델 연결' },
+  description: {
+    en: 'Calls the configured model providers directly from this browser.',
+    ko: '이 브라우저에서 설정한 모델 공급자에 직접 요청합니다.'
+  }
+}
+
 const plugins = {
   openai: () => import('@keundal/plugin-llm-openai').then((module) => module.default),
   'openai-chat': () => import('@keundal/plugin-llm-openai-chat').then((module) => module.default),

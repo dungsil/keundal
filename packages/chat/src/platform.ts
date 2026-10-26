@@ -54,6 +54,23 @@ export interface AgentPluginManager {
   configure(name: string, settings: AgentPluginSettings, restart: () => Promise<void>): Promise<void>
   remove(name: string, restart: () => Promise<void>): Promise<void>
 }
+export interface RuntimePluginInfo {
+  module: string
+  /** Plugin-owned display copy; module remains the stable selection identifier. */
+  metadata?: {
+    name: { en: string; ko: string }
+    description: { en: string; ko: string }
+  }
+  enabled: boolean
+  /** Service capability used to bind related UI without depending on implementation packages. */
+  feature?: 'skills' | 'mcp'
+  required?: boolean
+  error?: string
+}
+export interface RuntimePluginManager {
+  list(): Promise<RuntimePluginInfo[]>
+  setEnabled(module: string, enabled: boolean): Promise<void>
+}
 export type TranscriptEvent =
   | { type: 'transcript-delta'; delta: string }
   | { type: 'transcript-partial' | 'transcript-final'; text: string }
@@ -63,6 +80,7 @@ export interface TranscriptionStream {
 }
 export interface ChatPlatform {
   plugins?: AgentPluginManager
+  runtimePlugins?: RuntimePluginManager
   mcp: {
     readonly configuration: import('@keundal/mcp').McpClientConfig[]
     load(): Promise<void>

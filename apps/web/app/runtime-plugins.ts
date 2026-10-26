@@ -24,7 +24,12 @@ export async function loadWebRuntimePlugins(
     manifest = parseRuntimePluginManifest(await response.json())
     baseURL = new URL(response.url)
   }
-  return loadRuntimePlugins(manifest, {
+  // The bundled skill service has its own lifetime so the settings switch can dispose it.
+  const skills = manifest.plugins.find(spec => spec.module === 'builtin:skills')
+  const composition = await loadRuntimePlugins({
+    ...manifest,
+    plugins: manifest.plugins.filter(spec => spec.module !== 'builtin:skills')
+  }, {
     builtins,
     tools,
     deferredToolProvider,
@@ -38,4 +43,5 @@ export async function loadWebRuntimePlugins(
       return import(/* @vite-ignore */ /* webpackIgnore: true */ url.href)
     }
   })
+  return { ...composition, skills }
 }

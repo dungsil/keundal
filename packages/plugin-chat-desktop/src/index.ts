@@ -3,6 +3,8 @@ import { resolveModel, type ModelOption } from '@keundal/chat/models'
 import type { NativeInvoke } from '@keundal/chat/platform'
 import { RemoteChatStore, type RemoteAgentInfo } from '@keundal/plugin-chat-remote'
 
+export { createNativeRuntimePluginManager } from './runtime-plugins.js'
+
 function selection(model: string, models: ModelOption[]) {
   const selected = resolveModel(model)
   const metadata = models.find((item) => item.value === selected.value)

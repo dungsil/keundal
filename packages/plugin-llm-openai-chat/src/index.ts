@@ -15,6 +15,14 @@ import { OpenAIChatLLMConfigSchema, parseConfig, type OpenAIChatLLMConfig } from
 import { CompletionEvents } from './events.js'
 import { createInput } from './request.js'
 
+export const metadata = {
+  name: { en: 'OpenAI Chat Completions', ko: 'OpenAI Chat Completions' },
+  description: {
+    en: 'Connects models through the OpenAI-compatible Chat Completions API.',
+    ko: 'OpenAI 호환 Chat Completions API로 모델에 연결합니다.'
+  }
+}
+
 export { OpenAIChatLLMConfigSchema, type OpenAIChatLLMConfig } from './config.js'
 export { listOpenAIChatModels } from './models.js'
 

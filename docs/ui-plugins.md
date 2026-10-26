@@ -12,7 +12,20 @@
 | `@keundal/ui-*`       | 화면 기능 하나를 슬롯에 등록합니다.                                                                   |
 | `@keundal/chat-app`   | `app/plugins/ui.ts`에서 Cordis `Context`를 만들고 `app/ui-plugins.ts`의 플러그인을 등록합니다.        |
 
-`app/plugins/ui.ts`는 서버와 브라우저의 앱 인스턴스마다 같은 플러그인을 등록합니다. 그래서 서버 렌더링 결과와 하이드레이션 결과가 일치합니다. `ChatRuntime.start()`는 브라우저에서만 플랫폼을 연결합니다. 플랫폼이 필요한 멤버는 연결하기 전에 호출하면 예외를 던집니다.
+`app/plugins/ui.ts`는 서버 렌더링과 최초 하이드레이션에서 같은 기본 UI를 등록합니다. `ChatRuntime.start()`는 브라우저에서만 플랫폼을 연결하며, 앱이 마운트된 뒤 실제 실행 방식의 선택과 UI를 동기화합니다. 저장된 선택에서 기능을 꺼 두었어도 하이드레이션이 끝나기 전에는 기본 UI를 유지합니다. 이전 `keundal-ui-plugins` 쿠키는 읽거나 선택에 반영하지 않습니다. 플랫폼이 필요한 멤버는 연결하기 전에 호출하면 예외를 던집니다.
+
+`UIPluginManager`는 UI의 Cordis 등록 범위를 소유하지만 독립적인 UI 선택은 제공하지 않습니다. **설정 → 큰달 플러그인**에는 실행 방식이 제공하는 필수 서비스인 LLM·저장소·에이전트와 선택 기능인 스킬·MCP·날씨·차트 도구만 표시합니다. `ui-*`는 행이나 스위치로 표시하지 않습니다. `ChatRuntime.pluginManager`도 이 기능 목록만 제공하며, `platform.runtimePlugins`가 있을 때만 노출합니다. 원격 연결처럼 실행 방식의 관리자가 없으면 관리 화면은 사용할 수 없음을 표시하고 기본 UI를 유지합니다.
+
+| 선택 기능 모듈               | 함께 등록·해제하는 UI |
+| ---------------------------- | --------------------- |
+| `@keundal/plugin-skill`      | `@keundal/ui-skill`   |
+| `@keundal/plugin-mcp-client` | `@keundal/ui-mcp`     |
+
+선택 기능을 끄기 전에는 진행 중인 응답을 중단합니다. 스킬·MCP를 끄면 대응하는 UI 범위도 해제하고, 켜면 다시 등록합니다. 해당 설정 화면·탐색 항목도 함께 사라지거나 복원됩니다. 나머지 UI는 화면 셸·설정·관리 화면을 포함해 항상 등록합니다. Nuxt 레이어는 정적으로 빌드하며, 외부 모듈을 내려받거나 빌드하지 않습니다.
+
+`@keundal/ui-tool`은 `delegate_task`, `skill`, `web_search`, `google_search` 결과를, `@keundal/ui-chart`와 `@keundal/ui-weather`는 차트와 날씨 결과를 표시합니다. 세 UI는 기존 대화 기록을 표시해야 하므로 `@keundal/ui-chat`처럼 항상 등록합니다. `@keundal/plugin-tool-chart`와 `@keundal/plugin-tool-weather`를 각각 끄면 이후 실행 목록에서 해당 도구만 제외하며, 기존 결과를 표시하는 UI는 해제하지 않습니다. 공유 UI를 별도로 끄고 켜는 스위치는 없습니다.
+
+선택은 실행 방식의 관리자가 저장합니다. web의 `BrowserRuntimePluginManager`는 기존 `keundal:bundled-plugins` localStorage를 사용하고 desktop은 기존 네이티브 저장소를 사용합니다. UI 관리자는 선택을 별도로 저장하지 않습니다.
 
 ## 슬롯 선언
 
@@ -60,6 +73,8 @@ ctx.slots.register({ name: 'page.chat', children: { 'chat.message.tool': 'keyed'
 
 각 패키지는 `app/locales/{en,ko}.ts`에 자신이 쓰는 문구를 둡니다. `app/locale.ts`의 `useText()`는 패키지의 키를 먼저 찾고, 없으면 `@keundal/ui`의 공유 사전에서 찾습니다. 패키지 둘 이상이 쓰는 문구와 셸의 문구는 공유 사전에 둡니다. 다른 컴포넌트가 읽는 메타데이터의 문구는 `localizedText()`나 `sharedText()`로 모든 언어의 값을 함께 넘깁니다.
 
+큰달 플러그인 목록의 이름과 설명은 각 기능 패키지가 내보내는 `metadata`를 사용합니다. `name`과 `description`은 각각 `{ en: string, ko: string }`으로 제공합니다. 앱의 조립 계층은 이를 `RuntimePluginInfo.metadata`에 담고, 화면은 현재 앱 언어의 이름·설명과 스위치의 접근성 이름을 표시합니다. `module`은 선택과 저장에 쓰는 식별자로 유지합니다. 메타데이터가 없는 항목은 `module`을 이름으로 표시하며 설명은 생략합니다. desktop은 정적으로 포함한 패키지의 메타데이터만 조회하며, 표시를 위해 외부 모듈을 불러오지 않습니다.
+
 화면은 태그라인과 상시 도움말 대신 제목, 입력란 이름, 구분선과 컨트롤 배치로 구조를 전달합니다. 중복되는 보조 레이블은 표시하지 않습니다. 오류, 보안 경고, 사용자가 작성한 내용과 접근성 이름은 유지합니다.
 
 ## 패키지 구조
@@ -74,7 +89,7 @@ packages/ui-<name>/
   app/locale.ts      useText()
 ```
 
-Nuxt는 레이어의 `components`, `composables`, `utils`, `plugins`, `pages`, `layouts`, `middleware` 디렉터리를 전역으로 등록합니다. 플러그인 패키지는 이 디렉터리를 만들지 않습니다. 플러그인을 추가하거나 빼려면 `packages/chat-app/app/ui-plugins.ts`와 `nuxt.config.ts`의 `extends`를 함께 고칩니다.
+Nuxt는 레이어의 `components`, `composables`, `utils`, `plugins`, `pages`, `layouts`, `middleware` 디렉터리를 전역으로 등록합니다. 플러그인 패키지는 이 디렉터리를 만들지 않습니다. 번들 목록에 패키지를 추가하거나 빼려면 `packages/chat-app/app/ui-plugins.ts`의 `uiPluginCatalog`와 `nuxt.config.ts`의 `extends`를 함께 고칩니다.
 
 ## 슬롯 구조
 

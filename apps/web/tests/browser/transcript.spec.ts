@@ -56,6 +56,34 @@ test('이전 메시지 링크를 열면 대상 메시지를 표시하고 전체 
   expect(content).toContain('Fixture message 84')
 })
 
+test.describe('터치 대화 목록', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
+
+  test('마우스를 올리지 않아도 이름 변경과 삭제 버튼을 보고 누를 수 있다', async ({ page }) => {
+    await seedChat(page)
+    await ready(page, '/chat/browser-fixture')
+    await page.getByRole('button', { name: 'Open sidebar' }).tap()
+    const rename = page.getByRole('button', { name: 'Rename: Browser fixture', exact: true })
+    const remove = page.getByRole('button', { name: 'Delete: Browser fixture', exact: true })
+    await expect(rename).toBeVisible()
+    await expect(rename.locator('..')).toHaveCSS('opacity', '1')
+    for (const button of [rename, remove]) {
+      const box = await button.boundingBox()
+      expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44)
+      expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44)
+    }
+    await rename.tap()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.getByRole('textbox', { name: 'Chat title' }).fill('Mobile renamed')
+    await page.getByRole('button', { name: 'Save', exact: true }).tap()
+    await expect(page.getByRole('button', { name: 'Rename: Mobile renamed', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Delete: Mobile renamed', exact: true }).tap()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.getByRole('button', { name: 'Cancel', exact: true }).tap()
+    await expect(page.getByRole('button', { name: 'Rename: Mobile renamed', exact: true })).toBeVisible()
+  })
+})
+
 for (const colorScheme of ['light', 'dark'] as const) {
   test.describe(`${colorScheme} 테마의 메시지 편집`, () => {
     test.use({ colorScheme })

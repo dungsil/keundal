@@ -2,6 +2,14 @@ import { weatherSchema } from '@keundal/chat/tools/weather'
 import type { ExecutableTool } from '@keundal/tools'
 import { z } from 'zod'
 
+export const metadata = {
+  name: { en: 'Weather', ko: '날씨' },
+  description: {
+    en: 'Adds weather lookup and forecasts to conversations.',
+    ko: '대화에서 날씨와 예보를 조회할 수 있습니다.'
+  }
+}
+
 const getWeatherData = (k: string) =>
   ({
     sunny: { text: 'Sunny', icon: 'i-lucide-sun' },

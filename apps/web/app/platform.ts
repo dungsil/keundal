@@ -1,20 +1,22 @@
 import { McpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-chat-browser/mcp'
 import { SkillManager } from '@keundal/plugin-chat-browser/skills'
 import { BrowserAgentPluginManager } from '@keundal/plugin-chat-browser/plugins'
-import { Context } from 'cordis'
-import agentPlugin from '@keundal/plugin-agent-chat'
-import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
-import skillPlugin from '@keundal/plugin-skill'
+import { Context, type Fiber } from 'cordis'
+import agentPlugin, { metadata as agentMetadata } from '@keundal/plugin-agent-chat'
+import indexedDBStorePlugin, { metadata as storeMetadata } from '@keundal/plugin-store-indexeddb'
+import skillPlugin, { metadata as skillMetadata } from '@keundal/plugin-skill'
 import { ChatStore } from '@keundal/plugin-chat-local'
 import { RemoteChatStore } from '@keundal/plugin-chat-remote'
-import { browserLLMPlugin } from '@keundal/plugin-llm-browser'
+import { browserLLMPlugin, metadata as llmMetadata } from '@keundal/plugin-llm-browser'
 import { loadModels } from '@keundal/plugin-llm-browser/models'
 import { openaiTranscription } from '@keundal/plugin-transcription-browser'
-import { createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
-import { createChartTools } from '@keundal/plugin-tool-chart'
-import { createWeatherTools } from '@keundal/plugin-tool-weather'
+import { BrowserRuntimePluginManager, createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
+import { mountRuntimePlugin, type RuntimeModuleRegistry } from '@keundal/plugin-runtime'
+import { createChartTools, metadata as chartMetadata } from '@keundal/plugin-tool-chart'
+import { createWeatherTools, metadata as weatherMetadata } from '@keundal/plugin-tool-weather'
 import type { ChatPlatform } from '@keundal/chat/platform'
 import { loadWebRuntimePlugins } from './runtime-plugins'
+import { metadata as mcpMetadata } from '@keundal/plugin-chat-browser/mcp'
 
 export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: string, agentToken?: string, pluginConfig?: string } = {}): ChatPlatform {
   const mcp = new McpManager(createBrowserMcpSettingsStorage(storage))
@@ -37,18 +39,66 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
           throw error
         }
       }
-      const composition = await loadWebRuntimePlugins(runtime.pluginConfig, {
+      let manager: BrowserRuntimePluginManager
+      const chartTools = () => manager.isEnabled('@keundal/plugin-tool-chart') ? createChartTools() : []
+      const weatherTools = () => manager.isEnabled('@keundal/plugin-tool-weather') ? createWeatherTools() : []
+      const builtins: RuntimeModuleRegistry = {
         'builtin:llm': { exports: { default: browserLLMPlugin }, config: { getSettings: options.getSettings, getModels: options.getModels } },
         'builtin:store': { exports: { default: indexedDBStorePlugin }, config: { databaseName: 'keundal-web' } },
         'builtin:skills': { exports: { default: skillPlugin }, config: { providers: [...options.skills, ...(plugins ? [plugins.provider] : [])] } },
         'builtin:agent': { exports: { default: agentPlugin }, config: { maxToolRounds: 4, subagents: true, parallelTools: true } },
-        'builtin:chart': { exports: { default: createChartTools } },
-        'builtin:weather': { exports: { default: createWeatherTools } },
-        'builtin:chat-tools': { exports: { default: () => [...createChartTools(), ...createWeatherTools()] } }
-      }, undefined, async execution => [...await mcp.tools(execution), ...await plugins!.tools(execution)])
+        'builtin:chart': { exports: { default: chartTools } },
+        'builtin:weather': { exports: { default: weatherTools } },
+        'builtin:chat-tools': { exports: { default: () => [...chartTools(), ...weatherTools()] } }
+      }
+      const composition = await loadWebRuntimePlugins(runtime.pluginConfig, builtins, undefined,
+        async execution => manager.isEnabled('@keundal/plugin-mcp-client')
+          ? [...await mcp.tools(execution), ...await plugins!.tools(execution)] : [])
       const root = new Context()
-      const scope = root.plugin(async (ctx: Context) => composition.setup(ctx))
       let store: ChatStore | undefined
+      let skillFiber: Fiber | undefined
+      let connected = false
+      const selectSkills = async (enabled: boolean) => {
+        if (!enabled) {
+          await skillFiber?.dispose()
+          skillFiber = undefined
+        } else if (!skillFiber) {
+          skillFiber = await mountRuntimePlugin(root, composition.skills ?? { module: 'builtin:skills' }, {
+            builtins,
+            importModule: async () => { throw new Error('Only bundled plugins are selectable') }
+          })
+        }
+      }
+      const saved: unknown = JSON.parse(storage.getItem('keundal:bundled-plugins') ?? '{}')
+      if (saved && typeof saved === 'object' && '@keundal/plugin-tool-chat' in saved && typeof saved['@keundal/plugin-tool-chat'] === 'boolean') {
+        const selection = saved as Record<string, unknown>
+        storage.setItem('keundal:bundled-plugins', JSON.stringify({
+          ...selection,
+          '@keundal/plugin-tool-chart': typeof selection['@keundal/plugin-tool-chart'] === 'boolean' ? selection['@keundal/plugin-tool-chart'] : selection['@keundal/plugin-tool-chat'],
+          '@keundal/plugin-tool-weather': typeof selection['@keundal/plugin-tool-weather'] === 'boolean' ? selection['@keundal/plugin-tool-weather'] : selection['@keundal/plugin-tool-chat']
+        }))
+      }
+      manager = new BrowserRuntimePluginManager(storage, [
+        { module: '@keundal/plugin-llm-browser', metadata: llmMetadata, enabled: true, required: true },
+        { module: '@keundal/plugin-store-indexeddb', metadata: storeMetadata, enabled: true, required: true },
+        { module: '@keundal/plugin-agent-chat', metadata: agentMetadata, enabled: true, required: true },
+        { module: '@keundal/plugin-skill', metadata: skillMetadata, enabled: !!composition.skills, feature: 'skills' },
+        { module: '@keundal/plugin-tool-chart', metadata: chartMetadata, enabled: true },
+        { module: '@keundal/plugin-tool-weather', metadata: weatherMetadata, enabled: true },
+        { module: '@keundal/plugin-mcp-client', metadata: mcpMetadata, enabled: true, feature: 'mcp' }
+      ], async (module, enabled) => {
+        if (!connected) throw new Error('The browser plugin runtime is not connected')
+        await store!.stop()
+        if (module === '@keundal/plugin-skill') await selectSkills(enabled)
+        if (module === '@keundal/plugin-mcp-client' && !enabled) {
+          await mcp.close()
+          await plugins?.close()
+        }
+      })
+      const scope = root.plugin(async (ctx: Context) => {
+        await selectSkills(manager.isEnabled('@keundal/plugin-skill'))
+        await composition.setup(ctx)
+      })
       try {
         await scope
         for (const service of ['llm', 'session', 'generation'] as const) {
@@ -62,6 +112,8 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
           skills: config.skills
         }))
         await store.recover()
+        connected = true
+        platform.runtimePlugins = manager
         return {
           store,
           remoteAgent: false,
@@ -70,9 +122,11 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
             tools: (await composition.tools?.(execution ?? {}) ?? []).map(({ name, description }) => ({ name, description }))
           }),
           dispose: async () => {
+            connected = false
             try {
               await store!.stop()
             } finally {
+              await skillFiber?.dispose()
               await plugins?.close()
               await scope.dispose()
             }
@@ -82,6 +136,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         try {
           await store?.stop()
         } finally {
+          await skillFiber?.dispose()
           await plugins?.close()
           await scope.dispose()
         }
