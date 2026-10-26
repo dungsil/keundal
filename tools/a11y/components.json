@@ -6,6 +6,10 @@
     "scenario": "@a11y:plugins",
     "test": "apps/web/tests/browser/accessibility.spec.ts"
   },
+  "packages/ui-agent-plugins/app/views/RuntimePluginSettings.vue": {
+    "scenario": "@a11y:runtime-plugins",
+    "test": "apps/web/tests/browser/plugins.spec.ts"
+  },
   "packages/ui-chat-list/app/views/ChatActions.vue": {
     "scenario": "@a11y:home",
     "test": "apps/web/tests/browser/accessibility.spec.ts"

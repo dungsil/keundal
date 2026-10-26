@@ -7,11 +7,16 @@ import type { McpClientConfig } from '@keundal/mcp'
 import type { RuntimePluginManifest } from '@keundal/plugin-runtime'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 
-export { createNodeComposition } from './default-composition.js'
+export { createNodeComposition, getRequiredNodePluginModules } from './default-composition.js'
 
 export type AgentHostProvider = 'openai' | 'gemini' | 'anthropic' | (string & {})
+export type BundledPluginModule = '@keundal/plugin-skill' | '@keundal/plugin-mcp-client' | '@keundal/plugin-tool-chat'
+export type BundledPluginSelection = Readonly<Partial<Record<BundledPluginModule, boolean>>>
+
 export interface NodeHostOptions {
   readonly plugins?: readonly AgentPluginOptions[]
+  /** Bundled optional features default to enabled; deployment manifests remain operator-owned. */
+  readonly bundledPlugins?: BundledPluginSelection
   readonly mcpServers?: readonly McpClientConfig[]
   readonly provider: AgentHostProvider
   readonly apiKey: string
@@ -68,6 +73,7 @@ export async function createAgentRuntime(
     | 'maxActiveSubagents'
     | 'runtimePlugins'
     | 'runtimePluginBasePath'
+    | 'bundledPlugins'
   > & {
     compose: HostCompositionFactory
   }
@@ -103,6 +109,7 @@ export async function createAgentRuntime(
       subagents: options.subagents,
       maxActiveSubagents: options.maxActiveSubagents,
       plugins: options.plugins,
+      bundledPlugins: options.bundledPlugins,
       runtimePlugins: options.runtimePlugins,
       runtimePluginBasePath: options.runtimePluginBasePath,
       pluginConfigPath: env.KEUNDAL_PLUGIN_CONFIG,
