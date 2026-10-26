@@ -12,7 +12,9 @@
 | `@keundal/ui-*`       | 화면 기능 하나를 슬롯에 등록합니다.                                                                   |
 | `@keundal/chat-app`   | `app/plugins/ui.ts`에서 Cordis `Context`를 만들고 `app/ui-plugins.ts`의 플러그인을 등록합니다.        |
 
-`app/plugins/ui.ts`는 서버와 브라우저의 앱 인스턴스마다 같은 플러그인을 등록합니다. 그래서 서버 렌더링 결과와 하이드레이션 결과가 일치합니다. `ChatRuntime.start()`는 브라우저에서만 플랫폼을 연결합니다. 플랫폼이 필요한 멤버는 연결하기 전에 호출하면 예외를 던집니다.
+`app/plugins/ui.ts`는 서버와 브라우저의 앱 인스턴스마다 `keundal-ui-plugins` 쿠키에 저장한 같은 선택을 적용합니다. 그래서 서버 렌더링 결과와 하이드레이션 결과가 일치합니다. 선택을 저장하지 않은 항목은 기존처럼 켜져 있습니다. `ChatRuntime.start()`는 브라우저에서만 플랫폼을 연결합니다. 플랫폼이 필요한 멤버는 연결하기 전에 호출하면 예외를 던집니다.
+
+`UIPluginManager`는 선택한 항목의 Cordis 등록 범위를 소유합니다. **설정 → 큰달 플러그인**에서 끄면 해당 범위를 해제하고 켜면 다시 등록합니다. 화면 셸, 설정 화면과 관리 화면은 필수로 유지합니다. Nuxt 레이어는 정적으로 빌드하며, 외부 모듈을 내려받거나 빌드하지 않습니다. 이 관리자는 `ChatRuntime.pluginManager`로 UI 목록과 실행 방식의 번들 목록을 함께 제공합니다.
 
 ## 슬롯 선언
 
@@ -74,7 +76,7 @@ packages/ui-<name>/
   app/locale.ts      useText()
 ```
 
-Nuxt는 레이어의 `components`, `composables`, `utils`, `plugins`, `pages`, `layouts`, `middleware` 디렉터리를 전역으로 등록합니다. 플러그인 패키지는 이 디렉터리를 만들지 않습니다. 플러그인을 추가하거나 빼려면 `packages/chat-app/app/ui-plugins.ts`와 `nuxt.config.ts`의 `extends`를 함께 고칩니다.
+Nuxt는 레이어의 `components`, `composables`, `utils`, `plugins`, `pages`, `layouts`, `middleware` 디렉터리를 전역으로 등록합니다. 플러그인 패키지는 이 디렉터리를 만들지 않습니다. 번들 목록에 패키지를 추가하거나 빼려면 `packages/chat-app/app/ui-plugins.ts`의 `uiPluginCatalog`와 `nuxt.config.ts`의 `extends`를 함께 고칩니다.
 
 ## 슬롯 구조
 

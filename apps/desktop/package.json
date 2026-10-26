@@ -28,7 +28,6 @@
     "@keundal/plugin-tool-chat": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
     "@keundal/plugin-chat-desktop": "workspace:*",
-    "@keundal/plugin-runtime": "workspace:*",
     "@keundal/plugin-llm-browser": "workspace:*",
     "@tauri-apps/api": "2.12.4",
     "@keundal/plugin-transcription-browser": "workspace:*",

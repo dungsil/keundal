@@ -87,13 +87,52 @@ function createNodeImporter(basePath: string) {
   }
 }
 
+/** Required deployment modules are informational, never editable by bundled feature selection. */
+export function getRequiredNodePluginModules(options: NodeHostOptions): string[] {
+  const { manifest } = readManifest(options, true)
+  const llm = manifest.plugins.find((spec) => spec.module === 'builtin:llm')
+  const provider =
+    llm?.export && Object.hasOwn(providerPlugins, llm.export)
+      ? llm.export
+      : String(llm?.config?.provider ?? options.provider)
+  const builtinNames: Record<string, string> = {
+    'builtin:llm': `@keundal/plugin-llm-${provider}`,
+    'builtin:store': '@keundal/plugin-store-sqlite',
+    'builtin:agent': '@keundal/plugin-agent-chat'
+  }
+  return [
+    ...new Set(
+      [...manifest.plugins, manifest.agent]
+        .filter((spec) => !['builtin:skills', '@keundal/plugin-skill'].includes(spec.module))
+        .map((spec) => builtinNames[spec.module] ?? spec.module)
+    )
+  ]
+}
+
 export const createNodeComposition: HostCompositionFactory = (options) => {
   const plugins: LoadedAgentPlugin[] = []
   const skillProviders: SkillProvider[] = []
-  const mcpServers = parseMcpServers(options.mcpServers ?? [])
+  const skillsEnabled = options.bundledPlugins?.['@keundal/plugin-skill'] !== false
+  const mcpEnabled = options.bundledPlugins?.['@keundal/plugin-mcp-client'] !== false
+  const chatToolsEnabled = options.bundledPlugins?.['@keundal/plugin-tool-chat'] !== false
+  const mcpServers = mcpEnabled ? parseMcpServers(options.mcpServers ?? []) : []
   const mcpClients = new Map<string, Promise<McpClient>>()
   const mcpLifetime = new globalThis.AbortController()
-  const { manifest, basePath } = readManifest(options, Boolean(options.plugins?.length))
+  const selection = readManifest(options, skillsEnabled && Boolean(options.plugins?.length))
+  const manifest: RuntimePluginManifest = {
+    ...selection.manifest,
+    plugins: selection.manifest.plugins.filter(
+      (spec) => skillsEnabled || !['builtin:skills', '@keundal/plugin-skill'].includes(spec.module)
+    ),
+    ...(selection.manifest.tools === undefined
+      ? {}
+      : {
+          tools: selection.manifest.tools.filter(
+            (spec) => chatToolsEnabled || spec.module !== '@keundal/plugin-tool-chat'
+          )
+        })
+  }
+  const basePath = selection.basePath
   const builtinLlmSpec = manifest.plugins.find((spec) => spec.module === 'builtin:llm')
   const hasBuiltinLlm = Boolean(builtinLlmSpec)
   const builtinLlmProvider = String(builtinLlmSpec?.config?.provider ?? options.provider)
@@ -119,7 +158,7 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
     'builtin:agent': {
       config: {
         maxToolRounds: options.maxToolRounds ?? 4,
-        skills: Boolean(options.plugins?.length),
+        skills: skillsEnabled && Boolean(options.plugins?.length),
         subagents: options.subagents ?? true,
         maxActiveSubagents: options.maxActiveSubagents,
         parallelTools: true
@@ -127,7 +166,7 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       exports: { default: agentPlugin }
     }
   }
-  const defaultTools = manifest.tools === undefined ? options.defaultTools : undefined
+  const defaultTools = chatToolsEnabled && manifest.tools === undefined ? options.defaultTools : undefined
   const suppliedTools: ToolProvider | undefined =
     defaultTools || options.tools
       ? async (execution) => [
@@ -161,7 +200,9 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
         throw error
       }
     }
-    for (const plugin of plugins) result.push(...(await plugin.tools({ signal })))
+    if (mcpEnabled) {
+      for (const plugin of plugins) result.push(...(await plugin.tools({ signal })))
+    }
     return result
   }
   let runtime: LoadedNodePlugins | undefined
@@ -181,11 +222,11 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
         if (errors.length) throw new AggregateError(errors, 'failed to dispose agent plugins')
       })
       for (const config of options.plugins ?? []) {
-        const plugin = await loadAgentPlugin(config)
+        const plugin = await loadAgentPlugin(mcpEnabled ? config : { ...config, mcp: undefined })
         plugins.push(plugin)
         skillProviders.push(plugin.skillProvider)
       }
-      if (plugins.length && !manifest.plugins.some((spec) => spec.module === 'builtin:skills')) {
+      if (skillsEnabled && plugins.length && !manifest.plugins.some((spec) => spec.module === 'builtin:skills')) {
         throw new Error('runtime plugin manifest must include builtin:skills when Agent Plugins are configured')
       }
       if (hasBuiltinLlm && !providerPlugins[builtinLlmProvider as keyof typeof providerPlugins]) {
@@ -212,6 +253,7 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       if (!runtime) throw new Error('runtime plugins are not initialized')
       return runtime.mountAgent(ctx, {
         ...config,
+        ...(!skillsEnabled ? { skills: false } : {}),
         reasoning:
           hasBuiltinLlm &&
           (builtinLlmProvider === 'openai' || builtinLlmProvider === 'openai-chat') &&

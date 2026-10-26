@@ -60,7 +60,7 @@ function validateConfig(value: unknown, label: string): Readonly<Record<string, 
   return value
 }
 
-export function parseRuntimeModuleSpec(value: unknown, label = 'plugin'): RuntimeModuleSpec {
+function parseRuntimeModuleSpec(value: unknown, label = 'plugin'): RuntimeModuleSpec {
   if (!isRecord(value)) throw new TypeError(`${label} must be an object`)
   for (const key of Object.keys(value)) {
     if (key !== 'module' && key !== 'export' && key !== 'config')

@@ -7,259 +7,196 @@ import { join } from 'node:path'
 import { createNodeAgentHost } from '@keundal/agent-runtime-node'
 import type { NativeInvoke } from '@keundal/chat/platform'
 import { createNativeRuntimePluginManager } from '@keundal/plugin-chat-desktop'
+import { createChatTools } from '@keundal/plugin-tool-chat'
 import { expect, onTestFinished, test, vi } from 'vitest'
 
 import { manageRuntimePlugins, createDesktopComposition, type PluginRequest } from '../sidecar/runtime-plugins'
 
+const chat = '@keundal/plugin-tool-chat'
+const skills = '@keundal/plugin-skill'
+const mcp = '@keundal/plugin-mcp-client'
+
 function fixture() {
-  const directory = mkdtempSync(join(tmpdir(), 'keundal-managed-'))
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-bundled-'))
   onTestFinished(() => rmSync(directory, { force: true, recursive: true }))
-  const module = join(directory, 'plugin.mjs')
-  writeFileSync(module, 'export default () => {}')
-  return { directory, module }
+  const options = { provider: 'openai', model: 'test', apiKey: '', sqlitePath: join(directory, 'chats.sqlite'), defaultTools: createChatTools() }
+  const compose = createDesktopComposition(directory)
+  const open = async (provider = 'openai') => {
+    const host = await createNodeAgentHost({ ...options, provider }, compose)
+    onTestFinished(() => host.dispose())
+    return host
+  }
+  const invoke: NativeInvoke = async <T>(_command: string, args?: Record<string, unknown>) =>
+    (await manageRuntimePlugins(directory, args!.request as PluginRequest)) as T
+  return { directory, options, compose, open, invoke }
 }
 
-test('로컬 플러그인은 영속화되며 비활성화와 제거가 모듈 데이터를 보존한다', async () => {
-  const { directory, module } = fixture()
-  await manageRuntimePlugins(directory, {
-    action: 'install',
-    spec: { module, export: 'default', config: { retained: true } }
-  })
+test('번들 목록은 선택한 LLM과 저장소 및 에이전트를 잠그고 선택 기능은 기본 활성화한다', async () => {
+  const { directory, open } = fixture()
+  const host = await open()
   expect(await manageRuntimePlugins(directory, { action: 'list' })).toEqual([
-    { module, export: 'default', config: { retained: true }, enabled: false }
+    { module: '@keundal/plugin-llm-openai', enabled: true, required: true },
+    { module: '@keundal/plugin-store-sqlite', enabled: true, required: true },
+    { module: '@keundal/plugin-agent-chat', enabled: true, required: true },
+    { module: skills, enabled: true }, { module: mcp, enabled: true }, { module: chat, enabled: true }
   ])
-  await manageRuntimePlugins(directory, { action: 'enable', module, enabled: true })
-  rmSync(module)
-  // A missing or broken module must not prevent turning it off.
-  await manageRuntimePlugins(directory, { action: 'enable', module, enabled: false })
-  expect(await manageRuntimePlugins(directory, { action: 'list' })).toMatchObject([{ enabled: false }])
-  writeFileSync(module, 'user data')
-  await manageRuntimePlugins(directory, { action: 'remove', module })
-  expect(await manageRuntimePlugins(directory, { action: 'list' })).toEqual([])
-  expect(readFileSync(module, 'utf8')).toBe('user data')
-})
-
-test('설치 실패는 기존 선택을 변경하지 않고 상대 경로와 명령 인자를 거부한다', async () => {
-  const { directory, module } = fixture()
-  await manageRuntimePlugins(directory, { action: 'install', spec: { module } })
-  const before = readFileSync(join(directory, 'managed.json'), 'utf8')
-  for (const invalid of [
-    './plugin.mjs',
-    '--ignore-scripts=false',
-    'name;touch /tmp/injected',
-    'https://example.com/plugin.tgz',
-    join(directory, 'missing.mjs')
-  ]) {
-    await expect(manageRuntimePlugins(directory, { action: 'install', spec: { module: invalid } })).rejects.toThrow()
-    expect(readFileSync(join(directory, 'managed.json'), 'utf8')).toBe(before)
-  }
-})
-
-test('재시작 실패는 이전 선택을 복구하고 다음 비활성화를 허용한다', async () => {
-  const { directory, module } = fixture()
-  const invoke: NativeInvoke = async <T>(_command: string, args?: Record<string, unknown>) =>
-    (await manageRuntimePlugins(directory, args!.request as PluginRequest)) as T
-  const reload = vi.fn().mockRejectedValueOnce(new Error('broken plugin')).mockResolvedValue(undefined)
-  const manager = createNativeRuntimePluginManager(invoke, reload)
-  await manager.install({ module })
-  expect(reload).not.toHaveBeenCalled()
-  await expect(manager.setEnabled(module, true)).rejects.toThrow('broken plugin')
-  expect(await manager.list()).toEqual([{ module, enabled: false }])
-  await manager.setEnabled(module, false)
-  expect(await manager.list()).toEqual([{ module, enabled: false }])
-  expect(existsSync(module)).toBe(true)
-})
-
-test('배포 매니페스트와 상대 경로 기준 및 필수 서비스를 유지하면서 활성 플러그인을 적용한다', async () => {
-  const { directory, module } = fixture()
-  const config = join(directory, 'deployment.json')
-  const deployment = {
-    plugins: [{ module: 'builtin:llm' }, { module: 'builtin:store' }, { module: './deployment.mjs' }],
-    agent: { module: 'builtin:agent' },
-    tools: []
-  }
-  writeFileSync(config, JSON.stringify(deployment))
-  writeFileSync(join(directory, 'deployment.mjs'), 'export default () => {}')
-  await manageRuntimePlugins(directory, { action: 'install', spec: { module } })
-  await manageRuntimePlugins(directory, { action: 'enable', module, enabled: true })
-  const options = { provider: 'openai', model: 'test', apiKey: '', sqlitePath: ':memory:', pluginConfigPath: config }
-  const host = await createNodeAgentHost(options, createDesktopComposition(directory))
+  expect((await host.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart', 'weather'])
   await host.dispose()
-  expect(JSON.parse(readFileSync(config, 'utf8'))).toEqual(deployment)
-  expect(await manageRuntimePlugins(directory, { action: 'list' })).toEqual([{ module, enabled: true }])
-})
-
-test('손상된 선택이 저장되어 있어도 호스트가 시작되고 진단을 제공하며 비활성화할 수 있다', async () => {
-  const { directory, module } = fixture()
-  writeFileSync(module, 'export default () => { throw new Error("broken optional plugin") }')
-  await manageRuntimePlugins(directory, { action: 'install', spec: { module } })
-  await manageRuntimePlugins(directory, { action: 'enable', module, enabled: true })
-  const options = { provider: 'openai', model: 'test', apiKey: '', sqlitePath: ':memory:' }
-  const host = await createNodeAgentHost(options, createDesktopComposition(directory))
-  expect(await manageRuntimePlugins(directory, { action: 'list' })).toEqual([
-    { module, enabled: true, error: 'broken optional plugin' }
-  ])
-  await host.dispose()
-  await manageRuntimePlugins(directory, { action: 'enable', module, enabled: false })
-  const recovered = await createNodeAgentHost(options, createDesktopComposition(directory))
-  expect(await manageRuntimePlugins(directory, { action: 'list' })).toEqual([{ module, enabled: false }])
-  await recovered.dispose()
-})
-
-test('npm 설치는 별도 디렉터리에서 shell 없이 스크립트 비활성화 인자를 사용한다', async () => {
-  const { directory } = fixture()
-  const cli = join(directory, 'npm-cli.cjs')
-  const log = join(directory, 'npm-args.json')
-  writeFileSync(
-    cli,
-    `
-    const fs = require('node:fs'), path = require('node:path');
-    fs.writeFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)));
-    const prefix = process.argv[process.argv.indexOf('--prefix') + 1];
-    const pkg = path.join(prefix, 'node_modules', 'example-plugin');
-    fs.mkdirSync(pkg, { recursive: true });
-    fs.writeFileSync(path.join(pkg, 'package.json'), JSON.stringify({type:'module', exports:{import:'./index.js'}}));
-    fs.writeFileSync(path.join(pkg, 'index.js'), 'export default () => {}');
-  `
-  )
-  vi.stubEnv('KEUNDAL_NPM_CLI', cli)
-  onTestFinished(() => {
-    vi.unstubAllEnvs()
+  const switched = await open('gemini')
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual({
+    module: '@keundal/plugin-llm-gemini', enabled: true, required: true
   })
-  await manageRuntimePlugins(directory, { action: 'install', spec: { module: 'example-plugin@1.0.0' } })
-  const args: string[] = JSON.parse(readFileSync(log, 'utf8'))
-  expect(args).toContain('--ignore-scripts')
-  expect(args.slice(-2)).toEqual(['--', 'example-plugin@1.0.0'])
-  const prefix = args[args.indexOf('--prefix') + 1]!
-  expect(prefix.startsWith(join(directory, 'packages'))).toBe(true)
-  await manageRuntimePlugins(directory, { action: 'remove', module: 'example-plugin@1.0.0' })
-  expect(existsSync(join(prefix, 'node_modules/example-plugin/index.js'))).toBe(true)
+  expect(switched.services.models()).toMatchObject([{ id: 'test', provider: 'gemini' }])
 })
 
-test('다른 선택이 저장되면 오래된 트랜잭션 복구가 새 선택을 덮어쓰지 않는다', async () => {
-  const { directory, module } = fixture()
-  const transaction = await manageRuntimePlugins(directory, { action: 'install', spec: { module } })
-  await manageRuntimePlugins(directory, { action: 'enable', module, enabled: true })
-  if (Array.isArray(transaction)) throw new Error('Expected mutation transaction')
-  await expect(manageRuntimePlugins(directory, { action: 'restore', ...transaction })).rejects.toThrow(
-    'changed before rollback'
-  )
-})
-
-test('이미 설치한 활성 모듈을 다시 설치하면 기존 설정과 선택을 보존한다', async () => {
-  const { directory, module } = fixture()
-  await manageRuntimePlugins(directory, { action: 'install', spec: { module, config: { original: true } } })
-  await manageRuntimePlugins(directory, { action: 'enable', module, enabled: true })
-  const before = readFileSync(join(directory, 'managed.json'), 'utf8')
-  await expect(
-    manageRuntimePlugins(directory, { action: 'install', spec: { module, config: { original: false } } })
-  ).rejects.toThrow('already installed')
-  expect(readFileSync(join(directory, 'managed.json'), 'utf8')).toBe(before)
-})
-
-test('설치만 한 모듈은 import하지 않고 명시적으로 활성화한 named export의 설정과 정리를 적용한다', async () => {
-  const { directory, module } = fixture()
-  const marker = join(directory, 'lifecycle.txt')
-  writeFileSync(
-    module,
-    `
-    import { appendFileSync } from 'node:fs';
-    const marker = ${JSON.stringify(marker)};
-    appendFileSync(marker, 'import;');
-    export function activate(ctx, config) {
-      appendFileSync(marker, config.value + ';');
-      ctx.effect(() => () => { appendFileSync(marker, 'dispose;'); });
-    }
-  `
-  )
-  await manageRuntimePlugins(directory, {
-    action: 'install',
-    spec: { module, export: 'activate', config: { value: 'active' } }
-  })
-  const options = { provider: 'openai', model: 'test', apiKey: '', sqlitePath: ':memory:' }
-  const disabled = await createNodeAgentHost(options, createDesktopComposition(directory))
-  expect(existsSync(marker)).toBe(false)
+test('선택을 별도 파일에 보존하고 실제 도구 목록을 바꾸면서 SQLite 대화를 유지한다', async () => {
+  const { directory, open } = fixture()
+  const before = await open()
+  await before.services.session.commit({ threadId: 'saved', expectedRevision: 0, state: {}, messages: [{ id: 'user', role: 'user', content: 'keep me' }] })
+  await before.dispose()
+  await manageRuntimePlugins(directory, { action: 'enable', module: chat, enabled: false })
+  expect(JSON.parse(readFileSync(join(directory, 'bundled-selection.json'), 'utf8'))).toContainEqual({ module: chat, enabled: false })
+  const disabled = await open()
+  expect(await disabled.services.catalog!()).toEqual({ skills: [], tools: [] })
+  expect((await disabled.services.session.get('saved'))?.messages).toEqual([{ id: 'user', role: 'user', content: 'keep me' }])
   await disabled.dispose()
-  await manageRuntimePlugins(directory, { action: 'enable', module, enabled: true })
-  const enabled = await createNodeAgentHost(options, createDesktopComposition(directory))
-  expect(readFileSync(marker, 'utf8')).toBe('import;active;')
-  await enabled.dispose()
-  expect(readFileSync(marker, 'utf8')).toBe('import;active;dispose;')
+  await manageRuntimePlugins(directory, { action: 'enable', module: chat, enabled: true })
+  const enabled = await open()
+  expect((await enabled.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart', 'weather'])
+  expect((await enabled.services.session.get('saved'))?.revision).toBe(1)
 })
 
-test('활성화 진단이 발생하면 관리자는 비활성 설치를 보존하고 이전 런타임 선택을 복구한다', async () => {
-  const { directory, module } = fixture()
-  writeFileSync(module, 'throw new Error("import failed")')
-  const invoke: NativeInvoke = async <T>(_command: string, args?: Record<string, unknown>) =>
-    (await manageRuntimePlugins(directory, args!.request as PluginRequest)) as T
-  const reload = vi.fn(async () => {
-    const host = await createNodeAgentHost(
-      { provider: 'openai', model: 'test', apiKey: '', sqlitePath: ':memory:' },
-      createDesktopComposition(directory)
-    )
-    await host.dispose()
-  })
+test('이전 외부 설치는 import하지 않고 알려진 boolean만 안전하게 옮긴다', async () => {
+  const { directory, open } = fixture()
+  const external = join(directory, 'external.mjs')
+  const marker = join(directory, 'imported')
+  writeFileSync(external, `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'bad'); throw new Error('external import')`)
+  const legacy = [
+    { module: external, resolvedModule: external, enabled: true },
+    { module: chat, resolvedModule: external, enabled: false, config: { arbitrary: true }, export: 'activate' },
+    { module: skills, enabled: 'false' }
+  ]
+  writeFileSync(join(directory, 'managed.json'), JSON.stringify(legacy))
+  const host = await open()
+  expect(await host.services.catalog!()).toEqual({ skills: [], tools: [] })
+  expect(existsSync(marker)).toBe(false)
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).not.toContainEqual(expect.objectContaining({ module: external }))
+  await manageRuntimePlugins(directory, { action: 'enable', module: mcp, enabled: false })
+  expect(JSON.parse(readFileSync(join(directory, 'managed.json'), 'utf8'))).toEqual(legacy)
+  expect(readFileSync(join(directory, 'bundled-selection.json'), 'utf8')).not.toContain('resolvedModule')
+  expect(existsSync(external)).toBe(true)
+})
+
+test('알 수 없는 모듈과 필수 서비스 및 외부 설치 작업은 선택을 변경하지 않는다', async () => {
+  const { directory } = fixture()
+  await manageRuntimePlugins(directory, { action: 'enable', module: chat, enabled: false })
+  const path = join(directory, 'bundled-selection.json')
+  const before = readFileSync(path, 'utf8')
+  const invalid: unknown[] = [
+    null, {}, { action: 'install', spec: { module: 'example-plugin' } }, { action: 'remove', module: chat },
+    ...['example-plugin', 'https://example.com/plugin.mjs', '/tmp/plugin.mjs', './plugin.mjs', '@keundal/plugin-store-sqlite', '@keundal/plugin-agent-chat', '@keundal/plugin-llm-openai'].map((module) => ({ action: 'enable', module, enabled: false })),
+    { action: 'enable', module: chat, enabled: 'false' },
+    { action: 'enable', module: chat, enabled: true, config: {} },
+    { action: 'list', spec: { module: '/tmp/plugin.mjs' } }
+  ]
+  for (const request of invalid) {
+    await expect(manageRuntimePlugins(directory, request as PluginRequest)).rejects.toThrow()
+    expect(readFileSync(path, 'utf8')).toBe(before)
+  }
+})
+
+test('복구 요청도 알려진 모듈과 boolean만 허용하고 오래된 선택을 덮어쓰지 않는다', async () => {
+  const { directory } = fixture()
+  const transaction = await manageRuntimePlugins(directory, { action: 'enable', module: chat, enabled: false })
+  if (Array.isArray(transaction)) throw new Error('Expected transaction')
+  for (const previous of [
+    [],
+    transaction.previous.map((entry, index) => index ? entry : { ...entry, module: '/tmp/external.mjs' }),
+    transaction.previous.map((entry) => ({ ...entry, config: {} })),
+    transaction.previous.map((entry) => ({ ...entry, enabled: 'true' }))
+  ]) {
+    await expect(manageRuntimePlugins(directory, { action: 'restore', ...transaction, previous } as PluginRequest)).rejects.toThrow('Invalid bundled selection')
+  }
+  await manageRuntimePlugins(directory, { action: 'enable', module: skills, enabled: false })
+  await expect(manageRuntimePlugins(directory, { action: 'restore', ...transaction })).rejects.toThrow('changed before rollback')
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual({ module: skills, enabled: false })
+})
+
+test('재시작 실패는 이전 선택을 복구하고 다음 작업을 허용한다', async () => {
+  const { directory, invoke } = fixture()
+  const reload = vi.fn().mockRejectedValueOnce(new Error('restart failed')).mockResolvedValue(undefined)
   const manager = createNativeRuntimePluginManager(invoke, reload)
-  await manager.install({ module })
-  await expect(manager.setEnabled(module, true)).rejects.toThrow('import failed')
-  expect(await manager.list()).toEqual([{ module, enabled: false }])
+  expect(Object.keys(manager).sort()).toEqual(['list', 'setEnabled'])
+  await expect(manager.setEnabled(chat, false)).rejects.toThrow('restart failed')
+  expect(await manager.list()).toContainEqual({ module: chat, enabled: true })
+  await manager.setEnabled(chat, false)
+  expect(await manager.list()).toContainEqual({ module: chat, enabled: false })
   expect(reload).toHaveBeenCalledTimes(2)
-  await manager.setEnabled(module, false)
+  expect(existsSync(join(directory, 'bundled-selection.json'))).toBe(true)
 })
 
-test('번들 IPC 명령은 손상된 설치가 있어도 목록과 비활성화를 제공하고 호스트는 정상 시작한다', async () => {
-  const { directory, module } = fixture()
-  writeFileSync(module, 'export default () => { throw new Error("bundled broken plugin") }')
-  const env = { ...process.env, KEUNDAL_MANAGED_PLUGINS: directory }
-  const command = async (request: PluginRequest) => {
-    const process = spawn(globalThis.process.execPath, ['dist-sidecar/main.js', '--manage-runtime-plugins'], {
-      env,
-      signal: AbortSignal.timeout(10_000)
+test('활성화 진단 실패는 선택과 이미 교체한 호스트를 함께 복구한다', async () => {
+  const { invoke } = fixture()
+  const diagnosticInvoke: NativeInvoke = async <T>(command: string, args?: Record<string, unknown>) => {
+    const result = await invoke<T>(command, args)
+    return (Array.isArray(result) ? result.map((entry) => entry.module === chat && entry.enabled ? { ...entry, error: 'activation failed' } : entry) : result) as T
+  }
+  const reload = vi.fn().mockResolvedValue(undefined)
+  const manager = createNativeRuntimePluginManager(diagnosticInvoke, reload)
+  await manager.setEnabled(chat, false)
+  await expect(manager.setEnabled(chat, true)).rejects.toThrow('activation failed')
+  expect(await manager.list()).toContainEqual({ module: chat, enabled: false })
+  expect(reload).toHaveBeenCalledTimes(3)
+})
+
+test('재시작과 복구가 모두 실패하면 두 원인을 숨기지 않는다', async () => {
+  const { invoke } = fixture()
+  const brokenInvoke: NativeInvoke = async <T>(command: string, args?: Record<string, unknown>) => {
+    if ((args?.request as PluginRequest)?.action === 'restore') throw new Error('restore failed')
+    return invoke<T>(command, args)
+  }
+  const manager = createNativeRuntimePluginManager(brokenInvoke, async () => { throw new Error('restart failed') })
+  await expect(manager.setEnabled(chat, false)).rejects.toMatchObject({
+    errors: [expect.objectContaining({ message: 'restart failed' }), expect.objectContaining({ message: 'restore failed' })]
+  })
+})
+
+test('배포 매니페스트와 상대 경로 및 필수 서비스를 선택 변경 이후에도 유지한다', async () => {
+  const { directory, options, compose } = fixture()
+  const path = join(directory, 'deployment.json')
+  const deployment = {
+    plugins: [{ module: 'builtin:llm', config: { provider: 'gemini' } }, { module: 'builtin:store' }, { module: './deployment.mjs' }],
+    agent: { module: 'builtin:agent', config: { maxToolRounds: 2 } }, tools: []
+  }
+  writeFileSync(path, JSON.stringify(deployment))
+  writeFileSync(join(directory, 'deployment.mjs'), 'export default ctx => { ctx.provide("deploymentMarker", true) }')
+  await manageRuntimePlugins(directory, { action: 'enable', module: skills, enabled: false })
+  const host = await createNodeAgentHost({ ...options, pluginConfigPath: path }, compose)
+  onTestFinished(() => host.dispose())
+  expect(await host.services.catalog!()).toEqual({ skills: [], tools: [] })
+  expect(host.ctx.get('deploymentMarker')).toBe(true)
+  expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual({ module: '@keundal/plugin-llm-gemini', enabled: true, required: true })
+  expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(deployment)
+})
+
+test('번들 IPC는 외부 설치를 거부하고 선택 기능만 영속화한다', async () => {
+  const { directory } = fixture()
+  const command = async (request: unknown) => {
+    const child = spawn(process.execPath, ['dist-sidecar/main.js', '--manage-runtime-plugins'], {
+      env: { ...process.env, KEUNDAL_MANAGED_PLUGINS: directory, KEUNDAL_PROVIDER: 'openai' }, signal: AbortSignal.timeout(10_000)
     })
     let output = ''
     let errors = ''
-    process.stdout.on('data', (chunk) => {
-      output += String(chunk)
-    })
-    process.stderr.on('data', (chunk) => {
-      errors += String(chunk)
-    })
-    process.stdin.end(JSON.stringify(request))
-    const [status] = await once(process, 'close')
-    expect(status, errors).toBe(0)
-    return JSON.parse(output)
+    child.stdout.on('data', (chunk) => { output += String(chunk) })
+    child.stderr.on('data', (chunk) => { errors += String(chunk) })
+    child.stdin.end(JSON.stringify(request))
+    const [status] = await once(child, 'close')
+    return { status, output, errors }
   }
-  await command({ action: 'install', spec: { module } })
-  expect(await command({ action: 'list' })).toEqual([{ module, enabled: false }])
-  await command({ action: 'enable', module, enabled: true })
-  const child = spawn(process.execPath, ['dist-sidecar/main.js'], {
-    env: {
-      ...env,
-      PORT: '0',
-      KEUNDAL_PROVIDER: 'openai',
-      KEUNDAL_MODEL: 'test',
-      KEUNDAL_API_TOKEN: 'plugin-test-token',
-      KEUNDAL_SQLITE_PATH: ':memory:'
-    },
-    stdio: ['ignore', 'pipe', 'pipe']
-  })
-  onTestFinished(async () => {
-    if (child.exitCode === null && child.signalCode === null) {
-      const exited = once(child, 'exit')
-      child.kill()
-      await exited
-    }
-  })
-  let output = ''
-  child.stdout.on('data', (chunk) => {
-    output += String(chunk)
-  })
-  await expect.poll(() => output, { timeout: 5_000 }).toContain('keundal server listening')
-  const endpoint = /http:\/\/127\.0\.0\.1:\d+/.exec(output)![0]
-  const response = await fetch(`${endpoint}/threads`, { headers: { authorization: 'Bearer plugin-test-token' } })
-  expect(response.status).toBe(200)
-  expect(await response.json()).toEqual([])
-  expect(await command({ action: 'list' })).toEqual([{ module, enabled: true, error: 'bundled broken plugin' }])
-  await command({ action: 'enable', module, enabled: false })
-  expect(await command({ action: 'list' })).toEqual([{ module, enabled: false }])
+  expect((await command({ action: 'install', spec: { module: '/tmp/external.mjs' } })).status).toBe(1)
+  expect((await command({ action: 'enable', module: chat, enabled: false })).status).toBe(0)
+  const listed = await command({ action: 'list' })
+  expect(listed.status, listed.errors).toBe(0)
+  expect(JSON.parse(listed.output)).toContainEqual({ module: chat, enabled: false })
+  expect(JSON.parse(listed.output)).toContainEqual({ module: '@keundal/plugin-store-sqlite', enabled: true, required: true })
 })

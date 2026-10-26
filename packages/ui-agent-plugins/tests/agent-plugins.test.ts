@@ -1,7 +1,6 @@
 import { expect, test } from 'vitest'
 import { BrowserAgentPluginManager } from '@keundal/plugin-chat-browser/plugins'
 import { BrowserRuntimePluginManager } from '@keundal/plugin-chat-browser'
-import { Context } from 'cordis'
 import { reactive } from 'vue'
 import { importPluginDirectory } from '../app/lib/plugin-import'
 
@@ -75,55 +74,38 @@ test('중복 가져오기와 응답 중단 실패는 저장된 플러그인을 �
   expect((await manager.list())[0]!.enabled).toBe(false)
 })
 
-declare module 'cordis' {
-  interface Events {
-    'test/plugin-output'(output: string[]): void
-  }
-}
-
-test('Cordis 플러그인은 비활성으로 설치하고 활성화·복원·비활성화·삭제에 따라 효과를 등록하고 해제한다', async () => {
+test('번들 목록만 선택하고 비활성 선택을 복원하며 필수 항목과 외부 모듈은 거부한다', async () => {
   const data = new Map<string, string>()
+  data.set('keundal:runtime-plugins', JSON.stringify([{ module: 'https://example.com/old.mjs', enabled: true }]))
+  data.set('keundal:bundled-plugins', JSON.stringify({ '@keundal/required': false, 'https://example.com/other.mjs': true }))
   const storage = {
     getItem: (key: string) => data.get(key) ?? null,
     setItem: (key: string, value: string) => { data.set(key, value) }
   }
-  const ctx = new Context()
-  const module = 'https://example.com/report.mjs'
-  const load = async () => ({
-    report: (ctx: Context, config: { prefix: string }) => {
-      ctx.on('test/plugin-output', output => { output.push(config.prefix) })
-    }
-  })
-  const manager = new BrowserRuntimePluginManager(storage, load)
-  await manager.attach(ctx)
-  await manager.install({ module, export: 'report', config: { prefix: 'Report' } })
-  const output: string[] = []
-  ctx.emit('test/plugin-output', output)
-  expect(output).toEqual([])
-  expect((await manager.list())[0]).toMatchObject({ enabled: false })
-  await manager.setEnabled(module, true)
-  ctx.emit('test/plugin-output', output)
-  expect(output).toEqual(['Report'])
-  await manager.close()
-  const restored = new BrowserRuntimePluginManager(storage, load)
-  await restored.attach(ctx)
-  ctx.emit('test/plugin-output', output)
-  expect(output).toEqual(['Report', 'Report'])
-  await restored.setEnabled(module, false)
-  ctx.emit('test/plugin-output', output)
-  expect(output).toEqual(['Report', 'Report'])
-  expect((await restored.list())[0]).toMatchObject({ module, enabled: false, config: { prefix: 'Report' } })
-  await restored.setEnabled(module, true)
-  await restored.remove(module)
-  ctx.emit('test/plugin-output', output)
-  expect(output).toHaveLength(2)
-  expect(await new BrowserRuntimePluginManager(storage, load).list()).toEqual([])
-  await restored.close()
+  const catalog = [
+    { module: '@keundal/required', enabled: true, required: true },
+    { module: '@keundal/optional', enabled: true }
+  ]
+  const manager = new BrowserRuntimePluginManager(storage, catalog, async () => {})
+  expect((await manager.list()).map(entry => entry.module)).toEqual(['@keundal/required', '@keundal/optional'])
+  expect(manager.isEnabled('@keundal/required')).toBe(true)
+  await expect(manager.setEnabled('@keundal/required', false)).rejects.toThrow('Required')
+  for (const module of ['https://example.com/old.mjs', '/tmp/plugin.mjs', 'npm-package']) {
+    await expect(manager.setEnabled(module, true)).rejects.toThrow('Unknown bundled')
+  }
+  expect('install' in manager).toBe(false)
+  await manager.setEnabled('@keundal/optional', false)
+  const restored = new BrowserRuntimePluginManager(storage, catalog, async () => {})
+  expect(restored.isEnabled('@keundal/optional')).toBe(false)
+  await restored.setEnabled('@keundal/optional', true)
+  expect(restored.isEnabled('@keundal/optional')).toBe(true)
 })
 
-test('Cordis 활성화와 저장 실패는 효과를 정리하고 깨진 모듈이 있어도 관리 화면을 열 수 있다', async () => {
+test('번들 선택의 저장이나 활성화가 실패하면 이전 실행 상태와 선택을 보존한다', async () => {
   let saved: string | null = null
   let writable = true
+  let active = true
+  let failActivation = false
   const storage = {
     getItem: () => saved,
     setItem: (_: string, value: string) => {
@@ -131,49 +113,23 @@ test('Cordis 활성화와 저장 실패는 효과를 정리하고 깨진 모듈�
       saved = value
     }
   }
-  const module = 'https://example.com/plugin.mjs'
-  const ctx = new Context()
-  let failActivation = false
-  const load = async () => ({ default: (ctx: Context) => {
-    ctx.on('test/plugin-output', output => { output.push('active') })
-    if (failActivation) throw new Error('activation failed')
-  } })
-  const manager = new BrowserRuntimePluginManager(storage, load)
-  await manager.attach(ctx)
-  await expect(manager.install({ module: 'data:text/javascript,export default 1' })).rejects.toThrow('HTTPS')
-  await expect(manager.install({ module: 'https://user:password@example.com/plugin.mjs' })).rejects.toThrow('credentials')
-  await manager.install({ module })
-  await expect(manager.install({ module })).rejects.toThrow('already installed')
+  const module = '@keundal/optional'
+  const manager = new BrowserRuntimePluginManager(storage, [{ module, enabled: true }], async (_, enabled) => {
+    if (enabled && failActivation) throw new Error('activation failed')
+    active = enabled
+  })
   writable = false
-  await expect(manager.setEnabled(module, true)).rejects.toThrow('quota')
-  const output: string[] = []
-  ctx.emit('test/plugin-output', output)
-  expect(output).toEqual([])
-  expect((await manager.list())[0]!.enabled).toBe(false)
+  await expect(manager.setEnabled(module, false)).rejects.toThrow('quota')
+  expect(active).toBe(true)
+  expect(manager.isEnabled(module)).toBe(true)
   writable = true
+  await manager.setEnabled(module, false)
   failActivation = true
   await expect(manager.setEnabled(module, true)).rejects.toThrow('activation failed')
-  ctx.emit('test/plugin-output', output)
-  expect(output).toEqual([])
+  expect(active).toBe(false)
+  expect((await manager.list())[0]).toMatchObject({ enabled: false, error: 'activation failed' })
   failActivation = false
   await manager.setEnabled(module, true)
-  await manager.close()
-  let unavailable = true
-  const broken = new BrowserRuntimePluginManager(storage, async () => {
-    if (unavailable) throw new Error('module unavailable')
-    return load()
-  })
-  await expect(broken.attach(ctx)).resolves.toBeUndefined()
-  expect((await broken.list())[0]).toMatchObject({ enabled: true, error: 'module unavailable' })
-  unavailable = false
-  await broken.attach(ctx)
-  expect((await broken.list())[0]).toMatchObject({ enabled: true, error: undefined })
-  ctx.emit('test/plugin-output', output)
-  expect(output).toEqual(['active'])
-  unavailable = true
-  await broken.setEnabled(module, false)
-  expect((await broken.list())[0]).toMatchObject({ enabled: false, error: undefined })
-  await expect(broken.setEnabled(module, true)).rejects.toThrow('module unavailable')
-  expect((await broken.list())[0]!.enabled).toBe(false)
-  await broken.close()
+  expect(active).toBe(true)
+  expect((await manager.list())[0]).toMatchObject({ enabled: true, error: undefined })
 })

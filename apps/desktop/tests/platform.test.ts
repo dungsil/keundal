@@ -42,10 +42,8 @@ test('데스크톱 조립은 보안 저장소와 로컬 스킬을 제공하고 s
       await connection.selectModel?.('anthropic/test')
       expect(commands.filter(command => command === 'sidecar_info')).toHaveLength(2)
       expect(requests).toEqual(['http://sidecar.test/recover'])
-      expect(platform.runtimePlugins?.source).toBe('node')
-      await platform.runtimePlugins!.install({ module: 'example-plugin' })
-      expect(commands.filter(command => command === 'sidecar_info')).toHaveLength(2)
-      await platform.runtimePlugins!.setEnabled('example-plugin', false)
+      expect(Object.keys(platform.runtimePlugins!).sort()).toEqual(['list', 'setEnabled'])
+      await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chat', false)
       expect(commands.filter(command => command === 'sidecar_info')).toHaveLength(3)
     } finally {
       await connection.dispose()

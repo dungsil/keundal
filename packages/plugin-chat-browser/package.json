@@ -34,9 +34,7 @@
     "@keundal/llm-settings": "workspace:*",
     "@keundal/mcp": "workspace:*",
     "@keundal/plugin-mcp-client": "workspace:*",
-    "@keundal/plugin-runtime": "workspace:*",
-    "@keundal/skill-markdown": "workspace:*",
-    "cordis": "catalog:"
+    "@keundal/skill-markdown": "workspace:*"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",

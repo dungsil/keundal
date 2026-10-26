@@ -6,12 +6,12 @@
 
 | 슬롯               | 키                | 순서 | 설명                                                                      |
 | ------------------ | ----------------- | ---- | ------------------------------------------------------------------------- |
-| `settings.section` | `runtime-plugins` | 90   | Cordis 모듈 설치, 활성화·비활성화, 오류 확인, 삭제                        |
+| `settings.section` | `runtime-plugins` | 90   | 앱에 포함된 화면·실행 기능의 활성화·비활성화와 필수 항목 표시             |
 | `settings.section` | `plugins`         | 100  | `/settings/plugins`의 플러그인 폴더 가져오기, 활성화, MCP 권한 설정, 삭제 |
 
-섹션은 브라우저에서만 렌더링하므로 `ClientOnly`로 감쌉니다. `ctx.chatRuntime.platform.plugins`의 `list`·`import`·`configure`·`remove`를 콜백으로 받으며, 변경 전에는 `store.stop()`으로 진행 중인 응답을 멈춥니다. 큰달 플러그인 섹션은 별도의 `runtimePlugins` 계약을 사용합니다. 모듈의 내보내기 이름과 JSON 설정을 입력하고 출처·권한을 확인한 뒤 설치하며, 설치 직후에는 비활성 상태입니다. 연결이 플러그인 관리를 지원하지 않으면 안내 문구만 표시합니다. 이 슬롯 외에 선언하는 슬롯은 없습니다.
+섹션은 브라우저에서만 렌더링하므로 `ClientOnly`로 감쌉니다. Agent Plugins는 `ctx.chatRuntime.platform.plugins`의 `list`·`import`·`configure`·`remove`를 콜백으로 받습니다. 큰달 플러그인 섹션은 셸이 조립한 `ctx.chatRuntime.pluginManager`의 `list`와 `setEnabled`만 받습니다. 이 목록은 정적으로 번들된 패키지로 제한하며 외부 설치·다운로드 입력란은 제공하지 않습니다. 변경 전에는 진행 중인 응답을 중단하고, 필수 항목은 끌 수 없도록 표시합니다. 이 슬롯 외에 선언하는 슬롯은 없습니다.
 
-web과 desktop의 설치 형식과 권한은 [플러그인 조립 문서](../../docs/plugin-composition.md#ui에서-선택-기능-관리)를 참고합니다.
+web과 desktop의 적용 방식은 [플러그인 조립 문서](../../docs/plugin-composition.md#ui에서-선택-기능-관리)를 참고합니다.
 
 ## 구성
 

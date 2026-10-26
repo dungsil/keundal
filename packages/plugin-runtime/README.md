@@ -19,7 +19,7 @@ const agentFiber = await runtime.mountAgent(ownedContext, {
 
 `plugins`는 배열 순서대로 설치합니다. `builtin:`으로 시작하는 모듈 이름은 `builtins`에서만 찾습니다. 도구 팩터리는 도구를 열거할 때마다 실행 옵션과 함께 호출합니다. `manifest.tools: []`는 도구 팩터리가 없는 구성을 뜻합니다.
 
-`parseRuntimeModuleSpec(value)`는 개별 모듈 선택을 검증합니다. `mountRuntimePlugin(ctx, spec, options)`는 선택 기능 하나를 등록하고 활성화가 실패하면 해당 범위를 정리합니다. 반환된 Fiber의 `dispose()`로 효과를 해제하며, 설치 목록의 저장과 활성 상태 관리는 플랫폼이 담당합니다.
+`mountRuntimePlugin(ctx, spec, options)`는 선택 기능 하나를 등록하고 활성화가 실패하면 해당 범위를 정리합니다. 반환된 Fiber의 `dispose()`로 효과를 해제하며, 번들 기능의 선택 저장과 활성 상태 관리는 플랫폼이 담당합니다.
 
 기본 플러그인 목록의 키는 `builtin:store`처럼 전체 이름을 사용합니다. `runtime.tools(execution)`은 실제로 구성한 도구를 조회하므로 기능 목록에도 같은 구성을 사용할 수 있습니다. 매니페스트의 에이전트 설정과 실행 설정이 겹치면 실행 설정이 우선합니다. `agent.config.tools`는 허용하지 않습니다.
 

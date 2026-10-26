@@ -1,4 +1,4 @@
-import type { NativeInvoke, RuntimePluginInfo, RuntimePluginManager, RuntimePluginSpec } from '@keundal/chat/platform'
+import type { NativeInvoke, RuntimePluginInfo, RuntimePluginManager } from '@keundal/chat/platform'
 
 /** Apply and restart as one frontend operation; native startup keeps the old process on failure. */
 export function createNativeRuntimePluginManager(
@@ -9,8 +9,6 @@ export function createNativeRuntimePluginManager(
   const mutate = (request: Record<string, unknown>): Promise<void> => {
     const operation = pending.then(async () => {
       const transaction = await invoke<{ previous: unknown[]; expected: unknown[] }>('runtime_plugins', { request })
-      // Installation records a disabled selection and never imports or activates the module.
-      if (request.action === 'install') return
       let restarted = false
       try {
         await reload()
@@ -35,13 +33,10 @@ export function createNativeRuntimePluginManager(
     return operation
   }
   return {
-    source: 'node',
     async list() {
       await pending
       return invoke<RuntimePluginInfo[]>('runtime_plugins', { request: { action: 'list' } })
     },
-    install: (spec: RuntimePluginSpec) => mutate({ action: 'install', spec }),
-    setEnabled: (module, enabled) => mutate({ action: 'enable', module, enabled }),
-    remove: (module) => mutate({ action: 'remove', module })
+    setEnabled: (module, enabled) => mutate({ action: 'enable', module, enabled })
   }
 }
