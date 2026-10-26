@@ -73,7 +73,7 @@ ctx.slots.register({ name: 'page.chat', children: { 'chat.message.tool': 'keyed'
 
 각 패키지는 `app/locales/{en,ko}.ts`에 자신이 쓰는 문구를 둡니다. `app/locale.ts`의 `useText()`는 패키지의 키를 먼저 찾고, 없으면 `@keundal/ui`의 공유 사전에서 찾습니다. 패키지 둘 이상이 쓰는 문구와 셸의 문구는 공유 사전에 둡니다. 다른 컴포넌트가 읽는 메타데이터의 문구는 `localizedText()`나 `sharedText()`로 모든 언어의 값을 함께 넘깁니다.
 
-큰달 플러그인 목록의 이름과 설명은 각 기능 패키지가 내보내는 `metadata`를 사용합니다. `name`과 `description`은 각각 `{ en: string, ko: string }`으로 제공합니다. 앱의 조립 계층은 이를 `RuntimePluginInfo.metadata`에 담고, 화면은 현재 앱 언어의 이름·설명과 스위치의 접근성 이름을 표시합니다. `module`은 선택과 저장에 쓰는 식별자로 유지합니다. 메타데이터가 없는 항목은 `module`을 이름으로 표시하며 설명은 생략합니다. desktop은 정적으로 포함한 패키지의 메타데이터만 조회하며, 표시를 위해 외부 모듈을 불러오지 않습니다.
+큰달 플러그인 목록의 이름과 설명은 각 기능 패키지가 내보내는 `metadata`를 사용합니다. `name`과 `description`은 각각 `{ en: string, ko: string }`으로 제공합니다. 앱의 조립 계층은 이를 `RuntimePluginInfo.metadata`에 담고, 화면은 현재 앱 언어의 이름·설명과 스위치의 접근성 이름을 표시합니다. `module`은 선택과 저장에 쓰는 식별자로 유지합니다. 메타데이터가 없는 항목은 `module`을 이름으로 표시하며 설명은 생략합니다. desktop의 외부 설치 항목은 `package.json`의 이름·설명·버전을 사용하며, 표시를 위해 외부 모듈을 불러오지 않습니다. 설치·삭제 콜백은 desktop의 관리자가 제공할 때만 노출합니다.
 
 화면은 태그라인과 상시 도움말 대신 제목, 입력란 이름, 구분선과 컨트롤 배치로 구조를 전달합니다. 중복되는 보조 레이블은 표시하지 않습니다. 오류, 보안 경고, 사용자가 작성한 내용과 접근성 이름은 유지합니다.
 

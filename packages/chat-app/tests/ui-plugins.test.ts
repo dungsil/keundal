@@ -220,3 +220,30 @@ test('초기 기능 UI가 실패해도 부분 효과를 정리하고 기능 항�
     enabled: true, error: expect.stringContaining('startup activation failed')
   })
 })
+
+test('외부 설치 기능은 제공하는 실행 방식에서만 노출하고 설치와 삭제 전에 응답을 중단한다', async () => {
+  const browser = await fixture()
+  expect(browser.manager.install).toBeUndefined()
+  expect(browser.manager.remove).toBeUndefined()
+  const runtime = platform()
+  runtime.manager.install = async source => {
+    runtime.records.push({ module: 'external:example', source, enabled: false })
+  }
+  runtime.manager.remove = async module => {
+    const index = runtime.records.findIndex(entry => entry.module === module)
+    runtime.records.splice(index, 1)
+  }
+  const { manager, stop, ctx } = await fixture({ platform: runtime.manager })
+  const source = { type: 'jsr', value: '@example/plugin@1.0.0' } as const
+  stop.mockRejectedValueOnce(new Error('stop failed'))
+  await expect(manager.install!(source)).rejects.toThrow('stop failed')
+  expect((await manager.list()).some(entry => entry.source)).toBe(false)
+  await manager.install!(source)
+  expect(await manager.list()).toContainEqual({ module: 'external:example', source, enabled: false })
+  await manager.setEnabled('external:example', true)
+  expect((await manager.list()).find(entry => entry.source)?.enabled).toBe(true)
+  await manager.remove!('external:example')
+  expect((await manager.list()).some(entry => entry.source)).toBe(false)
+  expect(ctx.slots.describe('page.feature')).toHaveLength(1)
+  expect(ctx.slots.describe('page.settings')).toHaveLength(1)
+})

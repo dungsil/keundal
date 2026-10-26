@@ -28,6 +28,9 @@ export function createNativeRuntimePluginManager(
         }
         throw error
       }
+      // Delete managed files only after a successful restart; rollback still needs them before then.
+      if (request.action === 'remove')
+        await invoke('runtime_plugins', { request: { action: 'finalize', ...transaction } })
     })
     pending = operation.catch(() => {})
     return operation
@@ -37,6 +40,8 @@ export function createNativeRuntimePluginManager(
       await pending
       return invoke<RuntimePluginInfo[]>('runtime_plugins', { request: { action: 'list' } })
     },
-    setEnabled: (module, enabled) => mutate({ action: 'enable', module, enabled })
+    setEnabled: (module, enabled) => mutate({ action: 'enable', module, enabled }),
+    install: (source) => mutate({ action: 'install', source }),
+    remove: (module) => mutate({ action: 'remove', module })
   }
 }

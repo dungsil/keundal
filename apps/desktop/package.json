@@ -21,17 +21,21 @@
     "lint": "oxlint ."
   },
   "dependencies": {
-    "@keundal/chat-app": "workspace:*",
-    "nuxt": "^4.6.2",
     "@keundal/agent-runtime-node": "workspace:*",
     "@keundal/chat": "workspace:*",
-    "@keundal/plugin-tool-chat": "workspace:*",
+    "@keundal/chat-app": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
+    "@keundal/plugin-chat-browser": "workspace:*",
     "@keundal/plugin-chat-desktop": "workspace:*",
     "@keundal/plugin-llm-browser": "workspace:*",
-    "@tauri-apps/api": "2.12.4",
+    "@keundal/plugin-runtime": "workspace:*",
+    "@keundal/plugin-tool-chat": "workspace:*",
     "@keundal/plugin-transcription-browser": "workspace:*",
-    "@keundal/plugin-chat-browser": "workspace:*"
+    "@tauri-apps/api": "2.12.4",
+    "desktop-npm": "npm:npm@11.12.0",
+    "fflate": "0.8.3",
+    "import-meta-resolve": "4.2.0",
+    "nuxt": "^4.6.2"
   },
   "devDependencies": {
     "@keundal/agent-host": "workspace:*",
