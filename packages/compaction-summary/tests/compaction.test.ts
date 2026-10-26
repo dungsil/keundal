@@ -1,0 +1,444 @@
+import {
+  compact as compactMessages,
+  SummaryCompactionConfigSchema,
+  type SummaryCompactionConfig,
+  type SummaryCompactionOptions
+} from '@keundal/compaction-summary'
+import { EventType, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
+import { type LLMEvent, type LLMRequest } from '@keundal/llm'
+import { expect, test, type TestContext } from 'vitest'
+
+const input: RunAgentInput = {
+  threadId: 'thread',
+  runId: 'run',
+  state: { untouched: true },
+  tools: [],
+  context: [],
+  messages: [
+    { id: 'system', role: 'system', content: 'Keep this instruction' },
+    { id: 'old-user', role: 'user', content: 'old question '.repeat(100) },
+    { id: 'old-assistant', role: 'assistant', content: 'old answer '.repeat(100) },
+    { id: 'recent', role: 'user', content: 'continue' }
+  ]
+}
+
+async function* response(): AsyncIterable<LLMEvent> {
+  yield { type: EventType.TEXT_MESSAGE_START, messageId: 'summary', role: 'assistant' }
+  yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'summary', delta: 'Earlier facts.' }
+  yield { type: EventType.TEXT_MESSAGE_END, messageId: 'summary' }
+}
+
+async function setup(
+  _t: TestContext,
+  overrides: {
+    contextWindow?: number
+    stream?: (request: LLMRequest, options?: ExecutionOptions) => AsyncIterable<LLMEvent>
+    count?: (request: LLMRequest) => number
+    config?: SummaryCompactionConfig
+  } = {}
+) {
+  const requests: LLMRequest[] = []
+  class LLM {
+    async getModel() {
+      return { contextWindow: overrides.contextWindow ?? 10000, maxOutputTokens: 1000 }
+    }
+    async countTokens(request: LLMRequest) {
+      return overrides.count?.(request) ?? JSON.stringify(request.input).length
+    }
+    stream(request: LLMRequest, options?: ExecutionOptions) {
+      requests.push(request)
+      return overrides.stream?.(request, options) ?? response()
+    }
+  }
+  const llm = new LLM()
+  const compact = (data = input, budget = 700, options?: SummaryCompactionOptions) =>
+    compactMessages(
+      llm,
+      { input: data, model: 'test', maxInputTokens: budget },
+      {
+        keepRecentMessages: 1,
+        maxSummaryTokens: 100,
+        ...overrides.config,
+        ...options
+      }
+    )
+  return { requests, compact }
+}
+
+test('이전 메시지를 요약하고 지침, 최근 입력, 원본 요청을 보존한다', async (t) => {
+  const { compact, requests } = await setup(t)
+  const original = globalThis.structuredClone(input)
+  const result = await compact()
+  expect(input).toStrictEqual(original)
+  expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
+  expect(result.summary).toBe('Earlier facts.')
+  expect(result.messages[0]).toStrictEqual(input.messages[0])
+  expect(result.messages.at(-1)).toStrictEqual(input.messages.at(-1))
+  expect(result.messages[1].role).toBe('user')
+  expect(JSON.stringify({ ...input, messages: result.messages }).length).toBeLessThanOrEqual(700)
+  expect(requests).toHaveLength(1)
+  expect(requests[0].input.tools).toStrictEqual([])
+  expect(requests[0].input.state).toStrictEqual({})
+})
+
+test('입력이 예산 이내이면 요약을 생성하지 않고 기존 메시지를 반환한다', async (t) => {
+  const { compact, requests } = await setup(t)
+  expect(await compact(input, 10000)).toStrictEqual({ messages: input.messages, summary: '', sourceMessageIds: [] })
+  expect(requests).toHaveLength(0)
+})
+
+test('force 옵션은 입력이 예산 이내여도 이전 대화를 축약한다', async (t) => {
+  const { compact, requests } = await setup(t)
+  const result = await compact(input, 10000, { force: true })
+  expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
+  expect(requests).toHaveLength(1)
+})
+
+test('최근 토큰 보존량을 채우도록 사용자 턴의 보존 범위를 넓힌다', async (t) => {
+  const { compact } = await setup(t, {
+    count: (request) =>
+      request.input.messages.reduce(
+        (sum, message) =>
+          sum + ('content' in message && typeof message.content === 'string' ? message.content.length : 0),
+        0
+      )
+  })
+  const recent = [
+    { id: 'u2', role: 'user' as const, content: 'x'.repeat(100) },
+    { id: 'a2', role: 'assistant' as const, content: 'y'.repeat(100) },
+    { id: 'u3', role: 'user' as const, content: 'continue' }
+  ]
+  const result = await compact({ ...input, messages: [...input.messages.slice(0, 3), ...recent] }, 1000, {
+    keepRecentTokens: 150
+  })
+  expect(result.messages.slice(-3)).toStrictEqual(recent)
+  expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
+})
+
+test('inputTokens 옵션을 전달하면 첫 카운트 호출을 건너뛴다', async (t) => {
+  let counts = 0
+  const withOption = await setup(t, {
+    count: () => {
+      counts++
+      return 1
+    }
+  })
+  const result = await withOption.compact(input, 700, { inputTokens: 1 })
+  expect(counts).toBe(0)
+  expect(result).toStrictEqual({ messages: input.messages, summary: '', sourceMessageIds: [] })
+
+  counts = 0
+  const withoutOption = await setup(t, {
+    count: () => {
+      counts++
+      return 1
+    }
+  })
+  await withoutOption.compact(input, 700)
+  expect(counts).toBe(1)
+})
+
+test('한도를 넘는 이력을 예산에 맞게 나누어 요약하고 이전 요약을 다음 요청에 전달한다', async (t) => {
+  const { compact, requests } = await setup(t, { contextWindow: 2400 })
+  await compact()
+  expect(requests).toHaveLength(2)
+  for (const request of requests)
+    expect(JSON.stringify(request.input).length + request.maxOutputTokens).toBeLessThanOrEqual(2400)
+  const message = requests[1].input.messages[1]
+  expect(
+    'content' in message && typeof message.content === 'string' && JSON.parse(message.content).previousSummary
+  ).toBe('Earlier facts.')
+})
+
+test('최근 사용자 턴의 도구 호출과 결과를 함께 보존한다', async (t) => {
+  const { compact } = await setup(t)
+  const data: RunAgentInput = {
+    ...input,
+    messages: [
+      ...input.messages,
+      {
+        id: 'call',
+        role: 'assistant',
+        toolCalls: [{ id: 'tool-1', type: 'function', function: { name: 'lookup', arguments: '{}' } }]
+      },
+      { id: 'result', role: 'tool', toolCallId: 'tool-1', content: 'found' }
+    ]
+  }
+  const result = await compact(data, 1000)
+  expect(result.messages.slice(-3)).toStrictEqual(data.messages.slice(-3))
+  expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
+})
+
+test('주입한 컨텍스트를 새 사용자 턴으로 취급하지 않고 현재 요청과 도구 결과를 보존한다', async (t) => {
+  const { compact } = await setup(t)
+  const data: RunAgentInput = {
+    ...input,
+    messages: [
+      ...input.messages,
+      {
+        id: 'call',
+        role: 'assistant',
+        toolCalls: [{ id: 'tool-1', type: 'function', function: { name: 'lookup', arguments: '{}' } }]
+      },
+      { id: 'result', role: 'tool', toolCallId: 'tool-1', content: 'found' },
+      { id: 'keundal:context:time:reading', role: 'user', content: 'Current time: 2026-10-20T00:00:00Z' }
+    ]
+  }
+  const result = await compact(data, 1200)
+  expect(result.messages.slice(-4)).toStrictEqual(data.messages.slice(-4))
+  expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
+})
+
+test('사용자 턴을 가로지르는 도구 호출부터 결과까지 원래 순서로 보존한다', async (t) => {
+  const { compact, requests } = await setup(t)
+  const retained: RunAgentInput['messages'] = [
+    { id: 'lookup-request', role: 'user', content: 'Look up the result' },
+    {
+      id: 'lookup-call',
+      role: 'assistant',
+      toolCalls: [{ id: 'lookup-1', type: 'function', function: { name: 'lookup', arguments: '{"key":"a"}' } }]
+    },
+    { id: 'follow-up', role: 'user', content: 'Include the source' },
+    { id: 'lookup-result', role: 'tool', toolCallId: 'lookup-1', content: 'Found a at source b' }
+  ]
+  const result = await compact({ ...input, messages: [...input.messages.slice(0, -1), ...retained] }, 1200)
+
+  expect(result.messages.slice(2)).toStrictEqual(retained)
+  expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
+  const history = requests[0].input.messages[1]
+  if (history.role !== 'user' || typeof history.content !== 'string') throw new Error('expected summary history')
+  expect(JSON.parse(history.content).messages).toStrictEqual([input.messages[1], input.messages[2]])
+})
+
+test('보존 영역의 도구 결과가 사용자 턴을 가로질러 호출과 함께 보존된다', async (t) => {
+  const { compact } = await setup(t)
+  const data: RunAgentInput = {
+    ...input,
+    messages: [
+      ...input.messages.slice(0, 3),
+      { id: 'u1', role: 'user', content: 'turn one' },
+      {
+        id: 'a2',
+        role: 'assistant',
+        toolCalls: [{ id: 'call-2', type: 'function', function: { name: 'lookup', arguments: '{"key":"b"}' } }]
+      },
+      { id: 'u2', role: 'user', content: 'turn two' },
+      {
+        id: 'a1',
+        role: 'assistant',
+        toolCalls: [{ id: 'call-1', type: 'function', function: { name: 'lookup', arguments: '{"key":"a"}' } }]
+      },
+      { id: 't2', role: 'tool', toolCallId: 'call-2', content: 'found b' },
+      { id: 't1', role: 'tool', toolCallId: 'call-1', content: 'found a' },
+      { id: 'u3', role: 'user', content: 'turn three' },
+      { id: 'u4', role: 'user', content: 'answer now' }
+    ]
+  }
+  // 초기 경계가 t1에 걸치고, t1이 경계를 u1 앞으로 당긴 뒤 t2가 a2까지 한 번 더 당기는
+  // 되감기 연쇄를 만든다.
+  const result = await compact(data, 1000, { keepRecentMessages: 3 })
+
+  // 요약 턴(UUID id)이 시스템 지침과 보존 영역 사이에 삽입된다.
+  expect(result.messages[0]?.id).toBe('system')
+  expect(
+    result.messages[1]?.role === 'user' &&
+      typeof result.messages[1]?.content === 'string' &&
+      result.messages[1]?.content.includes('Earlier facts.')
+  ).toBe(true)
+  expect(result.messages.slice(2).map((message) => message.id)).toStrictEqual([
+    'u1',
+    'a2',
+    'u2',
+    'a1',
+    't2',
+    't1',
+    'u3',
+    'u4'
+  ])
+  expect(result.sourceMessageIds).toStrictEqual(['old-user', 'old-assistant'])
+})
+
+test('보존할 대화가 예산을 넘으면 모델을 호출하기 전에 거부한다', async (t) => {
+  const { compact, requests } = await setup(t)
+  await expect(
+    compact({
+      ...input,
+      messages: [...input.messages.slice(0, -1), { id: 'recent', role: 'user', content: 'x'.repeat(1000) }]
+    })
+  ).rejects.toThrow('preserved messages')
+  expect(requests).toHaveLength(0)
+})
+
+test('요약 요청 하나에도 담을 수 없는 이력은 거부한다', async (t) => {
+  const { compact, requests } = await setup(t, { contextWindow: 800 })
+  await expect(compact()).rejects.toThrow('summarization input budget')
+  expect(requests).toHaveLength(0)
+})
+
+test('축약 결과가 최종 입력 예산을 넘으면 거부한다', async (t) => {
+  const { compact } = await setup(t, {
+    count: (request) =>
+      request.input.messages.some(
+        (message) =>
+          'content' in message &&
+          typeof message.content === 'string' &&
+          message.content.startsWith('Summary of earlier')
+      )
+        ? 9999
+        : JSON.stringify(request.input).length
+  })
+  await expect(compact()).rejects.toThrow('compacted input still exceeds')
+})
+
+test('시작 이벤트만 전달하고 종료된 요약 스트림을 거부한다', async (t) => {
+  const { compact } = await setup(t, {
+    stream: async function* () {
+      yield { type: EventType.TEXT_MESSAGE_START, messageId: 'summary', role: 'assistant' }
+    }
+  })
+  await expect(compact()).rejects.toThrow('without completed text')
+})
+
+const summaryStart: LLMEvent = { type: EventType.TEXT_MESSAGE_START, messageId: 'summary', role: 'assistant' }
+const summaryContent: LLMEvent = { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'summary', delta: 'Earlier facts.' }
+const summaryEnd: LLMEvent = { type: EventType.TEXT_MESSAGE_END, messageId: 'summary' }
+
+test.for([
+  {
+    condition: '시작 전 내용',
+    events: [summaryContent, summaryStart, summaryEnd],
+    error: 'invalid summary text stream'
+  },
+  {
+    condition: '시작 전 종료',
+    events: [summaryEnd, summaryStart, summaryContent],
+    error: 'invalid summary text stream'
+  },
+  {
+    condition: '다른 메시지 ID의 내용',
+    events: [summaryStart, { ...summaryContent, messageId: 'other' }, summaryEnd],
+    error: 'invalid summary text stream'
+  },
+  {
+    condition: '다른 메시지 ID의 종료',
+    events: [summaryStart, summaryContent, { ...summaryEnd, messageId: 'other' }],
+    error: 'invalid summary text stream'
+  },
+  {
+    condition: '종료 후 내용',
+    events: [summaryStart, summaryContent, summaryEnd, summaryContent],
+    error: 'invalid summary text stream'
+  },
+  {
+    condition: '중복 종료',
+    events: [summaryStart, summaryContent, summaryEnd, summaryEnd],
+    error: 'invalid summary text stream'
+  },
+  {
+    condition: '두 번째 시작',
+    events: [summaryStart, summaryContent, { ...summaryStart, messageId: 'other' }, summaryEnd],
+    error: 'summary must contain a single text message'
+  }
+])('잘못된 요약 이벤트를 거부한다: $condition', async ({ events, error }, t) => {
+  const { compact } = await setup(t, {
+    stream: async function* () {
+      yield* events
+    }
+  })
+  await expect(compact()).rejects.toThrow(error)
+})
+
+test.for([
+  { condition: '내용 이벤트가 없음', events: [summaryStart, summaryEnd] },
+  { condition: '공백만 있음', events: [summaryStart, { ...summaryContent, delta: ' \t\n ' }, summaryEnd] }
+])('정상 종료되어도 빈 요약을 거부한다: $condition', async ({ events }, t) => {
+  const { compact } = await setup(t, {
+    stream: async function* () {
+      yield* events
+    }
+  })
+  await expect(compact()).rejects.toThrow('summary stream ended without completed text')
+})
+
+test('공급자 오류를 호출자에게 전달한다', async (t) => {
+  const { compact } = await setup(t, {
+    stream: () => {
+      throw new Error('provider unavailable')
+    }
+  })
+  await expect(compact()).rejects.toThrow('provider unavailable')
+})
+
+test('외부 취소 신호로 진행 중인 요약을 중단한다', async (t) => {
+  let started!: () => void
+  const ready = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  const { compact } = await setup(t, {
+    stream: async function* (_request, options) {
+      started()
+      await new Promise<void>((_resolve, reject) => {
+        options!.signal!.addEventListener('abort', () => reject(options!.signal!.reason), { once: true })
+      })
+      yield* response()
+    }
+  })
+  const controller = new globalThis.AbortController()
+  const pending = compact(input, 700, { signal: controller.signal })
+  const assertion = expect(pending).rejects.toThrow('user cancelled')
+  await ready
+  controller.abort(new Error('user cancelled'))
+  await assertion
+})
+
+test('이미 취소된 요청은 공급자를 호출하지 않고 거부한다', async (t) => {
+  const { compact, requests } = await setup(t)
+  await expect(compact(input, 700, { signal: globalThis.AbortSignal.abort(new Error('cancelled')) })).rejects.toThrow(
+    'cancelled'
+  )
+  expect(requests).toHaveLength(0)
+})
+
+test('잘못된 축약 설정을 거부한다', async () => {
+  for (const value of [{ keepRecentMessages: 0 }, { maxSummaryTokens: -1 }, null, []]) {
+    expect((await SummaryCompactionConfigSchema['~standard'].validate(value)).issues).toBeDefined()
+  }
+})
+
+test('토큰 보존량을 계산할 때도 도구 호출과 결과가 분리되지 않는다', async (t) => {
+  const { compact } = await setup(t, {
+    count: (request) => {
+      const calls = new Set(
+        request.input.messages.flatMap((message) =>
+          message.role === 'assistant' ? (message.toolCalls ?? []).map((call) => call.id) : []
+        )
+      )
+      for (const message of request.input.messages) {
+        if (message.role === 'tool' && !calls.has(message.toolCallId)) throw new Error('tool result without call')
+      }
+      return JSON.stringify(request.input).length
+    }
+  })
+  const recent: RunAgentInput['messages'] = [
+    { id: 'u1', role: 'user', content: 'first turn' },
+    {
+      id: 'a1',
+      role: 'assistant',
+      toolCalls: [{ id: 'c1', type: 'function', function: { name: 'lookup', arguments: '{}' } }]
+    },
+    { id: 't1', role: 'tool', toolCallId: 'c1', content: 'first result' },
+    { id: 'u2', role: 'user', content: 'second turn' },
+    {
+      id: 'a2',
+      role: 'assistant',
+      toolCalls: [{ id: 'c2', type: 'function', function: { name: 'lookup', arguments: '{}' } }]
+    },
+    { id: 't2', role: 'tool', toolCallId: 'c2', content: 'second result' },
+    { id: 'u3', role: 'user', content: 'continue' }
+  ]
+  const data = { ...input, messages: [...input.messages.slice(0, 3), ...recent] }
+  const result = await compact(data, 2000, { force: true, keepRecentTokens: 300 })
+  expect(result.sourceMessageIds).toContain('old-user')
+  expect(result.messages).toContainEqual(recent[4])
+  expect(result.messages).toContainEqual(recent[5])
+})

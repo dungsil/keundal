@@ -19,6 +19,7 @@
   "dependencies": {
     "@keundal/context": "workspace:*",
     "@keundal/core": "workspace:*",
+    "@keundal/session": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {

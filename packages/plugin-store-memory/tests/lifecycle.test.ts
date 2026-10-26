@@ -1,15 +1,8 @@
 import { getEventListeners } from 'node:events'
 
-import {
-  EventType,
-  LLMService,
-  type AGUIEvent,
-  type ExecutionOptions,
-  type GenerationRequest,
-  type LLMEvent,
-  type LLMModel,
-  type LLMRequest
-} from '@keundal/core'
+import { EventType, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
+import { type GenerationRequest } from '@keundal/generation'
+import { LLMService, type LLMEvent, type LLMModel, type LLMRequest } from '@keundal/llm'
 import memoryStorePlugin, { MemoryStore } from '@keundal/plugin-store-memory'
 import { Context, type Fiber } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'

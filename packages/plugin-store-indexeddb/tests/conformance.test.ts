@@ -1,4 +1,4 @@
-import { LLMService, type LLMEvent, type LLMModel } from '@keundal/core'
+import { LLMService, type LLMEvent, type LLMModel } from '@keundal/llm'
 import indexedDBStorePlugin, { IndexedDBStore, type WebLockManager } from '@keundal/plugin-store-indexeddb'
 import {
   checkConcurrentCommitProperties,
@@ -70,7 +70,7 @@ test('저장소 적합성과 동시 커밋의 단일 반영 및 journal 재생�
   const report = await runStoreConformance(makeStore)
   expect(report).toEqual(expectedConformanceReport)
   const store = await makeStore()
-  const session = store.session as import('@keundal/core').SessionService
+  const session = store.session as import('@keundal/session').SessionService
   try {
     await session.delete('thread', 0)
     await expect(session.delete(' ', 0)).rejects.toThrow('non-empty')
@@ -127,7 +127,7 @@ test('저장소 적합성과 동시 커밋의 단일 반영 및 journal 재생�
       mode: 'replace',
       messages: [{ id: 'duplicate', role: 'user', content: 'ignored' }],
       state: undefined,
-      generation: terminal as import('@keundal/core').TerminalGeneration
+      generation: terminal as import('@keundal/generation').TerminalGeneration
     })
     expect((await session.get('thread'))?.messages).toEqual([])
     await session.delete('thread', 5)

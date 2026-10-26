@@ -6,7 +6,8 @@ import type {
   TextBlockParam,
   ToolUnion
 } from '@anthropic-ai/sdk/resources/messages'
-import { parseReasoning, parseRunAgentInput, type AgentMessage, type LLMRequest } from '@keundal/core'
+import { parseRunAgentInput, type AgentMessage } from '@keundal/core'
+import { parseReasoning, type LLMRequest } from '@keundal/llm'
 
 type UserContent = Exclude<Extract<AgentMessage, { role: 'user' }>['content'], string>[number]
 type ConvertedMessage = { role: 'user' | 'assistant'; content: ContentBlockParam[] }

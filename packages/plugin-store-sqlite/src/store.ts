@@ -1,14 +1,7 @@
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite'
 
-import {
-  MessageAssembly,
-  type AGUIEvent,
-  type AgentMessage,
-  type GenerationJournalEntry,
-  type GenerationRequest,
-  type GenerationStatus,
-  type RunAgentInput
-} from '@keundal/core'
+import { MessageAssembly, type AGUIEvent, type AgentMessage, type RunAgentInput } from '@keundal/core'
+import { type GenerationJournalEntry, type GenerationRequest, type GenerationStatus } from '@keundal/generation'
 
 /** 스레드 하나의 확정된 저장 상태입니다. */
 export interface StoredThread {

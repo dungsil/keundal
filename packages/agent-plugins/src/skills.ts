@@ -1,7 +1,8 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-import type { ExecutionOptions, SkillDefinition, SkillProvider } from '@keundal/core'
+import type { ExecutionOptions } from '@keundal/core'
+import type { SkillDefinition, SkillProvider } from '@keundal/skill'
 
 import { contained, exists } from './files.js'
 import { pluginSkill } from './skill-metadata.js'

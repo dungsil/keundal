@@ -4,17 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
-import {
-  EventType,
-  LLMService,
-  type AGUIEvent,
-  type ExecutionOptions,
-  type GenerationRequest,
-  type LLMEvent,
-  type LLMModel,
-  type LLMRequest,
-  type RunAgentInput
-} from '@keundal/core'
+import { EventType, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
+import { type GenerationRequest } from '@keundal/generation'
+import { LLMService, type LLMEvent, type LLMModel, type LLMRequest } from '@keundal/llm'
 import sqliteStorePlugin, { SqliteStore } from '@keundal/plugin-store-sqlite'
 import { Context, type Fiber } from 'cordis'
 import { expect, test, vi, type TestContext } from 'vitest'

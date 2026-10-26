@@ -1,4 +1,5 @@
-import type { GenerationStatus, TraceSpan, TraceUsage } from '@keundal/core'
+import type { GenerationStatus } from '@keundal/generation'
+import type { TraceSpan, TraceUsage } from '@keundal/trace'
 
 export interface TraceRow {
   span: TraceSpan

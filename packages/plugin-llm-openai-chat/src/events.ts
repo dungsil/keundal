@@ -1,4 +1,5 @@
-import { EventType, type LLMEvent } from '@keundal/core'
+import { EventType } from '@keundal/core'
+import { type LLMEvent } from '@keundal/llm'
 import type { ChatCompletionChunk } from 'openai/resources/chat/completions'
 
 type ToolCall = { id: string; name: string; arguments: string }

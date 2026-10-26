@@ -1,14 +1,13 @@
 import {
   EventType,
-  LLM_SOURCE_EVENT,
   MessageAssembly,
   STEER_MESSAGE_EVENT,
   isSteerMessage,
   prepareReplayMessages,
   type AGUIEvent,
-  type AgentMessage,
-  type LLMSource
+  type AgentMessage
 } from '@keundal/core'
+import { LLM_SOURCE_EVENT, type LLMSource } from '@keundal/llm'
 import { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 
 export type ChatStatus = 'ready' | 'submitted' | 'streaming' | 'error'

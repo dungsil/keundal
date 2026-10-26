@@ -1,5 +1,7 @@
 # 계약과 구현 플러그인을 분리하고 앱이 조립한다
 
+계약과 실행 정책의 패키지 소유권은 [ADR-0005](0005-service-package-boundaries.md)에서 세분화한다. 아래 플랫폼별 조립과 수명 규칙은 유지한다.
+
 `@keundal/agent`, `tools`, `context`, `mcp`, `shell`, `transcription`, `fs`는 서비스 계약만 제공한다. 구현은 `plugin-*` 패키지에 두고, 공통 실행 루프와 축약·도구 정책은 `agent-loop`가 소유한다. 앱의 `app/platform.ts`가 실행 환경과 기본 플러그인 목록을 정한다. 계약 패키지와 공통 UI는 구현 패키지를 실행 의존성으로 가져오지 않으며, `pnpm check:boundaries`가 이를 검사한다.
 
 필수 서비스의 구현은 런타임 매니페스트로 고른다. web은 `/keundal.plugins.json`을 기본으로 읽고 `NUXT_PUBLIC_PLUGIN_CONFIG`로 다른 URL을 지정한다. Node.js 호스트와 desktop은 `KEUNDAL_PLUGIN_CONFIG`, 앱 데이터 디렉터리, 현재 디렉터리 순서로 설정 파일을 찾는다. 배포 설정이나 모듈이 잘못되면 기본 구성으로 대체하지 않고 시작을 거부한다.

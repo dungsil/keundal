@@ -1,5 +1,6 @@
-import type { ExecutionOptions, LLMModelInfo } from '@keundal/core'
-import { MODEL_CATALOG_LIMITS, ModelCatalogBudget } from '@keundal/core'
+import type { ExecutionOptions } from '@keundal/core'
+import type { LLMModelInfo } from '@keundal/llm'
+import { MODEL_CATALOG_LIMITS, ModelCatalogBudget } from '@keundal/llm'
 import { z } from 'zod'
 
 import type { OpenAIChatLLMConfig } from './config.js'

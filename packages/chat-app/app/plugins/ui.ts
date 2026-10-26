@@ -1,4 +1,4 @@
-import type { Reasoning } from '@keundal/core'
+import type { Reasoning } from '@keundal/llm'
 import type { ChatPlatform } from '@keundal/chat/platform'
 import { ChatRuntime, SettingsLoadError } from '@keundal/ui-runtime'
 import { SlotService } from '@keundal/ui-slots'

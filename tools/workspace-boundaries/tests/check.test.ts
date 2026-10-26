@@ -141,6 +141,14 @@ test('계약과 공통 UI는 구현 패키지를 실행 의존성으로 가져�
     ['@keundal/chat-app', '@keundal/plugin-chat-local'],
     ['@keundal/ui', '@keundal/plugin-chat-browser'],
     ['@keundal/ui-chat', '@keundal/plugin-store-memory'],
+    ['@keundal/llm', '@keundal/plugin-llm-openai'],
+    ['@keundal/session', '@keundal/plugin-store-memory'],
+    ['@keundal/generation', '@keundal/plugin-store-sqlite'],
+    ['@keundal/skill', '@keundal/plugin-skill'],
+    ['@keundal/compaction', '@keundal/plugin-agent-chat'],
+    ['@keundal/trace', '@keundal/plugin-store-indexeddb'],
+    ['@keundal/prompt', '@keundal/plugin-agent-chat'],
+    ['@keundal/subagent', '@keundal/plugin-agent-chat'],
     ['@keundal/agent', '@keundal/agent-loop'],
     ['@keundal/tools', '@keundal/plugin-tool-fs'],
     ['@keundal/context', '@keundal/plugin-context-node'],
@@ -170,4 +178,17 @@ test('계약의 통합 테스트와 앱 조립 지점은 구현 패키지를 사
     'apps/alpha/app/platform.ts': "import store from '@keundal/plugin-store-memory'"
   })
   assert.deepEqual(await checkWorkspaceBoundaries(root), [])
+})
+
+test('코어는 기능 계약을 다시 내보내거나 실행 의존성으로 가져올 수 없다', async (t) => {
+  const root = await fixture(t, {
+    'packages/shared/package.json': { name: '@keundal/core', dependencies: { '@keundal/llm': 'workspace:*' } },
+    'packages/llm/package.json': { name: '@keundal/llm' },
+    'packages/shared/src/index.ts': "export * from '@keundal/llm'",
+    'packages/shared/src/escape.ts': "export * from '../../llm/src/index'",
+    'packages/shared/tests/integration.test.ts': "import '@keundal/llm'"
+  })
+  const errors = await checkWorkspaceBoundaries(root)
+  assert.equal(errors.length, 3)
+  assert.ok(errors.every((error) => error.endsWith('couples core to a feature package')))
 })

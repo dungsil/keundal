@@ -1,19 +1,10 @@
 import { getEventListeners } from 'node:events'
 
-import {
-  EventType,
-  GenerationService,
-  LLMService,
-  SessionService,
-  type AGUIEvent,
-  type ExecutionOptions,
-  type GenerationRequest,
-  type LLMModel,
-  type LLMRequest,
-  type PreparedSession,
-  type RunAgentInput
-} from '@keundal/core'
+import { EventType, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
+import { GenerationService, type GenerationRequest } from '@keundal/generation'
+import { LLMService, type LLMModel, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
+import { SessionService, type PreparedSession } from '@keundal/session'
 import { Context, type Fiber } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
 

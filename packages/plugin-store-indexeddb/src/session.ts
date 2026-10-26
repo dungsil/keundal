@@ -1,13 +1,5 @@
-import {
-  mergeMessages,
-  parseRunAgentInput,
-  SessionService,
-  type ExecutionOptions,
-  type PreparedSession,
-  type RunAgentInput,
-  type SessionCommit,
-  type SessionSnapshot
-} from '@keundal/core'
+import { mergeMessages, parseRunAgentInput, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
+import { SessionService, type PreparedSession, type SessionCommit, type SessionSnapshot } from '@keundal/session'
 import type { Context } from 'cordis'
 
 import { IndexedDBStore } from './store.js'

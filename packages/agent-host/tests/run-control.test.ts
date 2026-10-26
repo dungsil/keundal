@@ -1,13 +1,8 @@
-import {
-  EventType,
-  LLMService,
-  readTraceSpans,
-  type LLMEvent,
-  type LLMRequest,
-  type RunAgentInput
-} from '@keundal/core'
+import { EventType, type RunAgentInput } from '@keundal/core'
+import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStore from '@keundal/plugin-store-memory'
+import { readTraceSpans } from '@keundal/trace'
 import { expect, test } from 'vitest'
 
 import { createAgentHost } from '../src/index.js'

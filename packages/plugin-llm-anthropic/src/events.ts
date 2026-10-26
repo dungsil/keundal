@@ -7,7 +7,8 @@ import type {
   RawMessageStreamEvent,
   StopReason
 } from '@anthropic-ai/sdk/resources/messages'
-import { EventType, LLM_SOURCE_EVENT, type LLMEvent } from '@keundal/core'
+import { EventType } from '@keundal/core'
+import { LLM_SOURCE_EVENT, type LLMEvent } from '@keundal/llm'
 
 type Item =
   | { type: 'text'; id: string; block: TextBlock }

@@ -24,6 +24,7 @@
     "@keundal/core": "workspace:*",
     "@keundal/mcp": "workspace:*",
     "@keundal/plugin-mcp-client": "workspace:*",
+    "@keundal/skill": "workspace:*",
     "@keundal/tools": "workspace:*",
     "yaml": "2.9.1"
   },

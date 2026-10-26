@@ -1,4 +1,4 @@
-import { LLMService, type LLMEvent, type LLMModel } from '@keundal/core'
+import { LLMService, type LLMEvent, type LLMModel } from '@keundal/llm'
 import memoryStorePlugin, { MemoryStore } from '@keundal/plugin-store-memory'
 import {
   checkConcurrentCommitProperties,
@@ -41,7 +41,7 @@ test('저장소 적합성과 동시 커밋의 단일 반영 및 journal 재생�
 })
 
 async function checkSessionEditing(store: ConformanceStore): Promise<void> {
-  const session = store.session as import('@keundal/core').SessionService
+  const session = store.session as import('@keundal/session').SessionService
   const message = (id: string) => ({ id, role: 'user' as const, content: id })
   try {
     await session.delete('missing', 0)
@@ -103,7 +103,7 @@ async function checkSessionEditing(store: ConformanceStore): Promise<void> {
       mode: 'replace',
       messages: [message('duplicate')],
       state: undefined,
-      generation: terminal as import('@keundal/core').TerminalGeneration
+      generation: terminal as import('@keundal/generation').TerminalGeneration
     })
     expect((await session.get('thread'))?.messages).toEqual([])
     await session.commit({ threadId: 'other', expectedRevision: 0, messages: [message('keep')], state: undefined })

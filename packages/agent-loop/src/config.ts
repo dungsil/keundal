@@ -1,31 +1,13 @@
-import type { Reasoning, SubagentRole } from '@keundal/core'
-import type { DeferredToolsConfig, ExecutableTool, ToolProvider } from '@keundal/tools'
-
-export interface CompactionPolicy {
-  readonly keepRecentMessages?: number
-  readonly maxSummaryTokens?: number
-  readonly keepRecentTokens?: number
-  readonly threshold?: number
-  readonly reserveTokens?: number
-}
-
-export interface AgentCompactionConfig extends CompactionPolicy {
-  readonly models?: Readonly<Record<string, CompactionPolicy>>
-}
-
-/** 100만 토큰당 가격입니다. 캐시 가격을 생략하면 해당 토큰에 입력 가격을 적용합니다. */
-export interface ModelPrice {
-  readonly inputPerMillion: number
-  readonly outputPerMillion: number
-  readonly cacheReadPerMillion?: number
-  readonly cacheWritePerMillion?: number
-}
-
-/** 모델 ID별 가격표입니다. 한 표는 하나의 통화만 사용합니다. */
-export interface AgentPricing {
-  readonly currency: string
-  readonly models: Readonly<Record<string, ModelPrice>>
-}
+import type { AgentCompactionConfig } from '@keundal/compaction'
+import { parseCompactionConfig } from '@keundal/compaction-summary/controller'
+import { parseDeferredToolsConfig, type DeferredToolsConfig } from '@keundal/deferred-tools'
+import { parseReasoning, type Reasoning } from '@keundal/llm'
+import { parseSubagentRoles, type SubagentRole } from '@keundal/subagent'
+import { SUBAGENT_TOOL_NAME } from '@keundal/subagent/tools'
+import { parseTools } from '@keundal/tool-execution'
+import type { ExecutableTool, ToolProvider } from '@keundal/tools'
+import { parsePricing, type AgentPricing } from '@keundal/trace'
+import type { StandardSchemaV1 } from '@standard-schema/spec'
 
 export interface AgentConfig {
   readonly model: string
@@ -56,4 +38,104 @@ export interface AgentConfig {
    * 가격표에 없는 모델은 비용을 미확정으로 둡니다.
    */
   readonly pricing?: AgentPricing
+}
+
+/**
+ * 에이전트 설정을 검증하고 기본값을 채웁니다. 잘못된 값은 예외로 알립니다.
+ */
+export function parseAgentConfig(value: unknown): AgentConfig {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('model' in value) ||
+    typeof value.model !== 'string' ||
+    !value.model.trim() ||
+    !('maxOutputTokens' in value) ||
+    typeof value.maxOutputTokens !== 'number' ||
+    !Number.isSafeInteger(value.maxOutputTokens) ||
+    value.maxOutputTokens <= 0
+  ) {
+    throw new Error('model and a positive integer maxOutputTokens are required')
+  }
+  const compaction = parseCompactionConfig('compaction' in value ? value.compaction : undefined)
+  for (const key of ['webSearch', 'skills', 'context', 'subagents'] as const) {
+    const option = (value as Record<string, unknown>)[key]
+    if (option !== undefined && typeof option !== 'boolean') {
+      throw new Error(`${key} must be a boolean`)
+    }
+  }
+  const configuredTools = 'tools' in value ? value.tools : undefined
+  const deferredTools =
+    'deferredTools' in value && value.deferredTools !== undefined
+      ? parseDeferredToolsConfig(value.deferredTools)
+      : undefined
+  const deferredToolProvider = 'deferredToolProvider' in value ? value.deferredToolProvider : undefined
+  if (deferredToolProvider !== undefined && typeof deferredToolProvider !== 'function') {
+    throw new Error('deferredToolProvider must be a function')
+  }
+  if ((deferredToolProvider === undefined) !== (deferredTools === undefined)) {
+    throw new Error('deferredTools and deferredToolProvider must be configured together')
+  }
+  const tools = typeof configuredTools === 'function' ? (configuredTools as ToolProvider) : parseTools(configuredTools)
+  const maxActiveSubagents =
+    'maxActiveSubagents' in value && value.maxActiveSubagents !== undefined ? value.maxActiveSubagents : 8
+  if (typeof maxActiveSubagents !== 'number' || !Number.isSafeInteger(maxActiveSubagents) || maxActiveSubagents <= 0)
+    throw new Error('maxActiveSubagents must be a positive integer')
+  const subagents = 'subagents' in value ? (value.subagents as boolean | undefined) : undefined
+  const subagentRoles =
+    'subagentRoles' in value && value.subagentRoles !== undefined ? parseSubagentRoles(value.subagentRoles) : undefined
+  if (subagents && typeof tools !== 'function' && tools.some((tool) => tool.name === SUBAGENT_TOOL_NAME))
+    throw new Error('delegate_task tool name is reserved when subagents are enabled')
+  const skills = 'skills' in value ? (value.skills as boolean | undefined) : undefined
+  if (skills && typeof tools !== 'function' && tools.some((tool) => tool.name === 'skill'))
+    throw new Error('skill tool name is reserved when skills are enabled')
+  const systemPrompt = 'systemPrompt' in value ? value.systemPrompt : undefined
+  if (systemPrompt !== undefined && (typeof systemPrompt !== 'string' || !systemPrompt.trim())) {
+    throw new Error('systemPrompt must be a non-empty string')
+  }
+  const maxToolRounds = 'maxToolRounds' in value ? value.maxToolRounds : 8
+  if (typeof maxToolRounds !== 'number' || !Number.isSafeInteger(maxToolRounds) || maxToolRounds <= 0) {
+    throw new Error('maxToolRounds must be a positive integer')
+  }
+  const maxToolCalls = 'maxToolCalls' in value ? value.maxToolCalls : 32
+  if (typeof maxToolCalls !== 'number' || !Number.isSafeInteger(maxToolCalls) || maxToolCalls <= 0) {
+    throw new Error('maxToolCalls must be a positive integer')
+  }
+  const parallelTools = 'parallelTools' in value ? value.parallelTools : false
+  if (typeof parallelTools !== 'boolean') throw new Error('parallelTools must be a boolean')
+  const pricing = 'pricing' in value && value.pricing !== undefined ? parsePricing(value.pricing) : undefined
+  return {
+    model: value.model,
+    maxOutputTokens: value.maxOutputTokens,
+    ...('webSearch' in value ? { webSearch: value.webSearch as boolean | undefined } : {}),
+    ...('reasoning' in value ? { reasoning: parseReasoning(value.reasoning) } : {}),
+    compaction,
+    tools,
+    ...(deferredTools === undefined ? {} : { deferredTools }),
+    ...(deferredToolProvider === undefined ? {} : { deferredToolProvider: deferredToolProvider as ToolProvider }),
+    subagents,
+    maxActiveSubagents,
+    ...(subagentRoles === undefined ? {} : { subagentRoles }),
+    skills,
+    ...('context' in value ? { context: value.context as boolean | undefined } : {}),
+    ...(systemPrompt === undefined ? {} : { systemPrompt }),
+    maxToolRounds,
+    maxToolCalls,
+    parallelTools,
+    ...(pricing === undefined ? {} : { pricing })
+  }
+}
+
+export const AgentConfigSchema: StandardSchemaV1<AgentConfig, AgentConfig> = {
+  '~standard': {
+    version: 1,
+    vendor: 'keundal',
+    validate(value) {
+      try {
+        return { value: parseAgentConfig(value) }
+      } catch (error) {
+        return { issues: [{ message: error instanceof Error ? error.message : 'invalid agent config' }] }
+      }
+    }
+  }
 }

@@ -19,6 +19,8 @@
   "dependencies": {
     "@google/genai": "catalog:",
     "@keundal/core": "workspace:*",
+    "@keundal/llm": "workspace:*",
+    "@keundal/trace": "workspace:*",
     "@standard-schema/spec": "catalog:",
     "cordis": "catalog:",
     "zod": "catalog:"

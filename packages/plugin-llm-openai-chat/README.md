@@ -1,6 +1,6 @@
 # @keundal/plugin-llm-openai-chat
 
-공식 OpenAI SDK의 Chat Completions API로 `@keundal/core`의 `LLMService`를 구현합니다. Cordis 플러그인으로 등록하면 `ctx.llm`에서 모델 한도 조회, 입력 토큰 계산, AG-UI 이벤트 스트리밍을 사용할 수 있습니다.
+공식 OpenAI SDK의 Chat Completions API로 `@keundal/llm`의 `LLMService`를 구현합니다. Cordis 플러그인으로 등록하면 `ctx.llm`에서 모델 한도 조회, 입력 토큰 계산, AG-UI 이벤트 스트리밍을 사용할 수 있습니다.
 
 Responses API로 생성하려면 `@keundal/plugin-llm-openai`을 등록하십시오. 두 플러그인은 같은 모델을 서로 다른 API로 호출하므로 용도를 나눠 등록할 수 있습니다.
 
@@ -23,7 +23,7 @@ Responses API로 생성하려면 `@keundal/plugin-llm-openai`을 등록하십시
 
 `listOpenAIChatModels({ apiKey, baseURL?, headers? }, { signal? })`은 `/models`에서 모델 목록을 조회합니다. 플러그인 등록과 `models` 설정은 필요하지 않습니다. `apiKey`는 직접 전달하며, 빈 문자열이면 기본 인증 헤더를 보내지 않습니다. 커스텀 인증 헤더는 그대로 적용합니다.
 
-결과는 `@keundal/core`의 `LLMModelInfo[]`이며 공급자 접두사 없는 `id`, 표시 이름 `name`, 선택적인 `contextWindow`·`maxOutputTokens`를 포함합니다. 호환 API가 반환한 한도는 보존하지만, 한도가 없는 모델에 기본값을 넣지 않습니다. Chat Completions 지원 여부는 모델마다 따로 확인해야 합니다.
+결과는 `@keundal/llm`의 `LLMModelInfo[]`이며 공급자 접두사 없는 `id`, 표시 이름 `name`, 선택적인 `contextWindow`·`maxOutputTokens`를 포함합니다. 호환 API가 반환한 한도는 보존하지만, 한도가 없는 모델에 기본값을 넣지 않습니다. Chat Completions 지원 여부는 모델마다 따로 확인해야 합니다.
 
 조회는 자동 재시도하거나 캐시하지 않습니다. 호출자가 취소 신호와 시간제한을 지정합니다. HTTP 오류는 `status`와 HTTP 400의 JSON 본문인 `error`를 전달합니다. UI에 표시하기 전에 호출자가 비밀 값을 제거해야 합니다.
 
@@ -34,7 +34,7 @@ Responses API로 생성하려면 `@keundal/plugin-llm-openai`을 등록하십시
 워크스페이스에서 `pnpm build`를 실행한 뒤 사용할 수 있습니다. 아래 코드의 `OPENAI_MODEL`, `OPENAI_CONTEXT_WINDOW`, `OPENAI_MAX_OUTPUT_TOKENS`는 호출하는 애플리케이션에서 플러그인 설정을 만드는 예시 환경 변수입니다. `OPENAI_API_KEY`도 설정해야 합니다.
 
 ```ts
-import type { LLMRequest } from '@keundal/core'
+import type { LLMRequest } from '@keundal/llm'
 import openaiChatLLMPlugin from '@keundal/plugin-llm-openai-chat'
 import { Context } from 'cordis'
 

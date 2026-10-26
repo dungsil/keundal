@@ -1,4 +1,4 @@
-import { MODEL_CATALOG_LIMITS } from '@keundal/core'
+import { MODEL_CATALOG_LIMITS } from '@keundal/llm'
 import { listOpenAIChatModels } from '@keundal/plugin-llm-openai-chat'
 import { expect, test, vi } from 'vitest'
 

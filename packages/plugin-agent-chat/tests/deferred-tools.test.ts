@@ -1,18 +1,11 @@
 import type { AgentConfig } from '@keundal/agent-loop'
-import {
-  EventType,
-  LLMService,
-  SteerQueue,
-  readTraceSpans,
-  type AGUIEvent,
-  type ExecutionOptions,
-  type LLMEvent,
-  type LLMRequest,
-  type RunAgentInput
-} from '@keundal/core'
+import { EventType, SteerQueue, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
+import { createDeferredToolSession, parseDeferredToolsConfig } from '@keundal/deferred-tools'
+import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
-import { createDeferredToolSession, parseDeferredToolsConfig, type ExecutableTool } from '@keundal/tools'
+import { type ExecutableTool } from '@keundal/tools'
+import { readTraceSpans } from '@keundal/trace'
 import { Context } from 'cordis'
 import { expect, test } from 'vitest'
 

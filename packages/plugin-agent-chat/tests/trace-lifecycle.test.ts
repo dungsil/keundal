@@ -1,16 +1,9 @@
 import type { AgentConfig } from '@keundal/agent-loop'
-import {
-  EventType,
-  LLMService,
-  LLM_USAGE_EVENT,
-  readTraceSpans,
-  type AGUIEvent,
-  type LLMEvent,
-  type LLMRequest,
-  type RunAgentInput
-} from '@keundal/core'
+import { EventType, type AGUIEvent, type RunAgentInput } from '@keundal/core'
+import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
+import { LLM_USAGE_EVENT, readTraceSpans } from '@keundal/trace'
 import { Context } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
 

@@ -1,4 +1,4 @@
-import { STREAM_LIMITS, StreamBudget } from '@keundal/core'
+import { STREAM_LIMITS, StreamBudget } from '@keundal/llm'
 
 export class RemoteResponseLimitError extends Error {}
 

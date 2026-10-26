@@ -5,16 +5,9 @@ import {
   formatSessionReferenceMention,
   parseSessionReferenceText
 } from '@keundal/context'
-import {
-  SessionService,
-  type AgentMessage,
-  type ExecutionOptions,
-  type PreparedSession,
-  type RunAgentInput,
-  type SessionCommit,
-  type SessionSnapshot
-} from '@keundal/core'
+import { type AgentMessage, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
 import { SessionReferenceResolver, type SessionReferenceConfig } from '@keundal/plugin-context'
+import { SessionService, type PreparedSession, type SessionCommit, type SessionSnapshot } from '@keundal/session'
 import { Context } from 'cordis'
 import { describe, expect, test } from 'vitest'
 

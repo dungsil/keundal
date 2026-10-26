@@ -1,5 +1,7 @@
-import { EventType, TRACE_EVENT, readTraceSpans } from '@keundal/core'
-import type { AGUIEvent, TraceSpan } from '@keundal/core'
+import { EventType } from '@keundal/core'
+import { TRACE_EVENT, readTraceSpans } from '@keundal/trace'
+import type { AGUIEvent } from '@keundal/core'
+import type { TraceSpan } from '@keundal/trace'
 import { shallowReactive } from 'vue'
 import type { ChatIndicatorOwner } from '@keundal/ui-chat/slots'
 

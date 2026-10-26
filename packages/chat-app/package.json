@@ -44,7 +44,8 @@
     "shiki": "^4.5.0",
     "striptags": "3.2.0",
     "tailwindcss": "^4.3.3",
-    "vue": "3.5.44"
+    "vue": "3.5.44",
+    "@keundal/llm": "workspace:*"
   },
   "devDependencies": {
     "@keundal/agent-loop": "workspace:*",
@@ -72,7 +73,10 @@
     "fake-indexeddb": "6.2.6",
     "typescript": "^6.0.3",
     "vitest": "catalog:",
-    "vue-tsc": "^3.3.13"
+    "vue-tsc": "^3.3.13",
+    "@keundal/core": "workspace:*",
+    "@keundal/tools": "workspace:*",
+    "@keundal/trace": "workspace:*"
   },
   "version": "0.0.0",
   "main": "./nuxt.config.ts",

@@ -1,15 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { clearInterval, setInterval } from 'node:timers'
 
+import { EventType, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
 import {
-  EventType,
-  StreamBudget,
   GenerationService,
   JournalHub,
   followJournal,
-  reconcileTerminalTraceJournal,
-  type AGUIEvent,
-  type ExecutionOptions,
   type GenerationJournalEntry,
   type GenerationOptions,
   type GenerationRequest,
@@ -17,7 +13,9 @@ import {
   type GenerationStatus,
   type GenerationSubscriptionOptions,
   type TerminalGeneration
-} from '@keundal/core'
+} from '@keundal/generation'
+import { StreamBudget } from '@keundal/llm'
+import { reconcileTerminalTraceJournal } from '@keundal/trace'
 import type { Context } from 'cordis'
 
 import { RunRecorder } from './messages.js'

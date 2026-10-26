@@ -1,5 +1,5 @@
 import type { Context } from 'cordis'
-import type { SubagentRole } from '@keundal/core'
+import type { SubagentRole } from '@keundal/subagent'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
 import { lazyView } from '@keundal/ui-slots'

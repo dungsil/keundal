@@ -2,7 +2,7 @@
 
 ## 기존 계약을 유지하는 범위
 
-Trace 계약과 집계는 `@keundal/core`가 제공합니다. 공통 실행 루프가 모델 호출, 도구 실행, Compaction과 에이전트 실행을 기록합니다. 공용 Chat UI는 저장소나 공급자 구현을 직접 참조하지 않습니다.
+Trace 계약과 집계·가격 계산은 `@keundal/trace`가 제공합니다. 공통 실행 루프는 `@keundal/trace/recording`을 사용해 모델 호출, 도구 실행, Compaction과 에이전트 실행을 기록합니다. 공용 Chat UI는 저장소나 공급자 구현을 직접 참조하지 않습니다.
 
 Generation Journal은 이미 순서가 있는 AG-UI 이벤트를 저장합니다. Trace는 이 Journal의 `CUSTOM` 이벤트를 재사용하므로 별도 저장소나 데이터 이전이 필요하지 않습니다. 원본 실행 이벤트의 상대 순서와 성공한 `RUN_FINISHED`를 커밋 뒤에 전달하는 조건은 바꾸지 않습니다.
 

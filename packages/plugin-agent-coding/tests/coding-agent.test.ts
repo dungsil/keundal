@@ -1,11 +1,5 @@
-import {
-  EventType,
-  LLMService,
-  type AGUIEvent,
-  type LLMEvent,
-  type LLMRequest,
-  type RunAgentInput
-} from '@keundal/core'
+import { EventType, type AGUIEvent, type RunAgentInput } from '@keundal/core'
+import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import codingAgentPlugin, {
   CODING_SYSTEM_PROMPT,
   CodingAgent,

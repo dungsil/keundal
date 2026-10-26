@@ -1,16 +1,9 @@
 import type {} from '@keundal/agent'
-import type {
-  AGUIEvent,
-  AgentMessage,
-  ExecutionOptions,
-  GenerationJournalEntry,
-  GenerationService,
-  GenerationSubscriptionOptions,
-  Reasoning,
-  RunAgentInput,
-  SessionService,
-  SkillSummary
-} from '@keundal/core'
+import type { AGUIEvent, AgentMessage, ExecutionOptions, RunAgentInput } from '@keundal/core'
+import type { GenerationJournalEntry, GenerationService, GenerationSubscriptionOptions } from '@keundal/generation'
+import type { Reasoning } from '@keundal/llm'
+import type { SessionService } from '@keundal/session'
+import type { SkillSummary } from '@keundal/skill'
 import type { Context, Fiber } from 'cordis'
 
 export interface AgentHostModel {

@@ -1,4 +1,4 @@
-import type { SkillDefinition } from '@keundal/core'
+import type { SkillDefinition } from '@keundal/skill'
 import { parse } from 'yaml'
 
 import { object, strings } from './validation.js'

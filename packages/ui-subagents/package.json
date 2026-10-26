@@ -9,7 +9,7 @@
     "./plugin": "./app/plugin.ts"
   },
   "dependencies": {
-    "@keundal/core": "workspace:*",
+    "@keundal/subagent": "workspace:*",
     "@keundal/ui": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
     "@keundal/ui-settings": "workspace:*",

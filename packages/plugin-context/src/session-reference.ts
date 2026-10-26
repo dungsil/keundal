@@ -8,13 +8,8 @@ import {
   type SessionReferenceInput,
   type ContextProvider
 } from '@keundal/context'
-import {
-  CONTEXT_MESSAGE_PREFIX,
-  type AgentMessage,
-  type RunAgentInput,
-  type SessionService,
-  type SessionSnapshot
-} from '@keundal/core'
+import { CONTEXT_MESSAGE_PREFIX, type AgentMessage, type RunAgentInput } from '@keundal/core'
+import { type SessionService, type SessionSnapshot } from '@keundal/session'
 import type { Context } from 'cordis'
 
 export const MAX_REFERENCES = 3

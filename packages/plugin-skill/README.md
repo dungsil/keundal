@@ -50,7 +50,7 @@ const definition = await catalog.load('review', { signal })
 
 ## 공급자 수명
 
-`SkillProvider`는 `@keundal/core`에서 가져옵니다. 공급자는 `prepare(options)`에서 `SkillCatalog`를 반환합니다.
+`SkillProvider`는 `@keundal/skill`에서 가져옵니다. 공급자는 `prepare(options)`에서 `SkillCatalog`를 반환합니다.
 
 추가 공급자는 `ctx.skills.registerProvider(provider)`로 등록합니다. 반환한 함수를 호출하면 등록을 해제하고 진행 중 작업의 신호를 취소합니다.
 

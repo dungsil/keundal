@@ -1,15 +1,9 @@
 import { setImmediate } from 'node:timers/promises'
 
-import { parseAgentConfig, type AgentCompactionConfig } from '@keundal/agent-loop'
-import {
-  EventType,
-  LLMService,
-  type AGUIEvent,
-  type ExecutionOptions,
-  type LLMEvent,
-  type LLMRequest,
-  type RunAgentInput
-} from '@keundal/core'
+import { parseAgentConfig } from '@keundal/agent-loop'
+import type { AgentCompactionConfig } from '@keundal/compaction'
+import { EventType, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
+import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import type { ExecutableTool } from '@keundal/tools'

@@ -1,4 +1,5 @@
-import { MessageAssembly, type AGUIEvent, type AgentMessage, type GenerationJournalEntry } from '@keundal/core'
+import { MessageAssembly, type AGUIEvent, type AgentMessage } from '@keundal/core'
+import { type GenerationJournalEntry } from '@keundal/generation'
 
 /**
  * 실행 이벤트를 journal과 실행 메시지로 누적합니다. 코어의 조립기가 어시스턴트 텍스트·도구 호출·추론

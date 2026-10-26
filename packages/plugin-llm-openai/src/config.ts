@@ -1,4 +1,4 @@
-import type { LLMModel } from '@keundal/core'
+import type { LLMModel } from '@keundal/llm'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 
 export interface OpenAILLMConfig {

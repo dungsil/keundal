@@ -1,369 +1,35 @@
 import { AgentService } from '@keundal/agent'
-import { compact } from '@keundal/compaction'
+import { SummaryCompactionController } from '@keundal/compaction-summary/controller'
 import type {} from '@keundal/context'
 import {
   CONTEXT_MESSAGE_EVENT,
   CONTEXT_MESSAGE_PREFIX,
-  PROMPT_MESSAGE_PREFIX,
-  assemblePrompt,
-  parsePromptPreset,
   EventType,
-  isContextOverflow,
-  LLM_USAGE_EVENT,
-  TRACE_EVENT,
   parseRunAgentInput,
-  parseReasoning,
-  parseSubagentRoles,
-  traceEvent,
   type AGUIEvent,
-  type CompactionResult,
   type ExecutionOptions,
-  type LLMRequest,
-  type LLMEvent,
   type RunAgentInput,
-  type SteerQueue,
-  type TraceMetadataEvent,
-  type TraceCost,
-  type TraceErrorCategory,
-  type TraceSpan,
-  type TraceUsage,
-  type LLMService
+  type SteerQueue
 } from '@keundal/core'
-import { createDeferredToolSession, parseDeferredToolsConfig, type ToolProvider } from '@keundal/tools'
-import type { StandardSchemaV1 } from '@standard-schema/spec'
-import { type Context } from 'cordis'
+import { createDeferredToolSession } from '@keundal/deferred-tools'
+import type {} from '@keundal/generation'
+import type { LLMRequest } from '@keundal/llm'
+import { PROMPT_MESSAGE_PREFIX, assemblePrompt, parsePromptPreset } from '@keundal/prompt'
+import type {} from '@keundal/session'
+import { SKILL_CATALOG_ID, skillTool, withSkillCatalog } from '@keundal/skill/tools'
+import { parseSubagentRoles } from '@keundal/subagent'
+import { subagentTool, SUBAGENT_TOOL_NAME } from '@keundal/subagent/tools'
+import { addTools, parseTools, streamWithTools } from '@keundal/tool-execution'
+import { traceEvent, type TraceSpan } from '@keundal/trace'
+import { TraceRecorder, type TraceParent } from '@keundal/trace/recording'
+import type { Context } from 'cordis'
 
-import type { AgentConfig, AgentPricing } from './config.js'
-export type { AgentConfig, AgentCompactionConfig, AgentPricing, CompactionPolicy, ModelPrice } from './config.js'
-export type { ToolProvider } from '@keundal/tools'
-
-import {
-  parseCompactionConfig,
-  applyPrepared,
-  matchesPrepared,
-  waitForPreparation,
-  type PreparedCompaction
-} from './compaction.js'
-import { estimateCost, parsePricing } from './pricing.js'
+import type { AgentConfig } from './config.js'
 import { SYSTEM_PROMPT_ID, withSystemPrompt } from './prompt.js'
-import { SKILL_CATALOG_ID, skillTool, withSkillCatalog } from './skills.js'
-import { subagentTool, SUBAGENT_TOOL_NAME } from './subagents.js'
-import { addTools, parseTools, streamWithTools } from './tools.js'
 
-export { TOOL_PROGRESS_EVENT } from './tools.js'
-export type { ExecutableTool, ToolExecutionContext } from './tools.js'
-
-type TraceParent = { readonly traceId: string; readonly parentSpanId: string }
-
-class TraceRecorder {
-  readonly traceId: string
-  readonly root: TraceSpan
-  lastModelSpanId?: string
-  private sequence = 0
-  private pending: TraceMetadataEvent[] = []
-  private active = new Map<string, TraceSpan>()
-
-  constructor(
-    readonly runId: string,
-    parent?: TraceParent,
-    private readonly pricing?: AgentPricing
-  ) {
-    this.traceId = parent?.traceId ?? globalThis.crypto.randomUUID()
-    this.root = this.start('agent', 'agent', parent?.parentSpanId)
-  }
-
-  /** 공급자 비용이 없을 때 가격표로 모델 호출의 비용을 추정합니다. */
-  estimateCost(model: string, usage: TraceUsage): TraceCost | undefined {
-    return estimateCost(this.pricing, model, usage)
-  }
-
-  start(
-    kind: TraceSpan['kind'],
-    name: string,
-    parentSpanId?: string,
-    toolCallId?: string,
-    model?: string,
-    enqueue = true,
-    detached = false
-  ): TraceSpan {
-    const span: TraceSpan = {
-      version: 1,
-      traceId: this.traceId,
-      spanId: globalThis.crypto.randomUUID(),
-      ...(parentSpanId ? { parentSpanId } : {}),
-      runId: this.runId,
-      ...(toolCallId ? { toolCallId } : {}),
-      kind,
-      name,
-      sequence: this.sequence++,
-      startedAt: Date.now(),
-      status: 'running',
-      ...(model ? { model } : {}),
-      ...(detached ? { detached: true } : {})
-    }
-    if (enqueue) this.pending.push(traceEvent(span))
-    this.active.set(span.spanId, span)
-    return span
-  }
-
-  finish(
-    span: TraceSpan,
-    status: TraceSpan['status'],
-    options: { usage?: TraceUsage; cost?: TraceCost; ttftMs?: number; error?: TraceErrorCategory } = {},
-    enqueue = true
-  ): TraceSpan {
-    const current = this.active.get(span.spanId)
-    if (!current) return span
-    const completed: TraceSpan = {
-      ...current,
-      endedAt: Date.now(),
-      status,
-      ...(options.usage ? { usage: options.usage } : {}),
-      ...(options.cost ? { cost: options.cost } : {}),
-      ...(options.ttftMs === undefined ? {} : { ttftMs: options.ttftMs }),
-      ...(options.error ? { error: options.error } : {})
-    }
-    this.active.delete(span.spanId)
-    if (enqueue) this.pending.push(traceEvent(completed))
-    return completed
-  }
-
-  finishOpenSpans(exceptSpanId: string): void {
-    for (const span of this.active.values()) {
-      if (span.spanId !== exceptSpanId && !span.detached) this.finish(span, 'interrupted')
-    }
-  }
-
-  updateUsage(span: TraceSpan, usage: TraceUsage, cost?: TraceCost): void {
-    const active = this.active.get(span.spanId)
-    if (!active) return
-    // 새 사용량으로 비용을 다시 계산하므로 이전 사용량의 비용을 남기지 않습니다.
-    const { cost: _previous, ...rest } = active
-    const updated = { ...rest, usage, ...(cost ? { cost } : {}) }
-    this.active.set(span.spanId, updated)
-    this.pending.push(traceEvent(updated))
-  }
-
-  drain(): TraceMetadataEvent[] {
-    return this.pending.splice(0)
-  }
-}
-
-function usageFromEvent(value: unknown): { usage: TraceUsage; cost?: TraceCost } | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
-  const source = value as Record<string, unknown>
-  if (source.source !== 'provider' && source.source !== 'estimate') return undefined
-  const usage: {
-    source: TraceUsage['source']
-    inputTokens?: number
-    outputTokens?: number
-    cacheReadTokens?: number
-    cacheWriteTokens?: number
-  } = { source: source.source }
-  for (const field of ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'] as const) {
-    const count = source[field]
-    if (typeof count === 'number' && Number.isSafeInteger(count) && count >= 0) usage[field] = count
-  }
-  const valueCost = source.cost
-  const cost =
-    typeof valueCost === 'object' && valueCost !== null && !Array.isArray(valueCost)
-      ? (valueCost as Record<string, unknown>)
-      : undefined
-  const safeCost =
-    cost &&
-    typeof cost.currency === 'string' &&
-    cost.currency.trim() &&
-    typeof cost.amount === 'number' &&
-    Number.isFinite(cost.amount) &&
-    cost.amount >= 0 &&
-    (cost.source === 'provider' || cost.source === 'estimate')
-      ? { currency: cost.currency, amount: cost.amount, source: cost.source }
-      : undefined
-  return { usage, ...(safeCost ? { cost: safeCost as TraceCost } : {}) }
-}
-
-function safeTraceError(error: unknown): TraceErrorCategory {
-  return isContextOverflow(error) ? 'context_overflow' : 'provider_error'
-}
-
-async function* tracedModelStream(
-  stream: AsyncIterable<LLMEvent>,
-  model: string,
-  trace: TraceRecorder,
-  parentSpanId: string,
-  signal: AbortSignal,
-  publishTraceEvents = true,
-  detached = false
-): AsyncGenerator<LLMEvent> {
-  const span = trace.start('model', 'generate', parentSpanId, undefined, model, true, detached)
-  if (publishTraceEvents) trace.lastModelSpanId = span.spanId
-  if (publishTraceEvents) yield* trace.drain()
-  let usage: TraceUsage | undefined
-  let providerCost: TraceCost | undefined
-  let cost: TraceCost | undefined
-  let ttftMs: number | undefined
-  try {
-    for await (const event of stream) {
-      if (event.type === EventType.CUSTOM && event.name === LLM_USAGE_EVENT) {
-        const parsed = usageFromEvent(event.value)
-        if (parsed) {
-          usage = parsed.usage
-          // 공급자가 준 비용이 있으면 가격표 추정으로 덮어쓰지 않습니다.
-          providerCost = parsed.cost ?? providerCost
-          cost = providerCost ?? trace.estimateCost(model, usage)
-          trace.updateUsage(span, usage, cost)
-        }
-      } else if (
-        ttftMs === undefined &&
-        (event.type === EventType.TEXT_MESSAGE_CONTENT ||
-          event.type === EventType.REASONING_MESSAGE_CONTENT ||
-          event.type === EventType.TOOL_CALL_ARGS)
-      ) {
-        ttftMs = Math.max(0, Date.now() - span.startedAt)
-      }
-      yield event
-      if (publishTraceEvents) yield* trace.drain()
-    }
-    trace.finish(span, 'completed', {
-      ...(usage ? { usage } : {}),
-      ...(cost ? { cost } : {}),
-      ...(ttftMs === undefined ? {} : { ttftMs })
-    })
-    if (publishTraceEvents) yield* trace.drain()
-  } catch (error) {
-    trace.finish(span, signal.aborted ? 'cancelled' : 'failed', {
-      ...(usage ? { usage } : {}),
-      ...(cost ? { cost } : {}),
-      ...(ttftMs === undefined ? {} : { ttftMs }),
-      ...(signal.aborted ? {} : { error: safeTraceError(error) })
-    })
-    if (publishTraceEvents) yield* trace.drain()
-    throw error
-  }
-}
-
-function tracedCompactionLLM(
-  llm: LLMService,
-  trace: TraceRecorder,
-  parentSpanId: string,
-  signal: AbortSignal,
-  detached = false
-): Pick<LLMService, 'getModel' | 'countTokens' | 'stream'> {
-  return {
-    getModel: (model, options) => llm.getModel(model, options),
-    countTokens: (request, options) => llm.countTokens(request, options),
-    stream: (request, options) =>
-      tracedModelStream(
-        llm.stream(request, options),
-        request.model,
-        trace,
-        parentSpanId,
-        options?.signal ?? signal,
-        false,
-        detached
-      )
-  }
-}
-
-/**
- * 에이전트 설정을 검증하고 기본값을 채웁니다. 잘못된 값은 예외로 알립니다.
- */
-export function parseAgentConfig(value: unknown): AgentConfig {
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    !('model' in value) ||
-    typeof value.model !== 'string' ||
-    !value.model.trim() ||
-    !('maxOutputTokens' in value) ||
-    typeof value.maxOutputTokens !== 'number' ||
-    !Number.isSafeInteger(value.maxOutputTokens) ||
-    value.maxOutputTokens <= 0
-  ) {
-    throw new Error('model and a positive integer maxOutputTokens are required')
-  }
-  const compaction = parseCompactionConfig('compaction' in value ? value.compaction : undefined)
-  for (const key of ['webSearch', 'skills', 'context', 'subagents'] as const) {
-    const option = (value as Record<string, unknown>)[key]
-    if (option !== undefined && typeof option !== 'boolean') {
-      throw new Error(`${key} must be a boolean`)
-    }
-  }
-  const configuredTools = 'tools' in value ? value.tools : undefined
-  const deferredTools =
-    'deferredTools' in value && value.deferredTools !== undefined
-      ? parseDeferredToolsConfig(value.deferredTools)
-      : undefined
-  const deferredToolProvider = 'deferredToolProvider' in value ? value.deferredToolProvider : undefined
-  if (deferredToolProvider !== undefined && typeof deferredToolProvider !== 'function') {
-    throw new Error('deferredToolProvider must be a function')
-  }
-  if ((deferredToolProvider === undefined) !== (deferredTools === undefined)) {
-    throw new Error('deferredTools and deferredToolProvider must be configured together')
-  }
-  const tools = typeof configuredTools === 'function' ? (configuredTools as ToolProvider) : parseTools(configuredTools)
-  const maxActiveSubagents =
-    'maxActiveSubagents' in value && value.maxActiveSubagents !== undefined ? value.maxActiveSubagents : 8
-  if (typeof maxActiveSubagents !== 'number' || !Number.isSafeInteger(maxActiveSubagents) || maxActiveSubagents <= 0)
-    throw new Error('maxActiveSubagents must be a positive integer')
-  const subagents = 'subagents' in value ? (value.subagents as boolean | undefined) : undefined
-  const subagentRoles =
-    'subagentRoles' in value && value.subagentRoles !== undefined ? parseSubagentRoles(value.subagentRoles) : undefined
-  if (subagents && typeof tools !== 'function' && tools.some((tool) => tool.name === SUBAGENT_TOOL_NAME))
-    throw new Error('delegate_task tool name is reserved when subagents are enabled')
-  const skills = 'skills' in value ? (value.skills as boolean | undefined) : undefined
-  if (skills && typeof tools !== 'function' && tools.some((tool) => tool.name === 'skill'))
-    throw new Error('skill tool name is reserved when skills are enabled')
-  const systemPrompt = 'systemPrompt' in value ? value.systemPrompt : undefined
-  if (systemPrompt !== undefined && (typeof systemPrompt !== 'string' || !systemPrompt.trim())) {
-    throw new Error('systemPrompt must be a non-empty string')
-  }
-  const maxToolRounds = 'maxToolRounds' in value ? value.maxToolRounds : 8
-  if (typeof maxToolRounds !== 'number' || !Number.isSafeInteger(maxToolRounds) || maxToolRounds <= 0) {
-    throw new Error('maxToolRounds must be a positive integer')
-  }
-  const maxToolCalls = 'maxToolCalls' in value ? value.maxToolCalls : 32
-  if (typeof maxToolCalls !== 'number' || !Number.isSafeInteger(maxToolCalls) || maxToolCalls <= 0) {
-    throw new Error('maxToolCalls must be a positive integer')
-  }
-  const parallelTools = 'parallelTools' in value ? value.parallelTools : false
-  if (typeof parallelTools !== 'boolean') throw new Error('parallelTools must be a boolean')
-  const pricing = 'pricing' in value && value.pricing !== undefined ? parsePricing(value.pricing) : undefined
-  return {
-    model: value.model,
-    maxOutputTokens: value.maxOutputTokens,
-    ...('webSearch' in value ? { webSearch: value.webSearch as boolean | undefined } : {}),
-    ...('reasoning' in value ? { reasoning: parseReasoning(value.reasoning) } : {}),
-    compaction,
-    tools,
-    ...(deferredTools === undefined ? {} : { deferredTools }),
-    ...(deferredToolProvider === undefined ? {} : { deferredToolProvider: deferredToolProvider as ToolProvider }),
-    subagents,
-    maxActiveSubagents,
-    ...(subagentRoles === undefined ? {} : { subagentRoles }),
-    skills,
-    ...('context' in value ? { context: value.context as boolean | undefined } : {}),
-    ...(systemPrompt === undefined ? {} : { systemPrompt }),
-    maxToolRounds,
-    maxToolCalls,
-    parallelTools,
-    ...(pricing === undefined ? {} : { pricing })
-  }
-}
-
-const agentConfigSchema: StandardSchemaV1<AgentConfig, AgentConfig> = {
-  '~standard': {
-    version: 1,
-    vendor: 'keundal',
-    validate(value) {
-      try {
-        return { value: parseAgentConfig(value) }
-      } catch (error) {
-        return { issues: [{ message: error instanceof Error ? error.message : 'invalid agent config' }] }
-      }
-    }
-  }
-}
+export type { AgentConfig } from './config.js'
+export type { ToolProvider, ExecutableTool, ToolExecutionContext } from '@keundal/tools'
+export { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 
 /**
  * 에이전트 구현의 계약입니다. 도구 실행, 후속 생성, 축약, 스킬을 함께 처리하는 기본 구현을
@@ -372,22 +38,17 @@ const agentConfigSchema: StandardSchemaV1<AgentConfig, AgentConfig> = {
 export class Agent extends AgentService {
   private readonly active = new Set<AbortController>()
   private closed = false
-  private readonly preparations = new Map<string, PreparedCompaction>()
-  private readonly compactionPolicy: ReturnType<Agent['resolveCompactionPolicy']>
+  private readonly compaction: SummaryCompactionController
 
   constructor(
     ctx: Context,
     protected readonly config: AgentConfig
   ) {
     super(ctx)
-    this.compactionPolicy = this.resolveCompactionPolicy()
+    this.compaction = new SummaryCompactionController(ctx.llm, config)
     ctx.fiber.effect(() => () => {
       this.closed = true
-      for (const entry of this.preparations.values()) {
-        entry.detach()
-        entry.controller.abort(new Error('agent disposed'))
-      }
-      this.preparations.clear()
+      this.compaction.dispose()
       for (const controller of this.active) controller.abort(new Error('agent disposed'))
     })
   }
@@ -534,7 +195,7 @@ export class Agent extends AgentService {
       ) {
         throw new Error('requested output budget exceeds the model limits')
       }
-      const maxInputTokens = model.contextWindow - maxOutputTokens - (this.compactionPolicy.reserveTokens ?? 0)
+      const maxInputTokens = model.contextWindow - maxOutputTokens - (this.compaction.policy.reserveTokens ?? 0)
       if (!Number.isSafeInteger(maxInputTokens) || maxInputTokens <= 0)
         throw new Error('compaction reserveTokens exceeds the model input budget')
       let step = 1
@@ -546,7 +207,7 @@ export class Agent extends AgentService {
             contextWindow: model.contextWindow
           })
         : preparedInput
-      const fitted = await this.fitInput(contextualInput, maxInputTokens, signal, false, signal, trace)
+      const fitted = await this.compaction.fitInput(contextualInput, maxInputTokens, signal, false, signal, trace)
       const previousIds = this.config.context ? new Set(preparedInput.messages.map((message) => message.id)) : undefined
       const initialContext = previousIds
         ? fitted.input.messages.filter(
@@ -555,7 +216,7 @@ export class Agent extends AgentService {
         : []
       const llm = this.ctx.llm
       const stream = (request: LLMRequest, execution?: ExecutionOptions) =>
-        this.streamWithRetry(request, maxInputTokens, execution?.signal ?? signal, trace!)
+        this.compaction.streamWithRetry(request, maxInputTokens, execution?.signal ?? signal, trace!)
       const maxToolRounds = this.config.maxToolRounds ?? 8
       const maxToolCalls = this.config.maxToolCalls ?? 32
       const parallel = this.config.parallelTools ?? false
@@ -568,7 +229,8 @@ export class Agent extends AgentService {
               contextWindow: model.contextWindow
             })
           : next
-        return (await this.fitInput(contextual, maxInputTokens, generationSignal, false, signal, trace)).input
+        return (await this.compaction.fitInput(contextual, maxInputTokens, generationSignal, false, signal, trace))
+          .input
       }
 
       const toolSpans = new Map<string, TraceSpan>()
@@ -675,7 +337,7 @@ export class Agent extends AgentService {
           yield* trace.drain()
         }
         if (event.type === EventType.RUN_FINISHED) {
-          for (const entry of this.preparations.values()) if (entry.sourceSignal === signal) entry.detach()
+          this.compaction.detach(signal)
         }
         yield event
       }
@@ -690,201 +352,6 @@ export class Agent extends AgentService {
     } finally {
       cleanup()
     }
-  }
-
-  private resolveCompactionPolicy() {
-    const config = parseCompactionConfig(this.config.compaction)
-    return config.models?.[this.config.model] ?? config
-  }
-
-  private discardPreparation(threadId: string, entry: PreparedCompaction) {
-    if (this.preparations.get(threadId) === entry) this.preparations.delete(threadId)
-    entry.detach()
-    entry.controller.abort(new Error('compaction preparation discarded'))
-  }
-
-  private prepareCompaction(
-    input: RunAgentInput,
-    maxInputTokens: number,
-    inputTokens: number,
-    signal: AbortSignal,
-    trace?: TraceRecorder
-  ) {
-    if (this.preparations.has(input.threadId)) return
-    // 준비 결과와 진행 중 작업의 수를 함께 제한합니다.
-    if (this.preparations.size >= 32) {
-      const oldest = this.preparations.entries().next().value
-      if (oldest) this.discardPreparation(...oldest)
-    }
-    let snapshot: RunAgentInput
-    try {
-      snapshot = globalThis.structuredClone(input)
-      JSON.stringify(snapshot)
-    } catch {
-      // 복제·비교할 수 없는 상태는 준비를 생략하고 정상 생성을 계속합니다.
-      return
-    }
-    const controller = new globalThis.AbortController()
-    const abort = () => controller.abort(signal.reason)
-    const detach = () => signal.removeEventListener('abort', abort)
-    signal.addEventListener('abort', abort, { once: true })
-    const entry: PreparedCompaction = {
-      input: snapshot,
-      controller,
-      sourceSignal: signal,
-      detach,
-      task: Promise.resolve(undefined)
-    }
-    this.preparations.set(input.threadId, entry)
-    const span = trace?.start('compaction', 'background_prepare', trace.root.spanId, undefined, undefined, true, true)
-    const compactionLLM =
-      span && trace ? tracedCompactionLLM(this.ctx.llm, trace, span.spanId, controller.signal, true) : this.ctx.llm
-    entry.task = compact(
-      compactionLLM,
-      {
-        input: entry.input,
-        model: this.config.model,
-        maxInputTokens
-      },
-      { ...this.compactionPolicy, signal: controller.signal, inputTokens, force: true }
-    ).then(
-      (result) => {
-        if (!controller.signal.aborted && this.preparations.get(input.threadId) === entry) entry.result = result
-        if (span && trace) trace.finish(span, controller.signal.aborted ? 'cancelled' : 'completed')
-        detach()
-        return entry.result
-      },
-      () => {
-        if (span && trace)
-          trace.finish(
-            span,
-            controller.signal.aborted ? 'cancelled' : 'failed',
-            controller.signal.aborted ? {} : { error: 'compaction_error' }
-          )
-        detach()
-        // 준비 실패는 실제 생성에 영향을 주지 않습니다. 필요해지면 동기 축약으로 재시도합니다.
-        if (this.preparations.get(input.threadId) === entry) this.preparations.delete(input.threadId)
-        return undefined
-      }
-    )
-  }
-
-  private async *streamWithRetry(
-    request: LLMRequest,
-    maxInputTokens: number,
-    signal: AbortSignal,
-    trace: TraceRecorder
-  ): AsyncGenerator<LLMEvent> {
-    let emitted = false
-    try {
-      for await (const event of tracedModelStream(
-        this.ctx.llm.stream(request, { signal }),
-        request.model,
-        trace,
-        trace.root.spanId,
-        signal
-      )) {
-        signal.throwIfAborted()
-        if (!(event.type === EventType.CUSTOM && (event.name === TRACE_EVENT || event.name === LLM_USAGE_EVENT)))
-          emitted = true
-        yield event
-      }
-    } catch (error) {
-      signal.throwIfAborted()
-      if (emitted || !isContextOverflow(error)) throw error
-      const fitted = await this.fitInput(request.input, maxInputTokens, signal, true, signal, trace)
-      signal.throwIfAborted()
-      yield* tracedModelStream(
-        this.ctx.llm.stream({ ...request, input: fitted.input }, { signal }),
-        request.model,
-        trace,
-        trace.root.spanId,
-        signal
-      )
-    }
-  }
-
-  private async fitInput(
-    input: RunAgentInput,
-    maxInputTokens: number,
-    signal: AbortSignal,
-    force = false,
-    backgroundSignal = signal,
-    trace?: TraceRecorder
-  ): Promise<{ input: RunAgentInput; compaction?: CompactionResult }> {
-    signal.throwIfAborted()
-    const countTokens = async (candidate: RunAgentInput) => {
-      const count = await this.ctx.llm.countTokens(
-        {
-          input: candidate,
-          model: this.config.model,
-          maxOutputTokens: this.config.maxOutputTokens,
-          ...(this.config.webSearch === undefined ? {} : { webSearch: this.config.webSearch }),
-          ...(this.config.reasoning === undefined ? {} : { reasoning: this.config.reasoning })
-        },
-        { signal }
-      )
-      signal.throwIfAborted()
-      if (!Number.isSafeInteger(count) || count < 0) throw new Error('invalid input token count')
-      return count
-    }
-
-    const count = await countTokens(input)
-    const entry = this.preparations.get(input.threadId)
-    if (entry && matchesPrepared(entry, input)) {
-      if (count > maxInputTokens || force) await waitForPreparation(entry.task, signal)
-      signal.throwIfAborted()
-      const ready = applyPrepared(entry, input)
-      if (entry.result && !ready) this.discardPreparation(input.threadId, entry)
-      if (ready) {
-        const candidate = { ...input, messages: ready.messages }
-        const tokens = await countTokens(candidate)
-        this.discardPreparation(input.threadId, entry)
-        if (tokens <= maxInputTokens && tokens < count) return { input: candidate, compaction: ready }
-      }
-    } else if (entry) this.discardPreparation(input.threadId, entry)
-    if (!force && count <= maxInputTokens) {
-      const policy = this.compactionPolicy
-      if (
-        count >= maxInputTokens * (policy.threshold ?? 0.8) &&
-        input.messages.length > (policy.keepRecentMessages ?? 6) &&
-        input.messages.filter((message) => message.role === 'user' && !message.id.startsWith(CONTEXT_MESSAGE_PREFIX))
-          .length > 1
-      )
-        this.prepareCompaction(input, maxInputTokens, count, backgroundSignal, trace)
-      return { input }
-    }
-
-    const compactionSpan = trace?.start('compaction', 'compact', trace.root.spanId)
-    let compaction: CompactionResult
-    const compactionLLM =
-      compactionSpan && trace ? tracedCompactionLLM(this.ctx.llm, trace, compactionSpan.spanId, signal) : this.ctx.llm
-    try {
-      compaction = await compact(
-        compactionLLM,
-        { input, model: this.config.model, maxInputTokens },
-        { ...this.compactionPolicy, signal, inputTokens: count, force }
-      )
-    } catch (error) {
-      if (compactionSpan && trace) {
-        trace.finish(
-          compactionSpan,
-          signal.aborted ? 'cancelled' : 'failed',
-          signal.aborted ? {} : { error: 'compaction_error' }
-        )
-      }
-      throw error
-    }
-    if (compactionSpan && trace) trace.finish(compactionSpan, 'completed')
-    signal.throwIfAborted()
-    const compacted = { ...input, messages: compaction.messages }
-    // 축약기의 기본 계산과 달리 네이티브 검색 도구의 입력 비용까지 포함해 다시 검사합니다.
-    if (
-      (this.config.webSearch !== undefined || this.config.reasoning !== undefined) &&
-      (await countTokens(compacted)) > maxInputTokens
-    )
-      throw new Error('compacted input exceeds the model input budget')
-    return { input: compacted, compaction }
   }
 }
 
@@ -906,4 +373,4 @@ export function registerAgent(ctx: Context, config: AgentConfig, implementation:
   }
 }
 
-export { agentConfigSchema as AgentConfigSchema }
+export { AgentConfigSchema, parseAgentConfig } from './config.js'

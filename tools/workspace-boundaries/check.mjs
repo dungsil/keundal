@@ -16,6 +16,14 @@ const implementationIndependent = new Set([
   '@keundal/chat-app',
   '@keundal/chat',
   '@keundal/core',
+  '@keundal/llm',
+  '@keundal/session',
+  '@keundal/generation',
+  '@keundal/skill',
+  '@keundal/compaction',
+  '@keundal/trace',
+  '@keundal/prompt',
+  '@keundal/subagent',
   '@keundal/agent',
   '@keundal/agent-loop',
   '@keundal/tools',
@@ -104,6 +112,17 @@ export async function checkWorkspaceBoundaries(root) {
       const source = await readFile(file, 'utf8')
       for (const value of strings(source, file)) {
         const local = relative(workspace.directory, file)
+        if (workspace.manifest.name === '@keundal/core' && /^src[/\\]/.test(local)) {
+          const target = value.startsWith('.') ? resolve(dirname(file), value) : null
+          const feature = workspaces.find(
+            (candidate) =>
+              candidate.directory !== workspace.directory &&
+              (value === candidate.manifest.name ||
+                value.startsWith(`${candidate.manifest.name}/`) ||
+                (target && isWithin(target, candidate.directory)))
+          )
+          if (feature) errors.push(`${relative(root, file)}: ${value} couples core to a feature package`)
+        }
         if (isImplementationIndependent(workspace.manifest.name) && /^(src|app|shared)[/\\]/.test(local)) {
           const target = value.startsWith('.') ? resolve(dirname(file), value) : null
           const implementation = workspaces.find(
@@ -145,6 +164,13 @@ export async function checkWorkspaceBoundaries(root) {
       if (file === resolve(workspace.directory, 'package.json')) {
         for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
           for (const name of Object.keys(workspace.manifest[field] ?? {})) {
+            if (
+              field !== 'devDependencies' &&
+              workspace.manifest.name === '@keundal/core' &&
+              workspaces.some((candidate) => candidate.manifest.name === name)
+            ) {
+              errors.push(`${relative(root, file)}: ${field}.${name} couples core to a feature package`)
+            }
             if (
               field !== 'devDependencies' &&
               isImplementationIndependent(workspace.manifest.name) &&

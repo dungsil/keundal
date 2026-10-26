@@ -1,4 +1,4 @@
-import type { SkillDefinition } from '@keundal/core'
+import type { SkillDefinition } from '@keundal/skill'
 import { parse } from 'yaml'
 
 export function parseSkillMarkdown(text: string): SkillDefinition {

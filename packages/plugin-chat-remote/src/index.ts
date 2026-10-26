@@ -6,19 +6,12 @@ import type { ChatStoreLike, ChatSummary, LocalChat } from '@keundal/chat/chat-s
 import { toMessages } from '@keundal/chat/messages'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
 import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
-import {
-  type Reasoning,
-  EventType,
-  parseAGUIEvent,
-  parsePromptPreset,
-  STREAM_LIMITS,
-  type AGUIEvent,
-  type GenerationSnapshot,
-  type SessionSnapshot,
-  type ExecutionOptions,
-  type SubagentRole,
-  type PromptPreset
-} from '@keundal/core'
+import { EventType, parseAGUIEvent, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
+import { type GenerationSnapshot } from '@keundal/generation'
+import { type Reasoning, STREAM_LIMITS } from '@keundal/llm'
+import { parsePromptPreset, type PromptPreset } from '@keundal/prompt'
+import { type SessionSnapshot } from '@keundal/session'
+import { type SubagentRole } from '@keundal/subagent'
 
 import { boundRemoteResponse, RemoteResponseLimitError, RemoteStreamBudget } from './response-budget'
 
@@ -110,8 +103,8 @@ export class RemoteChatStore implements ChatStoreLike {
   }
 
   async catalog(options: import('@keundal/core').ExecutionOptions = {}): Promise<{
-    skills: readonly import('@keundal/core').SkillSummary[]
-    tools: readonly import('@keundal/core').SkillSummary[]
+    skills: readonly import('@keundal/skill').SkillSummary[]
+    tools: readonly import('@keundal/skill').SkillSummary[]
   }> {
     return (await this.call('/catalog', { signal: options.signal })).json()
   }

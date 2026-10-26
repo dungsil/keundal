@@ -4,34 +4,44 @@ Keundal("큰달"으로 읽음)은 개인용 오픈소스 에이전트 도구입�
 
 ## 패키지 구성
 
-| 패키지                                 | 역할                                                                   |
-| -------------------------------------- | ---------------------------------------------------------------------- |
-| `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다. |
-| `@keundal/agent-host`                  | Node.js에서 에이전트 서비스와 플러그인을 조립합니다.                   |
-| `@keundal/agent`                       | 교체 가능한 에이전트 서비스 계약을 제공합니다.                         |
-| `@keundal/agent-loop`                  | 에이전트가 공유하는 실행 루프와 설정을 제공합니다.                     |
-| `@keundal/plugin-agent-chat`           | 공통 루프로 대화 에이전트를 등록합니다.                                |
-| `@keundal/plugin-agent-coding`         | 공통 루프에 코딩 지침을 적용한 에이전트를 등록합니다.                  |
-| `@keundal/tools`                       | 에이전트와 공급자가 공유하는 도구 실행 계약을 제공합니다.              |
-| `@keundal/context`                     | 요청 컨텍스트와 파일·세션 참조의 계약을 제공합니다.                    |
-| `@keundal/plugin-context`              | 공급자를 조합하여 요청 컨텍스트를 준비합니다.                          |
-| `@keundal/plugin-context-node`         | 로컬 파일·작업 지침·tmux 컨텍스트를 제공합니다.                        |
-| `@keundal/plugin-skill`                | 스킬 공급자를 조합하고 목록 조회와 본문 로딩을 제공합니다.             |
-| `@keundal/plugin-skill-filesystem`     | 지정한 디렉터리의 `SKILL.md`를 스킬 공급자로 등록합니다.               |
-| `@keundal/mcp`                         | SDK와 무관한 MCP 설정 계약과 검증을 제공합니다.                        |
-| `@keundal/plugin-mcp-client`           | 외부 MCP 서버의 도구와 리소스를 에이전트 도구에 연결합니다.            |
-| `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                             |
-| `@keundal/plugin-llm-openai-chat`      | OpenAI Chat Completions API로 `llm`을 구현합니다.                      |
-| `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                       |
-| `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                           |
-| `@keundal/plugin-transcription-openai` | OpenAI 실시간 받아쓰기 자격 증명과 브라우저 전송을 제공합니다.         |
-| `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                 |
-| `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.          |
-| `@keundal/plugin-store-sqlite`         | SQLite 파일로 `session`과 `generation`을 구현합니다.                   |
-| `@keundal/compaction`                  | 이전 대화를 요약하고 최근 대화를 보존하는 축약 함수를 제공합니다.      |
-| `@keundal/fs`                          | 파일 공급자와 정책이 공유하는 `ctx.fs` 계약을 제공합니다.              |
+| 패키지                                    | 역할                                                           |
+| ----------------------------------------- | -------------------------------------------------------------- |
+| `@keundal/core`                           | AG-UI 프로토콜, 메시지 조립과 공통 실행 옵션을 제공합니다.     |
+| `@keundal/llm`                            | LLM 서비스 계약, 모델 목록과 스트림 한도를 제공합니다.         |
+| `@keundal/session`, `@keundal/generation` | 세션 커밋과 생성 journal의 서비스 계약을 제공합니다.           |
+| `@keundal/skill`                          | 스킬 서비스 계약과 모델에 제공할 스킬 도구를 제공합니다.       |
+| `@keundal/prompt`, `@keundal/subagent`    | 프롬프트 프리셋과 서브에이전트 역할·위임 도구를 제공합니다.    |
+| `@keundal/trace`                          | 실행 추적의 기록·집계와 모델 가격 계산을 제공합니다.           |
+| `@keundal/agent-host`                     | Node.js에서 에이전트 서비스와 플러그인을 조립합니다.           |
+| `@keundal/agent`                          | 교체 가능한 에이전트 서비스 계약을 제공합니다.                 |
+| `@keundal/agent-loop`                     | 에이전트가 공유하는 실행 루프와 설정을 제공합니다.             |
+| `@keundal/plugin-agent-chat`              | 공통 루프로 대화 에이전트를 등록합니다.                        |
+| `@keundal/plugin-agent-coding`            | 공통 루프에 코딩 지침을 적용한 에이전트를 등록합니다.          |
+| `@keundal/tools`                          | 에이전트와 공급자가 공유하는 도구 실행 계약을 제공합니다.      |
+| `@keundal/tool-execution`                 | 도구 호출을 실행하고 결과로 후속 모델 요청을 구성합니다.       |
+| `@keundal/deferred-tools`                 | 지연 도구의 검색·활성화와 실행 권한 재검사를 담당합니다.       |
+| `@keundal/context`                        | 요청 컨텍스트와 파일·세션 참조의 계약을 제공합니다.            |
+| `@keundal/plugin-context`                 | 공급자를 조합하여 요청 컨텍스트를 준비합니다.                  |
+| `@keundal/plugin-context-node`            | 로컬 파일·작업 지침·tmux 컨텍스트를 제공합니다.                |
+| `@keundal/plugin-skill`                   | 스킬 공급자를 조합하고 목록 조회와 본문 로딩을 제공합니다.     |
+| `@keundal/plugin-skill-filesystem`        | 지정한 디렉터리의 `SKILL.md`를 스킬 공급자로 등록합니다.       |
+| `@keundal/mcp`                            | SDK와 무관한 MCP 설정 계약과 검증을 제공합니다.                |
+| `@keundal/plugin-mcp-client`              | 외부 MCP 서버의 도구와 리소스를 에이전트 도구에 연결합니다.    |
+| `@keundal/plugin-llm-openai`              | OpenAI Responses API로 `llm`을 구현합니다.                     |
+| `@keundal/plugin-llm-openai-chat`         | OpenAI Chat Completions API로 `llm`을 구현합니다.              |
+| `@keundal/plugin-llm-gemini`              | Gemini API로 `llm`을 구현합니다.                               |
+| `@keundal/plugin-llm-anthropic`           | Anthropic Messages API로 `llm`을 구현합니다.                   |
+| `@keundal/plugin-transcription-openai`    | OpenAI 실시간 받아쓰기 자격 증명과 브라우저 전송을 제공합니다. |
+| `@keundal/plugin-store-memory`            | `session`과 `generation`을 메모리 저장소로 구현합니다.         |
+| `@keundal/plugin-store-indexeddb`         | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.  |
+| `@keundal/plugin-store-sqlite`            | SQLite 파일로 `session`과 `generation`을 구현합니다.           |
+| `@keundal/compaction`                     | 축약 요청·결과와 모델별 정책의 계약을 제공합니다.              |
+| `@keundal/compaction-summary`             | 요약 축약과 백그라운드 준비·입력 예산 검사를 구현합니다.       |
+| `@keundal/fs`                             | 파일 공급자와 정책이 공유하는 `ctx.fs` 계약을 제공합니다.      |
 
 각 패키지의 설정과 사용법은 패키지 안의 README.md를 참고하고, 저장소 규칙은 [AGENTS.md](./AGENTS.md)에 정리되어 있습니다.
+
+계약과 구현의 의존 방향, 이전 가져오기 경로의 변경은 [패키지 경계 결정](docs/adr/0005-service-package-boundaries.md)에 정리되어 있습니다.
 
 ## 파일과 Shell 도구
 

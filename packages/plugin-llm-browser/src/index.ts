@@ -1,5 +1,6 @@
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
-import { LLMService, type LLMRequest, type ExecutionOptions, type LLMEvent } from '@keundal/core'
+import { type ExecutionOptions } from '@keundal/core'
+import { LLMService, type LLMRequest, type LLMEvent } from '@keundal/llm'
 import { providerCredentials, providerError, type LLMSettings } from '@keundal/llm-settings'
 import { Context, type Fiber } from 'cordis'
 

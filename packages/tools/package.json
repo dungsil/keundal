@@ -16,7 +16,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@keundal/core": "workspace:*"
+    "@keundal/core": "workspace:*",
+    "@keundal/trace": "workspace:*"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",

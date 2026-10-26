@@ -1,14 +1,6 @@
 import { AgentConfigSchema, type AgentConfig } from '@keundal/agent-loop'
-import {
-  EventType,
-  LLMService,
-  parseAGUIEvent,
-  type AGUIEvent,
-  type ExecutionOptions,
-  type LLMEvent,
-  type LLMRequest,
-  type RunAgentInput
-} from '@keundal/core'
+import { EventType, parseAGUIEvent, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
+import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import type { ExecutableTool } from '@keundal/tools'

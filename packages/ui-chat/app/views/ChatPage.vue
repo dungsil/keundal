@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import type { LocalChat } from '@keundal/chat/chat-store'
-import type { AGUIEvent, ReasoningLevel, SubagentRole, PromptPreset } from '@keundal/core'
+import type { AGUIEvent } from '@keundal/core'
+import type { ReasoningLevel } from '@keundal/llm'
+import type { SubagentRole } from '@keundal/subagent'
+import type { PromptPreset } from '@keundal/prompt'
 import type { ComposerOwner, DeliveryMode } from '@keundal/ui-composer/slots'
 import type { ChatSummary } from '@keundal/ui-runtime'
 import { SlotFactory, SlotOutlet } from '@keundal/ui-slots'

@@ -1,16 +1,11 @@
+import { mergeMessages, type AGUIEvent, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import {
-  assertGenerationMessageIds,
-  mergeMessages,
-  type AGUIEvent,
-  type AgentMessage,
   type GenerationJournalEntry,
   type GenerationRequest,
   type GenerationSnapshot,
-  type GenerationStatus,
-  type RunAgentInput,
-  type SessionCommit,
-  type SessionSnapshot
-} from '@keundal/core'
+  type GenerationStatus
+} from '@keundal/generation'
+import { assertGenerationMessageIds, type SessionCommit, type SessionSnapshot } from '@keundal/session'
 
 import { recordJournal } from './messages.js'
 

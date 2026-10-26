@@ -1,4 +1,5 @@
-import { parseReasoning, parseRunAgentInput, type AgentMessage, type LLMRequest } from '@keundal/core'
+import { parseRunAgentInput, type AgentMessage } from '@keundal/core'
+import { parseReasoning, type LLMRequest } from '@keundal/llm'
 import type {
   ResponseInput,
   ResponseInputContent,

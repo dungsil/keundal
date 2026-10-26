@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto'
 import { createServer } from 'node:http'
 import { Server, WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/server'
 import { expect, test } from 'vitest'
-import { readTraceSpans, summarizeTrace } from '@keundal/core'
+import { readTraceSpans, summarizeTrace } from '@keundal/trace'
 import { createWebPlatform } from '../app/platform'
 import { defaultLLMSettings } from '@keundal/llm-settings'
 
