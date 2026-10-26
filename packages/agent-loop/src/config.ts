@@ -1,4 +1,4 @@
-import type { Reasoning } from '@keundal/core'
+import type { Reasoning, SubagentRole } from '@keundal/core'
 import type { DeferredToolsConfig, ExecutableTool, ToolProvider } from '@keundal/tools'
 
 export interface CompactionPolicy {
@@ -40,6 +40,7 @@ export interface AgentConfig {
   readonly deferredToolProvider?: ToolProvider
   readonly subagents?: boolean
   readonly maxActiveSubagents?: number
+  readonly subagentRoles?: readonly SubagentRole[]
   readonly skills?: boolean
   readonly context?: boolean
   /** 모든 실행에 앞서 모델에 전달할 시스템 지침입니다. */

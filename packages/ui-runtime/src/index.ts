@@ -9,7 +9,14 @@ import {
 } from '@keundal/chat/model-preferences'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
 import type { ChatConnection, ChatPlatform, RuntimePluginManager } from '@keundal/chat/platform'
-import type { ExecutionOptions, Reasoning, ReasoningLevel, SkillSummary } from '@keundal/core'
+import {
+  parseSubagentRoles,
+  type ExecutionOptions,
+  type Reasoning,
+  type ReasoningLevel,
+  type SkillSummary,
+  type SubagentRole
+} from '@keundal/core'
 import {
   FALLBACK_MODEL,
   configuredProviders,
@@ -87,6 +94,7 @@ export class ChatRuntime extends Service {
   readonly titleModel = ref('')
   readonly defaultModel = ref('')
   readonly systemPrompt = ref('')
+  readonly subagentRoles = ref<SubagentRole[]>([])
   readonly switching = ref(false)
   readonly webSearch = computed<boolean>({
     get: () => this.options.preferences.webSearch.value ?? true,
@@ -189,6 +197,7 @@ export class ChatRuntime extends Service {
     const initialModel = preferences.model
     this.model.value = initialModel || FALLBACK_MODEL
     try {
+      this.subagentRoles.value = parseSubagentRoles(JSON.parse(storage.getItem('keundal:subagent-roles') ?? '[]'))
       this.settings.value = await platform.settings.load()
     } catch (error) {
       throw new SettingsLoadError(error)
@@ -284,6 +293,15 @@ export class ChatRuntime extends Service {
     if (prompt) storage.setItem('keundal:system-prompt', prompt)
     else storage.removeItem('keundal:system-prompt')
     this.systemPrompt.value = prompt
+  }
+
+  saveSubagentRoles(value: readonly SubagentRole[]): void {
+    const storage = this.options.storage
+    if (!storage) throw unavailable('Browser storage')
+    const roles = parseSubagentRoles(value)
+    if (roles.length) storage.setItem('keundal:subagent-roles', JSON.stringify(roles))
+    else storage.removeItem('keundal:subagent-roles')
+    this.subagentRoles.value = roles
   }
 
   /** Switch to the saved default model when the connection can serve it. */

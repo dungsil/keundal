@@ -54,8 +54,14 @@ export interface AgentPluginManager {
   configure(name: string, settings: AgentPluginSettings, restart: () => Promise<void>): Promise<void>
   remove(name: string, restart: () => Promise<void>): Promise<void>
 }
+export interface RuntimePluginSource {
+  type: 'npm' | 'jsr' | 'zip' | 'path'
+  value: string
+}
 export interface RuntimePluginInfo {
   module: string
+  source?: RuntimePluginSource
+  version?: string
   /** Plugin-owned display copy; module remains the stable selection identifier. */
   metadata?: {
     name: { en: string; ko: string }
@@ -70,6 +76,9 @@ export interface RuntimePluginInfo {
 export interface RuntimePluginManager {
   list(): Promise<RuntimePluginInfo[]>
   setEnabled(module: string, enabled: boolean): Promise<void>
+  /** Only local desktop hosts expose external code installation. Installs start disabled. */
+  install?(source: RuntimePluginSource): Promise<void>
+  remove?(module: string): Promise<void>
 }
 export type TranscriptEvent =
   | { type: 'transcript-delta'; delta: string }

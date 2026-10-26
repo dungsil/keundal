@@ -124,6 +124,10 @@
     "scenario": "@a11y:skills",
     "test": "apps/web/tests/browser/accessibility.spec.ts"
   },
+  "packages/ui-subagents/app/views/SubagentSettings.vue": {
+    "scenario": "@a11y:subagents",
+    "test": "apps/web/tests/browser/subagents.spec.ts"
+  },
   "packages/ui-chart/app/views/Chart.vue": {
     "exemption": "Requires generated tool output or source citations; browser generation fixtures are not implemented yet."
   },

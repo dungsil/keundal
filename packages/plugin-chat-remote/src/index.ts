@@ -14,7 +14,8 @@ import {
   type AGUIEvent,
   type GenerationSnapshot,
   type SessionSnapshot,
-  type ExecutionOptions
+  type ExecutionOptions,
+  type SubagentRole
 } from '@keundal/core'
 
 import { boundRemoteResponse, RemoteResponseLimitError, RemoteStreamBudget } from './response-budget'
@@ -353,6 +354,7 @@ export class RemoteChatStore implements ChatStoreLike {
       model: string
       titleModel?: string
       systemPrompt?: string
+      subagentRoles?: readonly SubagentRole[]
       reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void
@@ -435,7 +437,10 @@ export class RemoteChatStore implements ChatStoreLike {
           body: JSON.stringify({
             threadId: id,
             runId,
-            state: { web: chat },
+            state: {
+              web: chat,
+              ...(request.subagentRoles === undefined ? {} : { subagentRoles: request.subagentRoles })
+            },
             context: [],
             tools: [],
             messages: [

@@ -1,4 +1,4 @@
-import type { ExecutionOptions, GenerationSnapshot, Reasoning, AGUIEvent } from '@keundal/core'
+import type { ExecutionOptions, GenerationSnapshot, Reasoning, AGUIEvent, SubagentRole } from '@keundal/core'
 
 import type { ChatMessage } from './chat-message'
 export interface ChatStoreLike {
@@ -24,6 +24,7 @@ export interface ChatStoreLike {
       titleModel?: string
       /** Optional user-provided instructions for model responses; excluded from title generation. */
       systemPrompt?: string
+      subagentRoles?: readonly SubagentRole[]
       reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void

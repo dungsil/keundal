@@ -11,6 +11,7 @@ import * as modelSelection from '@keundal/ui-model-selection/plugin'
 import * as settings from '@keundal/ui-settings/plugin'
 import * as settingsLlm from '@keundal/ui-settings-llm/plugin'
 import * as skill from '@keundal/ui-skill/plugin'
+import * as subagents from '@keundal/ui-subagents/plugin'
 import * as tool from '@keundal/ui-tool/plugin'
 import * as trace from '@keundal/ui-trace/plugin'
 import * as weather from '@keundal/ui-weather/plugin'
@@ -40,6 +41,7 @@ export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-weather', plugin: weather },
   { module: '@keundal/ui-settings', plugin: settings },
   { module: '@keundal/ui-settings-llm', plugin: settingsLlm },
+  { module: '@keundal/ui-subagents', plugin: subagents },
   { module: '@keundal/ui-agent-plugins', plugin: agentPlugins },
   { module: '@keundal/ui-skill', plugin: skill, feature: 'skills' },
   { module: '@keundal/ui-mcp', plugin: mcp, feature: 'mcp' }
@@ -55,6 +57,8 @@ export class UIPluginManager implements RuntimePluginManager {
   private pending: Promise<unknown> = Promise.resolve()
   private closing = false
   private disposal?: Promise<void>
+  readonly install?: RuntimePluginManager['install']
+  readonly remove?: RuntimePluginManager['remove']
 
   constructor(
     private readonly ctx: Context,
@@ -63,7 +67,17 @@ export class UIPluginManager implements RuntimePluginManager {
       platform?: RuntimePluginManager
     },
     private readonly catalog: readonly UIPluginEntry[] = uiPluginCatalog
-  ) {}
+  ) {
+    if (options.platform?.install) this.install = source => this.change(async () => {
+      await options.stop()
+      await options.platform!.install!(source)
+    })
+    if (options.platform?.remove) this.remove = module => this.change(async () => {
+      await options.stop()
+      await options.platform!.remove!(module)
+      this.errors.delete(module)
+    })
+  }
 
   private change(action: () => Promise<void>): Promise<void> {
     if (this.closing) return Promise.reject(new Error('UI plugin manager is closed'))

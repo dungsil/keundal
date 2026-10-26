@@ -39,7 +39,11 @@ test('스킬·MCP 선택에 따라 해당 화면을 해제하고 새로고침 �
     const required = page.getByRole('switch', { name: `Enable ${name}`, exact: true })
     await expect(required).toBeDisabled()
     await expect(required).toBeChecked()
+    await expect(required).toHaveAccessibleDescription('Required plugin. Always enabled and cannot be turned off.')
+    await expect(required.locator('[class~="i-lucide:lock-keyhole"]')).toBeVisible()
   }
+  await expect(skills.locator('[class~="i-lucide:lock-keyhole"]')).toHaveCount(0)
+  await expect(skills).toHaveAccessibleDescription('')
   await expect(page.getByText('https://not-requested.invalid/old.mjs', { exact: true })).toHaveCount(0)
   await accessible(page)
   await skills.click()
@@ -104,5 +108,6 @@ test('선택한 언어로 기능 이름과 설명 및 스위치 이름을 표시
   await expect(page.getByRole('switch', { name: '차트 활성화', exact: true })).toBeChecked()
   await expect(page.getByRole('switch', { name: '날씨 활성화', exact: true })).toBeChecked()
   await expect(page.getByRole('switch', { name: '브라우저 저장소 활성화', exact: true })).toBeDisabled()
+  await expect(page.getByRole('switch', { name: '브라우저 저장소 활성화', exact: true })).toHaveAccessibleDescription('필수 플러그인입니다. 항상 켜져 있으며 끌 수 없습니다.')
   await expect(page.getByText('@keundal/plugin-skill', { exact: true })).toHaveCount(0)
 })

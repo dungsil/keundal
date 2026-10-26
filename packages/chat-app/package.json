@@ -31,6 +31,7 @@
     "@keundal/ui-settings-llm": "workspace:*",
     "@keundal/ui-skill": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
+    "@keundal/ui-subagents": "workspace:*",
     "@keundal/ui-tool": "workspace:*",
     "@keundal/ui-trace": "workspace:*",
     "@keundal/ui-weather": "workspace:*",

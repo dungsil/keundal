@@ -32,7 +32,7 @@ async function collect(events: AsyncIterable<AGUIEvent>) {
 
 test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제목·투표·편집·분기·삭제를 수행한다 (desktop=%s)', async (desktop) => {
   const ctx = new Context()
-  const inputs: unknown[] = []
+  const inputs: LLMRequest['input'][] = []
   const titleModels: string[] = []
   const selections: unknown[] = []
   class ScriptedLLM extends LLMService {
@@ -49,7 +49,7 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
   }
   const llm = await ctx.plugin(ScriptedLLM)
   const store = await ctx.plugin(memoryStorePlugin)
-  const agent = await ctx.plugin(agentPlugin, { model: 'test', maxOutputTokens: 100 })
+  const agent = await ctx.plugin(agentPlugin, { model: 'test', maxOutputTokens: 100, subagents: true })
   const services: AgentAppServices = {
     run: (input, options?: ExecutionOptions) => ctx.agent.run(input, options),
     steer: () => 0,
@@ -97,12 +97,15 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
       }, () => [], model)
     : new RemoteChatStore({ endpoint, token })
   await chats.create('chat', user, model)
-  const events = await collect(chats.respond('chat', { model, titleModel: 'anthropic/title', messages: [user], systemPrompt: 'First system prompt.' }))
+  const roles = [{ name: 'reviewer', description: 'Review changes', instructions: 'Check correctness.' }]
+  const events = await collect(chats.respond('chat', { model, titleModel: 'anthropic/title', messages: [user], systemPrompt: 'First system prompt.', subagentRoles: roles }))
   expect(events.some(event => event.type === EventType.RUN_FINISHED)).toBe(true)
+  expect(inputs[0]!.tools.find(tool => tool.name === 'delegate_task')?.parameters).toMatchObject({ properties: { role: { enum: ['reviewer'] } } })
   const firstInput = JSON.stringify(inputs[0])
   expect(firstInput).toContain('First system prompt.')
   expect(firstInput).toContain('You are a knowledgeable and helpful AI assistant.')
-  await collect(chats.respond('chat', { model, messages: [user], systemPrompt: 'Changed system prompt.' }))
+  await collect(chats.respond('chat', { model, messages: [user], systemPrompt: 'Changed system prompt.', subagentRoles: [] }))
+  expect(inputs[1]!.tools.find(tool => tool.name === 'delegate_task')?.parameters.properties).not.toHaveProperty('role')
   const changedInput = JSON.stringify(inputs[1])
   expect(changedInput).toContain('Changed system prompt.')
   expect(changedInput).not.toContain('First system prompt.')
