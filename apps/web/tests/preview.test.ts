@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { createServer } from 'node:net'
+import { Parser } from 'htmlparser2'
 import { expect, onTestFinished, test } from 'vitest'
 
-test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이 렌더링한다', async () => {
+test('프로덕션 서버는 경로와 압축된 CSS를 제공하고 언어와 리다이렉트를 유지한다', async () => {
   const listener = createServer().listen(0, '127.0.0.1')
   await once(listener, 'listening')
   const address = listener.address()
@@ -37,6 +38,7 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
       if (url) resolve(url)
     })
   })
+  const stylesheets = new Set<string>()
   for (const path of ['/', '/chat/preview-smoke-test', '/settings', '/settings/appearance', '/settings/models', '/settings/llm', '/settings/mcp', '/settings/skills']) {
     const response = await fetch(new URL(path, origin))
     const html = await response.text()
@@ -45,6 +47,22 @@ test('프로덕션 서버는 홈과 대화 경로를 모듈 로드 오류 없이
     expect(html).toContain('id="__nuxt"')
     expect(html.match(/<button\b[^>]*aria-label="Skills"/), path).toBeNull()
     expect(html.match(/<a\b[^>]*aria-label="Settings"/), path).not.toBeNull()
+    const linked: string[] = []
+    new Parser({
+      onopentag(name, attributes) {
+        if (name === 'link' && attributes.rel === 'stylesheet' && attributes.href) linked.push(attributes.href)
+      }
+    }).end(html)
+    expect(linked.length, path).toBeGreaterThan(0)
+    for (const href of linked) stylesheets.add(href)
+  }
+  for (const href of stylesheets) {
+    const response = await fetch(new URL(href, origin), { headers: { 'accept-encoding': 'br' } })
+    expect(response.status, href).toBe(200)
+    expect(response.headers.get('content-type')).toContain('text/css')
+    expect(response.headers.get('content-encoding')).toBe('br')
+    expect(response.headers.get('cache-control')).toMatch(/max-age=[1-9]\d*/)
+    expect(await response.text()).not.toBe('')
   }
   const localizedRequests: { headers: Record<string, string>, language: string, label: string }[] = [
     { headers: { 'accept-language': 'ko-KR,ko;q=0.9,en;q=0.8' }, language: 'ko', label: '새 대화' },
