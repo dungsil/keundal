@@ -107,7 +107,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
 
   try {
     scope = ctx.plugin(async (owned: Context) => {
-      new HostHttpService(owned)
+      await owned.plugin(HostHttpService)
       await options.setup(owned)
     })
     await scope

@@ -75,8 +75,11 @@ function quote(value: string): string {
 
 /** ffmpeg 필터 인자에서 경로와 문자열을 안전하게 표기합니다. */
 function filterValue(value: string): string {
-  // Escape the AVOption value, then the surrounding filter graph. Shell quoting is separate.
-  return value.replace(/[\\':]/g, '\\$&').replace(/[\\'[\],;]/g, '\\$&')
+  // Account for AVOption and filter-graph escaping in one pass. Shell quoting is separate.
+  return value.replace(
+    /[\\':[\],;]/g,
+    (character) => '\\'.repeat(character === '\\' || character === "'" ? 3 : character === ':' ? 2 : 1) + character
+  )
 }
 
 function seconds(milliseconds: number): string {

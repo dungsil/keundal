@@ -1,3 +1,5 @@
+import { setImmediate } from 'node:timers/promises'
+
 import { AgentService } from '@keundal/agent'
 import { EventType, type AGUIEvent, type RunAgentInput } from '@keundal/core'
 import { LLMService, type LLMEvent } from '@keundal/llm'
@@ -86,6 +88,30 @@ test('호스트 초기화가 실패하면 이미 등록한 서비스도 해제�
     })
   ).rejects.toThrow('setup failed')
   expect(disposed).toEqual(['llm'])
+})
+
+test('HTTP 확장 플러그인의 비동기 등록을 기다린 뒤 호스트를 반환한다', async () => {
+  const config = composition([])
+  const host = await createAgentHost({
+    ...config,
+    async setup(ctx) {
+      await config.setup(ctx)
+      await ctx.plugin({
+        inject: ['hostHttp'],
+        async apply(owned: Context) {
+          await setImmediate()
+          owned.hostHttp.register(owned, 'ready', { handle: async () => {} })
+        }
+      })
+    }
+  })
+  const url = new URL('http://localhost/ready')
+  try {
+    expect(host.services.http?.resolve(url)).toBeDefined()
+  } finally {
+    await host.dispose()
+  }
+  expect(host.services.http?.resolve(url)).toBeUndefined()
 })
 
 test('필수 서비스가 누락되면 호스트 시작을 거부하고 플러그인을 정리한다', async () => {
