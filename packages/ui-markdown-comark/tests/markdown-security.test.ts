@@ -4,8 +4,8 @@ import { MarkdownDocument } from '@comark/vue'
 import { describe, expect, test } from 'vitest'
 import { createSSRApp, defineComponent, h } from 'vue'
 import { renderToString } from 'vue/server-renderer'
-import { chatMarkdownOptions } from '@keundal/ui/app/utils/markdown.ts'
-import { sourceToInlineMdc } from '../app/lib/source'
+import { chatMarkdownOptions } from '../app/lib/markdown'
+import { sourceToInlineMdc, withSources } from '../app/lib/source'
 
 async function render(markdown: string, streaming = false) {
   const parse = createMarkdownParser(chatMarkdownOptions)
@@ -104,6 +104,20 @@ describe('공통 채팅 Markdown 렌더러의 보안 경계', () => {
     }))
     expect(html).toContain('href="https://example.com/source"')
     expect(html).toContain('example.com')
+  })
+
+  test('텍스트 중간과 끝의 출처를 순서대로 렌더링하고 안전하지 않은 출처는 제외한다', async () => {
+    const value = withSources('가🌙 longer', [
+      { offset: 3, url: 'https://first.example' },
+      { offset: 3, url: 'javascript:alert(1)' },
+      { offset: 3, url: 'https://second.example' },
+      { offset: 10, url: 'https://last.example' }
+    ])
+    for (const streaming of [false, true]) {
+      const html = await render(value, streaming)
+      expect(html).toMatch(/가🌙.*first\.example.*second\.example.* longer.*last\.example/)
+      expect(html).not.toContain('javascript:')
+    }
   })
 })
 

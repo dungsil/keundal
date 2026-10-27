@@ -4,6 +4,7 @@ export default defineNuxtConfig({
   // UI plugins are Nuxt layers so their components compile with this application's modules and styles.
   extends: [
     '@keundal/ui',
+    '@keundal/ui-markdown-comark',
     '@keundal/ui-layout',
     '@keundal/ui-chat-list',
     '@keundal/ui-home',
@@ -22,7 +23,7 @@ export default defineNuxtConfig({
     '@keundal/ui-mcp',
     '@keundal/ui-agent-plugins'
   ],
-  modules: ['@nuxt/ui', '@comark/nuxt'],
+  modules: ['@nuxt/ui'],
   app: { head: { style: [{ innerHTML: 'html.dark { --startup-bg: #09090b; --startup-fg: #fafafa; }' }] } },
   css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],
   ui: { fonts: false },

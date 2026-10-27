@@ -14,8 +14,6 @@
     "typecheck": "tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@comark/nuxt": "^0.8.1",
-    "@comark/vue": "^0.8.1",
     "@keundal/chat": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/ui": "workspace:*",
@@ -24,7 +22,6 @@
     "@keundal/ui-runtime": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
     "@nuxt/ui": "^4.11.3",
-    "@shikijs/langs": "^4.5.0",
     "@vueuse/core": "^14.4.0",
     "cordis": "catalog:",
     "nuxt": "^4.6.2",
