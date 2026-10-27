@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
+import process from 'node:process'
 import { clearInterval, setInterval } from 'node:timers'
 
 import type { ExecutionOptions } from '@keundal/core'
@@ -18,8 +19,10 @@ import {
 import type { ShellService } from '@keundal/shell'
 import type { Context } from 'cordis'
 
-const PROGRESS_PATTERN =
-  /\[download\]\s+(\d+(?:\.\d+)?)%\s+of\s+~?\s*([\d.]+)\s*([KMGT]?i?B)(?:\s+at\s+([\d.]+|Unknown)\s*([KMGT]?i?B)\/s)?(?:\s+ETA\s+([\d:]+))?/
+const PROGRESS_PREFIX = /^\[download\][ \t]{1,8}(\d{1,3}(?:\.\d{1,3})?)%[ \t]{1,8}of[ \t]{1,8}/
+const SIZE_PATTERN = /^([\d.]{1,16})([KMGT]?i?B)$/
+const SPEED_PATTERN = /^([\d.]{1,16}|Unknown)[ \t]{0,8}([KMGT]?i?B)\/s$/
+const ETA_PATTERN = /^([\d:]{1,12})$/
 
 const UNITS: Readonly<Record<string, number>> = {
   B: 1,
@@ -105,26 +108,36 @@ export function parseProgressLine(
   MediaDownloadProgress,
   'percent' | 'downloadedBytes' | 'totalBytes' | 'speedBytesPerSecond' | 'etaSeconds'
 > | null {
-  const matched = PROGRESS_PATTERN.exec(line)
-  if (!matched) return null
-  const percent = Number.parseFloat(matched[1]!)
-  const totalBytes = bytes(matched[2]!, matched[3]!)
-  const speed = matched[4] === undefined || matched[4] === 'Unknown' ? null : Number.parseFloat(matched[4])
-  const speedUnit = matched[5]
+  // 정규식 하나로 줄 전체를 해석하지 않습니다. 줄 길이에 따라 느려지지 않도록 순서대로 나눕니다.
+  const head = PROGRESS_PREFIX.exec(line)
+  if (!head) return null
+  const percent = Number.parseFloat(head[1]!)
+  const [sizePart, ...speedParts] = line.slice(head[0].length).split(' at ')
+  const size = SIZE_PATTERN.exec((sizePart ?? '').replace(/^[ \t]*~/, '').trim())
+  if (!size) return null
+  const totalBytes = bytes(size[1]!, size[2]!)
+  const [speedText, etaText] = speedParts.join(' at ').split(' ETA ')
+  const speed = speedText === undefined ? null : SPEED_PATTERN.exec(speedText.trim())
+  const speedValue = speed?.[1] === undefined || speed[1] === 'Unknown' ? null : Number.parseFloat(speed[1])
+  const speedUnit = speed?.[2]
+  const eta = etaText === undefined ? null : ETA_PATTERN.exec(etaText.trim())
   return {
     percent: Number.isFinite(percent) ? percent : null,
     downloadedBytes: totalBytes === null || !Number.isFinite(percent) ? null : Math.round((totalBytes * percent) / 100),
     totalBytes,
     speedBytesPerSecond:
-      speed === null || speedUnit === undefined || !Number.isFinite(speed)
+      speedValue === null || !Number.isFinite(speedValue) || speedUnit === undefined
         ? null
-        : Math.round(speed * (UNITS[speedUnit] ?? 1)),
-    etaSeconds: etaSeconds(matched[6])
+        : Math.round(speedValue * (UNITS[speedUnit] ?? 1)),
+    etaSeconds: eta === null ? null : etaSeconds(eta[1])
   }
 }
 
 function quote(value: string): string {
-  return `"${value.replace(/"/g, '\\"')}"`
+  if (process.platform !== 'win32') return `'${value.replace(/'/g, `'\\''`)}'`
+  // cmd.exe는 역슬래시를 이스케이프로 쓰지 않으므로, 인용 전에 역슬래시를 두 배로 늘립니다.
+  const escaped = value.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')
+  return `"${escaped}"`
 }
 
 export class LocalMediaDownloadService extends MediaDownloadService {

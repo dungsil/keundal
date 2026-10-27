@@ -88,6 +88,17 @@
     "scenario": "@a11y:mcp",
     "test": "apps/web/tests/browser/accessibility.spec.ts"
   },
+  "packages/ui-media/app/views/LibraryLink.vue": {
+    "exemption": "미디어를 제공하는 호스트에서만 사이드바에 나타나므로 브라우저 시나리오에서 그릴 수 없습니다."
+  },
+  "packages/ui-media/app/views/LibraryPage.vue": {
+    "scenario": "@a11y:media-library",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
+  "packages/ui-media/app/views/MediaSettings.vue": {
+    "scenario": "@a11y:media-settings",
+    "test": "apps/web/tests/browser/accessibility.spec.ts"
+  },
   "packages/ui-model-selection/app/views/ModelSelect.vue": {
     "scenario": "@a11y:home",
     "test": "apps/web/tests/browser/accessibility.spec.ts"

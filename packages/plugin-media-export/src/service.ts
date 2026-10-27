@@ -62,12 +62,15 @@ function findTrack(tracks: readonly SubtitleTrack[], trackId: string | undefined
 }
 
 function quote(value: string): string {
-  return process.platform === 'win32' ? `"${value.replace(/"/g, '\\"')}"` : `'${value.replace(/'/g, `'\\''`)}'`
+  if (process.platform !== 'win32') return `'${value.replace(/'/g, `'\\''`)}'`
+  // cmd.exe는 역슬래시를 이스케이프로 쓰지 않으므로, 인용 전에 역슬래시를 두 배로 늘립니다.
+  const escaped = value.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')
+  return `"${escaped}"`
 }
 
 /** ffmpeg 필터 인자에서 경로와 문자열을 안전하게 표기합니다. */
 function filterValue(value: string): string {
-  return value.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'")
+  return value.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'")
 }
 
 function escapeFilterText(value: string): string {

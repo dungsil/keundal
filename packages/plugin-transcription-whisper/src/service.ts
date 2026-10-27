@@ -45,8 +45,10 @@ function requireText(value: unknown, name: string): string {
 }
 
 function quote(value: string): string {
-  if (process.platform === 'win32') return `"${value.replace(/"/g, '\\"')}"`
-  return `'${value.replace(/'/g, `'\\''`)}'`
+  if (process.platform !== 'win32') return `'${value.replace(/'/g, `'\\''`)}'`
+  // cmd.exe는 역슬래시를 이스케이프로 쓰지 않으므로, 인용 전에 역슬래시를 두 배로 늘립니다.
+  const escaped = value.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')
+  return `"${escaped}"`
 }
 
 function summarize(stderr: string, tool: string): string {

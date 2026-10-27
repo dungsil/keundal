@@ -15,6 +15,8 @@ test('스킬·MCP 선택에 따라 해당 화면을 해제하고 새로고침 �
     globalThis.document.cookie = `keundal-ui-plugins=${encodeURIComponent(JSON.stringify(legacySelections))}; path=/`
   })
   await ready(page, '/settings/runtime-plugins')
+  // 모든 설정 구역이 등록될 때까지 기다려야 뒤의 키보드 동작이 포커스를 잃지 않습니다.
+  await expect(page.getByRole('link', { name: 'Media', exact: true })).toBeVisible()
   const skills = page.getByRole('switch', { name: 'Enable Skills', exact: true })
   const mcp = page.getByRole('switch', { name: 'Enable MCP connections', exact: true })
   const chart = page.getByRole('switch', { name: 'Enable Charts', exact: true })
@@ -62,13 +64,14 @@ test('스킬·MCP 선택에 따라 해당 화면을 해제하고 새로고침 �
   await expect(skills).not.toBeChecked()
   await expect(skillsLink).toHaveCount(0)
   await page.reload()
+  // 다시 불러온 뒤에도 모든 설정 구역이 등록되어야 포커스가 유지됩니다.
+  await expect(page.getByRole('link', { name: 'Media', exact: true })).toBeVisible()
   await expect(skills).not.toBeChecked()
   await expect(skillsLink).toHaveCount(0)
   await expect(mcp).toBeChecked()
   await expect(mcpLink).toBeVisible()
   await expect(skills).toBeEnabled()
-  await skills.focus()
-  await page.keyboard.press('Space')
+  await skills.press('Space')
   await expect(skills).toBeChecked()
   await expect(skillsLink).toBeVisible()
 

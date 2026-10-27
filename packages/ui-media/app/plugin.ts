@@ -46,6 +46,7 @@ const LibraryPage = lazyView(() => import('./views/LibraryPage.vue'), [
 ])
 const LibraryLink = lazyView(() => import('./views/LibraryLink.vue'), ['available'])
 
+
 /** 미디어 기능이 조립된 호스트에서만 설정 구역과 자료库 화면을 추가합니다. */
 export function apply(ctx: Context) {
   const runtime = ctx.chatRuntime

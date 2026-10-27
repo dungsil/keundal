@@ -6,11 +6,17 @@ export const SSE_HEADERS = {
   connection: 'keep-alive'
 } as const
 
-/** 오류 값을 HTTP 응답에 넣을 수 있는 짧은 문자열로 바꿉니다. */
+/**
+ * 오류 값을 로그나 HTTP 응답에 넣을 수 있는 짧은 문자열로 바꿉니다.
+ * 파일 경로 같은 호스트 정보는 지우고 줄바꿈을 펌침으로 눌러 둡니다.
+ */
 export function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-  if (typeof error === 'string') return error
-  return 'unknown error'
+  const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : 'unknown error'
+  return raw
+    .replace(/[A-Za-z]:[\\/][^\s"']*/g, '<path>')
+    .replace(/(^|[\s"'(])\/[^\s"')]{2,}/g, '$1<path>')
+    .replace(/[\r\n\t]+/g, ' ')
+    .slice(0, 300)
 }
 
 export const sendJson = (response: ServerResponse, status: number, body: unknown): void => {

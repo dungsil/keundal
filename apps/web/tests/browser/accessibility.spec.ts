@@ -36,6 +36,16 @@ test('스킬 설정 화면에 접근성 위반이 없다 @a11y:skills', async ({
   await accessible(page)
 })
 
+test('미디어 설정 화면에 접근성 위반이 없다 @a11y:media-settings', async ({ page }) => {
+  await ready(page, '/settings/media')
+  await accessible(page)
+})
+
+test('자료库 화면에 접근성 위반이 없다 @a11y:media-library', async ({ page }) => {
+  await ready(page, '/library')
+  await accessible(page)
+})
+
 for (const [locale, label] of [['en', 'Agent plugins'], ['ko', '에이전트 플러그인']] as const) {
   test.describe(`${locale} 언어`, () => {
     test('에이전트 플러그인 메뉴와 화면 제목이 일치하고 접근성 위반이 없다 @a11y:plugins', async ({ page, context, baseURL }) => {
@@ -130,8 +140,9 @@ test.describe('모바일 설정 탐색', () => {
     await page.getByLabel('Content', { exact: true }).fill('Unsaved mobile draft')
     const picker = page.getByRole('button', { name: 'Settings: Prompt presets', exact: true })
     await picker.tap()
-    await expect(page.getByRole('menuitem')).toHaveCount(9)
+    await expect(page.getByRole('menuitem')).toHaveCount(10)
     await expect(page.getByRole('menuitem', { name: 'Subagents', exact: true })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Media', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Keundal plugins', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Agent plugins', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Prompt presets', exact: true })).toHaveAttribute('aria-current', 'page')
