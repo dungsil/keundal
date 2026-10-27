@@ -3,17 +3,11 @@ import { getEventListeners } from 'node:events'
 import { createServer, type ServerResponse } from 'node:http'
 import { setImmediate } from 'node:timers/promises'
 
-import {
-  EventType,
-  LLM_USAGE_EVENT,
-  MessageAssembly,
-  parseAGUIEvent,
-  type AgentMessage,
-  type LLMEvent,
-  type LLMRequest
-} from '@keundal/core'
+import { EventType, MessageAssembly, parseAGUIEvent, type AgentMessage } from '@keundal/core'
+import { type LLMEvent, type LLMRequest } from '@keundal/llm'
 import geminiLLMPlugin, { GeminiLLMConfigSchema } from '@keundal/plugin-llm-gemini'
 import indexedDBStorePlugin, { type IndexedDBStoreConfig } from '@keundal/plugin-store-indexeddb'
+import { LLM_USAGE_EVENT } from '@keundal/trace'
 import { Context } from 'cordis'
 import { IDBFactory } from 'fake-indexeddb'
 import { expect, test, type TestContext } from 'vitest'

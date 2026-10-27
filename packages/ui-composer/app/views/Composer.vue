@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SkillSummary } from '@keundal/core'
+import type { SkillSummary } from '@keundal/skill'
 import type { ChatStatus } from '@keundal/chat/chat-message'
 import type { FileWithStatus } from '@keundal/chat/file'
 import { SlotOutlet } from '@keundal/ui-slots'

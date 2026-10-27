@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { EventType, type LLMEvent } from '@keundal/core'
+import { EventType } from '@keundal/core'
+import { type LLMEvent } from '@keundal/llm'
 import { expect, onTestFinished, test, vi } from 'vitest'
 
 import { createNodeAgentHost, createNodeComposition, createAgentRuntime } from '../src/index.js'

@@ -1,6 +1,7 @@
 import { FinishReason } from '@google/genai'
 import type { Candidate, GenerateContentResponse, Part } from '@google/genai'
-import { EventType, type LLMEvent } from '@keundal/core'
+import { EventType } from '@keundal/core'
+import { type LLMEvent } from '@keundal/llm'
 
 type ItemKind = 'text' | 'thought'
 

@@ -1,5 +1,5 @@
-import type { SkillDefinition, SkillProvider } from '@keundal/core'
 import skillPlugin from '@keundal/plugin-skill'
+import type { SkillDefinition, SkillProvider } from '@keundal/skill'
 import { Context } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
 

@@ -1,14 +1,14 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai'
+import { type ExecutionOptions } from '@keundal/core'
 import {
   fetchWithStreamLimit,
   StreamBudget,
   LLMService,
-  llmUsageEvent,
-  type ExecutionOptions,
   type LLMEvent,
   type LLMModel,
   type LLMRequest
-} from '@keundal/core'
+} from '@keundal/llm'
+import { llmUsageEvent } from '@keundal/trace'
 import type { Context } from 'cordis'
 
 import { GeminiLLMConfigSchema, parseConfig, type GeminiLLMConfig } from './config.js'

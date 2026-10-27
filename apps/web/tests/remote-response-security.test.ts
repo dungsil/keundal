@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import { RemoteChatStore } from '@keundal/plugin-chat-remote'
-import { EventType, STREAM_LIMITS, type AGUIEvent } from '@keundal/core'
+import { EventType, type AGUIEvent } from '@keundal/core'
+import { STREAM_LIMITS } from '@keundal/llm'
 import type { LocalChat } from '@keundal/chat/chat-store'
 
 const encoder = new TextEncoder()

@@ -17,7 +17,9 @@ web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도�
 | Node.js 환경 설정과 기본 플러그인 구성      | `@keundal/agent-runtime-node`           |
 | 런타임 플러그인 설정과 Cordis 모듈 로딩     | `@keundal/plugin-runtime`               |
 
-`@keundal/agent`, `@keundal/tools`, `@keundal/context`, `@keundal/mcp`는 구현을 가져오지 않는 계약입니다. `@keundal/shell`, `@keundal/transcription`, `@keundal/fs`도 서비스 계약만 제공합니다. 기본 실행 루프와 축약·도구 정책은 `@keundal/agent-loop`가 소유합니다. 독립적인 에이전트는 `AgentService`를 구현하고, 기본 루프를 재사용할 때는 `agent-loop`의 `Agent`를 상속합니다.
+`@keundal/llm`, `@keundal/session`, `@keundal/generation`, `@keundal/skill`은 각 서비스 계약과 Cordis Context 확장을 소유합니다. `@keundal/agent`, `@keundal/tools`, `@keundal/context`, `@keundal/mcp`, `@keundal/shell`, `@keundal/transcription`, `@keundal/fs`도 구현 플러그인에 의존하지 않습니다. `@keundal/core`는 AG-UI 프로토콜과 공통 실행·메시지만 제공하며 기능별 계약을 다시 내보내지 않습니다.
+
+기본 실행 루프는 `@keundal/agent-loop`가 소유하고, 요약 축약은 `@keundal/compaction-summary`, 도구 반복은 `@keundal/tool-execution`, 지연 도구는 `@keundal/deferred-tools`, 실행 추적은 `@keundal/trace`를 조합합니다. 독립적인 에이전트는 `AgentService`를 구현하고, 기본 루프를 재사용할 때는 `agent-loop`의 `Agent`를 상속합니다. 계약과 구현의 전체 경계와 가져오기 경로 변경은 [ADR-0005](adr/0005-service-package-boundaries.md)를 참고합니다.
 
 `@keundal/plugin-agent-chat`과 `@keundal/plugin-agent-coding`은 같은 루프를 재사용하는 별도 구현입니다. 코딩 구현은 채팅 구현에 의존하지 않습니다. `@keundal/plugin-context`는 환경에 독립적인 컨텍스트 공급자를, `@keundal/plugin-context-node`는 로컬 파일·에이전트 지침·tmux 공급자를 제공합니다. 스킬의 Markdown 형식 해석은 `@keundal/skill-markdown`이 담당합니다.
 

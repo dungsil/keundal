@@ -1,5 +1,5 @@
-import type { SkillDefinition } from '@keundal/core'
 import { parseMcpServers, type McpClientConfig } from '@keundal/mcp'
+import type { SkillDefinition } from '@keundal/skill'
 
 import { pluginSkill } from './skill-metadata.js'
 import { manifest, mcpServers, server, type PluginDiagnostic } from './validation.js'

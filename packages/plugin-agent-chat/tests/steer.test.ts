@@ -1,14 +1,12 @@
 import {
   EventType,
-  LLMService,
   STEER_MESSAGE_EVENT,
   SteerQueue,
   isSteerMessage,
   type AGUIEvent,
-  type LLMEvent,
-  type LLMRequest,
   type RunAgentInput
 } from '@keundal/core'
+import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import type { ExecutableTool } from '@keundal/tools'

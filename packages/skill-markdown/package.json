@@ -16,7 +16,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@keundal/core": "workspace:*",
+    "@keundal/skill": "workspace:*",
     "yaml": "2.9.1"
   },
   "devDependencies": {

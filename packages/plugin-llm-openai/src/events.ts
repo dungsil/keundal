@@ -1,4 +1,5 @@
-import { EventType, LLM_SOURCE_EVENT, type LLMEvent } from '@keundal/core'
+import { EventType } from '@keundal/core'
+import { LLM_SOURCE_EVENT, type LLMEvent } from '@keundal/llm'
 import type { ResponseStreamEvent } from 'openai/resources/responses/responses'
 
 type Item = {

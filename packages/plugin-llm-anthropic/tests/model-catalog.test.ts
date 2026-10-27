@@ -1,4 +1,4 @@
-import { MODEL_CATALOG_LIMITS } from '@keundal/core'
+import { MODEL_CATALOG_LIMITS } from '@keundal/llm'
 import { listAnthropicModels } from '@keundal/plugin-llm-anthropic'
 import { expect, test, vi } from 'vitest'
 

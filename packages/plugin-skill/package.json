@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@keundal/core": "workspace:*",
+    "@keundal/skill": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {

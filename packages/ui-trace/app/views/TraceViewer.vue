@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { readTraceSpans, summarizeTrace } from '@keundal/core'
-import type { AGUIEvent, ExecutionOptions, GenerationSnapshot, TraceSpan } from '@keundal/core'
+import { readTraceSpans, summarizeTrace } from '@keundal/trace'
+import type { AGUIEvent, ExecutionOptions } from '@keundal/core'
+import type { GenerationSnapshot } from '@keundal/generation'
+import type { TraceSpan } from '@keundal/trace'
 import { shallowRef } from 'vue'
 import { flattenTraceSpans, reconcileTraceSpans, traceDisplayStatus, traceTimelineBounds, traceUsageCompleteness, traceRunDuration } from '../lib/trace'
 import { useText } from '../locale'

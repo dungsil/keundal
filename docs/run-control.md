@@ -9,7 +9,7 @@
 | `SteerQueue`                                             | `@keundal/core`       | 실행 중 지시를 순서대로 보관합니다. 에이전트는 안전한 경계에서만 지시를 꺼냅니다.        |
 | `ExecutionOptions.steer`                                 | `@keundal/core`       | `agent.run()`에 지시 대기열을 전달합니다.                                                |
 | `STEER_MESSAGE_EVENT`                                    | `@keundal/core`       | 반영한 지시를 journal에 남기는 AG-UI `CUSTOM` 이벤트 이름 `keundal.steer.message`입니다. |
-| `GenerationService.subscribe()`                          | `@keundal/core`       | `afterSequence` 다음의 journal을 재생하고 실시간 기록을 이어서 전달합니다.               |
+| `GenerationService.subscribe()`                          | `@keundal/generation` | `afterSequence` 다음의 journal을 재생하고 실시간 기록을 이어서 전달합니다.               |
 | `AgentHostServices.steer`, `cancel`, `subscribe`         | `@keundal/agent-host` | 호스트가 실행별 지시 대기열과 취소 신호를 관리합니다.                                    |
 | `ChatStoreLike.enqueue`, `dequeue`, `steer`, `execution` | `@keundal/chat`       | 화면이 Queue와 Steer를 고르고 대기열을 관리합니다.                                       |
 

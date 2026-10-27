@@ -3,20 +3,12 @@ import { once } from 'node:events'
 import { createServer, request as httpRequest, type ServerResponse } from 'node:http'
 import { connect } from 'node:net'
 
-import {
-  EventType,
-  LLMService,
-  parseAGUIEvent,
-  readTraceSpans,
-  TRACE_EVENT,
-  type GenerationSnapshot,
-  type AGUIEvent,
-  type ExecutionOptions,
-  type LLMEvent,
-  type LLMRequest
-} from '@keundal/core'
+import { EventType, parseAGUIEvent, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
+import { type GenerationSnapshot } from '@keundal/generation'
+import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
+import { readTraceSpans, TRACE_EVENT } from '@keundal/trace'
 import { Context, type Fiber } from 'cordis'
 
 const fetch = globalThis.fetch

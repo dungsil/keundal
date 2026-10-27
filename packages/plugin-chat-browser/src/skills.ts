@@ -5,7 +5,8 @@ import {
   type SkillFileSource,
   type LocalSkillFile
 } from '@keundal/chat/skills'
-import type { ExecutionOptions, SkillCatalog, SkillDefinition, SkillProvider } from '@keundal/core'
+import type { ExecutionOptions } from '@keundal/core'
+import type { SkillCatalog, SkillDefinition, SkillProvider } from '@keundal/skill'
 
 export class SkillManager {
   readonly providers: readonly SkillProvider[]

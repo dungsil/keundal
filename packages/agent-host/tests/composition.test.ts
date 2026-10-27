@@ -1,5 +1,6 @@
 import { AgentService } from '@keundal/agent'
-import { EventType, LLMService, type LLMEvent, type AGUIEvent, type RunAgentInput } from '@keundal/core'
+import { EventType, type AGUIEvent, type RunAgentInput } from '@keundal/core'
+import { LLMService, type LLMEvent } from '@keundal/llm'
 import memoryStore from '@keundal/plugin-store-memory'
 import { Context } from 'cordis'
 import { expect, test } from 'vitest'

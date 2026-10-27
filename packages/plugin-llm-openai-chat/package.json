@@ -18,6 +18,8 @@
   },
   "dependencies": {
     "@keundal/core": "workspace:*",
+    "@keundal/llm": "workspace:*",
+    "@keundal/trace": "workspace:*",
     "@standard-schema/spec": "catalog:",
     "cordis": "catalog:",
     "openai": "catalog:",

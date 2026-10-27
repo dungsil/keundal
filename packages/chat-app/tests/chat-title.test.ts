@@ -1,6 +1,7 @@
 import { mountAgent } from './fixtures/agent'
 import { Context } from 'cordis'
-import { EventType, LLMService, type LLMEvent } from '@keundal/core'
+import { EventType } from '@keundal/core'
+import { LLMService, type LLMEvent } from '@keundal/llm'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { expect, onTestFinished, test } from 'vitest'
 import { createKeundalChat } from '@keundal/plugin-chat-local/keundal'

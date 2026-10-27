@@ -1,10 +1,5 @@
-import type {
-  AgentMessage,
-  GenerationJournalEntry,
-  GenerationRequest,
-  GenerationStatus,
-  RunAgentInput
-} from '@keundal/core'
+import type { AgentMessage, RunAgentInput } from '@keundal/core'
+import type { GenerationJournalEntry, GenerationRequest, GenerationStatus } from '@keundal/generation'
 
 /** 스레드 하나의 저장 상태입니다. */
 export interface StoredThread {

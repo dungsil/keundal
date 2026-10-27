@@ -1,5 +1,6 @@
 import type { Content, FunctionDeclaration, FunctionResponsePart, Part, Tool } from '@google/genai'
-import { parseReasoning, parseRunAgentInput, type AgentMessage, type AgentTool, type LLMRequest } from '@keundal/core'
+import { parseRunAgentInput, type AgentMessage, type AgentTool } from '@keundal/core'
+import { parseReasoning, type LLMRequest } from '@keundal/llm'
 
 type AssistantMessage = Extract<AgentMessage, { role: 'assistant' }>
 type ToolMessage = Extract<AgentMessage, { role: 'tool' }>

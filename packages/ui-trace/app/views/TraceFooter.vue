@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { ExecutionOptions, GenerationSnapshot } from '@keundal/core'
+import type { ExecutionOptions } from '@keundal/core'
+import type { GenerationSnapshot } from '@keundal/generation'
 import type { ChatMessageFooterOwner } from '@keundal/ui-chat/slots'
 
 import { traceRunIds, type LiveTrace } from '../lib/live-trace'

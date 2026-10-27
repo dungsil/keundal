@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@keundal/core": "workspace:*",
+    "@keundal/llm": "workspace:*",
     "@keundal/plugin-agent-chat": "workspace:*",
     "@keundal/plugin-fs-local": "workspace:*",
     "@keundal/plugin-fs-policy": "workspace:*",

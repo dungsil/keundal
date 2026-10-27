@@ -1,7 +1,8 @@
 import { inspectAgentPlugin } from '@keundal/agent-plugins/browser'
 import type { AgentPluginInfo, AgentPluginManager, AgentPluginSettings } from '@keundal/chat/platform'
-import type { ExecutionOptions, SkillProvider } from '@keundal/core'
+import type { ExecutionOptions } from '@keundal/core'
 import { parseMcpServers } from '@keundal/mcp'
+import type { SkillProvider } from '@keundal/skill'
 
 import { McpManager } from './mcp.js'
 

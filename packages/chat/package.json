@@ -65,8 +65,13 @@
   },
   "dependencies": {
     "@keundal/core": "workspace:*",
+    "@keundal/generation": "workspace:*",
+    "@keundal/llm": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
     "@keundal/mcp": "workspace:*",
+    "@keundal/prompt": "workspace:*",
+    "@keundal/skill": "workspace:*",
+    "@keundal/subagent": "workspace:*",
     "@keundal/tools": "workspace:*",
     "zod": "catalog:"
   },

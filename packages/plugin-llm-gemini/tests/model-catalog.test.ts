@@ -1,4 +1,4 @@
-import { MODEL_CATALOG_LIMITS } from '@keundal/core'
+import { MODEL_CATALOG_LIMITS } from '@keundal/llm'
 import { listGeminiModels } from '@keundal/plugin-llm-gemini'
 import { expect, test, vi } from 'vitest'
 

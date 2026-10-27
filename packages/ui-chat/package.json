@@ -16,6 +16,9 @@
   "dependencies": {
     "@keundal/chat": "workspace:*",
     "@keundal/core": "workspace:*",
+    "@keundal/llm": "workspace:*",
+    "@keundal/prompt": "workspace:*",
+    "@keundal/subagent": "workspace:*",
     "@keundal/ui": "workspace:*",
     "@keundal/ui-composer": "workspace:*",
     "@keundal/ui-layout": "workspace:*",

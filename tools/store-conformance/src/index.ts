@@ -1,5 +1,7 @@
-import type { AGUIEvent, GenerationRequest, GenerationSnapshot, RunAgentInput, SessionSnapshot } from '@keundal/core'
+import type { AGUIEvent, RunAgentInput } from '@keundal/core'
 import { CONTEXT_MESSAGE_EVENT, EventType } from '@keundal/core'
+import type { GenerationRequest, GenerationSnapshot } from '@keundal/generation'
+import type { SessionSnapshot } from '@keundal/session'
 
 export type { AGUIEvent, GenerationRequest, GenerationSnapshot, RunAgentInput, SessionSnapshot }
 

@@ -3,19 +3,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { AgentConfigSchema, type AgentConfig } from '@keundal/agent-loop'
-import {
-  EventType,
-  LLMService,
-  type AGUIEvent,
-  type LLMEvent,
-  type LLMRequest,
-  type RunAgentInput,
-  type SkillProvider
-} from '@keundal/core'
+import { EventType, type AGUIEvent, type RunAgentInput } from '@keundal/core'
+import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import skillPlugin from '@keundal/plugin-skill'
 import filesystemSkillPlugin from '@keundal/plugin-skill-filesystem'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
+import { type SkillProvider } from '@keundal/skill'
 import { Context } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
 

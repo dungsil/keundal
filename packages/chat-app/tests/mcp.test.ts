@@ -1,6 +1,7 @@
 import { createServer } from 'node:http'
 import { Context } from 'cordis'
-import { EventType, LLMService, type LLMRequest, type LLMEvent } from '@keundal/core'
+import { EventType } from '@keundal/core'
+import { LLMService, type LLMRequest, type LLMEvent } from '@keundal/llm'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { createKeundalChat } from '@keundal/plugin-chat-local/keundal'
 import agentPlugin from '@keundal/plugin-agent-chat'

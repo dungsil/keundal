@@ -1,4 +1,4 @@
-import { isContextOverflow } from '@keundal/core'
+import { isContextOverflow } from '@keundal/llm'
 import { z } from 'zod'
 
 export const FALLBACK_MODEL = 'anthropic/claude-haiku-4-5'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SubagentRole } from '@keundal/core'
+import type { SubagentRole } from '@keundal/subagent'
 import { useMounted } from '@vueuse/core'
 import type { Ref } from 'vue'
 

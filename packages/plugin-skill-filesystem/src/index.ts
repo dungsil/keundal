@@ -1,7 +1,8 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-import type { ExecutionOptions, SkillCatalog, SkillDefinition, SkillProvider } from '@keundal/core'
+import type { ExecutionOptions } from '@keundal/core'
+import type { SkillCatalog, SkillDefinition, SkillProvider } from '@keundal/skill'
 import type { Context } from 'cordis'
 
 import { parseSkillMarkdown } from './markdown.js'

@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@keundal/core": "workspace:*",
+    "@keundal/generation": "workspace:*",
+    "@keundal/session": "workspace:*",
     "fast-check": "4.10.2"
   },
   "devDependencies": {

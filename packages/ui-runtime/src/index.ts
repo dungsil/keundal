@@ -15,14 +15,8 @@ import {
 } from '@keundal/chat/model-preferences'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
 import type { ChatConnection, ChatPlatform, RuntimePluginManager } from '@keundal/chat/platform'
-import {
-  parseSubagentRoles,
-  type ExecutionOptions,
-  type Reasoning,
-  type ReasoningLevel,
-  type SkillSummary,
-  type SubagentRole
-} from '@keundal/core'
+import { type ExecutionOptions } from '@keundal/core'
+import { type Reasoning, type ReasoningLevel } from '@keundal/llm'
 import {
   FALLBACK_MODEL,
   configuredProviders,
@@ -31,6 +25,8 @@ import {
   providerIcon,
   type LLMSettings
 } from '@keundal/llm-settings'
+import { type SkillSummary } from '@keundal/skill'
+import { parseSubagentRoles, type SubagentRole } from '@keundal/subagent'
 import { useStorage } from '@vueuse/core'
 import { Service, type Context } from 'cordis'
 import { computed, effectScope, reactive, ref, shallowRef, watch, type Ref } from 'vue'

@@ -1,11 +1,5 @@
-import {
-  parseReasoning,
-  SteerQueue,
-  type Reasoning,
-  EventType,
-  type AgentMessage,
-  type RunAgentInput
-} from '@keundal/core'
+import { SteerQueue, EventType, type AgentMessage, type RunAgentInput } from '@keundal/core'
+import { parseReasoning, type Reasoning } from '@keundal/llm'
 import { Context, type Fiber } from 'cordis'
 
 import type { AgentHostOptions, AgentHost, AgentHostModel, AgentHostServices } from './contracts.js'

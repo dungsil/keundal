@@ -27,11 +27,16 @@
   "dependencies": {
     "@keundal/agent": "workspace:*",
     "@keundal/core": "workspace:*",
+    "@keundal/generation": "workspace:*",
+    "@keundal/llm": "workspace:*",
+    "@keundal/session": "workspace:*",
+    "@keundal/skill": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {
     "@keundal/plugin-agent-chat": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",
+    "@keundal/trace": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",

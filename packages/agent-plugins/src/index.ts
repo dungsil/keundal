@@ -4,9 +4,10 @@ import { access, mkdir, readFile, realpath } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import process from 'node:process'
 
-import type { ExecutionOptions, SkillProvider } from '@keundal/core'
+import type { ExecutionOptions } from '@keundal/core'
 import type { McpClientConfig, McpPermissions } from '@keundal/mcp'
 import { McpClient } from '@keundal/plugin-mcp-client'
+import type { SkillProvider } from '@keundal/skill'
 import type { ExecutableTool } from '@keundal/tools'
 
 import { contained, exists } from './files.js'

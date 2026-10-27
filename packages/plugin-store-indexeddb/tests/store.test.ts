@@ -1,13 +1,6 @@
-import {
-  EventType,
-  type AGUIEvent,
-  LLMService,
-  type ExecutionOptions,
-  type GenerationRequest,
-  type LLMEvent,
-  type LLMModel,
-  type LLMRequest
-} from '@keundal/core'
+import { EventType, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
+import { type GenerationRequest } from '@keundal/generation'
+import { LLMService, type LLMEvent, type LLMModel, type LLMRequest } from '@keundal/llm'
 import indexedDBStorePlugin, { IndexedDBStore, type WebLockManager } from '@keundal/plugin-store-indexeddb'
 import { Context, type Fiber } from 'cordis'
 import { IDBFactory, IDBVersionChangeEvent } from 'fake-indexeddb'

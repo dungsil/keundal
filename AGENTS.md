@@ -2,31 +2,38 @@
 
 ## 패키지 구성
 
-| 패키지                                 | 역할                                                                        |
-| -------------------------------------- | --------------------------------------------------------------------------- |
-| `@keundal/ui`                          | 웹 UI의 공통 Vue 컴포넌트를 Nuxt 레이어로 제공합니다.                       |
-| `@keundal/chat-app`                    | web과 desktop이 공유하는 셸이며, UI 플러그인을 조립합니다.                  |
-| `@keundal/ui-slots`                    | UI 플러그인이 컴포넌트를 등록하는 슬롯 레지스트리 `ctx.slots`를 제공합니다. |
-| `@keundal/ui-runtime`                  | 채팅 플랫폼 연결과 공유 화면 상태를 `ctx.chatRuntime`으로 제공합니다.       |
-| `@keundal/ui-*`                        | 화면 기능 하나를 슬롯에 등록하는 UI 플러그인입니다.                         |
-| `@keundal/core`                        | 서비스 계약, Cordis Context 확장, AG-UI 타입과 검증 기능을 제공합니다.      |
-| `@keundal/agent-host`                  | 주입받은 LLM·저장소·에이전트로 호스트와 HTTP 계층에 서비스를 제공합니다.    |
-| `@keundal/agent`                       | 교체 가능한 에이전트 서비스 계약을 제공합니다.                              |
-| `@keundal/agent-loop`                  | 공통 실행 루프와 축약·도구 반복 설정을 제공합니다.                          |
-| `@keundal/plugin-agent-chat`           | 공통 루프로 대화 에이전트를 등록합니다.                                     |
-| `@keundal/plugin-agent-coding`         | 공통 루프에 코딩 지침을 적용하여 에이전트를 등록합니다.                     |
-| `@keundal/tools`                       | 에이전트와 도구 공급자가 공유하는 실행 계약을 제공합니다.                   |
-| `@keundal/plugin-llm-openai`           | OpenAI Responses API로 `llm`을 구현합니다.                                  |
-| `@keundal/plugin-llm-openai-chat`      | OpenAI Chat Completions API로 `llm`을 구현합니다.                           |
-| `@keundal/plugin-llm-gemini`           | Gemini API로 `llm`을 구현합니다.                                            |
-| `@keundal/plugin-llm-anthropic`        | Anthropic Messages API로 `llm`을 구현합니다.                                |
-| `@keundal/plugin-store-memory`         | `session`과 `generation`을 메모리 저장소로 구현합니다.                      |
-| `@keundal/compaction`                  | 이전 대화를 요약하고 최근 대화를 보존하는 축약 함수를 제공합니다.           |
-| `@keundal/plugin-store-indexeddb`      | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.               |
-| `@keundal/plugin-store-sqlite`         | SQLite 파일로 `session`과 `generation`을 구현합니다.                        |
-| `@keundal/tsconfig`, `@keundal/tsdown` | 공통 TypeScript·빌드 설정을 제공합니다.                                     |
+| 패키지                                               | 역할                                                                        |
+| ---------------------------------------------------- | --------------------------------------------------------------------------- |
+| `@keundal/ui`                                        | 웹 UI의 공통 Vue 컴포넌트를 Nuxt 레이어로 제공합니다.                       |
+| `@keundal/chat-app`                                  | web과 desktop이 공유하는 셸이며, UI 플러그인을 조립합니다.                  |
+| `@keundal/ui-slots`                                  | UI 플러그인이 컴포넌트를 등록하는 슬롯 레지스트리 `ctx.slots`를 제공합니다. |
+| `@keundal/ui-runtime`                                | 채팅 플랫폼 연결과 공유 화면 상태를 `ctx.chatRuntime`으로 제공합니다.       |
+| `@keundal/ui-*`                                      | 화면 기능 하나를 슬롯에 등록하는 UI 플러그인입니다.                         |
+| `@keundal/core`                                      | AG-UI 프로토콜, 메시지 조립과 공통 실행 옵션을 제공합니다.                  |
+| `@keundal/llm`                                       | LLM 서비스 계약과 모델 목록·스트림 한도를 제공합니다.                       |
+| `@keundal/session`, `@keundal/generation`            | 세션과 생성 journal의 서비스 계약을 제공합니다.                             |
+| `@keundal/skill`                                     | 스킬 서비스 계약과 모델에 제공할 스킬 도구를 제공합니다.                    |
+| `@keundal/prompt`, `@keundal/subagent`               | 프롬프트 프리셋과 서브에이전트 역할·위임 도구를 제공합니다.                 |
+| `@keundal/trace`                                     | 실행 추적의 기록·집계와 모델 가격 계산을 제공합니다.                        |
+| `@keundal/agent-host`                                | 주입받은 LLM·저장소·에이전트로 호스트와 HTTP 계층에 서비스를 제공합니다.    |
+| `@keundal/agent`                                     | 교체 가능한 에이전트 서비스 계약을 제공합니다.                              |
+| `@keundal/agent-loop`                                | 공통 실행 루프와 축약·도구 반복 설정을 제공합니다.                          |
+| `@keundal/plugin-agent-chat`                         | 공통 루프로 대화 에이전트를 등록합니다.                                     |
+| `@keundal/plugin-agent-coding`                       | 공통 루프에 코딩 지침을 적용하여 에이전트를 등록합니다.                     |
+| `@keundal/tools`                                     | 에이전트와 도구 공급자가 공유하는 실행 계약을 제공합니다.                   |
+| `@keundal/tool-execution`, `@keundal/deferred-tools` | 도구 반복 실행과 지연 도구의 검색·활성화를 각각 구현합니다.                 |
+| `@keundal/plugin-llm-openai`                         | OpenAI Responses API로 `llm`을 구현합니다.                                  |
+| `@keundal/plugin-llm-openai-chat`                    | OpenAI Chat Completions API로 `llm`을 구현합니다.                           |
+| `@keundal/plugin-llm-gemini`                         | Gemini API로 `llm`을 구현합니다.                                            |
+| `@keundal/plugin-llm-anthropic`                      | Anthropic Messages API로 `llm`을 구현합니다.                                |
+| `@keundal/plugin-store-memory`                       | `session`과 `generation`을 메모리 저장소로 구현합니다.                      |
+| `@keundal/compaction`                                | 축약 요청·결과와 모델별 정책의 계약을 제공합니다.                           |
+| `@keundal/compaction-summary`                        | 요약 축약과 백그라운드 준비·입력 예산 검사를 구현합니다.                    |
+| `@keundal/plugin-store-indexeddb`                    | 브라우저의 IndexedDB로 `session`과 `generation`을 구현합니다.               |
+| `@keundal/plugin-store-sqlite`                       | SQLite 파일로 `session`과 `generation`을 구현합니다.                        |
+| `@keundal/tsconfig`, `@keundal/tsdown`               | 공통 TypeScript·빌드 설정을 제공합니다.                                     |
 
-서비스 계약은 `packages/core/src/{llm,session,generation,compaction}.ts`에 정의하고, 구체 구현은 플러그인으로 주입합니다. 저장소가 공유하는 대화 병합과 실행 메시지 조립은 `packages/core/src/messages.ts`에 둡니다. AG-UI 타입, 이벤트 상수, 검증 기능은 `@keundal/core`에서 가져옵니다. `@ag-ui/core` 직접 의존은 코어의 프로토콜 래퍼에서만 관리합니다.
+서비스 계약과 Cordis Context 확장은 `@keundal/llm`, `@keundal/session`, `@keundal/generation`, `@keundal/skill`처럼 해당 기능 패키지에 둡니다. `@keundal/core`는 기능 패키지를 가져오거나 다시 내보내지 않습니다. 저장소가 공유하는 대화 병합과 실행 메시지 조립은 `packages/core/src/messages.ts`에 두고, 세션 커밋의 메시지 충돌 검사는 `@keundal/session`에 둡니다. AG-UI 타입, 이벤트 상수, 검증 기능은 `@keundal/core`에서 가져옵니다. `@ag-ui/core` 직접 의존은 코어의 프로토콜 래퍼에서만 관리합니다.
 
 기능 서비스의 계약과 Cordis Context 확장은 해당 기능 패키지에서 관리합니다.
 `FileSystemService`는 `@keundal/fs`에 두고 로컬 공급자와 정책 구현이 공유합니다.
@@ -48,7 +55,7 @@ UI 플러그인의 컴포넌트는 `ctx`나 서비스 객체를 받지 않고, �
 - `llm`은 모델 한도 조회, 입력 토큰 계산, 공급자 스트림 호출을 담당합니다. 실행 수명 이벤트와 대화 저장은 담당하지 않습니다.
 - `session.prepare()`는 원본을 변경하지 않고 생성 입력과 기준 revision을 준비하며, `threadId`와 `runId`를 유지합니다.
 - `session.commit()`은 기준 revision을 검사합니다. 생성 종료 기록을 받으면 메시지·journal·종료 상태를 한 단위로 확정하고 중복 반영을 방지합니다.
-- `@keundal/compaction`의 `compact()`는 원본을 보존하면서 입력 예산에 맞춰 축약한 메시지, 요약, 요약에 반영한 메시지 ID를 반환합니다.
+- `@keundal/compaction-summary`의 `compact()`는 `@keundal/compaction` 계약에 따라 원본을 보존하면서 입력 예산에 맞춰 축약한 메시지, 요약, 요약에 반영한 메시지 ID를 반환합니다.
 - `generation`은 실행·journal·커밋·복구를 담당하며, 성공한 `RUN_FINISHED`는 커밋 이후에 전달합니다. 내구성이 필요한 저장소는 커밋의 영속성을 보장해야 합니다.
 - `generation.run()`은 `GenerationOptions.stream`이 있으면 해당 이벤트 공급자에 취소 신호를 전달하여 실행합니다. 함수는 실행 요청과 분리하며 저장하거나 복구 시 재호출하지 않습니다.
 - `generation.recover()`는 저장된 부분 응답과 확정된 종료 상태를 보존하고, 미완료 실행을 `interrupted`로 확정합니다. LLM을 다시 호출하거나 자동 재시도하지 않습니다.
@@ -58,7 +65,7 @@ UI 플러그인의 컴포넌트는 `ctx`나 서비스 객체를 받지 않고, �
 
 ## 에이전트 조합
 
-`@keundal/agent`는 `AgentService`와 `ctx.agent`의 계약만 제공합니다. `@keundal/agent-loop`는 공통 루프와 `AgentConfig`를 소유하며 `@keundal/compaction`을 직접 호출합니다. `@keundal/plugin-agent-chat`은 `llm`, `session`, `generation`을 주입받아 이 루프를 등록합니다. 축약 설정은 `compaction` 옵션으로 전달합니다. `ctx.agent.run(input, { signal })`은 AG-UI `RunAgentInput`을 받아 `AsyncIterable<AGUIEvent>`를 반환합니다.
+`@keundal/agent`는 `AgentService`와 `ctx.agent`의 계약만 제공합니다. `@keundal/agent-loop`는 공통 루프와 `AgentConfig`를 소유하며, 축약은 `@keundal/compaction-summary`, 도구 반복은 `@keundal/tool-execution`, 실행 추적은 `@keundal/trace`를 조합합니다. `@keundal/plugin-agent-chat`은 `llm`, `session`, `generation`을 주입받아 이 루프를 등록합니다. 축약 설정은 `compaction` 옵션으로 전달합니다. `ctx.agent.run(input, { signal })`은 AG-UI `RunAgentInput`을 받아 `AsyncIterable<AGUIEvent>`를 반환합니다.
 
 세션 입력을 준비한 뒤 컨텍스트 한도에서 출력 예산과 `reserveTokens`를 뺀 크기와 입력 크기를 비교합니다. `threshold`에 도달하면 백그라운드에서 축약을 준비하고, 예산을 넘으면 준비 결과를 기다리거나 동기 축약합니다. 준비 결과는 원본 메시지와 메타데이터가 일치할 때만 적용하고 추가 메시지를 보존하며 최신 토큰 수를 검사합니다. `compaction.models`로 모델별 정책을 재정의하고 `keepRecentTokens`로 최근 대화의 최소 보존 토큰 수를 지정합니다. 공급자의 컨텍스트 초과 오류는 해당 모델 요청의 첫 응답 이벤트 전에만 축약 후 한 번 재시도하며, 부분 응답과 완료된 도구는 다시 실행하지 않습니다. 축약 후에도 예산을 넘으면 생성을 시작하지 않습니다. 준비된 입력·revision·축약 결과는 `generation.run()`에 전달하고, 반환된 이벤트를 그대로 전달합니다. 준비 오류는 순회 중 예외로 전달합니다.
 

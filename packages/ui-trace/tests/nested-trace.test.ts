@@ -1,4 +1,5 @@
-import type { GenerationStatus, TraceSpan } from '@keundal/core'
+import type { GenerationStatus } from '@keundal/generation'
+import type { TraceSpan } from '@keundal/trace'
 import { expect, test } from 'vitest'
 import { flattenTraceSpans, reconcileTraceSpans, traceDisplayStatus, traceRunDuration, traceTimelineBounds } from '../app/lib/trace'
 

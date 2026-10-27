@@ -1,6 +1,6 @@
-import { assemblePrompt, parsePromptPreset, type PromptPreset } from '@keundal/core'
+import { assemblePrompt, parsePromptPreset, type PromptPreset } from '@keundal/prompt'
 
-export { assemblePrompt, parsePromptPreset, type PromptPreset, type PromptBlock } from '@keundal/core'
+export { assemblePrompt, parsePromptPreset, type PromptPreset, type PromptBlock } from '@keundal/prompt'
 
 export interface PromptPresetSettings {
   activePresetId: string | null

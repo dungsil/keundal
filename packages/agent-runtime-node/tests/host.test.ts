@@ -2,7 +2,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { EventType, readTraceSpans, summarizeTrace, type AGUIEvent, type LLMEvent } from '@keundal/core'
+import { EventType, type AGUIEvent } from '@keundal/core'
+import { type LLMEvent } from '@keundal/llm'
+import { readTraceSpans, summarizeTrace } from '@keundal/trace'
 import { afterEach, expect, test } from 'vitest'
 
 import { createNodeAgentHost, createNodeComposition, createAgentRuntime } from '../src/index.js'

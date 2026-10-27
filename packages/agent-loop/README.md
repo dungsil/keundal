@@ -1,6 +1,6 @@
 # @keundal/agent-loop
 
-`@keundal/agent`의 계약을 구현하는 공통 실행 루프를 제공합니다. `AgentConfig`와 축약·도구 반복 정책은 이 패키지가 소유합니다. `llm`, `session`, `generation`을 조합하고 입력 예산 검사, 축약, 도구 실행과 후속 생성을 처리합니다.
+`@keundal/agent`의 계약을 구현하는 공통 실행 루프와 `AgentConfig`를 제공합니다. `llm`, `session`, `generation`을 연결하고, 축약·도구 실행·스킬·위임·추적은 각 기능 패키지의 공개 진입점으로 조합합니다. 축약 정책과 요약 구현은 `@keundal/compaction`과 `@keundal/compaction-summary`가, 도구 반복은 `@keundal/tool-execution`이 소유합니다.
 
 플러그인 등록은 [`@keundal/plugin-agent-chat`](../plugin-agent-chat/README.md)과 [`@keundal/plugin-agent-coding`](../plugin-agent-coding/README.md)이 담당합니다. 이 패키지는 두 구현을 가져오지 않습니다. 공통 루프가 필요 없는 구현은 `@keundal/agent`의 `AgentService`를 직접 상속합니다.
 
@@ -153,7 +153,7 @@ await ctx.plugin(agentPlugin, {
 
 `systemPrompt`를 설정하면 매 실행의 맨 앞에 `system` 메시지로 지침을 넣습니다. 호출자가 입력 메시지에 넣는 시스템 메시지와 함께 전달되므로, 요청마다 다른 지침을 이어 붙일 수 있습니다.
 
-`RunAgentInput.forwardedProps.keundalPromptPreset`에 `@keundal/core`의 `PromptPreset`을 전달하면 세션 준비 후 프리셋을 조립합니다. 기본 시스템 지침과 스킬 목록은 앞에 유지하고, 프리셋의 텍스트와 전체 대화 기록을 지정한 순서로 넣습니다. 조립된 입력에 컨텍스트 준비와 토큰 예산 검사를 적용하므로 추가 지침도 입력 예산에 포함됩니다. 프리셋은 해당 실행에만 적용하며 서브에이전트에 상속하거나 세션 대화에 블록을 저장하지 않습니다. 재구독과 복구는 저장된 실행을 사용하고 프리셋을 다시 조립하지 않습니다. 블록 메시지의 `keundal:prompt:` ID 접두사는 예약되어 호출자의 메시지 ID로 쓸 수 없습니다.
+`RunAgentInput.forwardedProps.keundalPromptPreset`에 `@keundal/prompt`의 `PromptPreset`을 전달하면 세션 준비 후 프리셋을 조립합니다. 기본 시스템 지침과 스킬 목록은 앞에 유지하고, 프리셋의 텍스트와 전체 대화 기록을 지정한 순서로 넣습니다. 조립된 입력에 컨텍스트 준비와 토큰 예산 검사를 적용하므로 추가 지침도 입력 예산에 포함됩니다. 프리셋은 해당 실행에만 적용하며 서브에이전트에 상속하거나 세션 대화에 블록을 저장하지 않습니다. 재구독과 복구는 저장된 실행을 사용하고 프리셋을 다시 조립하지 않습니다. 블록 메시지의 `keundal:prompt:` ID 접두사는 예약되어 호출자의 메시지 ID로 쓸 수 없습니다.
 
 지침 메시지의 예약 ID는 `keundal:system-prompt`입니다. 세션이 이전 지침을 반환하면 같은 ID의 현재 지침으로 대체하므로 지침이 쌓이지 않습니다. 호출자가 입력 메시지에 예약 ID를 사용하면 거부합니다.
 
@@ -161,7 +161,7 @@ await ctx.plugin(agentPlugin, {
 
 ## 대화 축약 설정
 
-입력이 모델의 컨텍스트 예산에 가까워지면 `@keundal/compaction`의 `compact()`를 백그라운드에서 호출하여 축약을 준비합니다. 예산을 넘으면 준비 결과를 기다리거나 동기 축약을 수행합니다. 별도 등록 없이 에이전트 설정의 `compaction`으로 축약 옵션을 조정합니다.
+입력이 모델의 컨텍스트 예산에 가까워지면 `@keundal/compaction-summary`의 `compact()`를 백그라운드에서 호출하여 축약을 준비합니다. 예산을 넘으면 준비 결과를 기다리거나 동기 축약을 수행합니다. 별도 등록 없이 에이전트 설정의 `compaction`으로 축약 옵션을 조정합니다.
 
 | 설정                 | 기본값        | 설명                                                                                                         |
 | -------------------- | ------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -196,7 +196,7 @@ await ctx.plugin(agentPlugin, {
 
 공급자가 실제 컨텍스트 초과를 알리면 예상 토큰 수가 예산 이내여도 축약 후 한 번 재시도합니다. 각 모델 요청에서 응답 이벤트를 전달하기 전에만 재시도하며, 부분 응답 전달 후의 오류와 인증·요청 제한 등 다른 오류는 그대로 전달합니다. 도구 후속 요청에도 같은 정책을 적용하며 이미 완료된 도구는 다시 실행하지 않습니다. 재시도는 같은 generation 안에서 수행하고 `generation.recover()`에서는 수행하지 않습니다. generation 요청에는 최초 입력의 축약 정보가 기록됩니다.
 
-세부 동작과 요약 과정은 [축약 문서](../compaction/README.md)를 참고합니다.
+세부 동작과 요약 과정은 [요약 축약 문서](../compaction-summary/README.md)를 참고합니다.
 
 ## 실행 추적과 모델 사용량
 

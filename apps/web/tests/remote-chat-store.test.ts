@@ -1,13 +1,7 @@
 import { createServer } from 'node:http'
 
-import {
-  EventType,
-  LLMService,
-  type AGUIEvent,
-  type ExecutionOptions,
-  type LLMRequest,
-  type LLMEvent
-} from '@keundal/core'
+import { EventType, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
+import { LLMService, type LLMRequest, type LLMEvent } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { createAgentApp, type AgentAppServices } from '@keundal/agent-host/http'

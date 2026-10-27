@@ -1,4 +1,4 @@
-import type { SkillDefinition, SkillProvider } from '@keundal/core'
+import type { SkillDefinition, SkillProvider } from '@keundal/skill'
 import { z } from 'zod'
 
 export const SKILL_SETTINGS_KEY = 'keundal:skills'

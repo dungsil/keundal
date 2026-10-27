@@ -1,4 +1,5 @@
-import { MessageAssembly, type AGUIEvent, type AgentMessage, type GenerationJournalEntry } from '@keundal/core'
+import { MessageAssembly, type AGUIEvent, type AgentMessage } from '@keundal/core'
+import { type GenerationJournalEntry } from '@keundal/generation'
 
 import type { SqliteStore } from './store.js'
 

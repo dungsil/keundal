@@ -1,10 +1,5 @@
-import {
-  SkillService,
-  type ExecutionOptions,
-  type SkillCatalog,
-  type SkillProvider,
-  type SkillSummary
-} from '@keundal/core'
+import { type ExecutionOptions } from '@keundal/core'
+import { SkillService, type SkillCatalog, type SkillProvider, type SkillSummary } from '@keundal/skill'
 import type { Context } from 'cordis'
 
 export const metadata = {

@@ -1,5 +1,6 @@
-import { EventType, LLMService, type LLMEvent, type LLMRequest } from '@keundal/core'
+import { EventType } from '@keundal/core'
 import type { RunAgentInput } from '@keundal/core'
+import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { Context } from 'cordis'

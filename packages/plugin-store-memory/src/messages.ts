@@ -1,4 +1,5 @@
-import { MessageAssembly, type AGUIEvent, type AgentMessage, type GenerationJournalEntry } from '@keundal/core'
+import { MessageAssembly, type AGUIEvent, type AgentMessage } from '@keundal/core'
+import { type GenerationJournalEntry } from '@keundal/generation'
 
 /**
  * 실행 이벤트를 journal과 실행 메시지로 누적합니다. journal은 이벤트를 순서대로 보관하고, 실행
