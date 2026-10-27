@@ -22,6 +22,7 @@ vi.mock('@keundal/ui-dictation/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-home/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-layout/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-mcp/plugin', () => ({ apply() {} }))
+vi.mock('@keundal/ui-media/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-model-selection/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-settings/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-settings-llm/plugin', () => ({ apply() {} }))
@@ -62,7 +63,7 @@ async function fixture(options: {
   const catalog: UIPluginEntry[] = [
     { module: '@keundal/ui-layout', plugin: { inject: ['slots'], apply(ctx) {
       ctx.slots.register({ name: 'root', children: {
-        'page.feature': 'single', 'page.settings': 'single', 'page.mcp': 'single', 'page.tool': 'single'
+        'page.feature': 'single', 'page.settings': 'single', 'page.mcp': 'single', 'page.tool': 'single', 'page.library': 'single'
       } }, {})
     } } },
     { module: '@keundal/ui-skill', feature: 'skills', plugin: { inject: ['slots'], apply: options.feature ?? (ctx => {
@@ -251,4 +252,23 @@ test('외부 설치 기능은 제공하는 실행 방식에서만 노출하고 �
   expect((await manager.list()).some(entry => entry.source)).toBe(false)
   expect(ctx.slots.describe('page.feature')).toHaveLength(1)
   expect(ctx.slots.describe('page.settings')).toHaveLength(1)
+})
+
+test('미디어 UI는 기능 선택을 따르고 기능이 없는 로컬 실행 방식에서는 해제한다', async () => {
+  const runtime = platform()
+  runtime.records.push({ module: '@keundal/plugin-media', enabled: false, feature: 'media' })
+  const { ctx, manager } = await fixture({ platform: runtime.manager, entries: [{
+    module: '@keundal/ui-media', feature: 'media', plugin: { inject: ['slots'], apply(ctx) {
+      ctx.slots.inject('page.library', () => ctx.slots.register({ name: 'page.library' }, {}))
+    } }
+  }] })
+  await manager.sync()
+  expect(ctx.slots.describe('page.library')).toHaveLength(0)
+  await manager.setEnabled('@keundal/plugin-media', true)
+  expect(ctx.slots.describe('page.library')).toHaveLength(1)
+  await manager.setEnabled('@keundal/plugin-media', false)
+  expect(ctx.slots.describe('page.library')).toHaveLength(0)
+  runtime.records.pop()
+  await manager.sync()
+  expect(ctx.slots.describe('page.library')).toHaveLength(0)
 })

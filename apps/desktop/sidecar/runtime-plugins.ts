@@ -10,6 +10,7 @@ import {
 } from '@keundal/agent-runtime-node'
 import type { RuntimePluginInfo } from '@keundal/chat/platform'
 import { mountRuntimePlugin } from '@keundal/plugin-runtime'
+import mediaPlugin, { metadata as mediaMetadata } from '@keundal/plugin-media'
 import { metadata as chartMetadata } from '@keundal/plugin-tool-chart'
 import { metadata as weatherMetadata } from '@keundal/plugin-tool-weather'
 
@@ -17,18 +18,21 @@ import { installPlugin, installedDirectory, validateSource, type InstalledPlugin
 
 const metadata: Record<string, RuntimePluginInfo['metadata']> = {
   ...nodePluginMetadata,
+  '@keundal/plugin-media': mediaMetadata,
   '@keundal/plugin-tool-chart': chartMetadata,
   '@keundal/plugin-tool-weather': weatherMetadata
 }
 
-const optionalModules: readonly BundledPluginModule[] = [
+type DesktopBundledModule = BundledPluginModule | '@keundal/plugin-media'
+const optionalModules: readonly DesktopBundledModule[] = [
   '@keundal/plugin-skill',
   '@keundal/plugin-mcp-client',
   '@keundal/plugin-tool-chart',
-  '@keundal/plugin-tool-weather'
+  '@keundal/plugin-tool-weather',
+  '@keundal/plugin-media'
 ]
 const legacyToolsModule = '@keundal/plugin-tool-chat'
-type Entry = { module: BundledPluginModule; enabled: boolean } | InstalledPlugin
+type Entry = { module: DesktopBundledModule; enabled: boolean } | InstalledPlugin
 export type PluginRequest =
   | { action: 'list' }
   | { action: 'enable'; module: string; enabled: boolean }
@@ -50,9 +54,10 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 function validateEntries(value: unknown): Entry[] {
-  const modules = Array.isArray(value) && value.some(entry => record(entry) && entry.module === legacyToolsModule)
+  const modules: readonly DesktopBundledModule[] = Array.isArray(value) && value.some(entry => record(entry) && entry.module === legacyToolsModule)
     ? ['@keundal/plugin-skill', '@keundal/plugin-mcp-client', legacyToolsModule] as const
-    : optionalModules
+    : optionalModules.filter(module => module !== '@keundal/plugin-media' ||
+      Array.isArray(value) && value.some(entry => record(entry) && entry.module === module))
   if (!Array.isArray(value) || value.length < modules.length) throw new Error('Invalid bundled selection')
   const entries = modules.map((module) => {
     const matches = value.filter((entry) => record(entry) && entry.module === module)
@@ -66,9 +71,9 @@ function validateEntries(value: unknown): Entry[] {
   const bundled = optionalModules.map((module) => ({
     module,
     enabled: entries.find((entry) => entry.module === module)?.enabled
-      ?? entries.find((entry) => entry.module === legacyToolsModule)!.enabled
+      ?? (module === '@keundal/plugin-media' ? false : entries.find((entry) => entry.module === legacyToolsModule)!.enabled)
   }))
-  const external = value.filter(entry => !record(entry) || !modules.includes(entry.module as BundledPluginModule))
+  const external = value.filter(entry => !record(entry) || !modules.includes(entry.module as DesktopBundledModule))
   const seen = new Set<string>()
   for (const entry of external) {
     if (!record(entry) || typeof entry.module !== 'string' || !/^external:[a-f0-9-]{36}$/.test(entry.module) ||
@@ -104,7 +109,7 @@ function readEntries(directory: string): Entry[] {
       ?? (module === '@keundal/plugin-tool-chart' || module === '@keundal/plugin-tool-weather'
         ? entries.find((entry) => record(entry) && entry.module === legacyToolsModule)
         : undefined)
-    return { module, enabled: record(entry) && typeof entry.enabled === 'boolean' ? entry.enabled : true }
+    return { module, enabled: record(entry) && typeof entry.enabled === 'boolean' ? entry.enabled : module !== '@keundal/plugin-media' }
   })
 }
 
@@ -143,7 +148,8 @@ export async function manageRuntimePlugins(directory: string, request: PluginReq
         ...(entry.enabled && diagnostics[entry.module] ? { error: String(diagnostics[entry.module]) } : {}) }
         : { metadata: metadata[entry.module] }),
       feature: entry.module === '@keundal/plugin-skill' ? 'skills'
-        : entry.module === '@keundal/plugin-mcp-client' ? 'mcp' : undefined
+        : entry.module === '@keundal/plugin-mcp-client' ? 'mcp'
+        : entry.module === '@keundal/plugin-media' ? 'media' : undefined
     }))
   }
   let next: Entry[]
@@ -193,6 +199,9 @@ export function createDesktopComposition(directory?: string): HostCompositionFac
       ...base,
       async setup(ctx) {
         await base.setup(ctx)
+        if (selection['@keundal/plugin-media'] && !getRequiredNodePluginModules(options).includes('@keundal/plugin-media')) {
+          await ctx.plugin(mediaPlugin, { dataDir: directory ? join(directory, 'media') : undefined })
+        }
         // The IPC process does not receive secure provider settings. Record the actual live selection.
         if (directory) {
           save(directory, 'required-modules.json', getRequiredNodePluginModules(options))

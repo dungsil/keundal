@@ -12,7 +12,7 @@ import { readTraceSpans, TRACE_EVENT } from '@keundal/trace'
 import { Context, type Fiber } from 'cordis'
 
 const fetch = globalThis.fetch
-import { createAgentApp, type AgentAppOptions, type AgentAppServices } from '@keundal/agent-host/http'
+import { createAgentApp, HostHttpService, type AgentAppOptions, type AgentAppServices } from '@keundal/agent-host/http'
 import { expect, test, type TestContext } from 'vitest'
 
 const token = 'test-only-server-token'
@@ -38,6 +38,7 @@ const setup = async (
   script?: (request: LLMRequest, options?: ExecutionOptions) => AsyncIterable<LLMEvent>
 ) => {
   const ctx = new Context()
+  const http = new HostHttpService(ctx)
   class LLM extends LLMService {
     async getModel() {
       return { contextWindow: 2000, maxOutputTokens: 200 }
@@ -58,6 +59,7 @@ const setup = async (
 
   let agentCalls = 0
   const services: AgentAppServices = {
+    http,
     run: (run, options?: ExecutionOptions) => {
       agentCalls++
       return ctx.agent.run(run, options)
@@ -130,6 +132,7 @@ const setup = async (
   }
   return {
     base,
+    ctx,
     server,
     services,
     requestJson,
@@ -139,6 +142,35 @@ const setup = async (
     }
   }
 }
+
+test('기능 경로도 호스트 인증과 본문 제한을 적용하며 해제 뒤에는 사라진다', async (t) => {
+  const { ctx, base, requestJson } = await setup(t, { maxRequestBodyBytes: 32 })
+  const fiber = await ctx.plugin({
+    inject: ['hostHttp'],
+    apply(owned: Context) {
+      owned.hostHttp.register(owned, 'feature', {
+        async handle({ response, body }) {
+          const value = await body()
+          response.writeHead(200, { 'content-type': 'application/json' })
+          response.end(JSON.stringify({ value }))
+        }
+      })
+    }
+  })
+  try {
+    expect((await fetch(`${base}/feature`)).status).toBe(401)
+    expect(await requestJson('POST', '/feature', { text: 'small' })).toEqual({
+      status: 200,
+      json: { value: '{"text":"small"}' }
+    })
+    expect((await requestJson('POST', '/feature', { text: 'x'.repeat(40) })).status).toBe(413)
+    expect(() => ctx.hostHttp.register(ctx, 'runs', { handle: async () => {} })).toThrow('reserved')
+  } finally {
+    await fiber.dispose()
+  }
+  expect((await requestJson('GET', '/feature')).status).toBe(404)
+  expect((await requestJson('GET', '/models')).status).toBe(200)
+})
 
 const parseFrames = (text: string): { id?: number; event: AGUIEvent }[] =>
   text

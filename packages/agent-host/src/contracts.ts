@@ -6,6 +6,8 @@ import type { SessionService } from '@keundal/session'
 import type { SkillSummary } from '@keundal/skill'
 import type { Context, Fiber } from 'cordis'
 
+import type { HostHttpService } from './routes.js'
+
 export interface AgentHostModel {
   readonly id: string
   readonly provider: AgentHostProvider
@@ -53,6 +55,7 @@ export interface AgentHostServices {
   session: Pick<SessionService, 'get' | 'list' | 'commit' | 'delete'>
   generation: Pick<GenerationService, 'get' | 'list' | 'recover'>
   models(): readonly AgentHostModel[]
+  readonly http?: Pick<HostHttpService, 'resolve'>
   catalog?(options?: ExecutionOptions): Promise<{ skills: readonly SkillSummary[]; tools: readonly SkillSummary[] }>
   title(request: AgentHostTitleRequest, options?: ExecutionOptions): Promise<string>
 }

@@ -3,6 +3,7 @@ import { parseReasoning, type Reasoning } from '@keundal/llm'
 import { Context, type Fiber } from 'cordis'
 
 import type { AgentHostOptions, AgentHost, AgentHostModel, AgentHostServices } from './contracts.js'
+import { HostHttpService } from './routes.js'
 export * from './contracts.js'
 
 /** 호스트가 관리하는 실행 중 실행입니다. */
@@ -106,6 +107,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
 
   try {
     scope = ctx.plugin(async (owned: Context) => {
+      new HostHttpService(owned)
       await options.setup(owned)
     })
     await scope
@@ -165,6 +167,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         recover: (runOptions) => servicesContext.generation.recover(runOptions)
       },
       models: () => models,
+      http: servicesContext.hostHttp,
       async catalog(execution = {}) {
         if (closed) throw new Error('agent host disposed')
         const skills = servicesContext.skills ? (await servicesContext.skills.prepare(execution)).skills : []

@@ -1,0 +1,25 @@
+{
+  "name": "@keundal/ui-media",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./nuxt.config.ts",
+  "exports": {
+    ".": "./nuxt.config.ts",
+    "./plugin": "./app/plugin.ts"
+  },
+  "dependencies": {
+    "@keundal/chat": "workspace:*",
+    "@keundal/media": "workspace:*",
+    "@keundal/transcription": "workspace:*",
+    "@keundal/ui": "workspace:*",
+    "@keundal/ui-layout": "workspace:*",
+    "@keundal/ui-runtime": "workspace:*",
+    "@keundal/ui-settings": "workspace:*",
+    "@keundal/ui-slots": "workspace:*",
+    "@vueuse/core": "^14.4.0",
+    "cordis": "catalog:",
+    "nuxt": "^4.6.2",
+    "vue": "3.5.44"
+  }
+}

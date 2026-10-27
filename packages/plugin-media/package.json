@@ -1,0 +1,47 @@
+{
+  "name": "@keundal/plugin-media",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "import": "./dist/http.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@keundal/agent-host": "workspace:*",
+    "@keundal/media": "workspace:*",
+    "@keundal/plugin-library-fs": "workspace:*",
+    "@keundal/plugin-media-download": "workspace:*",
+    "@keundal/plugin-media-export": "workspace:*",
+    "@keundal/plugin-media-tools": "workspace:*",
+    "@keundal/plugin-shell-local": "workspace:*",
+    "@keundal/plugin-subtitle-translate": "workspace:*",
+    "@keundal/plugin-transcription-whisper": "workspace:*",
+    "@keundal/transcription": "workspace:*",
+    "cordis": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/llm": "workspace:*",
+    "@keundal/plugin-agent-chat": "workspace:*",
+    "@keundal/plugin-store-memory": "workspace:*",
+    "@keundal/tsconfig": "workspace:*",
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

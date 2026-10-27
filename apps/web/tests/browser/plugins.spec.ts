@@ -67,6 +67,7 @@ test('스킬·MCP 선택에 따라 해당 화면을 해제하고 새로고침 �
   await expect(mcp).toBeChecked()
   await expect(mcpLink).toBeVisible()
   await expect(skills).toBeEnabled()
+  await expect(page.locator('[inert]')).toHaveCount(0)
   await skills.focus()
   await page.keyboard.press('Space')
   await expect(skills).toBeChecked()

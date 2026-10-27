@@ -6,6 +6,10 @@
   ],
   "type": "module",
   "exports": {
+    "./media": {
+      "types": "./dist/media.d.ts",
+      "import": "./dist/media.js"
+    },
     "./chat-message": {
       "types": "./dist/chat-message.d.ts",
       "import": "./dist/chat-message.js"
@@ -61,7 +65,8 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
     "@keundal/core": "workspace:*",
@@ -69,10 +74,12 @@
     "@keundal/llm": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
     "@keundal/mcp": "workspace:*",
+    "@keundal/media": "workspace:*",
     "@keundal/prompt": "workspace:*",
     "@keundal/skill": "workspace:*",
     "@keundal/subagent": "workspace:*",
     "@keundal/tools": "workspace:*",
+    "@keundal/transcription": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

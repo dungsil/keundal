@@ -17,6 +17,8 @@ import { type SessionCommit } from '@keundal/session'
 
 import type { AgentHostModel, AgentHostRunOptions, AgentHostServices } from './contracts.js'
 
+export { HostHttpService, type HostHttpRequest, type HostHttpRoute } from './routes.js'
+
 /** HTTP 계층이 접근하는 에이전트 표면입니다. `@keundal/agent-host`가 이 모양을 만듭니다. */
 export interface AgentAppServices extends Omit<AgentHostServices, 'run'> {
   run(input: RunAgentInput, options?: AgentHostRunOptions): AsyncIterable<AGUIEvent>
@@ -31,7 +33,7 @@ export interface AgentAppOptions {
   allowedOrigins?: readonly string[]
 }
 
-class RequestBodyTooLargeError extends Error {}
+export class RequestBodyTooLargeError extends Error {}
 
 const errorMessage = (error: unknown): string => {
   if (error instanceof Error) return error.message
@@ -259,15 +261,38 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
         return
       }
 
+      const target = request.url ?? '/'
+      const url = URL.canParse(target, 'http://localhost') ? new URL(target, 'http://localhost') : undefined
+      const route = url ? services.http?.resolve(url) : undefined
       const credentials = /^Bearer ([A-Za-z0-9\-._~+/]+=*)$/i.exec(request.headers.authorization ?? '')
       const supplied = Buffer.from(credentials?.[1] ?? '')
-      if (supplied.length !== token.length || !timingSafeEqual(supplied, token)) {
+      const authenticated = supplied.length === token.length && timingSafeEqual(supplied, token)
+      if (!authenticated && !(url && route?.authorize?.({ request, url }))) {
         response.setHeader('WWW-Authenticate', 'Bearer')
         return sendJson(response, 401, { error: 'unauthorized' })
       }
+      if (!url) return sendJson(response, 400, { error: 'invalid request' })
 
-      const url = new URL(request.url ?? '/', 'http://localhost')
       const segments = url.pathname.split('/').filter(Boolean)
+
+      if (route) {
+        const abort = new AbortController()
+        const disconnect = () => abort.abort()
+        response.once('close', disconnect)
+        try {
+          await route.handle({
+            request,
+            response,
+            url,
+            segments,
+            body: () => readBody(request, maxRequestBodyBytes),
+            signal: abort.signal
+          })
+        } finally {
+          response.off('close', disconnect)
+        }
+        return
+      }
 
       if (request.method === 'GET' && segments.join('/') === 'models') {
         return sendJson(response, 200, { models: models() })

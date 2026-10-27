@@ -15,6 +15,7 @@ import { mountRuntimePlugin, type RuntimeModuleRegistry } from '@keundal/plugin-
 import { createChartTools, metadata as chartMetadata } from '@keundal/plugin-tool-chart'
 import { createWeatherTools, metadata as weatherMetadata } from '@keundal/plugin-tool-weather'
 import type { ChatPlatform } from '@keundal/chat/platform'
+import { createHttpMediaClient } from '@keundal/chat/media'
 import { loadWebRuntimePlugins } from './runtime-plugins'
 import { metadata as mcpMetadata } from '@keundal/plugin-chat-browser/mcp'
 
@@ -24,6 +25,9 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
   const platform: ChatPlatform = {
     mcp,
     plugins,
+    media: runtime.agentEndpoint ? createHttpMediaClient({
+      connection: async () => ({ endpoint: runtime.agentEndpoint!, token: runtime.agentToken ?? '' })
+    }) : undefined,
     settings: createBrowserSettingsStorage(storage),
     skills: new SkillManager(storage),
     loadModels,

@@ -16,6 +16,8 @@ declare module '@keundal/ui-slots' {
     'page.chat': { kind: 'single'; owner: { chatId: string } }
     /** The page at `/history`. */
     'page.history': { kind: 'single'; owner: Record<string, never> }
+    /** The page at `/library`. */
+    'page.library': { kind: 'single'; owner: Record<string, never> }
     /** The pages under `/settings`. */
     'page.settings': { kind: 'single'; owner: { section: string } }
     /** Sidebar body, ordered by `order`. */

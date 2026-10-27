@@ -8,6 +8,7 @@ import * as home from '@keundal/ui-home/plugin'
 import * as layout from '@keundal/ui-layout/plugin'
 import * as markdown from '@keundal/ui-markdown-comark/plugin'
 import * as mcp from '@keundal/ui-mcp/plugin'
+import * as media from '@keundal/ui-media/plugin'
 import * as modelSelection from '@keundal/ui-model-selection/plugin'
 import * as settings from '@keundal/ui-settings/plugin'
 import * as settingsLlm from '@keundal/ui-settings-llm/plugin'
@@ -46,6 +47,7 @@ export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-subagents', plugin: subagents },
   { module: '@keundal/ui-agent-plugins', plugin: agentPlugins },
   { module: '@keundal/ui-skill', plugin: skill, feature: 'skills' },
+  { module: '@keundal/ui-media', plugin: media, feature: 'media' },
   { module: '@keundal/ui-mcp', plugin: mcp, feature: 'mcp' }
 ]
 
@@ -99,7 +101,8 @@ export class UIPluginManager implements RuntimePluginManager {
 
   private async reconcile(plugins: RuntimePluginInfo[], startup = false): Promise<void> {
     for (const entry of this.catalog) {
-      const enabled = !entry.feature || plugins.find(plugin => plugin.feature === entry.feature)?.enabled !== false
+      const feature = plugins.find(plugin => plugin.feature === entry.feature)
+      const enabled = !entry.feature || (entry.feature === 'media' && plugins.length > 0 ? feature?.enabled === true : feature?.enabled !== false)
       try {
         if (enabled && !this.fibers.has(entry.module)) await this.activate(entry)
         if (!enabled) {

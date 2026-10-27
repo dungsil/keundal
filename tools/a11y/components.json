@@ -88,6 +88,15 @@
     "scenario": "@a11y:mcp",
     "test": "apps/web/tests/browser/accessibility.spec.ts"
   },
+  "packages/ui-media/app/views/LibraryLink.vue": {
+    "exemption": "Requires an authenticated media-enabled remote or desktop host; local web intentionally has no media capability."
+  },
+  "packages/ui-media/app/views/LibraryPage.vue": {
+    "exemption": "Requires an authenticated media-enabled remote or desktop host; local web intentionally has no media capability."
+  },
+  "packages/ui-media/app/views/MediaSettings.vue": {
+    "exemption": "Requires an authenticated media-enabled remote or desktop host; local web intentionally has no media capability."
+  },
   "packages/ui-model-selection/app/views/ModelSelect.vue": {
     "scenario": "@a11y:home",
     "test": "apps/web/tests/browser/accessibility.spec.ts"

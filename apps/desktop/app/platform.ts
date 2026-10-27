@@ -9,10 +9,14 @@ import { openaiTranscription } from '@keundal/plugin-transcription-browser'
 import { resolveModel } from '@keundal/chat/models'
 import { FALLBACK_MODEL } from '@keundal/llm-settings'
 import type { ChatPlatform, NativeInvoke } from '@keundal/chat/platform'
+import { createHttpMediaClient } from '@keundal/chat/media'
 
 export function createDesktopPlatform(storage: Storage, invoke: NativeInvoke): ChatPlatform {
   let connected: Awaited<ReturnType<typeof createDesktopChatStore>> | undefined
   const platform: ChatPlatform = {
+    media: createHttpMediaClient({
+      connection: () => invoke<{ endpoint: string; token: string }>('sidecar_info')
+    }),
     runtimePlugins: createNativeRuntimePluginManager(invoke, async () => { await connected?.reloadSettings() }),
     mcp: new McpManager(createNativeMcpSettingsStorage(invoke), { allowStdio: true }),
     settings: createNativeSettingsStorage(storage, invoke),

@@ -28,6 +28,7 @@
     "@keundal/plugin-chat-browser": "workspace:*",
     "@keundal/plugin-chat-desktop": "workspace:*",
     "@keundal/plugin-llm-browser": "workspace:*",
+    "@keundal/plugin-media": "workspace:*",
     "@keundal/plugin-runtime": "workspace:*",
     "@keundal/plugin-tool-chart": "workspace:*",
     "@keundal/plugin-tool-weather": "workspace:*",

@@ -20,6 +20,7 @@
 | ---------------------------- | --------------------- |
 | `@keundal/plugin-skill`      | `@keundal/ui-skill`   |
 | `@keundal/plugin-mcp-client` | `@keundal/ui-mcp`     |
+| `@keundal/plugin-media`      | `@keundal/ui-media`   |
 
 선택 기능을 끄기 전에는 진행 중인 응답을 중단합니다. 스킬·MCP를 끄면 대응하는 UI 범위도 해제하고, 켜면 다시 등록합니다. 해당 설정 화면·탐색 항목도 함께 사라지거나 복원됩니다. 나머지 UI는 화면 셸·설정·관리 화면을 포함해 항상 등록합니다. Nuxt 레이어는 정적으로 빌드하며, 외부 모듈을 내려받거나 빌드하지 않습니다.
 
@@ -109,6 +110,7 @@ Nuxt는 레이어의 `components`, `composables`, `utils`, `plugins`, `pages`, `
 root                               ui-layout
 ├─ page.home                       ui-home
 ├─ page.history                    ui-chat-list
+├─ page.library                    ui-media (미디어 기능 활성 시)
 ├─ page.chat                       ui-chat
 │  ├─ chat.message.tool            ui-tool, ui-chart, ui-weather (항목이 없으면 기본 도구 카드)
 │  ├─ chat.message.footer          ui-trace

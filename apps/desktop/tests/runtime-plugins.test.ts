@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
 import { createNodeAgentHost } from '@keundal/agent-runtime-node'
+import { createAgentApp } from '@keundal/agent-host/http'
 import type { NativeInvoke } from '@keundal/chat/platform'
 import { createNativeRuntimePluginManager } from '@keundal/plugin-chat-desktop'
 import { createChartTools, metadata as chartMetadata } from '@keundal/plugin-tool-chart'
@@ -20,6 +21,7 @@ const chart = '@keundal/plugin-tool-chart'
 const weather = '@keundal/plugin-tool-weather'
 const skills = '@keundal/plugin-skill'
 const mcp = '@keundal/plugin-mcp-client'
+const media = '@keundal/plugin-media'
 
 function fixture() {
   const directory = mkdtempSync(join(tmpdir(), 'keundal-bundled-'))
@@ -36,7 +38,7 @@ function fixture() {
   return { directory, options, compose, open, invoke }
 }
 
-test('번들 목록은 선택한 LLM과 저장소 및 에이전트를 잠그고 선택 기능은 기본 활성화한다', async () => {
+test('번들 목록은 필수 서비스를 잠그고 미디어는 명시적으로 켜야 활성화한다', async () => {
   const { directory, open } = fixture()
   const host = await open()
   const entries = await manageRuntimePlugins(directory, { action: 'list' })
@@ -45,7 +47,8 @@ test('번들 목록은 선택한 LLM과 저장소 및 에이전트를 잠그고 
     { module: '@keundal/plugin-store-sqlite', enabled: true, required: true },
     { module: '@keundal/plugin-agent-chat', enabled: true, required: true },
     { module: skills, enabled: true, feature: 'skills' }, { module: mcp, enabled: true, feature: 'mcp' },
-    { module: chart, enabled: true }, { module: weather, enabled: true }
+    { module: chart, enabled: true }, { module: weather, enabled: true },
+    { module: media, enabled: false, feature: 'media' }
   ])
   if (!Array.isArray(entries)) throw new Error('Expected plugin list')
   expect(entries.find(entry => entry.module === chart)?.metadata).toEqual(chartMetadata)
@@ -132,7 +135,7 @@ test.each([true, false])('이전 bundled-selection.json의 결합 선택 $0을 �
   const transaction = await manageRuntimePlugins(directory, { action: 'enable', module: chart, enabled: !enabled })
   expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual([
     { module: skills, enabled: true }, { module: mcp, enabled: true },
-    { module: chart, enabled: !enabled }, { module: weather, enabled }
+    { module: chart, enabled: !enabled }, { module: weather, enabled }, { module: media, enabled: false }
   ])
   const reopened = await open()
   expect((await reopened.services.catalog!()).tools.map(({ name }) => name)).toEqual(enabled ? ['weather'] : ['chart'])
@@ -159,12 +162,40 @@ test('이전 결합 선택을 분리할 때 설치한 외부 플러그인의 활
   await manageRuntimePlugins(directory, { action: 'enable', module: chart, enabled: true })
   expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual([
     { module: skills, enabled: true }, { module: mcp, enabled: true },
-    { module: chart, enabled: true }, { module: weather, enabled: false }, external
+    { module: chart, enabled: true }, { module: weather, enabled: false }, { module: media, enabled: false }, external
   ])
   const host = await open()
   expect(host.ctx.get('retainedExternal')).toBe(true)
   expect((await host.services.catalog!()).tools.map(({ name }) => name)).toEqual(['chart'])
   expect(existsSync(source)).toBe(true)
+})
+
+test('미디어 선택은 API를 등록하고 꺼도 자료실 파일을 유지한다', async () => {
+  const { directory, open } = fixture()
+  const path = join(directory, 'library')
+  for (const enabled of [false, true, false, true]) {
+    await manageRuntimePlugins(directory, { action: 'enable', module: media, enabled })
+    const host = await open()
+    const server = createServer(createAgentApp(host.services, { token: 'desktop-media-test' }))
+    server.listen(0, '127.0.0.1')
+    await once(server, 'listening')
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('server did not bind')
+    const base = `http://127.0.0.1:${address.port}`
+    const headers = { authorization: 'Bearer desktop-media-test', 'content-type': 'application/json' }
+    try {
+      expect((await fetch(`${base}/media/status`, { headers })).status).toBe(enabled ? 200 : 404)
+      if (enabled && !existsSync(path)) {
+        expect((await fetch(`${base}/media/libraries`, {
+          method: 'POST', headers, body: JSON.stringify({ path, name: 'Saved library' })
+        })).status).toBe(201)
+      }
+      if (existsSync(path)) expect(JSON.parse(readFileSync(join(path, 'library.json'), 'utf8')).name).toBe('Saved library')
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      await host.dispose()
+    }
+  }
 })
 
 test('이전 선택 파일도 중복 모듈과 boolean 이외의 값 및 외부 설정을 거부한다', async () => {
@@ -419,7 +450,7 @@ test('ZIP 경로 탈출과 URL 패키지 및 상대 경로는 선택과 원본 �
     { type: 'jsr', value: 'not-scoped' }
   ]) {
     await expect(manageRuntimePlugins(directory, { action: 'install', source } as PluginRequest)).rejects.toThrow()
-    expect((await manageRuntimePlugins(directory, { action: 'list' }) as unknown[])).toHaveLength(7)
+    expect((await manageRuntimePlugins(directory, { action: 'list' }) as unknown[])).toHaveLength(8)
   }
   expect(existsSync(join(directory, 'escaped'))).toBe(false)
   expect(readdirSync(join(directory, 'installed'))).toEqual([])

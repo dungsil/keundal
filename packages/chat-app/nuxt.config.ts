@@ -21,6 +21,7 @@ export default defineNuxtConfig({
     '@keundal/ui-subagents',
     '@keundal/ui-skill',
     '@keundal/ui-mcp',
+    '@keundal/ui-media',
     '@keundal/ui-agent-plugins'
   ],
   modules: ['@nuxt/ui'],

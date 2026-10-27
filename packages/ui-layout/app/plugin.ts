@@ -15,6 +15,7 @@ export function apply(ctx: Context) {
       'page.home': 'single',
       'page.chat': 'single',
       'page.history': 'single',
+      'page.library': 'single',
       'page.settings': 'single',
       'layout.sidebar': 'list',
       'layout.sidebar.footer': 'list',
