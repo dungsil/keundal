@@ -96,9 +96,10 @@ async function setup(t: TestContext) {
 }
 
 function logPath(command: string): string {
-  const matched = / > "(.+?)" 2>&1$/.exec(command)
+  // Windows는 따옴표를 두 개, POSIX는 하나로 인용합니다.
+  const matched = / > (["'])(.+?)\1[ \t]*2>&1$/.exec(command)
   if (!matched) throw new Error(`log path is missing: ${command}`)
-  return matched[1]!
+  return matched[2]!
 }
 
 const destination = process.platform === 'win32' ? 'C:\\out\\첫 영상.mp4' : '/out/첫 영상.mp4'
