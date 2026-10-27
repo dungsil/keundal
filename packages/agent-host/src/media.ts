@@ -7,7 +7,7 @@ import type { URL } from 'node:url'
 import type { MediaDownloadRequest, MediaDownloadState, MediaItemStorage, SubtitleTrack } from '@keundal/media'
 
 import type { AgentHostMedia } from './contracts.js'
-import { errorMessage, openEventStream, sendJson } from './respond.js'
+import { openEventStream, sendJson } from './respond.js'
 
 export interface MediaRequestContext {
   readonly media: AgentHostMedia
@@ -167,6 +167,24 @@ function requireTranscription(media: AgentHostMedia, response: ServerResponse) {
   if (media.transcription) return media.transcription
   sendJson(response, 503, { error: 'media transcription is not available' })
   return undefined
+}
+
+/**
+ * 실패 사유를 HTTP 상태와 고정 코드로 바꿉니다.
+ * 예외 메시지는 호스트 경로를 담을 수 있으므로 응답에 그대로 넣지 않습니다.
+ */
+function mediaFailure(error: unknown): { status: number; code: string } {
+  const message = error instanceof Error ? error.message.toLowerCase() : ''
+  if (message.includes('not found') || message.includes('is missing')) {
+    return { status: 404, code: 'media-not-found' }
+  }
+  if (message.includes('outside the configured root') || message.includes('must be') || message.includes('invalid')) {
+    return { status: 400, code: 'media-invalid-request' }
+  }
+  if (message.includes('is not installed') || message.includes('is not available')) {
+    return { status: 409, code: 'media-unavailable' }
+  }
+  return { status: 400, code: 'media-request-failed' }
 }
 
 /** 자막 번역 서비스가 없으면 503을 보내고 undefined를 돌려줍니다. */
@@ -461,6 +479,7 @@ export async function handleMediaRequest(context: MediaRequestContext): Promise<
       response.end()
       return
     }
-    sendJson(response, 400, { error: errorMessage(error) })
+    const failure = mediaFailure(error)
+    sendJson(response, failure.status, { error: failure.code })
   }
 }

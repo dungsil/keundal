@@ -122,7 +122,7 @@ test('자료库 경로가 지정한 상위 디렉터리 밖이면 요청을 거�
   const call = await serve(t, runtime)
   const outside = await call('POST', '/media/libraries', { path: join(files.directory, 'outside') })
   expect(outside.status).toBe(400)
-  expect(String(outside.json.error)).toContain('outside the configured root')
+  expect(String(outside.json.error)).toBe('media-invalid-request')
 })
 
 test('미디어 디렉터리가 없으면 미디어 서비스를 조립하지 않고 503으로 응답한다', async (t) => {

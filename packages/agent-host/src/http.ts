@@ -18,7 +18,7 @@ import {
 
 import type { AgentHostModel, AgentHostRunOptions, AgentHostServices } from './contracts.js'
 import { handleMediaRequest } from './media.js'
-import { SSE_HEADERS, errorMessage, sendJson } from './respond.js'
+import { SSE_HEADERS, sendJson } from './respond.js'
 
 /** HTTP 계층이 접근하는 에이전트 표면입니다. `@keundal/agent-host`가 이 모양을 만듭니다. */
 export interface AgentAppServices extends Omit<AgentHostServices, 'run'> {
@@ -35,6 +35,12 @@ export interface AgentAppOptions {
 }
 
 class RequestBodyTooLargeError extends Error {}
+
+const errorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  return 'unknown error'
+}
 
 // Summary projections contain only explicitly requested scalar leaves, never object subtrees.
 function projectScalarState(state: unknown, fields: string[]): Record<string, unknown> {

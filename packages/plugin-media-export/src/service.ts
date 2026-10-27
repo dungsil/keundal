@@ -63,18 +63,24 @@ function findTrack(tracks: readonly SubtitleTrack[], trackId: string | undefined
 
 function quote(value: string): string {
   if (process.platform !== 'win32') return `'${value.replace(/'/g, `'\\''`)}'`
-  // cmd.exe는 역슬래시를 이스케이프로 쓰지 않으므로, 인용 전에 역슬래시를 두 배로 늘립니다.
-  const escaped = value.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')
-  return `"${escaped}"`
+  // cmd.exe는 역슬래시를 이스케이프로 쓰지 않으므로, 인용문자가 든 값은 받지 않습니다.
+  if (value.includes('"')) throw new TypeError('value must not contain a double quote')
+  return `"${value}"`
 }
 
 /** ffmpeg 필터 인자에서 경로와 문자열을 안전하게 표기합니다. */
-function filterValue(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'")
+function filterValue(value: string, extra: readonly string[] = []): string {
+  let result = ''
+  for (const character of value) {
+    if (character === '\\') result += '\\\\'
+    else if (character === ':' || character === "'" || extra.includes(character)) result += `\\${character}`
+    else result += character
+  }
+  return result
 }
 
 function escapeFilterText(value: string): string {
-  return filterValue(value).replace(/,/g, '\\,')
+  return filterValue(value, [','])
 }
 
 function seconds(milliseconds: number): string {
