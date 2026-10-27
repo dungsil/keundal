@@ -254,14 +254,18 @@ test('외부 설치 기능은 제공하는 실행 방식에서만 노출하고 �
   expect(ctx.slots.describe('page.settings')).toHaveLength(1)
 })
 
-test('미디어 UI는 기능 선택을 따르고 기능이 없는 로컬 실행 방식에서는 해제한다', async () => {
+test('미디어 UI는 초기 렌더에서 제외하고 동기화 후 호스트의 기능 선택을 따른다', async () => {
   const runtime = platform()
   runtime.records.push({ module: '@keundal/plugin-media', enabled: false, feature: 'media' })
-  const { ctx, manager } = await fixture({ platform: runtime.manager, entries: [{
+  const entries: UIPluginEntry[] = [{
     module: '@keundal/ui-media', feature: 'media', plugin: { inject: ['slots'], apply(ctx) {
       ctx.slots.inject('page.library', () => ctx.slots.register({ name: 'page.library' }, {}))
     } }
-  }] })
+  }]
+  const server = await fixture({ platform: null, entries })
+  const { ctx, manager } = await fixture({ platform: runtime.manager, entries })
+  expect(server.ctx.slots.describe('page.library')).toHaveLength(0)
+  expect(ctx.slots.describe('page.library')).toHaveLength(0)
   await manager.sync()
   expect(ctx.slots.describe('page.library')).toHaveLength(0)
   await manager.setEnabled('@keundal/plugin-media', true)
@@ -271,4 +275,12 @@ test('미디어 UI는 기능 선택을 따르고 기능이 없는 로컬 실행 
   runtime.records.pop()
   await manager.sync()
   expect(ctx.slots.describe('page.library')).toHaveLength(0)
+  // Remote hosts without a selection API still expose media after hydration and probe its capability.
+  await server.manager.sync()
+  expect(server.ctx.slots.describe('page.library')).toHaveLength(1)
+  runtime.records.push({ module: '@keundal/plugin-media', enabled: true, feature: 'media' })
+  const reopened = await fixture({ platform: runtime.manager, entries })
+  expect(reopened.ctx.slots.describe('page.library')).toHaveLength(0)
+  await reopened.manager.sync()
+  expect(reopened.ctx.slots.describe('page.library')).toHaveLength(1)
 })

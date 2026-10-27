@@ -8,7 +8,6 @@ import * as home from '@keundal/ui-home/plugin'
 import * as layout from '@keundal/ui-layout/plugin'
 import * as markdown from '@keundal/ui-markdown-comark/plugin'
 import * as mcp from '@keundal/ui-mcp/plugin'
-import * as media from '@keundal/ui-media/plugin'
 import * as modelSelection from '@keundal/ui-model-selection/plugin'
 import * as settings from '@keundal/ui-settings/plugin'
 import * as settingsLlm from '@keundal/ui-settings-llm/plugin'
@@ -47,7 +46,9 @@ export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-subagents', plugin: subagents },
   { module: '@keundal/ui-agent-plugins', plugin: agentPlugins },
   { module: '@keundal/ui-skill', plugin: skill, feature: 'skills' },
-  { module: '@keundal/ui-media', plugin: media, feature: 'media' },
+  { module: '@keundal/ui-media', feature: 'media', plugin: async (ctx: Context) => {
+    await ctx.plugin(await import('@keundal/ui-media/plugin'))
+  } },
   { module: '@keundal/ui-mcp', plugin: mcp, feature: 'mcp' }
 ]
 
@@ -92,17 +93,20 @@ export class UIPluginManager implements RuntimePluginManager {
 
   /** Mount identical defaults on the server and during hydration; sync saved functional state afterward. */
   mount(): Promise<void> {
-    return this.change(() => this.reconcile([], true))
+    return this.change(() => this.reconcile(undefined, true))
   }
 
   sync(): Promise<void> {
     return this.change(async () => this.reconcile(await this.options.platform?.list() ?? [], true))
   }
 
-  private async reconcile(plugins: RuntimePluginInfo[], startup = false): Promise<void> {
+  private async reconcile(plugins: RuntimePluginInfo[] | undefined, startup = false): Promise<void> {
     for (const entry of this.catalog) {
-      const feature = plugins.find(plugin => plugin.feature === entry.feature)
-      const enabled = !entry.feature || (entry.feature === 'media' && plugins.length > 0 ? feature?.enabled === true : feature?.enabled !== false)
+      const feature = plugins?.find(plugin => plugin.feature === entry.feature)
+      // Media is opt-in: do not load its views before the browser has resolved the host's selection.
+      const enabled = !entry.feature || (entry.feature === 'media'
+        ? plugins !== undefined && (plugins.length === 0 || feature?.enabled === true)
+        : feature?.enabled !== false)
       try {
         if (enabled && !this.fibers.has(entry.module)) await this.activate(entry)
         if (!enabled) {
