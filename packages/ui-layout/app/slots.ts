@@ -24,5 +24,7 @@ declare module '@keundal/ui-slots' {
     'layout.sidebar.footer': { kind: 'list'; owner: SidebarOwner }
     /** Dialogs and other overlays that live beside the pages. */
     'layout.overlay': { kind: 'list'; owner: Record<string, never> }
+    /** The media library page at `/library`. */
+    'page.library': { kind: 'single'; owner: Record<string, never> }
   }
 }

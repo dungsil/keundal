@@ -27,6 +27,8 @@
   "dependencies": {
     "@keundal/agent": "workspace:*",
     "@keundal/core": "workspace:*",
+    "@keundal/media": "workspace:*",
+    "@keundal/transcription": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {

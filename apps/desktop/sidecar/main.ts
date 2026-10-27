@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { dirname, join, resolve } from 'node:path'
 
 import { createAgentRuntime } from '@keundal/agent-runtime-node'
 import { createChartTools } from '@keundal/plugin-tool-chart'
@@ -24,7 +25,13 @@ const host = process.env.KEUNDAL_HOST ?? '127.0.0.1'
 const port = Number(process.env.PORT ?? (sidecar ? 0 : 8000))
 if (!host.trim()) throw new Error('KEUNDAL_HOST는 비어 있을 수 없습니다.')
 if (!Number.isSafeInteger(port) || port < 0 || port > 65_535) throw new Error('PORT가 올바르지 않습니다.')
-const agentHost = await createAgentRuntime(process.env, {
+// 미디어 자료库와 도구는 데스크톱 프로세스만 로컬 실행 파일을 가지므로 여기서 기본 경로를 정합니다.
+const env = {
+  ...process.env,
+  KEUNDAL_MEDIA_DIR:
+    process.env.KEUNDAL_MEDIA_DIR ?? join(dirname(resolve(process.env.KEUNDAL_SQLITE_PATH ?? '.data/keundal.sqlite')), 'media')
+}
+const agentHost = await createAgentRuntime(env, {
   defaultTools: [...createChartTools(), ...createWeatherTools()],
   compose: createDesktopComposition(process.env.KEUNDAL_MANAGED_PLUGINS)
 })
@@ -38,6 +45,9 @@ const server = createServer(app).listen(port, host, () => {
   console.log(`keundal server listening on ${url}`)
   console.log(
     `POST /runs · GET /threads · GET /threads/:id · PUT /threads/:id · DELETE /threads/:id · GET /runs · GET /runs/:id · POST /recover · GET /models · POST /title`
+  )
+  console.log(
+    `GET /media/tools · POST /media/tools/:name/install · PUT /media/tools/:name · POST /media/libraries · POST /media/libraries/open · POST /media/downloads`
   )
   if (sidecar) console.log(JSON.stringify({ kind: 'keundal-sidecar', port: boundPort, url }))
 })

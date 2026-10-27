@@ -7,6 +7,7 @@ import * as dictation from '@keundal/ui-dictation/plugin'
 import * as home from '@keundal/ui-home/plugin'
 import * as layout from '@keundal/ui-layout/plugin'
 import * as mcp from '@keundal/ui-mcp/plugin'
+import * as media from '@keundal/ui-media/plugin'
 import * as modelSelection from '@keundal/ui-model-selection/plugin'
 import * as settings from '@keundal/ui-settings/plugin'
 import * as settingsLlm from '@keundal/ui-settings-llm/plugin'
@@ -41,6 +42,7 @@ export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-weather', plugin: weather },
   { module: '@keundal/ui-settings', plugin: settings },
   { module: '@keundal/ui-settings-llm', plugin: settingsLlm },
+  { module: '@keundal/ui-media', plugin: media },
   { module: '@keundal/ui-subagents', plugin: subagents },
   { module: '@keundal/ui-agent-plugins', plugin: agentPlugins },
   { module: '@keundal/ui-skill', plugin: skill, feature: 'skills' },

@@ -25,7 +25,8 @@ const implementationIndependent = new Set([
   '@keundal/agent-host',
   '@keundal/fs',
   '@keundal/shell',
-  '@keundal/transcription'
+  '@keundal/transcription',
+  '@keundal/media'
 ])
 // Every UI plugin package is presentation over contracts: apps choose the implementations.
 const isImplementationIndependent = (name) =>

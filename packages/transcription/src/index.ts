@@ -1,3 +1,5 @@
+export * from './speech.js'
+
 import type { ExecutionOptions } from '@keundal/core'
 import { Service, type Context } from 'cordis'
 

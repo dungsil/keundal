@@ -7,19 +7,26 @@ import { loadAgentPlugin, type LoadedAgentPlugin } from '@keundal/agent-plugins'
 import type { ExecutionOptions, SkillProvider } from '@keundal/core'
 import { parseMcpServers } from '@keundal/mcp'
 import agentPlugin, { metadata as agentMetadata } from '@keundal/plugin-agent-chat'
+import fsMediaLibraryPlugin from '@keundal/plugin-library-fs'
 import anthropic, { metadata as anthropicMetadata } from '@keundal/plugin-llm-anthropic'
 import gemini, { metadata as geminiMetadata } from '@keundal/plugin-llm-gemini'
 import openai, { metadata as openaiMetadata } from '@keundal/plugin-llm-openai'
 import openaiChat, { metadata as openaiChatMetadata } from '@keundal/plugin-llm-openai-chat'
 import { McpClient, metadata as mcpMetadata } from '@keundal/plugin-mcp-client'
+import localMediaDownloadPlugin from '@keundal/plugin-media-download'
+import localMediaExportPlugin from '@keundal/plugin-media-export'
+import localMediaToolsPlugin from '@keundal/plugin-media-tools'
 import { loadRuntimePlugins, parseRuntimePluginManifest, type RuntimePluginManifest } from '@keundal/plugin-runtime'
+import localShellPlugin from '@keundal/plugin-shell-local'
 import skillPlugin, { metadata as skillMetadata } from '@keundal/plugin-skill'
 import sqlite, { metadata as storeMetadata } from '@keundal/plugin-store-sqlite'
+import subtitleTranslatePlugin from '@keundal/plugin-subtitle-translate'
+import whisperTranscriptionPlugin from '@keundal/plugin-transcription-whisper'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 import type { Context, Fiber } from 'cordis'
 import { resolve as resolveModule } from 'import-meta-resolve'
 
-import type { HostCompositionFactory, NodeHostOptions } from './index.js'
+import type { HostCompositionFactory, NodeHostOptions, NodeMediaOptions } from './index.js'
 
 const providerPlugins = { openai, 'openai-chat': openaiChat, anthropic, gemini }
 
@@ -119,6 +126,20 @@ export function getRequiredNodePluginModules(options: NodeHostOptions): string[]
         .map((spec) => builtinNames[spec.module] ?? spec.module)
     )
   ]
+}
+
+/** 미디어 관련 플러그인을 shell, 자료库, 도구, 다운로드 순서로 조립합니다. */
+async function mountMedia(ctx: Context, media: NodeMediaOptions): Promise<void> {
+  const shellCwd = media.shellCwd ?? media.dataDir
+  mkdirSync(media.dataDir, { recursive: true })
+  mkdirSync(shellCwd, { recursive: true })
+  await ctx.plugin(localShellPlugin, { cwd: shellCwd })
+  await ctx.plugin(fsMediaLibraryPlugin, media.libraryRoot === undefined ? {} : { root: media.libraryRoot })
+  await ctx.plugin(localMediaToolsPlugin, { dataDir: media.dataDir })
+  await ctx.plugin(localMediaDownloadPlugin, { workDirectory: join(media.dataDir, 'work') })
+  await ctx.plugin(whisperTranscriptionPlugin, { dataDir: media.dataDir })
+  await ctx.plugin(subtitleTranslatePlugin)
+  await ctx.plugin(localMediaExportPlugin, { workDirectory: join(media.dataDir, 'work') })
 }
 
 export const createNodeComposition: HostCompositionFactory = (options) => {
@@ -291,6 +312,7 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       })
       runtime = await runtimePromise
       await runtime.setup(ctx)
+      if (options.media) await mountMedia(ctx, options.media)
     },
     async mountAgent(ctx, config) {
       if (!runtime) throw new Error('runtime plugins are not initialized')

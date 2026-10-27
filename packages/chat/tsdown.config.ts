@@ -10,6 +10,7 @@ export default defineConfig({
     'src/chat-store.ts',
     'src/run-queue.ts',
     'src/platform.ts',
+    'src/media.ts',
     'src/messages.ts',
     'src/index.ts',
     'src/tools/chart.ts',

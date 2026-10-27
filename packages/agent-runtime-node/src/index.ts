@@ -19,6 +19,16 @@ export type BundledPluginModule =
   | '@keundal/plugin-tool-chat'
 export type BundledPluginSelection = Readonly<Partial<Record<BundledPluginModule, boolean>>>
 
+/** 미디어 자료库와 로컬 도구를 데스크톱 호스트에 조립하는 설정입니다. */
+export interface NodeMediaOptions {
+  /** 도구 실행 파일과 작업 로그를 저장하는 디렉터리입니다. 호스트가 없으면 만듭니다. */
+  readonly dataDir: string
+  /** 자료库 경로를 이 디렉터리 안으로 제한합니다. 생략하면 제한하지 않습니다. */
+  readonly libraryRoot?: string
+  /** shell 명령의 기준 디렉터리입니다. 생략하면 `dataDir`을 쓿니다. */
+  readonly shellCwd?: string
+}
+
 export interface NodeHostOptions {
   readonly plugins?: readonly AgentPluginOptions[]
   /** Bundled optional features default to enabled; deployment manifests remain operator-owned. */
@@ -43,6 +53,8 @@ export interface NodeHostOptions {
   readonly runtimePluginBasePath?: string
   readonly pluginConfigPath?: string
   readonly requireProviderApiKey?: boolean
+  /** 값을 주면 미디어 플러그인을 자료库·도구·다운로드 순서로 조립합니다. */
+  readonly media?: NodeMediaOptions
 }
 
 export type HostComposition = Pick<AgentHostOptions, 'setup' | 'mountAgent' | 'toolCatalog'> & {
@@ -108,6 +120,8 @@ export async function createAgentRuntime(
       .filter(Boolean)
   }
   const sqlitePath = env.KEUNDAL_SQLITE_PATH ?? '.data/keundal.sqlite'
+  const mediaDir = env.KEUNDAL_MEDIA_DIR?.trim()
+  const libraryRoot = env.KEUNDAL_LIBRARY_DIR?.trim()
   const host = await createNodeAgentHost(
     {
       tools: options.tools,
@@ -127,6 +141,14 @@ export async function createAgentRuntime(
       models: { [model]: { contextWindow, maxOutputTokens } },
       sqlitePath,
       maxOutputTokens,
+      ...(mediaDir
+        ? {
+            media: {
+              dataDir: mediaDir,
+              ...(libraryRoot ? { libraryRoot } : {})
+            }
+          }
+        : {}),
       baseURL: env.KEUNDAL_BASE_URL || undefined,
       headers: env.KEUNDAL_HEADERS ? (JSON.parse(env.KEUNDAL_HEADERS) as Record<string, string>) : undefined
     },

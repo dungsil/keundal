@@ -55,6 +55,21 @@ const runtime = await createAgentRuntime(process.env, { compose: createNodeCompo
 
 `createNodeAgentHost({ ...options, plugins }, createNodeComposition)`와 `createAgentRuntime(env, { plugins, compose: createNodeComposition })`는 Agent Plugins 1.0.0 패키지를 로드합니다. 각 설정에 `root`와 설치 인스턴스별 `dataDirectory`를 지정합니다. `mcp`를 명시한 경우에만 MCP 서버를 실행합니다. 호스트가 스킬 등록과 도구 조합, 종료 시 연결 정리를 담당합니다. 지원 범위와 권한 설정은 [Agent Plugins 문서](../agent-plugins/README.md)를 참고하세요.
 
+## 미디어 조립
+
+`KEUNDAL_MEDIA_DIR`을 설정하면 기본 구성이 shell, 자료库, 도구, 다운로드 플러그인을 차례로 등록합니다. 이 값이 없으면 미디어 서비스를 만들지 않습니다. 데스크톱 sidecar는 SQLite 파일이 있는 폴더의 `media`를 기본값으로 씁니다.
+
+| 환경 변수             | 역할                                                                     |
+| --------------------- | ------------------------------------------------------------------------ |
+| `KEUNDAL_MEDIA_DIR`   | 도구 실행 파일과 작업 로그를 두는 디렉터리입니다. 없으면 만듭니다.       |
+| `KEUNDAL_LIBRARY_DIR` | 자료库 경로를 이 디렉터리 안으로 제한합니다. 생략하면 제한하지 않습니다. |
+
+프로그램 구성에서는 `NodeHostOptions.media`에 `dataDir`, `libraryRoot`, `shellCwd`를 넘집니다. 자료库는 keundal 형식을 쓰고, 항목 폴더의 `item.json`과 자료库 루트의 `library.json`으로 저장합니다. 자료库 계약과 다운로드 계약은 [`@keundal/media`](../media/README.md)에 있습니다.
+
+로컬 음성 인식도 함께 등록합니다. 전사에는 `whisper.cpp`의 `whisper-cli` 실행 파일과 `ffmpeg`가 필요하고, 모델은 `KEUNDAL_MEDIA_DIR` 아래 `models` 폴더에 저장됩니다. 전사 플러그인은 [`@keundal/plugin-transcription-whisper`](../plugin-transcription-whisper/README.md)를 참고합니다.
+
+자막 번역도 같은 조립 단계에서 등록합니다. 번역은 호스트의 `llm` 서비스를 그대로 쓰므로 공급자 설정을 따로 두지 않습니다.
+
 ## 서브에이전트
 
 기본 Node 조합은 `delegate_task`를 제공하고 같은 응답의 도구 호출을 병렬로 실행합니다.

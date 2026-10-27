@@ -17,6 +17,8 @@ import {
 } from '@keundal/core'
 
 import type { AgentHostModel, AgentHostRunOptions, AgentHostServices } from './contracts.js'
+import { handleMediaRequest } from './media.js'
+import { SSE_HEADERS, errorMessage, sendJson } from './respond.js'
 
 /** HTTP 계층이 접근하는 에이전트 표면입니다. `@keundal/agent-host`가 이 모양을 만듭니다. */
 export interface AgentAppServices extends Omit<AgentHostServices, 'run'> {
@@ -33,26 +35,6 @@ export interface AgentAppOptions {
 }
 
 class RequestBodyTooLargeError extends Error {}
-
-const errorMessage = (error: unknown): string => {
-  if (error instanceof Error) return error.message
-  if (typeof error === 'string') return error
-  return 'unknown error'
-}
-
-const SSE_HEADERS = {
-  'content-type': 'text/event-stream',
-  'cache-control': 'private, no-store',
-  connection: 'keep-alive'
-} as const
-
-const sendJson = (response: ServerResponse, status: number, body: unknown): void => {
-  response.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    'cache-control': 'private, no-store'
-  })
-  response.end(JSON.stringify(body))
-}
 
 // Summary projections contain only explicitly requested scalar leaves, never object subtrees.
 function projectScalarState(state: unknown, fields: string[]): Record<string, unknown> {
@@ -261,7 +243,14 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
       }
 
       const credentials = /^Bearer ([A-Za-z0-9\-._~+/]+=*)$/i.exec(request.headers.authorization ?? '')
-      const supplied = Buffer.from(credentials?.[1] ?? '')
+      // <video>는 헤더를 보낼 수 없으므로 비디오 스트림 경로만 쿼리 토큰을 받습니다.
+      // 인증은 경로 해석보다 먼저 하므로 잘못된 target도 401로 끝납니다.
+      let presented = credentials?.[1]
+      if (presented === undefined && (request.url ?? '').startsWith('/media/video?')) {
+        const index = request.url!.indexOf('?')
+        presented = new URLSearchParams(request.url!.slice(index + 1)).get('token') ?? undefined
+      }
+      const supplied = Buffer.from(presented ?? '')
       if (supplied.length !== token.length || !timingSafeEqual(supplied, token)) {
         response.setHeader('WWW-Authenticate', 'Bearer')
         return sendJson(response, 401, { error: 'unauthorized' })
@@ -272,6 +261,27 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
 
       if (request.method === 'GET' && segments.join('/') === 'models') {
         return sendJson(response, 200, { models: models() })
+      }
+
+      if (segments[0] === 'media') {
+        const media = services.media
+        if (!media) return sendJson(response, 503, { error: 'media is not configured' })
+        const abort = new AbortController()
+        const disconnect = () => abort.abort()
+        response.once('close', disconnect)
+        try {
+          return await handleMediaRequest({
+            media,
+            request,
+            response,
+            url,
+            segments,
+            body: () => readBody(request, maxRequestBodyBytes),
+            signal: abort.signal
+          })
+        } finally {
+          response.off('close', disconnect)
+        }
       }
 
       if (request.method === 'GET' && segments.join('/') === 'catalog') {

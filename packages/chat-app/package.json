@@ -25,6 +25,7 @@
     "@keundal/ui-home": "workspace:*",
     "@keundal/ui-layout": "workspace:*",
     "@keundal/ui-mcp": "workspace:*",
+    "@keundal/ui-media": "workspace:*",
     "@keundal/ui-model-selection": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
     "@keundal/ui-settings": "workspace:*",

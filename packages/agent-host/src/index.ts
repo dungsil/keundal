@@ -8,7 +8,7 @@ import {
 } from '@keundal/core'
 import { Context, type Fiber } from 'cordis'
 
-import type { AgentHostOptions, AgentHost, AgentHostModel, AgentHostServices } from './contracts.js'
+import type { AgentHostOptions, AgentHost, AgentHostMedia, AgentHostModel, AgentHostServices } from './contracts.js'
 export * from './contracts.js'
 
 /** 호스트가 관리하는 실행 중 실행입니다. */
@@ -119,6 +119,17 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
     for (const name of ['llm', 'session', 'generation'] as const) {
       if (!servicesContext[name]) throw new Error(`missing host service: ${name}`)
     }
+    const media: AgentHostMedia | undefined =
+      servicesContext.media && servicesContext.mediaTools && servicesContext.mediaDownload
+        ? {
+            library: servicesContext.media,
+            tools: servicesContext.mediaTools,
+            download: servicesContext.mediaDownload,
+            ...(servicesContext.mediaTranscription ? { transcription: servicesContext.mediaTranscription } : {}),
+            ...(servicesContext.subtitleTranslation ? { translation: servicesContext.subtitleTranslation } : {}),
+            ...(servicesContext.mediaExport ? { export: servicesContext.mediaExport } : {})
+          }
+        : undefined
 
     const services: AgentHostServices = {
       run(input, runOptions = {}) {
@@ -171,6 +182,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         recover: (runOptions) => servicesContext.generation.recover(runOptions)
       },
       models: () => models,
+      ...(media ? { media } : {}),
       async catalog(execution = {}) {
         if (closed) throw new Error('agent host disposed')
         const skills = servicesContext.skills ? (await servicesContext.skills.prepare(execution)).skills : []

@@ -34,6 +34,10 @@
       "types": "./dist/platform.d.ts",
       "import": "./dist/platform.js"
     },
+    "./media": {
+      "types": "./dist/media.d.ts",
+      "import": "./dist/media.js"
+    },
     "./messages": {
       "types": "./dist/messages.d.ts",
       "import": "./dist/messages.js"
@@ -61,13 +65,16 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "@keundal/core": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
     "@keundal/mcp": "workspace:*",
+    "@keundal/media": "workspace:*",
     "@keundal/tools": "workspace:*",
+    "@keundal/transcription": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

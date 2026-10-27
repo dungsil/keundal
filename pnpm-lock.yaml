@@ -484,6 +484,12 @@ importers:
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
+      '@keundal/media':
+        specifier: workspace:*
+        version: link:../media
+      '@keundal/transcription':
+        specifier: workspace:*
+        version: link:../transcription
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
@@ -610,6 +616,9 @@ importers:
       '@keundal/plugin-agent-chat':
         specifier: workspace:*
         version: link:../plugin-agent-chat
+      '@keundal/plugin-library-fs':
+        specifier: workspace:*
+        version: link:../plugin-library-fs
       '@keundal/plugin-llm-anthropic':
         specifier: workspace:*
         version: link:../plugin-llm-anthropic
@@ -625,15 +634,33 @@ importers:
       '@keundal/plugin-mcp-client':
         specifier: workspace:*
         version: link:../plugin-mcp-client
+      '@keundal/plugin-media-download':
+        specifier: workspace:*
+        version: link:../plugin-media-download
+      '@keundal/plugin-media-export':
+        specifier: workspace:*
+        version: link:../plugin-media-export
+      '@keundal/plugin-media-tools':
+        specifier: workspace:*
+        version: link:../plugin-media-tools
       '@keundal/plugin-runtime':
         specifier: workspace:*
         version: link:../plugin-runtime
+      '@keundal/plugin-shell-local':
+        specifier: workspace:*
+        version: link:../plugin-shell-local
       '@keundal/plugin-skill':
         specifier: workspace:*
         version: link:../plugin-skill
       '@keundal/plugin-store-sqlite':
         specifier: workspace:*
         version: link:../plugin-store-sqlite
+      '@keundal/plugin-subtitle-translate':
+        specifier: workspace:*
+        version: link:../plugin-subtitle-translate
+      '@keundal/plugin-transcription-whisper':
+        specifier: workspace:*
+        version: link:../plugin-transcription-whisper
       '@keundal/tools':
         specifier: workspace:*
         version: link:../tools
@@ -677,9 +704,15 @@ importers:
       '@keundal/mcp':
         specifier: workspace:*
         version: link:../mcp
+      '@keundal/media':
+        specifier: workspace:*
+        version: link:../media
       '@keundal/tools':
         specifier: workspace:*
         version: link:../tools
+      '@keundal/transcription':
+        specifier: workspace:*
+        version: link:../transcription
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -753,6 +786,9 @@ importers:
       '@keundal/ui-mcp':
         specifier: workspace:*
         version: link:../ui-mcp
+      '@keundal/ui-media':
+        specifier: workspace:*
+        version: link:../ui-media
       '@keundal/ui-model-selection':
         specifier: workspace:*
         version: link:../ui-model-selection
@@ -1050,6 +1086,34 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+
+  packages/media:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/plugin-agent-chat:
     dependencies:
@@ -1421,6 +1485,37 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/plugin-library-fs:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/media':
+        specifier: workspace:*
+        version: link:../media
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/plugin-llm-anthropic:
     dependencies:
       '@anthropic-ai/sdk':
@@ -1682,6 +1777,108 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/plugin-media-download:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/media':
+        specifier: workspace:*
+        version: link:../media
+      '@keundal/shell':
+        specifier: workspace:*
+        version: link:../shell
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/plugin-media-export:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/media':
+        specifier: workspace:*
+        version: link:../media
+      '@keundal/shell':
+        specifier: workspace:*
+        version: link:../shell
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/plugin-media-tools:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/media':
+        specifier: workspace:*
+        version: link:../media
+      '@keundal/shell':
+        specifier: workspace:*
+        version: link:../shell
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/plugin-runtime:
     dependencies:
       '@keundal/core':
@@ -1883,6 +2080,37 @@ importers:
       '@keundal/store-conformance':
         specifier: workspace:*
         version: link:../../tools/store-conformance
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/plugin-subtitle-translate:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/media':
+        specifier: workspace:*
+        version: link:../media
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
         version: link:../../tools/tsconfig
@@ -2117,6 +2345,43 @@ importers:
       ws:
         specifier: 8.22.0
         version: 8.22.0
+
+  packages/plugin-transcription-whisper:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/media':
+        specifier: workspace:*
+        version: link:../media
+      '@keundal/shell':
+        specifier: workspace:*
+        version: link:../shell
+      '@keundal/transcription':
+        specifier: workspace:*
+        version: link:../transcription
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/shell:
     dependencies:
@@ -2541,6 +2806,45 @@ importers:
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
+      '@keundal/ui-runtime':
+        specifier: workspace:*
+        version: link:../ui-runtime
+      '@keundal/ui-settings':
+        specifier: workspace:*
+        version: link:../ui-settings
+      '@keundal/ui-slots':
+        specifier: workspace:*
+        version: link:../ui-slots
+      '@vueuse/core':
+        specifier: ^14.4.0
+        version: 14.4.0(vue@3.5.44(typescript@6.0.3))
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+      nuxt:
+        specifier: ^4.6.2
+        version: 4.6.2(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.154.0)(@types/node@24.19.2)(@vercel/blob@2.8.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.89.0(oxlint-tsgolint@7.0.2004))(rolldown@1.2.14)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.14)(rollup@4.64.7))(rollup@4.64.7)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(yaml@2.9.1)
+      vue:
+        specifier: 3.5.44
+        version: 3.5.44(typescript@6.0.3)
+
+  packages/ui-media:
+    dependencies:
+      '@keundal/chat':
+        specifier: workspace:*
+        version: link:../chat
+      '@keundal/media':
+        specifier: workspace:*
+        version: link:../media
+      '@keundal/transcription':
+        specifier: workspace:*
+        version: link:../transcription
+      '@keundal/ui':
+        specifier: workspace:*
+        version: link:../ui
+      '@keundal/ui-layout':
+        specifier: workspace:*
+        version: link:../ui-layout
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime

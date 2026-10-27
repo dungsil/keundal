@@ -1,6 +1,23 @@
 import type { ExecutionOptions, SkillProvider, SkillSummary } from '@keundal/core'
 import type { LLMSettings } from '@keundal/llm-settings'
 import type { McpProbeResult, McpRequestOptions } from '@keundal/mcp'
+import type {
+  ExportClipsRequest,
+  ExportFcpxmlRequest,
+  ExportFcpxmlResult,
+  ImportMediaEntry,
+  MediaDownloadJob,
+  MediaDownloadRequest,
+  MediaExportFile,
+  MediaItem,
+  MediaLibrary,
+  MediaToolName,
+  MediaToolStatus,
+  SubtitleTrack,
+  TranslateSubtitlesRequest,
+  TranslateSubtitlesResult
+} from '@keundal/media'
+import type { SpeechModelStatus, TranscribeMediaRequest, TranscribeMediaResult } from '@keundal/transcription'
 
 import type { ChatStoreLike } from './chat-store'
 import type { ModelOption } from './models'
@@ -87,9 +104,38 @@ export interface TranscriptionStream {
   fullStream: AsyncIterable<TranscriptEvent>
   text: Promise<string>
 }
+/**
+ * 자료库와 로컬 미디어 도구를 다루는 플랫폼 표면입니다.
+ * 호스트가 미디어 기능을 조립하지 않았으면 플랫폼은 이 값을 제공하지 않습니다.
+ */
+export interface PlatformMedia {
+  tools(): Promise<readonly MediaToolStatus[]>
+  installTool(name: MediaToolName): Promise<MediaToolStatus>
+  configureTool(name: MediaToolName, path: string | null): Promise<void>
+  models(): Promise<readonly SpeechModelStatus[]>
+  installModel(id: string): Promise<SpeechModelStatus>
+  createLibrary(request: { path: string; name?: string }): Promise<MediaLibrary>
+  openLibrary(path: string): Promise<MediaLibrary>
+  items(path: string): Promise<readonly MediaItem[]>
+  /** `<video src>`에 넣을 수 있는 주소를 만듭니다. 토큰이 쿼리에 붙습니다. */
+  videoUrl(request: { libraryPath: string; itemId: string }): Promise<string>
+  importMedia(request: { libraryPath: string; entries: readonly ImportMediaEntry[] }): Promise<readonly MediaItem[]>
+  removeItem(request: { libraryPath: string; itemId: string; permanent?: boolean }): Promise<void>
+  saveSubtitle(request: { libraryPath: string; itemId: string; track: SubtitleTrack }): Promise<void>
+  startDownload(request: MediaDownloadRequest): Promise<MediaDownloadJob>
+  downloads(): Promise<readonly MediaDownloadJob[]>
+  controlDownload(id: string, action: 'pause' | 'resume' | 'cancel'): Promise<void>
+  transcribe(request: TranscribeMediaRequest): Promise<TranscribeMediaResult>
+  translate(request: TranslateSubtitlesRequest): Promise<TranslateSubtitlesResult>
+  exportClips(request: ExportClipsRequest): Promise<readonly MediaExportFile[]>
+  exportFcpxml(request: ExportFcpxmlRequest): Promise<ExportFcpxmlResult>
+}
+
 export interface ChatPlatform {
   plugins?: AgentPluginManager
   runtimePlugins?: RuntimePluginManager
+  /** 호스트가 미디어 경로를 제공할 때만 있습니다. */
+  media?: PlatformMedia
   mcp: {
     readonly configuration: import('@keundal/mcp').McpClientConfig[]
     load(): Promise<void>

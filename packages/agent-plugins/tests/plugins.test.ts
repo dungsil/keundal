@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -7,7 +7,8 @@ import { loadAgentPlugin, PLUGIN_SCHEMA, MCP_SCHEMA, type LoadedAgentPlugin } fr
 import { expect, test, type TestContext } from 'vitest'
 
 async function fixture(t: TestContext) {
-  const base = await mkdtemp(join(tmpdir(), 'agent-plugins-'))
+  // 짧은 경로와 긴 경로가 다를 수 있으므로 기준 경로를 정규화해 둡니다.
+  const base = await realpath(await mkdtemp(join(tmpdir(), 'agent-plugins-')))
   const root = join(base, 'plugin')
   const dataDirectory = join(base, 'data')
   const plugins: LoadedAgentPlugin[] = []
@@ -36,6 +37,23 @@ async function fixture(t: TestContext) {
   return { base, root, dataDirectory, file, skill, load, mcp }
 }
 const stdio = { type: 'stdio', command: 'node', args: [fileURLToPath(new URL('./stdio.ts', import.meta.url))] }
+
+/**
+ * Windows에서 개발자 모드가 꺼져 있으면 심볼릭 링크를 만들 수 없습니다.
+ * 경계 검사는 링크 대상이 필요하므로 권한이 없으면 건너뜁니다.
+ */
+const canSymlink = await (async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'agent-plugins-link-'))
+  try {
+    await writeFile(join(directory, 'target'), '')
+    await symlink(join(directory, 'target'), join(directory, 'link'))
+    return true
+  } catch {
+    return false
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})()
 
 test('최소 매니페스트는 구성요소 없이 로드한다', async (t) => {
   const f = await fixture(t)
@@ -103,6 +121,10 @@ test('빈 본문과 유니코드 이름을 가진 유효한 스킬도 제공한�
 })
 
 test('루트 밖의 매니페스트 링크는 거부한다', async (t) => {
+  if (!canSymlink) {
+    t.skip('심볼릭 링크를 만들 권한이 없어 건너뜁니다')
+    return
+  }
   const f = await fixture(t)
   await writeFile(join(f.base, 'outside.json'), await readFile(join(f.root, 'plugin.json')))
   await rm(join(f.root, 'plugin.json'))
@@ -111,6 +133,10 @@ test('루트 밖의 매니페스트 링크는 거부한다', async (t) => {
 })
 
 test('스킬 링크는 내부 대상만 허용하고 로드 직전 경계를 다시 검사한다', async (t) => {
+  if (!canSymlink) {
+    t.skip('심볼릭 링크를 만들 권한이 없어 건너뜁니다')
+    return
+  }
   const f = await fixture(t)
   await f.file('bundled/SKILL.md', '---\nname: hello\ndescription: test\n---\nbody')
   await mkdir(join(f.root, 'skills'))
@@ -124,6 +150,10 @@ test('스킬 링크는 내부 대상만 허용하고 로드 직전 경계를 다
 })
 
 test.for(['skills', 'mcp.json'])('외부 구성요소 링크 %s는 해당 종류만 비활성화한다', async (component, t) => {
+  if (!canSymlink) {
+    t.skip('심볼릭 링크를 만들 권한이 없어 건너뜁니다')
+    return
+  }
   const f = await fixture(t)
   if (component === 'mcp.json') await f.skill()
   const outside = join(f.base, 'outside')
