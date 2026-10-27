@@ -36,8 +36,6 @@ import * as chat from '@keundal/ui-chat/plugin'
 - `app/views/ChatTitle.vue`, `ChatVisibility.vue`, `ChatSkeleton.vue`, `ChatIndicator.vue`, `ChatQueue.vue`: 화면의 구성 요소입니다.
 - `app/views/message/`: 메시지 내용, 동작 버튼, 편집 양식입니다.
 - `app/lib/use-keundal-chat.ts`: 전송·중단·편집·재생성·대기열 상태를 관리하는 컴포저블입니다. Nuxt 자동 가져오기에 의존하지 않으므로 단위 테스트에서 그대로 사용합니다.
-- `app/lib/messages.ts`: 인접한 텍스트 조각과 출처를 합칩니다.
-- `app/lib/source.ts`: 출처 URL을 `:source-link` MDC로 바꿉니다. 안전하지 않은 URL은 빈 문자열입니다.
-- `tests/markdown-security.test.ts`: 공통 Markdown 렌더러(`@keundal/ui`의 `chatMarkdownOptions`)의 보안 경계를 검증합니다.
+- `app/lib/messages.ts`: 인접한 텍스트 조각을 합치고 원문 기준 출처 위치를 보존합니다. 렌더러의 문법은 만들지 않습니다.
 
-Markdown 렌더링(`ChatComark`, `SourceLink`, `chatMarkdownOptions`)은 여러 플러그인이 쓰므로 `@keundal/ui`에 있습니다.
+본문과 추론은 `@keundal/ui`의 `ChatMarkdown`을 사용합니다. 구현은 `markdown` 팩터리에 등록하며, 기본 구현인 `@keundal/ui-markdown-comark`가 Comark 설정과 보안 경계를 소유합니다.

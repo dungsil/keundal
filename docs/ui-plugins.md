@@ -69,6 +69,18 @@ ctx.slots.register({ name: 'page.chat', children: { 'chat.message.tool': 'keyed'
 
 항목의 컴포넌트가 오류를 던지면 렌더러는 오류를 기록하고 그 항목만 비웁니다.
 
+## Markdown 렌더링
+
+LLM 본문·추론·서브에이전트 결과는 `@keundal/ui`의 `ChatMarkdown`으로 표시합니다. 이 컴포넌트는 `markdown` 팩터리에 입력을 전달하며 구현을 가져오지 않습니다. 계약인 `MarkdownOwner`는 `@keundal/ui/app/types/markdown.ts`에 있습니다.
+
+- `value`: 원본 Markdown 문자열입니다.
+- `streaming`: 응답을 생성 중인지 나타냅니다.
+- `sources`: 원문에서 출처를 표시할 위치와 URL입니다. `offset`은 UTF-16 코드 단위이며 원문 순서대로 전달합니다. 같은 위치의 출처도 배열 순서를 유지합니다.
+
+현재 구현은 `@keundal/ui-markdown-comark` 하나입니다. Comark Nuxt 모듈, 지연 로딩, 코드 강조와 다크 테마, 출처 문법 변환, 보안 처리를 이 패키지에서 관리합니다. 보안 테스트도 구현 패키지에 둡니다. `SourceLink`의 URL 검증은 공통 UI에 유지합니다.
+
+구현을 교체할 때는 `@keundal/chat-app`의 Nuxt `extends`와 `uiPluginCatalog`에서 구현 패키지를 함께 바꿉니다. 새 구현은 `ctx.slots.registerFactory({ name: 'markdown' }, component)`로 등록하고 `value`, `streaming`, `sources`를 props로 받습니다. `lazyView`를 쓰면 세 이름을 전달 목록에 포함합니다. 소비 컴포넌트나 저장된 대화 형식은 바꾸지 않습니다. 별도의 사용자 선택 화면이나 런타임 매니페스트 항목은 추가하지 않습니다.
+
 ## 번역
 
 각 패키지는 `app/locales/{en,ko}.ts`에 자신이 쓰는 문구를 둡니다. `app/locale.ts`의 `useText()`는 패키지의 키를 먼저 찾고, 없으면 `@keundal/ui`의 공유 사전에서 찾습니다. 패키지 둘 이상이 쓰는 문구와 셸의 문구는 공유 사전에 둡니다. 다른 컴포넌트가 읽는 메타데이터의 문구는 `localizedText()`나 `sharedText()`로 모든 언어의 값을 함께 넘깁니다.

@@ -3,20 +3,23 @@ import { describe, expect, test } from 'vitest'
 import * as Vue from 'vue'
 import { compileScript, parse } from 'vue/compiler-sfc'
 import { renderToString } from 'vue/server-renderer'
+import { Context } from 'cordis'
+import * as slots from '@keundal/ui-slots'
 import ts from 'typescript'
 import * as urls from '../../ui/app/utils/url'
-import { sourceToInlineMdc } from '../../ui-chat/app/lib/source'
+import { sourceToInlineMdc } from '@keundal/ui-markdown-comark/app/lib/source.ts'
 import { getSources } from '../../ui-tool/app/lib/tool'
 
 // Compile the actual SFCs, including their attribute inheritance and templates.
 function component(path: string): Vue.Component {
-  const { descriptor } = parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
+  const url = new URL(path, import.meta.url)
+  const { descriptor } = parse(readFileSync(url, 'utf8'), { filename: url.pathname })
   const script = compileScript(descriptor, { id: 'citation-test', inlineTemplate: true })
   const code = ts.transpileModule(script.content, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText
   const exports = {} as { default: Vue.Component }
-  const require = (name: string) => name === 'vue' ? Vue : urls
+  const require = (name: string) => name === 'vue' ? Vue : name === '@keundal/ui-slots' ? slots : urls
   new Function('require', 'exports', 'computed', 'getDomain', 'getFaviconUrl', code)(
     require, exports, Vue.computed, urls.getDomain, urls.getFaviconUrl
   )
@@ -24,6 +27,7 @@ function component(path: string): Vue.Component {
 }
 
 const SourceLink = component('../../ui/app/components/chat/SourceLink.vue')
+const ChatMarkdown = component('../../ui/app/components/chat/Markdown.vue')
 const Sources = component('../../ui-tool/app/views/Sources.vue')
 
 function render(component: Vue.Component, props: Record<string, unknown>) {
@@ -96,5 +100,32 @@ test('인용 컴포넌트는 저장된 favicon 속성과 도구 출처에서 자
     expect(html).toContain('href="https://example.com/source"')
     expect(html).not.toContain('<img')
     expect(html).not.toContain('src=')
+  }
+})
+
+test('공통 Markdown은 구현을 바꿔도 원문과 스트리밍 상태 및 출처를 전달하고 방향과 줄바꿈 속성을 유지한다', async () => {
+  const ctx = new Context()
+  const fiber = await ctx.plugin(slots.SlotService)
+  try {
+    const owner = { value: '**원문🌙**', streaming: true, sources: [{ offset: 8, url: 'https://example.com' }] }
+    ctx.slots.register({ name: 'root' }, Vue.defineComponent({
+      setup: () => () => Vue.h(ChatMarkdown, { ...owner, dir: 'auto', class: 'wrap-break-word' })
+    }))
+    for (const tag of ['pre', 'article']) {
+      const dispose = ctx.slots.registerFactory({ name: 'markdown' }, Vue.defineComponent({
+        props: ['value', 'streaming', 'sources'],
+        setup: props => () => Vue.h(tag, JSON.stringify(props))
+      }))
+      const html = await renderToString(Vue.createSSRApp(slots.SlotRoot, { service: ctx.slots }))
+      expect(html).toContain('dir="auto"')
+      expect(html).toContain('wrap-break-word')
+      expect(html).toContain(`<${tag}>`)
+      expect(html).toContain('**원문🌙**')
+      expect(html).toContain('&quot;streaming&quot;:true')
+      expect(html).toContain('&quot;sources&quot;:[{&quot;offset&quot;:8,&quot;url&quot;:&quot;https://example.com&quot;}]')
+      dispose()
+    }
+  } finally {
+    await fiber.dispose()
   }
 })
