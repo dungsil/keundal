@@ -1,5 +1,15 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { closeSync, constants, existsSync, lstatSync, openSync, readdirSync, realpathSync, statSync } from 'node:fs'
+import {
+  closeSync,
+  constants,
+  type Dirent,
+  existsSync,
+  lstatSync,
+  openSync,
+  readdirSync,
+  realpathSync,
+  statSync
+} from 'node:fs'
 import { dirname, isAbsolute, join, normalize, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -56,15 +66,21 @@ function inspectTree(path: string, runtime: boolean, root = true): void {
   const entry = root ? statSync(path) : lstatSync(path)
   if (entry.isSymbolicLink()) return
   if (entry.isDirectory()) {
-    let names: string[]
+    let children: Dirent[]
     try {
-      names = readdirSync(path)
+      children = readdirSync(path, { withFileTypes: true })
     } catch (error) {
       // Root-owned, inaccessible system directories remain inaccessible after cap-drop.
       if (runtime && entry.uid !== process.getuid!() && (error as NodeJS.ErrnoException).code === 'EACCES') return
       throw error
     }
-    for (const name of names) inspectTree(join(path, name), runtime, false)
+    for (const child of children) {
+      // Trusted runtime files may have package-manager hardlinks. Directory entry
+      // types already distinguish these files from sockets/devices, without one
+      // extra stat syscall per file in a potentially very large OS installation.
+      if (runtime && (child.isFile() || child.isSymbolicLink())) continue
+      inspectTree(join(path, child.name), runtime, false)
+    }
   } else if (!entry.isFile() || (!runtime && entry.nlink !== 1)) {
     throw new Error(`Unsafe sandbox file (special file or hardlink): ${path}`)
   }

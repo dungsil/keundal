@@ -352,11 +352,15 @@ describe.skipIf(process.platform !== 'linux')('LinuxSandboxProvider 실제 격�
         const heartbeat = join(workspace, 'heartbeat')
         const code = `
         import { spawn } from 'node:child_process';
-        spawn(process.execPath, ['--eval', ${JSON.stringify(`setInterval(() => require('node:fs').appendFileSync(${JSON.stringify(heartbeat)}, '.'), 20)`)}],
+        spawn(process.execPath, ['--eval', "setInterval(() => require('node:fs').appendFileSync(process.env.HEARTBEAT, '.'), 20)"],
           { detached: true, stdio: 'ignore' }).unref();
         setInterval(() => {}, 1000);
       `
-        const runningRequest = { ...request, args: ['--input-type=module', '--eval', code] }
+        const runningRequest = {
+          ...request,
+          environment: { HEARTBEAT: heartbeat },
+          args: ['--input-type=module', '--eval', code]
+        }
         const child = killParent
           ? spawn(
               process.execPath,
@@ -364,14 +368,20 @@ describe.skipIf(process.platform !== 'linux')('LinuxSandboxProvider 실제 격�
                 '--input-type=module',
                 '--eval',
                 `
-            import { LinuxSandboxProvider } from ${JSON.stringify(new URL('../dist/index.js', import.meta.url).href)};
-            const child = new LinuxSandboxProvider().start(${JSON.stringify(runningRequest)});
+            const { LinuxSandboxProvider } = await import(process.env.PROVIDER_URL);
+            const child = new LinuxSandboxProvider().start(JSON.parse(process.env.SANDBOX_REQUEST));
             child.stderr.pipe(process.stderr);
             child.on('error', error => { console.error(error); process.exit(1); });
             setInterval(() => {}, 1000);
           `
               ],
-              { stdio: 'pipe' }
+              {
+                stdio: 'pipe',
+                env: {
+                  PROVIDER_URL: new URL('../dist/index.js', import.meta.url).href,
+                  SANDBOX_REQUEST: JSON.stringify(runningRequest)
+                }
+              }
             )
           : provider.start(runningRequest)
         let stderr = ''
