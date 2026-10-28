@@ -52,6 +52,10 @@ export class ShellToolsService extends Service {
           required: ['command'],
           additionalProperties: false
         },
+        describeOperation: (args) => {
+          const request = parseArgs(args)
+          return { kind: 'shell', command: request.command, paths: request.cwd ? [request.cwd] : [] }
+        },
         execute: async (args, context) =>
           JSON.stringify(await ctx.shell.execute(parseArgs(args), { signal: context.signal }))
       } satisfies ExecutableTool)

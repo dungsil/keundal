@@ -8,6 +8,7 @@ import { type GenerationSnapshot } from '@keundal/generation'
 import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
+import { ToolApproval, isToolApprovalRecord } from '@keundal/tool-approval'
 import { readTraceSpans, TRACE_EVENT } from '@keundal/trace'
 import { Context, type Fiber } from 'cordis'
 
@@ -139,6 +140,37 @@ const setup = async (
     }
   }
 }
+
+test('승인 API는 인증과 결정을 검증하고 첫 응답만 받아들인다', async (t) => {
+  const { services, requestJson } = await setup(t)
+  const approval = new ToolApproval()
+  services.respondToToolApproval = (runId, requestId, decision) => approval.respond(runId, requestId, decision)
+  const abort = new AbortController()
+  t.onTestFinished(() => abort.abort())
+  let requestId = ''
+  const authorized = approval.authorize(
+    {
+      threadId: 'thread',
+      runId: 'r1',
+      toolCallId: 'call',
+      toolName: 'shell',
+      arguments: {},
+      operation: { kind: 'shell' }
+    },
+    abort.signal,
+    async (event) => {
+      if (isToolApprovalRecord(event.value)) requestId = event.value.requestId
+    }
+  )
+  const path = `/runs/r1/approvals/${requestId}`
+  expect((await requestJson('POST', path, { decision: 'allow' }, { authorization: 'Bearer wrong' })).status).toBe(401)
+  expect((await requestJson('POST', path, { decision: 'always' })).status).toBe(400)
+  expect((await requestJson('POST', path, { decision: 'allow', extra: true })).status).toBe(400)
+  expect((await requestJson('POST', `/runs/other/approvals/${requestId}`, { decision: 'allow' })).status).toBe(409)
+  expect((await requestJson('POST', path, { decision: 'allow' })).status).toBe(202)
+  expect(await authorized).toBe(true)
+  expect((await requestJson('POST', path, { decision: 'deny' })).status).toBe(409)
+})
 
 const parseFrames = (text: string): { id?: number; event: AGUIEvent }[] =>
   text

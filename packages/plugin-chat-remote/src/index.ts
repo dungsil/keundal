@@ -198,6 +198,17 @@ export class RemoteChatStore implements ChatStoreLike {
     return this.runs.dequeue(id, messageId)
   }
 
+  async respondToToolApproval(runId: string, requestId: string, decision: 'allow' | 'deny') {
+    const response = await this.raw(`/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(requestId)}`, {
+      method: 'POST',
+      body: JSON.stringify({ decision })
+    })
+    if (response.status !== 202 && response.status !== 409)
+      throw new Error(`Approval request failed (HTTP ${response.status})`)
+    await response.body?.cancel()
+    return response.status === 202
+  }
+
   steer(id: string, message: ChatMessage) {
     return this.runs.steer(id, message, async (run) => {
       const chat = await this.get(id)
@@ -372,20 +383,23 @@ export class RemoteChatStore implements ChatStoreLike {
       const snapshot = this.snapshot(await (await this.call(`/threads/${encodeURIComponent(id)}`)).json())
       const current = this.chat(snapshot)
       if (!current) throw new Error('Chat not found')
-      const runId = randomUUID()
+      const resuming = !!current.pendingRunId
+      const runId = current.pendingRunId ?? randomUUID()
       // 대기열에서 꺼낸 메시지는 대화에 넣는 같은 커밋에서 대기열에서 지워 중복 실행을 막습니다.
       const sent = new Set(request.messages.map((message) => message.id))
       const queue = (current.queue ?? []).filter((message) => !sent.has(message.id))
-      let chat: LocalChat = {
-        ...current,
-        messages: request.messages,
-        model: request.model,
-        started: true,
-        pendingRunId: runId,
-        queue: queue.length ? queue : undefined
-      }
-      const saved = await this.save(snapshot, chat)
-      if (!chat.title && chat.messages[0]) {
+      let chat: LocalChat = resuming
+        ? current
+        : {
+            ...current,
+            messages: request.messages,
+            model: request.model,
+            started: true,
+            pendingRunId: runId,
+            queue: queue.length ? queue : undefined
+          }
+      const saved = resuming ? snapshot : await this.save(snapshot, chat)
+      if (!resuming && !chat.title && chat.messages[0]) {
         try {
           chat = {
             ...chat,
@@ -400,7 +414,7 @@ export class RemoteChatStore implements ChatStoreLike {
         }
       }
       combined.throwIfAborted()
-      const selected = await this.model(request.model)
+      const selected = await this.model(chat.model)
       const projection = new ChatMessageAssembly(runId)
       const publisher = new ChatMessagePublisher(request.onMessage)
       let finished: Extract<AGUIEvent, { type: 'RUN_FINISHED' }> | undefined
@@ -424,33 +438,35 @@ export class RemoteChatStore implements ChatStoreLike {
       let cursor = -1
       const budget = new RemoteStreamBudget()
       try {
-        let response = await this.call('/runs', {
-          method: 'POST',
-          headers: {
-            'x-keundal-model': selected.id,
-            ...(request.reasoning === undefined ? {} : { 'x-keundal-reasoning': String(request.reasoning) })
-          },
-          signal: combined,
-          body: JSON.stringify({
-            threadId: id,
-            runId,
-            state: {
-              web: chat,
-              ...(request.subagentRoles === undefined ? {} : { subagentRoles: request.subagentRoles })
-            },
-            context: [],
-            tools: [],
-            forwardedProps: { keundalPromptPreset: promptPreset },
-            messages: [
-              {
-                id: 'keundal:web-instructions',
-                role: 'system',
-                content: instructions(!!request.webSearch, request.systemPrompt)
+        let response = resuming
+          ? await this.call(`/runs/${encodeURIComponent(runId)}/events`, { signal: combined })
+          : await this.call('/runs', {
+              method: 'POST',
+              headers: {
+                'x-keundal-model': selected.id,
+                ...(request.reasoning === undefined ? {} : { 'x-keundal-reasoning': String(request.reasoning) })
               },
-              ...toMessages(request.messages, request.model)
-            ]
-          })
-        })
+              signal: combined,
+              body: JSON.stringify({
+                threadId: id,
+                runId,
+                state: {
+                  web: chat,
+                  ...(request.subagentRoles === undefined ? {} : { subagentRoles: request.subagentRoles })
+                },
+                context: [],
+                tools: [],
+                forwardedProps: { keundalPromptPreset: promptPreset },
+                messages: [
+                  {
+                    id: 'keundal:web-instructions',
+                    role: 'system',
+                    content: instructions(!!request.webSearch, request.systemPrompt)
+                  },
+                  ...toMessages(request.messages, request.model)
+                ]
+              })
+            })
         let attempts = 0
         for (;;) {
           try {
@@ -511,7 +527,7 @@ export class RemoteChatStore implements ChatStoreLike {
           }
         }
         run.closing = true
-        projection.finish(request.model)
+        projection.finish(chat.model)
         await this.complete(id, runId, projection.message, projection.steered, run)
         settled = true
         publisher.finish(projection.message)

@@ -106,6 +106,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         }
         store = new ChatStore(root, (ctx, config) => composition.mountAgent(ctx, {
           model: config.model,
+          toolApproval: config.toolApproval,
           maxOutputTokens: config.maxOutputTokens,
           reasoning: config.reasoning,
           webSearch: config.webSearch,

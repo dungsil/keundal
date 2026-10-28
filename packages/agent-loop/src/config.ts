@@ -4,6 +4,7 @@ import { parseDeferredToolsConfig, type DeferredToolsConfig } from '@keundal/def
 import { parseReasoning, type Reasoning } from '@keundal/llm'
 import { parseSubagentRoles, type SubagentRole } from '@keundal/subagent'
 import { SUBAGENT_TOOL_NAME } from '@keundal/subagent/tools'
+import { ToolApproval } from '@keundal/tool-approval'
 import { parseTools } from '@keundal/tool-execution'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 import { parsePricing, type AgentPricing } from '@keundal/trace'
@@ -16,6 +17,7 @@ export interface AgentConfig {
   readonly reasoning?: Reasoning
   readonly compaction?: AgentCompactionConfig
   readonly tools?: readonly ExecutableTool[] | ToolProvider
+  readonly toolApproval?: ToolApproval
   /** 도구를 검색한 뒤 다음 모델 요청에서만 노출합니다. */
   readonly deferredTools?: DeferredToolsConfig
   /** 지연 도구만 공급합니다. 기존 tools 공급자와 별도로 조회합니다. */
@@ -65,6 +67,10 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     }
   }
   const configuredTools = 'tools' in value ? value.tools : undefined
+  const toolApproval = 'toolApproval' in value ? value.toolApproval : undefined
+  if (toolApproval !== undefined && !(toolApproval instanceof ToolApproval)) {
+    throw new Error('toolApproval must be a host-owned ToolApproval instance')
+  }
   const deferredTools =
     'deferredTools' in value && value.deferredTools !== undefined
       ? parseDeferredToolsConfig(value.deferredTools)
@@ -111,6 +117,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     ...('reasoning' in value ? { reasoning: parseReasoning(value.reasoning) } : {}),
     compaction,
     tools,
+    ...(toolApproval === undefined ? {} : { toolApproval }),
     ...(deferredTools === undefined ? {} : { deferredTools }),
     ...(deferredToolProvider === undefined ? {} : { deferredToolProvider: deferredToolProvider as ToolProvider }),
     subagents,

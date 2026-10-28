@@ -9,6 +9,7 @@ import {
   type RunAgentInput
 } from '@keundal/core'
 import { type LLMEvent, type LLMRequest, type LLMService } from '@keundal/llm'
+import { ToolApproval } from '@keundal/tool-approval'
 import { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 import type { ExecutableTool, ToolExecutionContext } from '@keundal/tools'
 import { readTraceSpans, traceEvent, type TraceSpan } from '@keundal/trace'
@@ -25,6 +26,7 @@ export function parseTools(value: unknown): ExecutableTool[] {
       !tool.name.trim() ||
       typeof tool.description !== 'string' ||
       !isObject(tool.parameters) ||
+      (tool.describeOperation !== undefined && typeof tool.describeOperation !== 'function') ||
       typeof tool.execute !== 'function'
     ) {
       throw new Error('each tool requires a name, description, parameters object and execute function')
@@ -35,6 +37,9 @@ export function parseTools(value: unknown): ExecutableTool[] {
       name: tool.name,
       description: tool.description,
       parameters: tool.parameters,
+      ...(tool.describeOperation
+        ? { describeOperation: tool.describeOperation as ExecutableTool['describeOperation'] }
+        : {}),
       execute: tool.execute as ExecutableTool['execute']
     }
   })
@@ -64,6 +69,7 @@ export async function* streamWithTools(
   prepareInput: (input: RunAgentInput) => Promise<RunAgentInput>,
   signal: AbortSignal,
   options: {
+    approval?: ToolApproval
     parallel?: boolean
     stream?: LLMService['stream']
     maxToolCalls?: number
@@ -76,6 +82,7 @@ export async function* streamWithTools(
     }
   } = {}
 ): AsyncGenerator<LLMEvent> {
+  const approval = options.approval ?? new ToolApproval({ default: 'allow' })
   let registered = new Map(tools.map((tool) => [tool.name, tool]))
   const usedIds = new Set(
     request.input.messages.flatMap((message) =>
@@ -216,7 +223,14 @@ export async function* streamWithTools(
     })
     const batches = options.parallel ? [executions] : executions.map((execution) => [execution])
     for (const batch of batches) {
-      for await (const event of executeBatch(batch, executionContext, signal, options.trace, options.traceContext)) {
+      for await (const event of executeBatch(
+        batch,
+        executionContext,
+        signal,
+        approval,
+        options.trace,
+        options.traceContext
+      )) {
         assembly.apply(event)
         yield event
       }
@@ -233,6 +247,7 @@ async function* executeBatch(
   executions: { call: PendingCall; tool: ExecutableTool; args: Record<string, unknown> }[],
   context: (call: PendingCall) => ToolExecutionContext,
   signal: AbortSignal,
+  approval: ToolApproval,
   trace?: {
     onToolStart(call: { id: string; name: string }): AGUIEvent | undefined
     onToolEnd(call: { id: string; name: string; status: 'completed' | 'failed' | 'cancelled' }): AGUIEvent | undefined
@@ -240,6 +255,9 @@ async function* executeBatch(
   traceContext?: (call: { id: string; name: string }) => { traceId: string; parentSpanId: string }
 ): AsyncGenerator<LLMEvent> {
   const progress: LLMEvent[] = []
+  const acknowledgements = new Map<LLMEvent, () => void>()
+  const approvalCancellation = new globalThis.AbortController()
+  const approvalSignal = globalThis.AbortSignal.any([signal, approvalCancellation.signal])
   let wake: (() => void) | undefined
   let closed = false
   let onAbort: (() => void) | undefined
@@ -263,6 +281,32 @@ async function* executeBatch(
       const task = Promise.resolve()
         .then(async () => {
           try {
+            signal.throwIfAborted()
+            const allowed = await approval.authorize(
+              {
+                threadId: context(call).threadId,
+                runId: context(call).runId,
+                toolCallId: call.id,
+                toolName: tool.name,
+                arguments: args,
+                operation: tool.describeOperation?.(globalThis.structuredClone(args)) ?? { kind: tool.name }
+              },
+              approvalSignal,
+              async (event) => {
+                const recorded = Promise.withResolvers<void>()
+                acknowledgements.set(event, recorded.resolve)
+                progress.push(event)
+                notify()
+                await recorded.promise
+                approvalSignal.throwIfAborted()
+                if (closed) throw new Error('tool execution stream closed')
+              }
+            )
+            if (!allowed)
+              return {
+                ok: true as const,
+                value: JSON.stringify({ error: 'TOOL_PERMISSION_DENIED', tool: tool.name })
+              }
             signal.throwIfAborted()
             const callInfo = { id: call.id, name: call.name }
             const toolTraceContext = traceContext?.(callInfo)
@@ -365,6 +409,8 @@ async function* executeBatch(
         const event = progress.shift()
         if (event) {
           yield event
+          acknowledgements.get(event)?.()
+          acknowledgements.delete(event)
           continue
         }
         if (entry.settled()) break
@@ -386,6 +432,9 @@ async function* executeBatch(
     }
   } finally {
     closed = true
+    approvalCancellation.abort(new Error('tool execution stream closed'))
+    for (const acknowledge of acknowledgements.values()) acknowledge()
+    acknowledgements.clear()
     if (onAbort) signal.removeEventListener('abort', onAbort)
     signal.removeEventListener('abort', notify)
   }

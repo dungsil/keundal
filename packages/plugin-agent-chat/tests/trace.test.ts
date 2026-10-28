@@ -5,6 +5,7 @@ import { LLMService } from '@keundal/llm'
 import type { LLMEvent, LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
+import { TOOL_APPROVAL_EVENT } from '@keundal/tool-approval'
 import type { ToolExecutionContext } from '@keundal/tools'
 import { LLM_USAGE_EVENT, TRACE_EVENT, llmUsageEvent, readTraceSpans, summarizeTrace } from '@keundal/trace'
 import { Context } from 'cordis'
@@ -156,7 +157,7 @@ test.for([false, true])(
         event.type !== EventType.RUN_STARTED &&
         event.type !== EventType.RUN_FINISHED &&
         event.type !== EventType.TOOL_CALL_RESULT &&
-        !(event.type === EventType.CUSTOM && event.name === TRACE_EVENT)
+        !(event.type === EventType.CUSTOM && (event.name === TRACE_EVENT || event.name === TOOL_APPROVAL_EVENT))
     )
     expect(providerEvents).toEqual(original)
     expect(

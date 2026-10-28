@@ -8,6 +8,7 @@ import {
   type AgentMessage
 } from '@keundal/core'
 import { LLM_SOURCE_EVENT, type LLMSource } from '@keundal/llm'
+import { TOOL_APPROVAL_EVENT, isToolApprovalRecord, type ToolApprovalRecord } from '@keundal/tool-approval'
 import { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 
 export type ChatStatus = 'ready' | 'submitted' | 'streaming' | 'error'
@@ -34,6 +35,7 @@ export type ToolPart = ToolInvocation & {
   type: `tool-${string}`
   providerExecuted?: boolean
   subagent?: SubagentProgress
+  approvals?: ToolApprovalRecord[]
 }
 export type ChatPart =
   | TextPart
@@ -153,11 +155,23 @@ export class ChatMessageAssembly {
         break
       }
       case EventType.CUSTOM:
+        if (event.name === TOOL_APPROVAL_EVENT && isToolApprovalRecord(event.value)) {
+          const part = this.calls.get(event.value.toolCallId)?.part
+          if (part && part.type === `tool-${event.value.toolName}`) this.applyApproval(part, event.value)
+        }
         if (event.name === TOOL_PROGRESS_EVENT) {
           const payload = event.value
           if (payload && typeof payload === 'object' && typeof payload.toolCallId === 'string') {
             const part = this.calls.get(payload.toolCallId)?.part
             const progress = payload.value
+            if (
+              part?.type === 'tool-delegate_task' &&
+              progress &&
+              typeof progress === 'object' &&
+              isToolApprovalRecord(progress.approval)
+            ) {
+              this.applyApproval(part, progress.approval)
+            }
             if (
               part?.type === 'tool-delegate_task' &&
               progress &&
@@ -188,6 +202,13 @@ export class ChatMessageAssembly {
         }
         break
     }
+  }
+
+  private applyApproval(part: ToolPart, record: ToolApprovalRecord) {
+    part.approvals ??= []
+    const index = part.approvals.findIndex((entry) => entry.requestId === record.requestId)
+    if (index === -1) part.approvals.push(record)
+    else part.approvals[index] = record
   }
 
   finish(model: string) {

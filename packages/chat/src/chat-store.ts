@@ -6,6 +6,7 @@ import type { SubagentRole } from '@keundal/subagent'
 
 import type { ChatMessage } from './chat-message'
 export interface ChatStoreLike {
+  respondToToolApproval?(runId: string, requestId: string, decision: 'allow' | 'deny'): Promise<boolean>
   list(): Promise<LocalChat[]>
   listSummaries?(): Promise<ChatSummary[]>
   get(id: string): Promise<LocalChat | undefined>

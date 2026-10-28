@@ -5,6 +5,7 @@ import { createAgentApp, type AgentAppOptions } from '@keundal/agent-host/http'
 import type { AgentPluginOptions, LoadedAgentPlugin } from '@keundal/agent-plugins'
 import type { McpClientConfig } from '@keundal/mcp'
 import type { RuntimePluginManifest } from '@keundal/plugin-runtime'
+import { ToolApproval, type ToolApprovalPolicy } from '@keundal/tool-approval'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 
 export { createNodeComposition, getRequiredNodePluginModules, nodePluginMetadata } from './default-composition.js'
@@ -20,6 +21,7 @@ export type BundledPluginModule =
 export type BundledPluginSelection = Readonly<Partial<Record<BundledPluginModule, boolean>>>
 
 export interface NodeHostOptions {
+  readonly toolApproval?: ToolApprovalPolicy
   readonly plugins?: readonly AgentPluginOptions[]
   /** Bundled optional features default to enabled; deployment manifests remain operator-owned. */
   readonly bundledPlugins?: BundledPluginSelection
@@ -54,6 +56,7 @@ export async function createNodeAgentHost(options: NodeHostOptions, compose: Hos
   const models = options.models ?? { [options.model]: { contextWindow: 128000, maxOutputTokens: 4096 } }
   const composition = compose(options)
   const host = await createAgentHost({
+    ...(options.toolApproval === undefined ? {} : { toolApproval: new ToolApproval(options.toolApproval) }),
     model: options.model,
     models: Object.entries(models).map(([id, limits]) => ({ id, provider: options.provider, ...limits })),
     maxOutputTokens: options.maxOutputTokens,
@@ -80,6 +83,7 @@ export async function createAgentRuntime(
     | 'runtimePlugins'
     | 'runtimePluginBasePath'
     | 'bundledPlugins'
+    | 'toolApproval'
   > & {
     compose: HostCompositionFactory
   }
@@ -110,6 +114,8 @@ export async function createAgentRuntime(
   const sqlitePath = env.KEUNDAL_SQLITE_PATH ?? '.data/keundal.sqlite'
   const host = await createNodeAgentHost(
     {
+      toolApproval:
+        options.toolApproval ?? (env.KEUNDAL_TOOL_APPROVAL ? JSON.parse(env.KEUNDAL_TOOL_APPROVAL) : undefined),
       tools: options.tools,
       defaultTools: options.defaultTools,
       subagents: options.subagents,
