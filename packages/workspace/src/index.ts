@@ -13,6 +13,23 @@ export interface WorkspaceChange {
   readonly workingTree: string
 }
 
+export interface CodingWorkspaceSnapshot {
+  readonly threadId: string
+  readonly projectPath: string
+  readonly path: string
+  readonly changes: readonly WorkspaceChange[]
+  readonly patch: string
+  readonly reviewId?: string
+}
+
+/** User-facing capability. Never expose creation or apply as model tools. */
+export interface CodingWorkspaceClient {
+  get(threadId: string): Promise<CodingWorkspaceSnapshot | undefined>
+  create(threadId: string, projectPath: string): Promise<CodingWorkspaceSnapshot>
+  review(threadId: string): Promise<CodingWorkspaceSnapshot>
+  apply(threadId: string, reviewId: string): Promise<CodingWorkspaceSnapshot>
+}
+
 export interface WorkspaceStatus {
   readonly path: string
   readonly branch: string | null

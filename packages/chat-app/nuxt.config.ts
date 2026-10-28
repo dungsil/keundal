@@ -16,6 +16,7 @@ export default defineNuxtConfig({
     '@keundal/ui-tool',
     '@keundal/ui-chart',
     '@keundal/ui-weather',
+    '@keundal/ui-workspace',
     '@keundal/ui-settings',
     '@keundal/ui-settings-llm',
     '@keundal/ui-subagents',

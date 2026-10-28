@@ -219,3 +219,17 @@ test('승인 대기 중 취소하거나 플러그인을 해제하면 나중에 �
     expect(await readFile(join(cwd, 'a.txt'), 'utf8')).toBe(original)
   }
 })
+
+test('Worktree를 만들 때 저장소의 smudge·process 필터를 실행하지 않는다', async (t) => {
+  const { workspace, cwd, git, root } = await setup(t, async () => true)
+  await writeFile(join(cwd, '.gitattributes'), 'a.txt filter=unsafe\n')
+  git('add', '.gitattributes')
+  git('commit', '-m', 'attributes')
+  const marker = join(root, 'filter-executed')
+  git('config', 'filter.unsafe.smudge', `touch '${marker}'; cat`)
+  git('config', 'filter.unsafe.process', `touch '${marker}'; exit 1`)
+  git('config', 'filter.unsafe.required', 'true')
+  const task = await workspace.createWorktree('safe-checkout')
+  expect(await readFile(join(task.path, 'a.txt'), 'utf8')).toBe(original)
+  await expect(readFile(marker)).rejects.toThrow()
+})
