@@ -232,7 +232,7 @@ test('취소하면 응답을 기다리는 공급자 연결과 UI 스트림을 �
   await closed
 })
 
-test('공급자 오류를 성공 응답으로 바꾸거나 자동 재시도하지 않는다', async () => {
+test('공급자 오류의 재시도 한도를 소진하면 성공 응답 대신 오류로 종료한다', async () => {
   let calls = 0
   const baseURL = await setup((_body, response) => {
     calls++
@@ -244,7 +244,7 @@ test('공급자 오류를 성공 응답으로 바꾸거나 자동 재시도하�
   const chunks = await collect(chat.respond({ threadId: 'chat', messages: [user], instructions: '' }))
   expect(chunks).toContainEqual(expect.objectContaining({ type: EventType.RUN_ERROR, message: expect.stringContaining('HTTP 429') }))
   expect(chunks.some(chunk => chunk.type === EventType.RUN_FINISHED)).toBe(false)
-  expect(calls).toBe(1)
+  expect(calls).toBe(3)
 })
 
 test.each(['openai', 'anthropic', 'google'] as const)('%s의 토큰·제목·생성에 커스텀 헤더를 보내고 400 원인은 표시하되 비밀 값은 저장하지 않는다', async (provider) => {
@@ -430,6 +430,24 @@ test('브라우저 공급자가 컨텍스트 초과를 반환하면 오류 정�
   expect(events).toContainEqual(expect.objectContaining({ type: EventType.TEXT_MESSAGE_CONTENT, delta: 'Recovered' }))
   expect(calls).toBe(2)
   expect(summaries).toBe(1)
+})
+
+test.each([429, 503])('브라우저 공급자의 HTTP %s 오류를 비밀 정보 없이 재시도하여 응답한다', async (status) => {
+  let calls = 0
+  const baseURL = await setup((_body, response) => {
+    if (++calls === 1) {
+      response.writeHead(status, { 'content-type': 'application/json', 'retry-after': '0', 'x-private': 'private-key' })
+      response.end(JSON.stringify({ error: { message: 'private-key' } }))
+    } else send(response, openaiText('Recovered'))
+  })
+  const runtime = await createKeundalChat('openai/gpt-5-nano', {}, { OPENAI_API_KEY: 'private-key', OPENAI_BASE_URL: baseURL })
+  onTestFinished(runtime.dispose)
+  const events = await collect(runtime.respond({ threadId: 'transient', messages: [user], instructions: '' }))
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(events).toContainEqual(expect.objectContaining({ type: EventType.TEXT_MESSAGE_CONTENT, delta: 'Recovered' }))
+  expect(calls).toBe(2)
+  expect(JSON.stringify(events)).not.toContain('private-key')
+  expect(JSON.stringify(events)).not.toContain(baseURL)
 })
 
 test.each([

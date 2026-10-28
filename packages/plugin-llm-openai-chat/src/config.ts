@@ -1,4 +1,4 @@
-import type { LLMModel } from '@keundal/llm'
+import { parseModelCapabilities, type LLMModel } from '@keundal/llm'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 
 export interface OpenAIChatLLMConfig {
@@ -50,7 +50,12 @@ export function parseConfig(value: unknown): OpenAIChatLLMConfig {
       limits.contextWindow < limits.maxOutputTokens
     )
       throw new Error(`invalid model limits for ${name}`)
-    models[name] = { contextWindow: limits.contextWindow, maxOutputTokens: limits.maxOutputTokens }
+    const capabilities = parseModelCapabilities(limits.capabilities)
+    models[name] = {
+      contextWindow: limits.contextWindow,
+      maxOutputTokens: limits.maxOutputTokens,
+      ...(capabilities === undefined ? {} : { capabilities })
+    }
   }
   return {
     apiKey: value.apiKey as string | undefined,
