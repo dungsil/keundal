@@ -4,6 +4,7 @@ import { once } from 'node:events'
 import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http'
 import { URL } from 'node:url'
 
+import type { AutomationDefinition, AutomationEvent } from '@keundal/automation'
 import {
   EventType,
   parseAGUIEvent,
@@ -271,6 +272,38 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
 
       if (request.method === 'GET' && segments.join('/') === 'models') {
         return sendJson(response, 200, { models: models() })
+      }
+
+      if (services.automation) {
+        const automation = services.automation
+        if (segments[0] === 'automations') {
+          const id = segments[1] === undefined ? undefined : decodeURIComponent(segments[1])
+          if (request.method === 'GET' && segments.length === 1) return sendJson(response, 200, await automation.list())
+          if (request.method === 'PUT' && segments.length === 2 && id) {
+            const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as AutomationDefinition
+            return sendJson(response, 200, await automation.put(id, body))
+          }
+          if (request.method === 'DELETE' && segments.length === 2 && id) {
+            await automation.delete(id)
+            response.writeHead(204).end()
+            return
+          }
+          if (request.method === 'GET' && segments.length === 3 && id && segments[2] === 'history')
+            return sendJson(response, 200, await automation.history(id))
+          if (request.method === 'POST' && segments.length === 3 && id && segments[2] === 'webhook') {
+            const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as AutomationEvent
+            const attempts = await automation.webhook(id, body)
+            return attempts.length
+              ? sendJson(response, 202, attempts)
+              : sendJson(response, 404, { error: 'enabled webhook not found' })
+          }
+        }
+        if (request.method === 'POST' && segments.join('/') === 'automation-events') {
+          const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as AutomationEvent & { name: string }
+          if (!body || typeof body.name !== 'string' || !body.name.trim() || body.name.length > 256)
+            throw new Error('invalid event name')
+          return sendJson(response, 202, await automation.emit(body.name, body))
+        }
       }
 
       if (segments[0] === 'tasks' && services.tasks) {

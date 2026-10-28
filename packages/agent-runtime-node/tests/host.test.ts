@@ -729,6 +729,85 @@ test('같은 모델의 추론 수준을 바꾸면 캐시된 에이전트에도 �
   expect(received).toEqual(['low', 'high', 'medium', 'low'].map((effort) => ({ effort, summary: 'auto' })))
 })
 
+test('자동화 HTTP API는 인증 뒤 Webhook과 이름 기반 이벤트로 작업을 만들고 결과를 저장한다', async (t) => {
+  const { createServer } = await import('node:http')
+  const runtime = await createAgentRuntime(
+    {
+      KEUNDAL_PROVIDER: 'openai',
+      OPENAI_API_KEY: 'test',
+      KEUNDAL_MODEL: 'small',
+      KEUNDAL_API_TOKEN: 'automation-test-token',
+      KEUNDAL_SQLITE_PATH: sqlitePath()
+    },
+    { compose: createNodeComposition }
+  )
+  hosts.push(runtime)
+  runtime.ctx.llm.countTokens = async () => 10
+  runtime.ctx.llm.stream = async function* (): AsyncIterable<LLMEvent> {
+    yield { type: EventType.TEXT_MESSAGE_START, messageId: 'answer', role: 'assistant' }
+    yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'answer', delta: 'automatic response' }
+    yield { type: EventType.TEXT_MESSAGE_END, messageId: 'answer' }
+  }
+  const server = createServer(runtime.app)
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.onTestFinished(
+    () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+  )
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('server did not bind a port')
+  const base = `http://127.0.0.1:${address.port}`
+  const request = (method: string, path: string, body?: unknown, token = 'automation-test-token') =>
+    fetch(base + path, {
+      method,
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    })
+  const definition = {
+    label: 'Automation',
+    enabled: true,
+    trigger: { type: 'webhook' },
+    input: { state: {}, context: [], tools: [], messages: [{ id: 'q', role: 'user', content: 'Respond' }] }
+  }
+  expect((await request('PUT', '/automations/hook', definition, 'wrong-token')).status).toBe(401)
+  expect(
+    (
+      await request('PUT', '/automations/hook', {
+        ...definition,
+        trigger: { type: 'cron', expression: 'invalid', timezone: 'UTC' }
+      })
+    ).status
+  ).toBe(400)
+  expect((await request('PUT', '/automations/hook', definition)).status).toBe(200)
+  expect((await request('POST', '/automations/hook/webhook', {})).status).toBe(400)
+  expect((await request('POST', '/automations/hook/webhook', { id: 'one' }, 'wrong-token')).status).toBe(401)
+  expect((await request('POST', '/automations/hook/webhook', { id: 'one', payload: { source: 'ci' } })).status).toBe(
+    202
+  )
+  expect((await request('POST', '/automations/hook/webhook', { id: 'one' })).status).toBe(202)
+  await expect.poll(async () => (await runtime.services.automation!.history('hook'))[0]?.task?.status).toBe('completed')
+  const history = await (await request('GET', '/automations/hook/history')).json()
+  expect(history).toMatchObject([{ status: 'submitted', task: { status: 'completed', content: 'automatic response' } }])
+  expect(await runtime.services.tasks!.list()).toHaveLength(1)
+  const [attempt] = await runtime.services.automation!.history('hook')
+  expect((await runtime.services.session.get(attempt!.task!.threadId))?.messages).toContainEqual(
+    expect.objectContaining({ role: 'assistant', content: 'automatic response' })
+  )
+  expect(
+    (await request('PUT', '/automations/named', { ...definition, trigger: { type: 'event', name: 'ci.failed' } }))
+      .status
+  ).toBe(200)
+  expect((await request('POST', '/automation-events', { name: 'ci.passed', id: 'build-1' })).status).toBe(202)
+  expect(await runtime.services.tasks!.list()).toHaveLength(1)
+  expect((await request('POST', '/automation-events', { name: 'ci.failed', id: 'build-1' })).status).toBe(202)
+  await expect
+    .poll(async () => (await runtime.services.automation!.history('named'))[0]?.task?.status)
+    .toBe('completed')
+  expect(await runtime.services.tasks!.list()).toHaveLength(2)
+  expect((await request('DELETE', '/automations/hook')).status).toBe(204)
+  expect((await request('POST', '/automations/hook/webhook', { id: 'two' })).status).toBe(404)
+  expect(await (await request('GET', '/automations')).json()).toMatchObject([{ id: 'named' }])
+})
+
 test.each([['x'.repeat(101)], ['x'.repeat(60), 'x'.repeat(41)], [' '.repeat(1025)], ['x'.repeat(100_000)]])(
   '호스트 제목이 한도를 넘으면 스트림을 정리하고 거부한다',
   async (...chunks) => {

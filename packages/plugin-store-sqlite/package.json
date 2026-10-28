@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@keundal/automation": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/generation": "workspace:*",
     "@keundal/llm": "workspace:*",

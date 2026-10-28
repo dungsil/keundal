@@ -64,3 +64,7 @@ OAuth를 쓰는 호스트는 `mcpAuthentication: { documents: account }`로 서�
 `maxActiveSubagents`의 기본값은 8이며 부모 실행별 동시 자식 수를 제한합니다.
 `createAgentRuntime(env, { compose: createNodeComposition, subagents: false })`에도 같은 설정을 전달할 수 있습니다.
 자세한 결과 형식과 취소 동작은 [에이전트 문서](../agent-loop/README.md#서브에이전트)를 참고하세요.
+
+## 예약 실행과 이벤트 기반 작업
+
+기본 Node 조립은 SQLite에 등록한 Cron·Webhook·이름 기반 이벤트를 `TaskService`의 백그라운드 작업으로 제출합니다. 예약 실행은 호스트가 켜져 있을 때만 동작합니다. `automation: false` 옵션으로 끌 수 있습니다. 등록 API, 중복 실행 방지와 복구 정책은 [자동화 문서](../automation/README.md)를 참고하세요.
