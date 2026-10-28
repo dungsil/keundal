@@ -154,6 +154,7 @@ test('계약과 공통 UI는 구현 패키지를 실행 의존성으로 가져�
     ['@keundal/tools', '@keundal/plugin-tool-fs'],
     ['@keundal/context', '@keundal/plugin-context-node'],
     ['@keundal/mcp', '@keundal/plugin-mcp-client'],
+    ['@keundal/memory', '@keundal/plugin-store-sqlite'],
     ['@keundal/llm-settings', '@keundal/plugin-llm-openai'],
     ['@keundal/agent-loop', '@keundal/plugin-agent-chat']
   ]) {

@@ -31,6 +31,7 @@ const implementationIndependent = new Set([
   '@keundal/tools',
   '@keundal/context',
   '@keundal/mcp',
+  '@keundal/memory',
   '@keundal/llm-settings',
   '@keundal/agent-host',
   '@keundal/fs',

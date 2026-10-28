@@ -25,6 +25,89 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
+test('프로젝트 메모리를 에이전트 도구로 저장하고 호스트 재시작 후 새 대화에서 출처와 함께 검색한다', async () => {
+  const path = sqlitePath()
+  const decision = {
+    title: '프로젝트 저장소 결정',
+    content: 'SQLite WAL로 영속성을 제공한다',
+    sources: [{ uri: 'https://example.com/decisions/42', label: '설계 결정' }]
+  }
+  const open = async (projectId: string) => {
+    const host = await createAgentRuntime(
+      {
+        KEUNDAL_PROVIDER: 'openai',
+        KEUNDAL_MODEL: 'test',
+        KEUNDAL_SQLITE_PATH: path,
+        KEUNDAL_API_TOKEN: 'memory-test-token',
+        KEUNDAL_PROJECT_ID: projectId
+      },
+      { compose: createNodeComposition, subagents: false }
+    )
+    hosts.push(host)
+    host.ctx.llm.countTokens = async () => 20
+    host.ctx.llm.stream = async function* (request): AsyncIterable<LLMEvent> {
+      const result = request.input.messages.find((message) => message.role === 'tool')
+      if (result) {
+        yield { type: EventType.TEXT_MESSAGE_START, messageId: 'answer', role: 'assistant' }
+        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'answer', delta: String(result.content) }
+        yield { type: EventType.TEXT_MESSAGE_END, messageId: 'answer' }
+        return
+      }
+      const save = request.input.messages.some((message) => message.role === 'user' && message.content === 'save')
+      const name = save ? 'memory_save' : 'memory_search'
+      expect(request.input.tools.some((tool) => tool.name === name)).toBe(true)
+      yield { type: EventType.TOOL_CALL_START, toolCallId: 'memory-call', toolCallName: name }
+      yield {
+        type: EventType.TOOL_CALL_ARGS,
+        toolCallId: 'memory-call',
+        delta: JSON.stringify(save ? decision : { query: '결정 sqlite' })
+      }
+      yield { type: EventType.TOOL_CALL_END, toolCallId: 'memory-call' }
+    }
+    return host
+  }
+  const run = async (host: Awaited<ReturnType<typeof open>>, threadId: string, command: string) => {
+    const events = []
+    for await (const event of host.services.run({
+      threadId,
+      runId: `${threadId}-run`,
+      state: {},
+      tools: [],
+      context: [],
+      messages: [{ id: 'user', role: 'user', content: command }]
+    }))
+      events.push(event)
+    expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+    const session = await host.services.session.get(threadId)
+    const result = session?.messages.find((message) => message.role === 'tool')
+    return JSON.parse(String(result?.content))
+  }
+  const first = await open('keundal')
+  expect((await first.services.catalog?.())?.tools.map((tool) => tool.name)).toEqual([
+    'memory_search',
+    'memory_get',
+    'memory_save',
+    'memory_update',
+    'memory_delete'
+  ])
+  const saved = await run(first, 'first-conversation', 'save')
+  expect(saved).toMatchObject({
+    ...decision,
+    sources: [
+      ...decision.sources,
+      { uri: 'keundal://threads/first-conversation/runs/first-conversation-run', label: 'Conversation' }
+    ]
+  })
+  const original = await first.services.session.get('first-conversation')
+  await first.services.session.delete('first-conversation', original!.revision)
+  await first.dispose()
+  const second = await open('keundal')
+  expect(await run(second, 'new-conversation', 'search')).toEqual([saved])
+  await second.dispose()
+  const unrelated = await open('unrelated-project')
+  expect(await run(unrelated, 'other-project-conversation', 'search')).toEqual([])
+})
+
 test('외부 매니페스트가 파일과 import 전용 패키지를 불러오고 사용자 공급자를 유지한다', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'keundal-runtime-plugins-'))
   directories.push(directory)
