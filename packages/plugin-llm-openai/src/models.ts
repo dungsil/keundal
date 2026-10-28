@@ -1,6 +1,6 @@
 import type { ExecutionOptions } from '@keundal/core'
 import type { LLMModelInfo } from '@keundal/llm'
-import { MODEL_CATALOG_LIMITS, ModelCatalogBudget } from '@keundal/llm'
+import { MODEL_CATALOG_LIMITS, ModelCatalogBudget, readModelCatalogCapabilities } from '@keundal/llm'
 import { z } from 'zod'
 
 import type { OpenAILLMConfig } from './config.js'
@@ -37,7 +37,8 @@ export async function listOpenAIModels(
           id: z.string().min(1).max(MODEL_CATALOG_LIMITS.fieldLength),
           display_name: z.string().max(MODEL_CATALOG_LIMITS.fieldLength).optional(),
           max_input_tokens: z.number().positive().nullish(),
-          max_tokens: z.number().positive().nullish()
+          max_tokens: z.number().positive().nullish(),
+          capabilities: z.unknown().transform(readModelCatalogCapabilities).optional()
         })
       )
     })
@@ -52,7 +53,8 @@ export async function listOpenAIModels(
           id: model.id,
           name: model.display_name || model.id,
           contextWindow: model.max_input_tokens ?? undefined,
-          maxOutputTokens: model.max_tokens ?? undefined
+          maxOutputTokens: model.max_tokens ?? undefined,
+          capabilities: model.capabilities
         }
       ])
     ).values()

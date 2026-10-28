@@ -56,6 +56,18 @@ const rowSpans = computed(() => flattenTraceSpans(visibleSpans.value, MAX_SPANS)
 const timeline = computed(() => traceTimelineBounds(spans.value, Date.now(), runStatus.value))
 const usageComplete = computed(() => traceUsageCompleteness(spans.value))
 const runDuration = computed(() => traceRunDuration(spans.value, runStatus.value, Date.now(), props.runId))
+const modelSwitches = computed(() => {
+  const previous = new Map<string, string>()
+  const changes = new Map<string, string>()
+  for (const span of spans.value) {
+    if (span.kind !== 'model' || !span.model) continue
+    const scope = `${span.runId}:${span.parentSpanId ?? ''}`
+    const from = previous.get(scope)
+    if (from && from !== span.model) changes.set(span.spanId, from)
+    previous.set(scope, span.model)
+  }
+  return changes
+})
 
 function usageNumber(field: keyof typeof usageComplete.value) {
   const value = summary.value[field]
@@ -269,13 +281,17 @@ function* journalEvents(journal: GenerationSnapshot['journal'], start = 0): Iter
               <UIcon :name="STATUS_ICONS[traceDisplayStatus(span, runStatus)].name" class="size-3.5 shrink-0" :class="STATUS_ICONS[traceDisplayStatus(span, runStatus)].color" aria-hidden="true" />
               <span class="sr-only">{{ t(`trace.status.${traceDisplayStatus(span, runStatus)}`) }}</span>
               <span class="shrink-0 whitespace-nowrap text-xs text-muted">{{ spanLabel(span.kind) }}</span>
-              <span class="min-w-12 flex-1 truncate">{{ span.name }}</span>
+              <span class="min-w-0 flex-1 truncate">{{ span.name }}</span>
+              <span v-if="modelSwitches.has(span.spanId)" class="shrink-0 text-xs text-warning">{{ t('trace.modelSwitch') }}</span>
               <span class="relative hidden h-3 w-28 overflow-hidden rounded bg-muted/40 sm:block" :title="`${t('trace.started')}: +${formatDuration(span.startedAt - timeline.start)}`">
                 <span data-trace-bar class="absolute inset-y-0 min-w-px rounded bg-primary" :style="barStyle(span)" />
               </span>
               <span class="shrink-0 text-xs text-muted tabular-nums">{{ duration(span) }}</span>
             </summary>
             <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 px-2 py-2 text-xs text-muted wrap-anywhere">
+              <template v-if="modelSwitches.has(span.spanId)">
+                <dt>{{ t('trace.modelSwitch') }}</dt><dd>{{ modelSwitches.get(span.spanId) }} → {{ span.model }}</dd>
+              </template>
               <dt v-if="span.name">{{ t('trace.name') }}</dt><dd v-if="span.name">{{ span.name }}</dd>
               <template v-if="mode === 'full'">
                 <dt>{{ t('trace.traceId') }}</dt><dd class="break-all">{{ span.traceId }}</dd>

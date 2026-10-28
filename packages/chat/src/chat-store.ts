@@ -7,6 +7,7 @@ import type { PromptPreset } from '@keundal/prompt'
 import type { SubagentRole } from '@keundal/subagent'
 
 import type { ChatMessage } from './chat-message'
+import type { ModelRecoveryPolicy } from './model-preferences'
 export interface ChatStoreLike {
   readonly backup?: {
     export(): Promise<HistoryBackup>
@@ -33,6 +34,7 @@ export interface ChatStoreLike {
       messages: ChatMessage[]
       model: string
       titleModel?: string
+      modelRecovery?: ModelRecoveryPolicy
       /** Optional user-provided instructions for model responses; excluded from title generation. */
       systemPrompt?: string
       /** Ordered prompt recipe, captured for this response only. */

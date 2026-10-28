@@ -1,4 +1,26 @@
+import { parseModelRecoveryPolicy, type ModelRecoveryPolicy } from '@keundal/agent'
+
 import { resolveModel } from './models'
+
+export { parseModelRecoveryPolicy, type ModelRecoveryPolicy } from '@keundal/agent'
+export const MODEL_RECOVERY_KEY = 'keundal:model-recovery'
+
+export function loadModelRecovery(storage: Pick<Storage, 'getItem'>): ModelRecoveryPolicy | undefined {
+  try {
+    const saved = storage.getItem(MODEL_RECOVERY_KEY)
+    return saved ? parseModelRecoveryPolicy(JSON.parse(saved)) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function saveModelRecovery(storage: Pick<Storage, 'setItem'>, value: ModelRecoveryPolicy) {
+  const policy = parseModelRecoveryPolicy(value)
+  const fallbackModels = policy.fallbackModels?.map((model) => resolveModel(model).value)
+  const normalized = parseModelRecoveryPolicy({ ...policy, fallbackModels })
+  storage.setItem(MODEL_RECOVERY_KEY, JSON.stringify(normalized))
+  return normalized
+}
 
 export const MODEL_KEY = 'keundal:model'
 export const TITLE_MODEL_KEY = 'keundal:title-model'

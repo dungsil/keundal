@@ -1,6 +1,6 @@
 import type { ExecutionOptions } from '@keundal/core'
 import type { LLMModelInfo } from '@keundal/llm'
-import { MODEL_CATALOG_LIMITS, ModelCatalogBudget } from '@keundal/llm'
+import { MODEL_CATALOG_LIMITS, ModelCatalogBudget, readModelCatalogCapabilities } from '@keundal/llm'
 import { z } from 'zod'
 
 import type { GeminiLLMConfig } from './config.js'
@@ -44,7 +44,8 @@ export async function listGeminiModels(
             displayName: z.string().max(MODEL_CATALOG_LIMITS.fieldLength).optional(),
             supportedGenerationMethods: z.array(z.string()).optional(),
             inputTokenLimit: z.number().positive().optional(),
-            outputTokenLimit: z.number().positive().optional()
+            outputTokenLimit: z.number().positive().optional(),
+            capabilities: z.unknown().transform(readModelCatalogCapabilities).optional()
           })
         ),
         nextPageToken: z.string().max(MODEL_CATALOG_LIMITS.cursorLength).optional()
@@ -58,7 +59,8 @@ export async function listGeminiModels(
         id,
         name: model.displayName || id,
         contextWindow: model.inputTokenLimit,
-        maxOutputTokens: model.outputTokenLimit
+        maxOutputTokens: model.outputTokenLimit,
+        capabilities: model.capabilities
       })
     }
     cursor = page.nextPageToken || ''

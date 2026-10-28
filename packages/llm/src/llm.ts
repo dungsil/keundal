@@ -29,6 +29,7 @@ export interface LLMModelInfo {
   readonly name: string
   readonly contextWindow?: number
   readonly maxOutputTokens?: number
+  readonly capabilities?: LLMModel['capabilities']
 }
 
 export type ReasoningLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max'

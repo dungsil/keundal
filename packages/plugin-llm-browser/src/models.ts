@@ -100,7 +100,8 @@ export async function loadModels(
           : model.name,
       icon: providerIcon(provider),
       contextWindow: model.contextWindow,
-      maxOutputTokens: model.maxOutputTokens
+      maxOutputTokens: model.maxOutputTokens,
+      capabilities: model.capabilities
     }))
     try {
       if (isCurrent()) storage.setItem(key, JSON.stringify({ scope, fetchedAt: Date.now(), models: result }))

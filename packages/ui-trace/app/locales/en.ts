@@ -23,6 +23,7 @@ export default {
   'trace.duration': 'Duration',
   'trace.usageSource': 'Usage source',
   'trace.model': 'Model',
+  'trace.modelSwitch': 'Model switch',
   'trace.name': 'Name',
   'trace.started': 'Started',
   'trace.statusLabel': 'Status',
