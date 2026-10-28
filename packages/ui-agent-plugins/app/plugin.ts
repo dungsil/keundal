@@ -14,9 +14,6 @@ export const inject = ['slots', 'chatRuntime']
 /** Add the agent plugin section to the settings page. */
 export function apply(ctx: Context) {
   const runtime = ctx.chatRuntime
-  // The platform and store exist only in the browser, so each callback reads them when it runs.
-  const manager = () => runtime.platform.plugins!
-  const stop = () => runtime.store.stop()
   const modules = () => runtime.pluginManager!
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
@@ -40,7 +37,17 @@ export function apply(ctx: Context) {
       }
     })
   }, RuntimePluginSettings))
-  ctx.slots.inject('settings.section', () => ctx.slots.register({
+}
+
+/** Folder imports are optional; disabling them must not remove the recovery screen. */
+export const agentPluginSettings = {
+  name: 'ui-agent-plugin-settings',
+  inject,
+  apply(ctx: Context) {
+    const runtime = ctx.chatRuntime
+    const manager = () => runtime.platform.plugins!
+    const stop = () => runtime.store.stop()
+    ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
     key: 'plugins',
     order: 100,
@@ -52,5 +59,6 @@ export function apply(ctx: Context) {
       configure: (name: string, settings: AgentPluginSettings) => manager().configure(name, settings, stop),
       remove: (name: string) => manager().remove(name, stop)
     })
-  }, AgentPluginSettingsSection))
+    }, AgentPluginSettingsSection))
+  }
 }

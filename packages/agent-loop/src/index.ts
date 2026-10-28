@@ -121,7 +121,8 @@ export class Agent extends AgentService {
     try {
       signal.throwIfAborted()
       const request = parseRunAgentInput(input)
-      const presetValue: unknown = request.forwardedProps?.keundalPromptPreset
+      const presetValue: unknown =
+        this.config.promptPresets === false ? undefined : request.forwardedProps?.keundalPromptPreset
       const promptPreset = presetValue === undefined ? undefined : parsePromptPreset(presetValue)
       const trace = new TraceRecorder(request.runId, traceParent, this.config.pricing)
       failedTrace = trace
