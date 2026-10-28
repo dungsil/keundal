@@ -1,5 +1,6 @@
 import { EventType, MessageAssembly, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
 import type { TaskService } from '@keundal/task'
+import { TOOL_APPROVAL_EVENT, isToolApprovalRecord } from '@keundal/tool-approval'
 import type { ExecutableTool } from '@keundal/tools'
 import { readTraceSpans } from '@keundal/trace'
 
@@ -164,6 +165,9 @@ export function subagentTool(
             }
           )) {
             if (event.type === EventType.CUSTOM) {
+              if (event.name === TOOL_APPROVAL_EVENT && isToolApprovalRecord(event.value)) {
+                context.reportProgress?.({ status: 'running', threadId, runId, approval: event.value })
+              }
               const span = readTraceSpans([event], undefined, 1)[0]
               if (
                 span &&

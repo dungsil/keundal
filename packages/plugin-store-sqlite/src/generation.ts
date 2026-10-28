@@ -15,6 +15,7 @@ import {
   type TerminalGeneration
 } from '@keundal/generation'
 import { StreamBudget } from '@keundal/llm'
+import { TOOL_APPROVAL_EVENT } from '@keundal/tool-approval'
 import { reconcileTerminalTraceJournal } from '@keundal/trace'
 import type { Context } from 'cordis'
 
@@ -231,6 +232,7 @@ export class SqliteGenerationService extends GenerationService {
         budget.accept(event)
         // 실행이 종료를 확정했거나 다른 소유자가 넘겨받았으면 기록을 멈춥니다.
         if (!run.recorder.record(event)) return
+        if (event.type === EventType.CUSTOM && event.name === TOOL_APPROVAL_EVENT && !run.recorder.flush()) return
         yield event
       }
       signal.throwIfAborted()

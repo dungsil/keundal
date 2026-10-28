@@ -19,6 +19,7 @@
     "@keundal/llm": "workspace:*",
     "@keundal/prompt": "workspace:*",
     "@keundal/subagent": "workspace:*",
+    "@keundal/tool-approval": "workspace:*",
     "@keundal/ui": "workspace:*",
     "@keundal/ui-composer": "workspace:*",
     "@keundal/ui-layout": "workspace:*",

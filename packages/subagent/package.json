@@ -23,6 +23,7 @@
   "dependencies": {
     "@keundal/core": "workspace:*",
     "@keundal/task": "workspace:*",
+    "@keundal/tool-approval": "workspace:*",
     "@keundal/tools": "workspace:*",
     "@keundal/trace": "workspace:*",
     "zod": "catalog:"

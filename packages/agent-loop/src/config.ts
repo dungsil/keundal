@@ -1,21 +1,27 @@
+import type { RunBudget } from '@keundal/agent'
 import type { AgentCompactionConfig } from '@keundal/compaction'
 import { parseCompactionConfig } from '@keundal/compaction-summary/controller'
 import { parseDeferredToolsConfig, type DeferredToolsConfig } from '@keundal/deferred-tools'
 import { parseReasoning, type Reasoning } from '@keundal/llm'
 import { parseSubagentRoles, type SubagentRole } from '@keundal/subagent'
 import { SUBAGENT_TOOL_NAME } from '@keundal/subagent/tools'
+import { ToolApproval } from '@keundal/tool-approval'
 import { parseTools } from '@keundal/tool-execution'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 import { parsePricing, type AgentPricing } from '@keundal/trace'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 
+import { parseRunBudget } from './budget.js'
+
 export interface AgentConfig {
   readonly model: string
   readonly maxOutputTokens: number
+  readonly budget?: RunBudget
   readonly webSearch?: boolean
   readonly reasoning?: Reasoning
   readonly compaction?: AgentCompactionConfig
   readonly tools?: readonly ExecutableTool[] | ToolProvider
+  readonly toolApproval?: ToolApproval
   /** 도구를 검색한 뒤 다음 모델 요청에서만 노출합니다. */
   readonly deferredTools?: DeferredToolsConfig
   /** 지연 도구만 공급합니다. 기존 tools 공급자와 별도로 조회합니다. */
@@ -24,6 +30,7 @@ export interface AgentConfig {
   readonly maxActiveSubagents?: number
   readonly subagentRoles?: readonly SubagentRole[]
   readonly skills?: boolean
+  readonly promptPresets?: boolean
   readonly context?: boolean
   /** 모든 실행에 앞서 모델에 전달할 시스템 지침입니다. */
   readonly systemPrompt?: string
@@ -58,13 +65,17 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     throw new Error('model and a positive integer maxOutputTokens are required')
   }
   const compaction = parseCompactionConfig('compaction' in value ? value.compaction : undefined)
-  for (const key of ['webSearch', 'skills', 'context', 'subagents'] as const) {
+  for (const key of ['webSearch', 'skills', 'context', 'subagents', 'promptPresets'] as const) {
     const option = (value as Record<string, unknown>)[key]
     if (option !== undefined && typeof option !== 'boolean') {
       throw new Error(`${key} must be a boolean`)
     }
   }
   const configuredTools = 'tools' in value ? value.tools : undefined
+  const toolApproval = 'toolApproval' in value ? value.toolApproval : undefined
+  if (toolApproval !== undefined && !(toolApproval instanceof ToolApproval)) {
+    throw new Error('toolApproval must be a host-owned ToolApproval instance')
+  }
   const deferredTools =
     'deferredTools' in value && value.deferredTools !== undefined
       ? parseDeferredToolsConfig(value.deferredTools)
@@ -104,19 +115,23 @@ export function parseAgentConfig(value: unknown): AgentConfig {
   const parallelTools = 'parallelTools' in value ? value.parallelTools : false
   if (typeof parallelTools !== 'boolean') throw new Error('parallelTools must be a boolean')
   const pricing = 'pricing' in value && value.pricing !== undefined ? parsePricing(value.pricing) : undefined
+  const budget = 'budget' in value && value.budget !== undefined ? parseRunBudget(value.budget) : undefined
   return {
     model: value.model,
     maxOutputTokens: value.maxOutputTokens,
+    ...(budget ? { budget } : {}),
     ...('webSearch' in value ? { webSearch: value.webSearch as boolean | undefined } : {}),
     ...('reasoning' in value ? { reasoning: parseReasoning(value.reasoning) } : {}),
     compaction,
     tools,
+    ...(toolApproval === undefined ? {} : { toolApproval }),
     ...(deferredTools === undefined ? {} : { deferredTools }),
     ...(deferredToolProvider === undefined ? {} : { deferredToolProvider: deferredToolProvider as ToolProvider }),
     subagents,
     maxActiveSubagents,
     ...(subagentRoles === undefined ? {} : { subagentRoles }),
     skills,
+    ...('promptPresets' in value ? { promptPresets: value.promptPresets as boolean | undefined } : {}),
     ...('context' in value ? { context: value.context as boolean | undefined } : {}),
     ...(systemPrompt === undefined ? {} : { systemPrompt }),
     maxToolRounds,

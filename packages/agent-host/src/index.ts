@@ -1,5 +1,6 @@
 import { SteerQueue, EventType, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import { parseReasoning, type Reasoning } from '@keundal/llm'
+import { ToolApproval } from '@keundal/tool-approval'
 import { Context, type Fiber } from 'cordis'
 
 import type { AgentHostOptions, AgentHost, AgentHostModel, AgentHostServices } from './contracts.js'
@@ -29,6 +30,7 @@ const titleInstructions =
  * HTTP 전송과 프로세스 수명은 호출자가 담당합니다.
  */
 export async function createAgentHost(options: AgentHostOptions): Promise<AgentHost> {
+  const toolApproval = options.toolApproval ?? new ToolApproval({ default: 'allow' })
   if (!options.model.trim()) throw new Error('model is required')
   const models = [...options.models]
   if (!models.some((model) => model.id === options.model))
@@ -89,6 +91,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         await options.mountAgent(child, {
           model: selected.id,
           reasoning,
+          toolApproval,
           maxOutputTokens
         })
       })
@@ -116,6 +119,9 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
     }
 
     const services: AgentHostServices = {
+      respondToToolApproval(runId, requestId, decision) {
+        return toolApproval.respond(runId, requestId, decision)
+      },
       run(input, runOptions = {}) {
         const selected = model(runOptions.model)
         const { model: _model, reasoning: rawReasoning, steer: _steer, ...execution } = runOptions

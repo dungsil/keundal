@@ -71,8 +71,12 @@ export interface RuntimePluginInfo {
     description: { en: string; ko: string }
   }
   enabled: boolean
+  /** Module identifiers required for this plugin to operate. */
+  requires?: readonly string[]
+  /** Disabled dependencies; the saved enabled selection is retained. */
+  blockedBy?: readonly string[]
   /** Service capability used to bind related UI without depending on implementation packages. */
-  feature?: 'skills' | 'mcp'
+  feature?: 'skills' | 'mcp' | 'prompt' | 'subagents' | 'agent'
   required?: boolean
   error?: string
 }

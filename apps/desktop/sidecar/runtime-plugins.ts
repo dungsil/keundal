@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 import {
   createNodeComposition,
+  getConfiguredNodePluginModules,
   getRequiredNodePluginModules,
   nodePluginMetadata,
   type BundledPluginModule,
@@ -25,10 +26,13 @@ const optionalModules: readonly BundledPluginModule[] = [
   '@keundal/plugin-skill',
   '@keundal/plugin-mcp-client',
   '@keundal/plugin-tool-chart',
-  '@keundal/plugin-tool-weather'
+  '@keundal/plugin-tool-weather',
+  '@keundal/prompt',
+  '@keundal/subagent',
+  '@keundal/plugin-agent-chat'
 ]
 const legacyToolsModule = '@keundal/plugin-tool-chat'
-type Entry = { module: BundledPluginModule; enabled: boolean } | InstalledPlugin
+type Entry = { module: string; enabled: boolean } | InstalledPlugin
 export type PluginRequest =
   | { action: 'list' }
   | { action: 'enable'; module: string; enabled: boolean }
@@ -49,10 +53,12 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function validateEntries(value: unknown): Entry[] {
-  const modules = Array.isArray(value) && value.some(entry => record(entry) && entry.module === legacyToolsModule)
+function validateEntries(value: unknown, configured: readonly string[] = []): Entry[] {
+  const legacy = Array.isArray(value) && value.some(entry => record(entry) && entry.module === legacyToolsModule)
+  const modern = Array.isArray(value) && value.some(entry => record(entry) && optionalModules.slice(4).includes(entry.module as BundledPluginModule))
+  const modules = legacy
     ? ['@keundal/plugin-skill', '@keundal/plugin-mcp-client', legacyToolsModule] as const
-    : optionalModules
+    : modern ? optionalModules : optionalModules.slice(0, 4)
   if (!Array.isArray(value) || value.length < modules.length) throw new Error('Invalid bundled selection')
   const entries = modules.map((module) => {
     const matches = value.filter((entry) => record(entry) && entry.module === module)
@@ -66,9 +72,18 @@ function validateEntries(value: unknown): Entry[] {
   const bundled = optionalModules.map((module) => ({
     module,
     enabled: entries.find((entry) => entry.module === module)?.enabled
-      ?? entries.find((entry) => entry.module === legacyToolsModule)!.enabled
+      ?? ((module === '@keundal/plugin-tool-chart' || module === '@keundal/plugin-tool-weather')
+        ? entries.find((entry) => entry.module === legacyToolsModule)?.enabled : undefined)
+      ?? true
   }))
-  const external = value.filter(entry => !record(entry) || !modules.includes(entry.module as BundledPluginModule))
+  const configuredEntries = configured.filter(module => !optionalModules.includes(module as BundledPluginModule)).map(module => {
+    const matches = value.filter(entry => record(entry) && entry.module === module)
+    if (matches.length > 1 || matches.some(entry => !record(entry) || typeof entry.enabled !== 'boolean' ||
+      Object.keys(entry).some(key => key !== 'module' && key !== 'enabled'))) throw new Error('Invalid bundled selection')
+    return { module, enabled: matches.length ? Boolean((matches[0] as Record<string, unknown>).enabled) : true }
+  })
+  const external = value.filter(entry => !record(entry) ||
+    ![...modules, ...configuredEntries.map(entry => entry.module)].includes(entry.module as string))
   const seen = new Set<string>()
   for (const entry of external) {
     if (!record(entry) || typeof entry.module !== 'string' || !/^external:[a-f0-9-]{36}$/.test(entry.module) ||
@@ -86,19 +101,27 @@ function validateEntries(value: unknown): Entry[] {
     }
     seen.add(entry.module)
   }
-  return [...bundled, ...external as InstalledPlugin[]]
+  return [...bundled, ...configuredEntries, ...external as InstalledPlugin[]]
 }
 
-function readEntries(directory: string): Entry[] {
+function configuredModules(directory: string): string[] {
+  const path = join(directory, 'configured-modules.json')
+  if (!existsSync(path)) return []
+  const value: unknown = JSON.parse(readFileSync(path, 'utf8'))
+  if (!Array.isArray(value) || !value.every(module => typeof module === 'string')) throw new Error('Invalid configured modules')
+  return value
+}
+
+function readEntries(directory: string, configured = configuredModules(directory)): Entry[] {
   const path = join(directory, 'bundled-selection.json')
-  if (existsSync(path)) return validateEntries(JSON.parse(readFileSync(path, 'utf8')))
+  if (existsSync(path)) return validateEntries(JSON.parse(readFileSync(path, 'utf8')), configured)
   // Only known boolean preferences migrate. Old paths, exports and configs are never used.
   const legacyPath = join(directory, 'managed.json')
   let legacy: unknown = []
   try {
     if (existsSync(legacyPath)) legacy = JSON.parse(readFileSync(legacyPath, 'utf8'))
   } catch { /* Ignore obsolete installer state. */ }
-  return optionalModules.map((module) => {
+  return [...optionalModules, ...configured.filter(module => !optionalModules.includes(module as BundledPluginModule))].map((module) => {
     const entries = Array.isArray(legacy) ? legacy : []
     const entry = entries.find((entry) => record(entry) && entry.module === module && typeof entry.enabled === 'boolean')
       ?? (module === '@keundal/plugin-tool-chart' || module === '@keundal/plugin-tool-weather'
@@ -112,11 +135,12 @@ function requiredModules(directory: string): string[] {
   const path = join(directory, 'required-modules.json')
   if (existsSync(path)) {
     const value: unknown = JSON.parse(readFileSync(path, 'utf8'))
-    if (Array.isArray(value) && value.every((module) => typeof module === 'string')) return value
+    if (Array.isArray(value) && value.every((module) => typeof module === 'string')) return value.filter(module =>
+      module.startsWith('@keundal/plugin-llm-') || module.startsWith('@keundal/plugin-store-'))
   }
   const provider = process.env.KEUNDAL_PROVIDER ||
     (process.env.OPENAI_API_KEY ? 'openai' : process.env.GEMINI_API_KEY ? 'gemini' : 'anthropic')
-  return [`@keundal/plugin-llm-${provider}`, '@keundal/plugin-store-sqlite', '@keundal/plugin-agent-chat']
+  return [`@keundal/plugin-llm-${provider}`, '@keundal/plugin-store-sqlite']
 }
 
 export async function manageRuntimePlugins(directory: string, request: PluginRequest) {
@@ -139,17 +163,23 @@ export async function manageRuntimePlugins(directory: string, request: PluginReq
     ].map((entry): RuntimePluginInfo => ({
       module: entry.module, enabled: entry.enabled,
       ...('required' in entry ? { required: true } : {}),
+      ...(entry.module === '@keundal/prompt' || entry.module === '@keundal/subagent'
+        ? { requires: ['@keundal/plugin-agent-chat'] }
+        : entry.module === '@keundal/plugin-agent-chat' ? { requires: required } : {}),
       ...('source' in entry ? { source: entry.source, version: entry.version, metadata: entry.metadata,
         ...(entry.enabled && diagnostics[entry.module] ? { error: String(diagnostics[entry.module]) } : {}) }
         : { metadata: metadata[entry.module] }),
       feature: entry.module === '@keundal/plugin-skill' ? 'skills'
-        : entry.module === '@keundal/plugin-mcp-client' ? 'mcp' : undefined
+        : entry.module === '@keundal/plugin-mcp-client' ? 'mcp'
+        : entry.module === '@keundal/prompt' ? 'prompt'
+        : entry.module === '@keundal/subagent' ? 'subagents'
+        : entry.module === '@keundal/plugin-agent-chat' ? 'agent' : undefined
     }))
   }
   let next: Entry[]
   if (request.action === 'restore' || request.action === 'finalize') {
-    const expected = validateEntries(request.expected)
-    next = validateEntries(request.previous)
+    const expected = validateEntries(request.expected, configuredModules(directory))
+    next = validateEntries(request.previous, configuredModules(directory))
     if (JSON.stringify(previous) !== JSON.stringify(expected)) throw new Error('Plugin selection changed before rollback')
     if (request.action === 'finalize') {
       for (const entry of next) {
@@ -186,7 +216,9 @@ export async function manageRuntimePlugins(directory: string, request: PluginReq
 /** Desktop-managed optional plugins are independent from the deployment manifest. */
 export function createDesktopComposition(directory?: string): HostCompositionFactory {
   return (options) => {
-    const entries = directory ? readEntries(directory) : []
+    const required = getRequiredNodePluginModules(options)
+    const configured = getConfiguredNodePluginModules(options).filter(module => !required.includes(module) && module !== legacyToolsModule)
+    const entries = directory ? readEntries(directory, [...new Set([...configuredModules(directory), ...configured])]) : []
     const selection = Object.fromEntries(entries.filter(entry => !('source' in entry)).map(({ module, enabled }) => [module, enabled]))
     const base = createNodeComposition({ ...options, bundledPlugins: { ...options.bundledPlugins, ...selection } })
     return {
@@ -196,6 +228,7 @@ export function createDesktopComposition(directory?: string): HostCompositionFac
         // The IPC process does not receive secure provider settings. Record the actual live selection.
         if (directory) {
           save(directory, 'required-modules.json', getRequiredNodePluginModules(options))
+          save(directory, 'configured-modules.json', [...new Set([...configuredModules(directory), ...configured])])
           const diagnostics: Record<string, string> = {}
           for (const entry of entries) {
             if (!('source' in entry) || !entry.enabled) continue

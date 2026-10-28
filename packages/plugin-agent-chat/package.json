@@ -36,6 +36,7 @@
     "@keundal/session": "workspace:*",
     "@keundal/skill": "workspace:*",
     "@keundal/task-memory": "workspace:*",
+    "@keundal/tool-approval": "workspace:*",
     "@keundal/tools": "workspace:*",
     "@keundal/trace": "workspace:*",
     "@keundal/tsconfig": "workspace:*",

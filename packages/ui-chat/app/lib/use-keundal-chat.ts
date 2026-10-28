@@ -151,5 +151,5 @@ export function useKeundalChat(options: {
     await run()
   }
 
-  return { messages, queue, status, error, sendMessage, regenerate, stop, resumeQueue, removeQueued }
+  return { messages, queue, status, error, sendMessage, regenerate, resume: run, stop, resumeQueue, removeQueued }
 }

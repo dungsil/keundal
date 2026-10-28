@@ -1,6 +1,17 @@
 import type en from './en'
 
 export default {
+  'approval.title': '도구 실행 승인 필요',
+  'approval.operation': '작업 종류',
+  'approval.command': '명령어',
+  'approval.paths': '대상 경로',
+  'approval.defaultPath': '설정된 작업 디렉터리',
+  'approval.allow': '한 번 허용',
+  'approval.deny': '거부',
+  'approval.allowed': '도구 실행 허용됨',
+  'approval.denied': '도구 실행 거부됨',
+  'approval.expired': '더 이상 응답할 수 없는 승인 요청입니다.',
+  'approval.failed': '결정을 보내지 못했습니다. 다시 시도하세요.',
   'plugin.toolRunning': '도구 실행 중',
   'plugin.toolFinished': '도구 실행 완료',
   'plugin.toolFailed': '도구 실행 실패',

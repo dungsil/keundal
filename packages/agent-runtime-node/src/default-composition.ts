@@ -34,7 +34,21 @@ export const nodePluginMetadata = {
   '@keundal/plugin-store-sqlite': storeMetadata,
   '@keundal/plugin-agent-chat': agentMetadata,
   '@keundal/plugin-skill': skillMetadata,
-  '@keundal/plugin-mcp-client': mcpMetadata
+  '@keundal/plugin-mcp-client': mcpMetadata,
+  '@keundal/prompt': {
+    name: { en: 'Prompt presets', ko: '프롬프트 프리셋' },
+    description: {
+      en: 'Applies reusable prompt presets to agent conversations.',
+      ko: '에이전트 대화에 재사용 가능한 프롬프트 프리셋을 적용합니다.'
+    }
+  },
+  '@keundal/subagent': {
+    name: { en: 'Subagents', ko: '서브에이전트' },
+    description: {
+      en: 'Lets the agent delegate independent tasks to subagents.',
+      ko: '에이전트가 독립 작업을 서브에이전트에 위임할 수 있게 합니다.'
+    }
+  }
 }
 
 interface LoadedNodePlugins {
@@ -101,8 +115,8 @@ function createNodeImporter(basePath: string) {
   }
 }
 
-/** Required deployment modules are informational, never editable by bundled feature selection. */
-export function getRequiredNodePluginModules(options: NodeHostOptions): string[] {
+/** Configured deployment modules, including optional modules, without importing them. */
+export function getConfiguredNodePluginModules(options: NodeHostOptions): string[] {
   const { manifest } = readManifest(options, true)
   const llm = manifest.plugins.find((spec) => spec.module === 'builtin:llm')
   const provider =
@@ -116,16 +130,25 @@ export function getRequiredNodePluginModules(options: NodeHostOptions): string[]
   }
   return [
     ...new Set(
-      [...manifest.plugins, manifest.agent]
+      [...manifest.plugins, manifest.agent, ...(manifest.tools ?? [])]
         .filter((spec) => !['builtin:skills', '@keundal/plugin-skill'].includes(spec.module))
         .map((spec) => builtinNames[spec.module] ?? spec.module)
     )
   ]
 }
 
+/** Only the LLM and persistence implementations are protected from selection changes. */
+export function getRequiredNodePluginModules(options: NodeHostOptions): string[] {
+  return getConfiguredNodePluginModules(options).filter(
+    (module) => module.startsWith('@keundal/plugin-llm-') || module.startsWith('@keundal/plugin-store-')
+  )
+}
+
 export const createNodeComposition: HostCompositionFactory = (options) => {
   const plugins: LoadedAgentPlugin[] = []
   const skillProviders: SkillProvider[] = []
+  const promptPresetsEnabled = options.bundledPlugins?.['@keundal/prompt'] !== false
+  const subagentsEnabled = options.bundledPlugins?.['@keundal/subagent'] !== false
   const skillsEnabled = options.bundledPlugins?.['@keundal/plugin-skill'] !== false
   const mcpEnabled = options.bundledPlugins?.['@keundal/plugin-mcp-client'] !== false
   const legacyToolsEnabled = options.bundledPlugins?.['@keundal/plugin-tool-chat'] ?? true
@@ -135,15 +158,27 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
   const mcpClients = new Map<string, Promise<McpClient>>()
   const mcpLifetime = new globalThis.AbortController()
   const selection = readManifest(options, skillsEnabled && Boolean(options.plugins?.length))
+  const agentEnabled =
+    options.bundledPlugins?.['@keundal/plugin-agent-chat'] !== false &&
+    options.bundledPlugins?.[selection.manifest.agent.module] !== false
+  const required = new Set(getRequiredNodePluginModules(options))
   const manifest: RuntimePluginManifest = {
     ...selection.manifest,
+    ...(!agentEnabled ? { agent: { module: 'builtin:agent' } } : {}),
     plugins: selection.manifest.plugins.filter(
-      (spec) => skillsEnabled || !['builtin:skills', '@keundal/plugin-skill'].includes(spec.module)
+      (spec) =>
+        (skillsEnabled || !['builtin:skills', '@keundal/plugin-skill'].includes(spec.module)) &&
+        (spec.module === 'builtin:llm' ||
+          spec.module === 'builtin:store' ||
+          required.has(spec.module) ||
+          options.bundledPlugins?.[spec.module] !== false)
     ),
     ...(selection.manifest.tools === undefined
       ? {}
       : {
           tools: selection.manifest.tools.flatMap((spec) => {
+            if (options.bundledPlugins?.[spec.module] === false && spec.module !== '@keundal/plugin-tool-chat')
+              return []
             if (spec.module === '@keundal/plugin-tool-chat') {
               return [
                 ...(chartEnabled
@@ -296,10 +331,13 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       await runtime.setup(ctx)
     },
     async mountAgent(ctx, config) {
+      if (!agentEnabled) throw new Error('Agent is disabled; enable the agent plugin to generate responses')
       if (!runtime) throw new Error('runtime plugins are not initialized')
       return runtime.mountAgent(ctx, {
         ...config,
         ...(!skillsEnabled ? { skills: false } : {}),
+        ...(!promptPresetsEnabled ? { promptPresets: false } : {}),
+        ...(!subagentsEnabled ? { subagents: false } : {}),
         reasoning:
           hasBuiltinLlm &&
           (builtinLlmProvider === 'openai' || builtinLlmProvider === 'openai-chat') &&

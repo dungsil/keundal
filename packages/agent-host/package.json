@@ -32,6 +32,7 @@
     "@keundal/session": "workspace:*",
     "@keundal/skill": "workspace:*",
     "@keundal/task": "workspace:*",
+    "@keundal/tool-approval": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {

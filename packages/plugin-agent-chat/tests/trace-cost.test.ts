@@ -1,3 +1,5 @@
+import { setTimeout as delay } from 'node:timers/promises'
+
 import { AgentConfigSchema, parseAgentConfig, type AgentConfig } from '@keundal/agent-loop'
 import { EventType, type RunAgentInput } from '@keundal/core'
 import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
@@ -52,7 +54,7 @@ function* call(id: string, name: string): Generator<LLMEvent> {
 
 async function setup(
   t: TestContext,
-  stream: (request: LLMRequest) => AsyncIterable<LLMEvent>,
+  stream: LLMService['stream'],
   config: Partial<AgentConfig> = {},
   countTokens: (request: LLMRequest) => number = () => 10
 ) {
@@ -64,9 +66,7 @@ async function setup(
     async countTokens(request: LLMRequest) {
       return countTokens(request)
     }
-    stream(request: LLMRequest) {
-      return stream(request)
-    }
+    stream = stream
   }
   const llm = await ctx.plugin(LLM)
   const store = await ctx.plugin(memoryStorePlugin)
@@ -373,5 +373,217 @@ test.for([
     maxOutputTokens: 100,
     pricing: invalid
   })
+  expect(result.issues).toBeDefined()
+})
+
+async function consume(stream: AsyncIterable<unknown>): Promise<void> {
+  for await (const event of stream) void event
+}
+
+test.for([132, 133])('축약 모델의 사용량도 실행 토큰 예산 %s에서 차감한다', async (maxTokens, t) => {
+  const isSummary = (request: LLMRequest) =>
+    request.input.messages.some(
+      (message) =>
+        message.role === 'system' &&
+        typeof message.content === 'string' &&
+        message.content.startsWith('Summarize the conversation data')
+    )
+  const ctx = await setup(
+    t,
+    async function* (request) {
+      yield* text('answer', isSummary(request) ? 'saved summary' : 'done')
+      yield llmUsageEvent({ source: 'provider', inputTokens: 20, outputTokens: 3 })
+    },
+    { budget: { maxTokens }, compaction: { keepRecentMessages: 1, maxSummaryTokens: 30 } },
+    (request) => {
+      if (isSummary(request)) return 20
+      return request.input.messages.some((message) => message.id === 'old') ? 950 : 10
+    }
+  )
+  const input = {
+    ...runInput('budget-compaction'),
+    messages: [
+      { id: 'old', role: 'user' as const, content: 'old question' },
+      { id: 'old-answer', role: 'assistant' as const, content: 'old answer' },
+      { id: 'recent', role: 'user' as const, content: 'continue' }
+    ]
+  }
+  const completion = consume(ctx.agent.run(input))
+  if (maxTokens === 132) await expect(completion).rejects.toThrow('run budget exceeded: tokens')
+  else await completion
+  expect((await ctx.generation.get(input.runId))?.status === 'completed').toBe(maxTokens === 133)
+})
+
+test('공급자 사용량이 예산을 초과하면 스트림의 나머지를 진행하지 않고 부분 응답을 보존한다', async (t) => {
+  let continued = false
+  const ctx = await setup(
+    t,
+    async function* () {
+      yield* text('answer', 'partial')
+      yield llmUsageEvent({ source: 'provider', inputTokens: 90, outputTokens: 30 })
+      continued = true
+      yield* text('late', 'must not arrive')
+    },
+    { budget: { maxTokens: 110 } }
+  )
+  const input = runInput('budget-overrun')
+  await expect(consume(ctx.agent.run(input))).rejects.toThrow('run budget exceeded: tokens')
+  expect(continued).toBe(false)
+  const saved = await ctx.generation.get(input.runId)
+  expect(saved?.status).not.toBe('completed')
+  expect(saved?.messages).toContainEqual(expect.objectContaining({ content: 'partial' }))
+})
+
+test('비용 예산의 통화가 가격표와 다르면 기본 정책은 모델 호출 전에 거부한다', async (t) => {
+  let started = false
+  const ctx = await setup(
+    t,
+    async function* () {
+      started = true
+      yield* text('answer', 'done')
+    },
+    { pricing, budget: { maxCost: { currency: 'KRW', amount: 100 } } }
+  )
+  await expect(consume(ctx.agent.run(runInput('budget-currency')))).rejects.toThrow('unknown model pricing or currency')
+  expect(started).toBe(false)
+})
+
+test.for([109, 110])('첫 모델 요청의 입력과 최대 출력 예약을 토큰 예산 %s와 비교한다', async (maxTokens, t) => {
+  const ctx = await setup(t, async function* () {
+    yield* text('answer', 'done')
+  })
+  const input = runInput('budget-boundary')
+  const completion = consume(ctx.agent.run(input, { budget: { maxTokens } }))
+  if (maxTokens === 109) await expect(completion).rejects.toThrow('run budget exceeded: tokens')
+  else await completion
+  const saved = await ctx.generation.get(input.runId)
+  expect(saved?.status === 'completed').toBe(maxTokens === 110)
+  const spans = readTraceSpans(saved!.journal.map((entry) => entry.event))
+  if (maxTokens === 110) {
+    expect(spans.find((span) => span.kind === 'model')?.usage).toEqual({
+      source: 'estimate',
+      inputTokens: 10,
+      outputTokens: 100
+    })
+  }
+})
+
+test.for([126, 127])('누적 공급자 사용량으로 정산한 뒤 후속 요청을 토큰 예산 %s와 비교한다', async (maxTokens, t) => {
+  const ctx = await setup(
+    t,
+    async function* (request) {
+      if (request.input.messages.some((message) => message.role === 'tool')) yield* text('answer', 'done')
+      else yield* call('echo', 'echo')
+      yield llmUsageEvent({ source: 'provider', inputTokens: 10, outputTokens: 7 })
+      // Usage events are cumulative snapshots, not additive deltas.
+      yield llmUsageEvent({ source: 'provider', inputTokens: 10, outputTokens: 7 })
+    },
+    { tools: [echoTool], budget: { maxTokens } }
+  )
+  const input = runInput('budget-settlement')
+  const completion = consume(ctx.agent.run(input))
+  if (maxTokens === 126) await expect(completion).rejects.toThrow('run budget exceeded: tokens')
+  else await completion
+  expect((await ctx.generation.get(input.runId))?.status === 'completed').toBe(maxTokens === 127)
+})
+
+test.for([219, 220])('사용량이 없으면 최대 출력 예약을 유지하여 토큰 예산 %s를 검사한다', async (maxTokens, t) => {
+  const ctx = await setup(
+    t,
+    async function* (request) {
+      if (request.input.messages.some((message) => message.role === 'tool')) yield* text('answer', 'done')
+      else yield* call('echo', 'echo')
+    },
+    { tools: [echoTool], budget: { maxTokens } }
+  )
+  const input = runInput('budget-estimate')
+  const completion = consume(ctx.agent.run(input))
+  if (maxTokens === 219) await expect(completion).rejects.toThrow('run budget exceeded: tokens')
+  else await completion
+  expect((await ctx.generation.get(input.runId))?.status === 'completed').toBe(maxTokens === 220)
+})
+
+test.for([0.0055, 0.0056])(
+  '공급자 비용을 우선 정산하고 후속 요청의 추정 비용을 예산 %s에 예약한다',
+  async (amount, t) => {
+    const ctx = await setup(
+      t,
+      async function* (request) {
+        if (request.input.messages.some((message) => message.role === 'tool')) {
+          yield* text('answer', 'done')
+        } else {
+          yield* call('echo', 'echo')
+          yield llmUsageEvent({
+            source: 'provider',
+            inputTokens: 10,
+            outputTokens: 7,
+            cost: { source: 'provider', currency: 'USD', amount: 0.004 }
+          })
+          yield llmUsageEvent({ source: 'provider', inputTokens: 10, outputTokens: 7 })
+        }
+      },
+      { pricing, tools: [echoTool], budget: { maxCost: { currency: 'USD', amount } } }
+    )
+    const input = runInput('budget-cost')
+    const completion = consume(ctx.agent.run(input))
+    if (amount === 0.0055) await expect(completion).rejects.toThrow('run budget exceeded: cost')
+    else await completion
+    expect((await ctx.generation.get(input.runId))?.status === 'completed').toBe(amount === 0.0056)
+  }
+)
+
+test.for(['reject', 'allow'] as const)(
+  '가격 미상 모델은 %s 정책을 따르고 비용을 0으로 기록하지 않는다',
+  async (unknownPricing, t) => {
+    const ctx = await setup(
+      t,
+      async function* () {
+        yield* text('answer', 'done')
+      },
+      {
+        budget: { maxCost: { currency: 'USD', amount: 1 }, unknownPricing }
+      }
+    )
+    const input = runInput('budget-unknown')
+    const completion = consume(ctx.agent.run(input))
+    if (unknownPricing === 'reject') await expect(completion).rejects.toThrow('unknown model pricing')
+    else await completion
+    const saved = await ctx.generation.get(input.runId)
+    expect(saved?.status === 'completed').toBe(unknownPricing === 'allow')
+    expect(summarizeTrace(readTraceSpans(saved!.journal.map((entry) => entry.event))).cost).toBeUndefined()
+  }
+)
+
+test('시간 예산이 지나면 응답을 기다리는 모델 요청에도 취소 신호를 전달한다', async (t) => {
+  let cancelled = false
+  const ctx = await setup(
+    t,
+    async function* (_request, options) {
+      try {
+        await delay(10_000, undefined, { signal: options?.signal })
+        yield* text('answer', 'late answer')
+      } finally {
+        cancelled = options?.signal?.aborted ?? false
+      }
+    },
+    { budget: { maxDurationMs: 50 } }
+  )
+  const input = runInput('budget-duration')
+  await expect(consume(ctx.agent.run(input))).rejects.toThrow('run budget exceeded: duration')
+  expect(cancelled).toBe(true)
+  expect((await ctx.generation.get(input.runId))?.status).not.toBe('completed')
+})
+
+test.for([
+  null,
+  [],
+  { maxTokens: 0 },
+  { maxTokens: 1.5 },
+  { maxCost: { amount: -1, currency: 'USD' } },
+  { maxDurationMs: 2_147_483_648 },
+  { unknownPricing: 'ignore' },
+  { maxToken: 100 }
+])('잘못된 실행 예산 %j는 설정 검증에서 거부한다', async (budget) => {
+  const result = await AgentConfigSchema['~standard'].validate({ model: 'priced-model', maxOutputTokens: 100, budget })
   expect(result.issues).toBeDefined()
 })

@@ -1,10 +1,11 @@
-import type {} from '@keundal/agent'
+import type { AgentExecutionOptions } from '@keundal/agent'
 import type { AGUIEvent, AgentMessage, ExecutionOptions, RunAgentInput } from '@keundal/core'
 import type { GenerationJournalEntry, GenerationService, GenerationSubscriptionOptions } from '@keundal/generation'
 import type { Reasoning } from '@keundal/llm'
 import type { SessionService } from '@keundal/session'
 import type { SkillSummary } from '@keundal/skill'
 import type { TaskService } from '@keundal/task'
+import type { ToolApproval } from '@keundal/tool-approval'
 import type { Context, Fiber } from 'cordis'
 
 export interface AgentHostModel {
@@ -20,9 +21,11 @@ export interface AgentMountConfig {
   readonly model: string
   readonly maxOutputTokens: number
   readonly reasoning?: Reasoning
+  readonly toolApproval?: ToolApproval
 }
 
 export interface AgentHostOptions {
+  readonly toolApproval?: ToolApproval
   readonly model: string
   readonly models: readonly AgentHostModel[]
   readonly maxOutputTokens?: number
@@ -32,7 +35,7 @@ export interface AgentHostOptions {
   readonly toolCatalog?: (options: ExecutionOptions) => Promise<readonly SkillSummary[]>
 }
 
-export interface AgentHostRunOptions extends ExecutionOptions {
+export interface AgentHostRunOptions extends AgentExecutionOptions {
   readonly reasoning?: Reasoning
   readonly model?: string
 }
@@ -44,6 +47,7 @@ export interface AgentHostTitleRequest {
 
 /** HTTP 계층과 sidecar가 공통으로 사용하는 에이전트 표면입니다. */
 export interface AgentHostServices {
+  respondToToolApproval?(runId: string, requestId: string, decision: 'allow' | 'deny'): boolean
   run(input: RunAgentInput, options?: AgentHostRunOptions): AsyncIterable<AGUIEvent>
   /** 실행 중인 실행에 지시를 넣고, 받아들인 메시지 수를 돌려줍니다. 실행이 없으면 0입니다. */
   steer(runId: string, messages: readonly AgentMessage[]): number

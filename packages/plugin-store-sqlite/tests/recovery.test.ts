@@ -96,6 +96,30 @@ const request = (runId = 'run'): GenerationRequest => ({
   sessionRevision: 0
 })
 
+test('승인 이벤트를 전달하기 전에 배치를 디스크에 확정한다', async (t) => {
+  const path = databasePath(t)
+  const event: LLMEvent = {
+    type: EventType.CUSTOM,
+    name: 'keundal.tool.approval',
+    value: { status: 'decided', decision: 'allow' }
+  }
+  const { ctx } = await setup(t, { events: [event] }, path)
+  const iterator = ctx.generation.run(request())[Symbol.asyncIterator]()
+  try {
+    await iterator.next()
+    expect((await iterator.next()).value).toEqual(event)
+    const disk = new DatabaseSync(path, { readOnly: true })
+    try {
+      const rows = disk.prepare('SELECT event FROM run_journal WHERE run_id = ? ORDER BY sequence').all('run')
+      expect(rows.map((row) => JSON.parse(String(row.event)))).toContainEqual(event)
+    } finally {
+      disk.close()
+    }
+  } finally {
+    await iterator.return?.()
+  }
+})
+
 test.for([128, 1024])('응답을 %i개로 나누어도 누적 메시지는 종료 시 한 번만 저장한다', async (fragments, t) => {
   const writes = vi.spyOn(SqliteStore.prototype, 'writeRunMessages')
   t.onTestFinished(() => writes.mockRestore())

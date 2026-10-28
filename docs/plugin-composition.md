@@ -17,7 +17,9 @@ web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도�
 | Node.js 환경 설정과 기본 플러그인 구성      | `@keundal/agent-runtime-node`           |
 | 런타임 플러그인 설정과 Cordis 모듈 로딩     | `@keundal/plugin-runtime`               |
 
-`@keundal/llm`, `@keundal/session`, `@keundal/generation`, `@keundal/skill`은 각 서비스 계약과 Cordis Context 확장을 소유합니다. `@keundal/agent`, `@keundal/tools`, `@keundal/context`, `@keundal/mcp`, `@keundal/shell`, `@keundal/transcription`, `@keundal/fs`도 구현 플러그인에 의존하지 않습니다. `@keundal/core`는 AG-UI 프로토콜과 공통 실행·메시지만 제공하며 기능별 계약을 다시 내보내지 않습니다.
+`@keundal/llm`, `@keundal/session`, `@keundal/generation`, `@keundal/skill`은 각 서비스 계약과 Cordis Context 확장을 소유합니다. `@keundal/agent`, `@keundal/tools`, `@keundal/context`, `@keundal/mcp`, `@keundal/shell`, `@keundal/transcription`, `@keundal/fs`, `@keundal/workspace`도 구현 플러그인에 의존하지 않습니다. `@keundal/core`는 AG-UI 프로토콜과 공통 실행·메시지만 제공하며 기능별 계약을 다시 내보내지 않습니다.
+
+Git 작업공간은 `@keundal/workspace` 계약, `@keundal/plugin-workspace-git` 로컬 구현, `@keundal/plugin-tool-workspace` 에이전트 도구로 분리합니다. 앱이 저장소 경로·Worktree 디렉터리·검토 콜백을 선택하며 기본 앱 구성에는 자동 등록하지 않습니다. 승인 화면이나 공통 승인 서비스는 이 계약에 포함하지 않습니다. 조립과 검토 경계는 [Git 작업공간 문서](../packages/plugin-workspace-git/README.md)를 참고합니다.
 
 기본 실행 루프는 `@keundal/agent-loop`가 소유하고, 요약 축약은 `@keundal/compaction-summary`, 도구 반복은 `@keundal/tool-execution`, 지연 도구는 `@keundal/deferred-tools`, 실행 추적은 `@keundal/trace`를 조합합니다. 독립적인 에이전트는 `AgentService`를 구현하고, 기본 루프를 재사용할 때는 `agent-loop`의 `Agent`를 상속합니다. 계약과 구현의 전체 경계와 가져오기 경로 변경은 [ADR-0005](adr/0005-service-package-boundaries.md)를 참고합니다.
 
@@ -78,25 +80,31 @@ web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도�
 
 ### UI에서 선택 기능 관리
 
-**설정 → 큰달 플러그인**(`/settings/runtime-plugins`)은 앱에 함께 패키징한 기능 모듈을 표시합니다. 필수 서비스인 LLM·저장소·에이전트는 잠긴 항목으로 표시하고, 선택 기능인 스킬·MCP·날씨·차트 도구를 스위치로 끄고 켭니다. desktop에서는 외부 큰달 플러그인도 설치하고 관리합니다. web은 번들된 모듈만 관리합니다. `ui-*` 행이나 별도의 화면 스위치는 제공하지 않습니다. **에이전트 플러그인**(영문 **Agent plugins**)의 폴더 가져오기는 스킬·MCP 묶음을 관리하는 별도 기능입니다.
+**설정 → 큰달 플러그인**(`/settings/runtime-plugins`)은 앱에 함께 패키징한 실행 목록과 UI 목록을 함께 표시합니다. 필수 서비스인 LLM·저장소와 선택을 복구하는 관리 셸인 `@keundal/ui-layout`, `@keundal/ui-settings`, `@keundal/ui-agent-plugins`는 잠긴 항목입니다. 나머지 번들 실행·UI 플러그인은 각각 끄고 켤 수 있습니다. 채팅 에이전트를 끄면 새 응답을 막되 기존 세션과 기능 목록·관리 화면은 유지합니다. desktop에서는 외부 큰달 플러그인도 설치하고 관리합니다. web은 번들된 모듈만 관리합니다. **에이전트 플러그인**(영문 **Agent plugins**)의 폴더 가져오기는 스킬·MCP 묶음을 관리하는 별도 기능입니다.
 
-- **화면**: 실행 기능의 선택에 따라 아래 UI의 Cordis 등록 범위를 해제하거나 다시 등록합니다. 나머지 UI는 항상 등록하며, Nuxt 레이어는 모두 빌드에 유지합니다. 스킬·MCP를 끄면 해당 설정 화면과 탐색 항목도 사라지고, 다시 켜면 복원됩니다.
-- **web 로컬 실행**: 스킬을 끄면 해당 서비스의 효과를 해제하고, 도구와 MCP를 끄면 이후 실행 목록에서 제외합니다. 선택은 기존 `BrowserRuntimePluginManager`가 `keundal:bundled-plugins` localStorage에 저장합니다. UI 관리자는 별도 선택을 저장하지 않습니다.
-- **desktop 실행**: 번들 선택과 외부 설치 목록을 앱 데이터 디렉터리에 유지합니다. 선택을 바꾸면 sidecar를 다시 시작하며 실패하면 이전 선택으로 복구합니다. npm을 앱에 포함하므로 시스템에 Node.js나 npm을 따로 설치할 필요가 없습니다.
-- **원격 서버 연결**: `platform.runtimePlugins`가 없으면 `runtime.pluginManager`도 제공하지 않습니다. 관리 화면은 사용할 수 없음을 표시하고 기본 UI를 유지합니다. 서버의 실행 기능을 바꾸거나 서버에 패키지를 설치하는 API는 제공하지 않으며, 로컬 UI만 별도로 끄고 켤 수도 없습니다.
+- **화면**: 셸의 UI 관리자가 저장한 선택과 `requires`에 따라 UI의 Cordis 등록 범위를 해제하거나 다시 등록합니다. 의존 대상이 꺼지면 해당 UI와 탐색 항목을 일시 해제하지만 저장한 활성화 선택은 유지합니다. 의존 대상을 다시 켜면 활성화해 둔 UI만 복원하며, 직접 끈 UI는 꺼진 상태를 유지합니다. Nuxt 레이어는 모두 빌드에 유지합니다.
+- **web 로컬 실행**: 스킬을 끄면 해당 서비스의 효과를 해제하고, 도구와 MCP를 끄면 이후 실행 목록에서 제외합니다. 실행 선택은 기존 `BrowserRuntimePluginManager`가 `keundal:bundled-plugins` localStorage에 저장합니다. UI 선택은 브라우저 localStorage의 `keundal:ui-plugin-selections`에 별도로 저장합니다.
+- **desktop 실행**: 번들 실행 선택과 외부 설치 목록을 기존 네이티브 저장소인 앱 데이터 디렉터리에 유지합니다. 실행 선택을 바꾸면 sidecar를 다시 시작하며 실패하면 이전 선택으로 복구합니다. UI 선택은 브라우저 localStorage의 `keundal:ui-plugin-selections`에 저장하고 서버 구성을 바꾸지 않습니다. npm을 앱에 포함하므로 시스템에 Node.js나 npm을 따로 설치할 필요가 없습니다.
+- **원격 서버 연결**: `platform.runtimePlugins`가 없어도 셸의 `runtime.pluginManager`는 로컬 UI 목록과 선택을 제공합니다. 이 경우 서버의 실행 목록은 관리하지 않습니다. 서버의 실행 기능을 바꾸거나 서버에 패키지를 설치하는 API는 제공하지 않습니다.
 
-| 선택 기능 모듈               | 함께 등록·해제하는 UI |
-| ---------------------------- | --------------------- |
-| `@keundal/plugin-skill`      | `@keundal/ui-skill`   |
-| `@keundal/plugin-mcp-client` | `@keundal/ui-mcp`     |
+각 항목의 `requires`는 의존 대상을 나타냅니다. 관리 화면은 **의존 대상**(Requires)과 이 항목을 참조하는 **사용하는 플러그인**(Used by)을 함께 표시합니다. UI는 공통으로 `@keundal/ui-layout`에 의존하며, 기능별 관계는 다음과 같습니다.
 
-`@keundal/ui-tool`은 `delegate_task`, `skill`, `web_search`, `google_search` 결과를, `@keundal/ui-chart`와 `@keundal/ui-weather`는 차트와 날씨 결과를 표시합니다. 세 UI는 기존 대화 기록을 표시해야 하므로 `@keundal/ui-chat`처럼 항상 등록합니다. `@keundal/plugin-tool-chart`와 `@keundal/plugin-tool-weather`를 각각 끄면 이후 실행 목록에서 해당 도구만 제외하며, 기존 결과를 표시하는 UI는 유지합니다. 별도의 UI 스위치는 제공하지 않습니다. 이전 통합 도구의 저장된 선택은 두 도구에 반영하되, 이미 저장한 개별 선택이 있으면 이를 우선합니다.
+| UI 항목                                  | 의존하는 실행 기능           |
+| ---------------------------------------- | ---------------------------- |
+| `@keundal/ui-skill`                      | `@keundal/plugin-skill`      |
+| `@keundal/ui-mcp`                        | `@keundal/plugin-mcp-client` |
+| `@keundal/ui-settings-llm/prompt-plugin` | `@keundal/prompt`            |
+| `@keundal/ui-subagents`                  | `@keundal/subagent`          |
 
-서버 렌더링과 최초 하이드레이션에서는 기본 UI를 등록합니다. 앱이 마운트된 뒤 실행 방식의 관리자가 제공하는 실제 선택과 UI를 동기화하므로, 저장된 비활성화 상태가 있어도 하이드레이션에는 같은 구성을 사용합니다. 이전 `keundal-ui-plugins` 쿠키는 읽거나 선택에 반영하지 않습니다.
+`@keundal/prompt`와 `@keundal/subagent`는 공통 에이전트 루프에 내장된 프롬프트 프리셋·서브에이전트 기능의 선택 항목입니다. 새 구현 플러그인 패키지를 등록하는 것은 아닙니다. 프롬프트 UI는 `@keundal/ui-settings-llm/prompt-plugin`으로 따로 내보내므로 LLM 공급자 설정 UI인 `@keundal/ui-settings-llm`과 독립적으로 선택합니다.
+
+`@keundal/ui-tool`은 `delegate_task`, `skill`, `web_search`, `google_search` 결과를, `@keundal/ui-chart`와 `@keundal/ui-weather`는 차트와 날씨 결과를 표시합니다. 세 결과 UI도 각각 끄고 켤 수 있지만 실행 도구에는 의존하지 않습니다. `@keundal/plugin-tool-chart`와 `@keundal/plugin-tool-weather`를 각각 끄면 이후 실행 목록에서 해당 도구만 제외하며, 사용자가 UI를 따로 끄지 않으면 기존 결과를 계속 표시합니다. 이전 통합 도구의 저장된 선택은 두 도구에 반영하되, 이미 저장한 개별 선택이 있으면 이를 우선합니다. desktop은 이전 통합 도구·개별 도구 선택 형식도 새 목록으로 이전하며, 새 선택 항목은 기본값을 사용합니다.
+
+서버 렌더링과 최초 하이드레이션에서는 기본 UI를 등록합니다. 앱이 마운트된 뒤 저장한 UI 선택과 실행 기능의 의존 상태를 동기화하므로, 저장된 비활성화 상태가 있어도 하이드레이션에는 같은 구성을 사용합니다. 이전 `keundal-ui-plugins` 쿠키는 읽거나 선택에 반영하지 않습니다.
 
 변경 전에는 진행 중인 응답을 중단합니다. 기본 선택은 기존 번들 구성을 유지하며, 비활성화해도 사용자 설정과 IndexedDB·SQLite 대화 기록은 지우지 않습니다. 이전의 외부 모듈 설치 목록은 자동으로 불러오지 않으며 다운로드했던 파일도 자동 삭제하지 않습니다. 배포 매니페스트는 운영자가 관리하는 별도 설정으로 유지합니다.
 
-새 번들 선택 기능을 제공하려면 모노레포 패키지를 앱의 정적 기능 목록에 추가하고 함께 빌드합니다. 해당 기능만 사용하는 UI가 있으면 `@keundal/chat-app`의 UI 목록에 기능 모듈과의 연결도 선언합니다. 다른 기능이나 기존 기록을 표시하는 공유 UI는 기능 선택과 관계없이 유지합니다. 플러그인은 `inject`로 서비스 의존성을 선언하고 전달받은 컨텍스트에 효과를 등록해야 비활성화 시 올바르게 해제됩니다.
+새 번들 선택 기능을 제공하려면 모노레포 패키지를 앱의 정적 기능 목록에 추가하고 함께 빌드합니다. UI는 `@keundal/chat-app`의 UI 목록에 추가하고 해당 기능이 있어야 동작한다면 `requires`도 선언합니다. 기존 기록을 표시하는 결과 UI에는 실행 도구 의존성을 두지 않습니다. 목록의 의존 관계와 별개로 플러그인은 `inject`로 서비스 의존성을 선언하고 전달받은 컨텍스트에 효과를 등록해야 비활성화 시 올바르게 해제됩니다.
 
 ### desktop 외부 큰달 플러그인
 

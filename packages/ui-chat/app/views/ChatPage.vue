@@ -53,6 +53,7 @@ const props = defineProps<{
     signal?: AbortSignal
   ) => AsyncGenerator<AGUIEvent>
   steer: (message: ChatMessage) => Promise<boolean>
+  respondToToolApproval: (runId: string, requestId: string, decision: 'allow' | 'deny') => Promise<boolean>
   enqueue: (message: ChatMessage) => Promise<ChatMessage[]>
   dequeue: (messageId: string) => Promise<ChatMessage[]>
   truncate: (messageId: string, type: 'edit' | 'regenerate') => Promise<void>
@@ -125,7 +126,7 @@ const observer = computed<ChatObserverOwner>(() => ({
   }
 }))
 
-const { messages, queue, status, error, sendMessage, regenerate, stop, resumeQueue, removeQueued } = useKeundalChat({
+const { messages, queue, status, error, sendMessage, regenerate, resume, stop, resumeQueue, removeQueued } = useKeundalChat({
   respond: (messages, onMessage, signal) => props.respond({
     messages, model: props.model.value, titleModel: props.titleModel.value || undefined, webSearch: props.webSearch.value, reasoning: props.reasoning.value,
     promptPreset: props.promptPreset.value,
@@ -348,7 +349,8 @@ watch(data, async (chat) => {
   messages.value = chat.messages
   queue.value = chat.queue ?? []
   votes.value = chat.votes
-  if (!chat.started && chat.messages.length === 1) await regenerate()
+  if (chat.pendingRunId && !props.isBrowserOnly()) await resume()
+  else if (!chat.started && chat.messages.length === 1) await regenerate()
 }, { immediate: true })
 
 onBeforeUnmount(() => {
@@ -448,6 +450,7 @@ onBeforeUnmount(() => {
                 <div :id="messageAnchor(message.id)" tabindex="-1" class="scroll-mt-20 outline-none focus-visible:ring-2 focus-visible:ring-primary forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-[Highlight]">
                   <MessageContent
                     :message="message"
+                    :respond-to-tool-approval="respondToToolApproval"
                     :editing="isOwner && editingMessageId === message.id"
                     @save="saveEdit"
                     @cancel-edit="editingMessageId = null"
