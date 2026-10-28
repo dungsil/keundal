@@ -58,7 +58,7 @@ onBeforeUnmount(() => {
       <h2 id="background-tasks-title" class="text-lg font-semibold text-highlighted">{{ t('tasks.title') }}</h2>
       <UButton :label="t('tasks.refresh')" icon="i-lucide-refresh-cw" color="neutral" variant="outline" :loading="loading" @click="refresh" />
     </div>
-    <p class="text-sm text-muted">{{ t('tasks.memoryOnly') }}</p>
+    <p class="text-sm text-muted">{{ t('tasks.storage') }}</p>
     <p v-if="error" role="alert" class="text-sm text-error">{{ error }}</p>
     <p v-if="loading" role="status" class="text-sm text-muted">{{ t('tasks.loading') }}</p>
     <p v-else-if="!tasks.length && !error" class="rounded-lg border border-default p-4 text-sm text-muted">{{ t('tasks.empty') }}</p>

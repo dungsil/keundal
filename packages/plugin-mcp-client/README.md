@@ -72,6 +72,64 @@ const remote = await McpClient.connect(
 
 SDK의 자동 협상으로 지원하는 프로토콜 버전을 선택합니다. stdio 협상은 확인용 자식 프로세스를 먼저 실행할 수 있습니다. `timeoutMs`의 기본값은 60,000ms이며 연결과 각 요청에 적용합니다. `connect()`와 조회 메서드는 선택적인 `signal`을 받습니다.
 
+## OAuth 계정 연결
+
+`McpOAuth`는 Streamable HTTP 서버의 Authorization Code + PKCE(S256), 인증 서버 검색, 사전 등록한 공개 클라이언트와 동적 클라이언트 등록을 지원합니다. Node.js 진입점과 브라우저 진입점에서 같은 API를 제공합니다. 클라이언트 비밀을 사용하는 confidential client는 지원하지 않습니다.
+
+```ts
+import type { McpCredentialStorage } from '@keundal/mcp'
+import { McpClient, McpOAuth } from '@keundal/plugin-mcp-client'
+
+// 앱이 OS 보안 저장소 또는 서버 측 비밀 저장소로 구현합니다.
+declare const secureStore: McpCredentialStorage
+declare function openExternal(url: string): Promise<void>
+
+const account = new McpOAuth({
+  serverUrl: 'https://mcp.example.com/mcp',
+  redirectUrl: 'https://app.example.com/oauth/mcp/callback',
+  clientId: 'registered-public-client', // 생략하면 동적 등록
+  scope: 'issues:read',
+  storage: secureStore
+})
+
+// 로그인·재인증 버튼에서 호출합니다. 자동 도구 실행에서는 호출하지 않습니다.
+async function login() {
+  await openExternal(await account.authorize())
+}
+
+// 앱의 콜백 처리기가 전체 URL을 전달합니다. code만 전달하면 안 됩니다.
+async function completeLogin(callbackUrl: string) {
+  await account.complete(callbackUrl)
+  return McpClient.connect(
+    {
+      serverName: 'issues',
+      transport: 'streamable-http',
+      url: account.serverUrl,
+      permissions: { tools: ['search_issues'] }
+    },
+    { authentication: account }
+  )
+}
+```
+
+`authorize()`는 로그인 URL을 반환하며 창을 직접 열지 않습니다. 로그인 버튼, 외부 브라우저 실행, 콜백 HTTP/IPC 라우트와 사용자 세션 검사는 앱이 소유합니다. 현재 기본 앱의 MCP 설정 화면에 로그인 버튼이나 콜백 라우트를 자동으로 추가하지는 않습니다. 데스크톱 콜백은 앱이 먼저 연 loopback 리스너의 URL을 사용합니다. 서버 콜백은 신뢰하는 고정 HTTPS URL을 사용하고, 요청의 Host 헤더로 URL을 만들지 않습니다. 브라우저에서 직접 연결하면 MCP 서버와 인증 서버 모두 필요한 CORS를 허용해야 합니다.
+
+`complete()`는 콜백 origin·경로, 고정 query, 중복 응답 매개변수, 무작위 state, 10분 유효 시간과 인증 서버 issuer를 검사합니다. PKCE verifier와 검색 결과는 콜백 왕복 동안 같은 보안 저장소에 보존합니다. 성공·거부·코드 교환 실패 시 state를 소비하여 재사용을 막습니다. 새로운 `authorize()`는 이전 로그인 요청을 무효화하고 인증 서버를 다시 검색합니다.
+
+`status()`는 `disconnected`, `authorizing`, `connected`, `reauthentication-required`를 반환하며 토큰을 노출하지 않습니다. `connected`는 저장된 grant가 있거나 갱신할 수 있다는 뜻이며 서버의 실시간 연결 확인은 아닙니다. `token()`은 요청마다 현재 access token을 읽고 만료 30초 전부터 갱신합니다. refresh token이 없으면 access token 만료 시 재인증을 요구합니다. 회전된 refresh token을 저장하고 같은 컨트롤러의 동시 갱신을 직렬화합니다. 같은 토큰에 대한 동시 401은 중복 갱신하지 않습니다. HTTP 전송은 401 이후 한 번만 다시 요청하며 완료된 도구를 자동 재실행하지 않습니다.
+
+폐기된 grant는 `McpAuthenticationRequiredError`로 알립니다. 인증이 없거나 만료되어도 로그인 창을 자동으로 열지 않습니다. 일시적인 네트워크·인증 서버 오류는 갱신 자격 증명을 보존합니다. 각 OAuth 작업은 30초 네트워크 제한과 선택적인 `{ signal }`을 받습니다. 오류 본문과 토큰을 공개 오류나 SDK 경고에 포함하지 않으며 OAuth 응답 본문은 1MiB로 제한합니다.
+
+`await account.disconnect()`는 저장된 토큰·클라이언트 등록 정보·진행 중인 로그인을 삭제합니다. 연결 해제와 새 로그인 시작은 기존 MCP 전송과 진행 중인 요청을 즉시 중단합니다. 새 grant를 얻은 뒤 새 클라이언트를 연결해야 하므로 다른 계정에 이전 MCP 세션을 재사용하지 않습니다. 원격 서비스의 계정·로그인 세션이나 grant 자체를 철회하는 API는 아닙니다. 이미 발생한 도구의 부작용을 되돌릴 수 없으며 원격 작업의 취소 여부는 서버에 달려 있습니다.
+
+### 자격 증명 저장 경계
+
+- `McpCredentialStorage`는 필수입니다. 기본 평문 파일·localStorage·IndexedDB 저장이나 안전하지 않은 저장소로의 대체 동작은 제공하지 않습니다. 데스크톱은 OS Keychain/Credential Manager/Secret Service, 서버는 접근 제어와 암호화를 적용한 비밀 저장소를 주입합니다. 이 패키지는 구체적인 저장소 공급자를 선택하지 않습니다.
+- 서버 설정에는 URL과 권한만 저장합니다. 토큰, 동적 등록의 비밀, PKCE verifier와 state를 `McpClientConfig`, 환경 변수, 대화, 모델 입력, 브라우저 저장소에 넣지 않습니다. `McpSettingsStorage`와 OAuth 저장소는 서로 다른 계약입니다.
+- 저장 키는 정확한 MCP URL, 콜백 URL, client ID와 scope에 묶입니다. 다중 사용자 서버에서는 저장소 자체도 인증된 사용자별로 격리하고 로그인·콜백·연결 해제 경로에 접근 제어를 적용합니다. 컨트롤러 하나를 서로 다른 사용자에게 공유하지 않습니다.
+- 서버·사용자·설정별로 살아 있는 `McpOAuth` 인스턴스는 하나만 유지합니다. 여러 MCP 클라이언트는 같은 인스턴스를 공유합니다. 다중 프로세스 배포는 해당 계정의 작업을 단일 소유자로 라우팅하거나 외부 잠금으로 직렬화해야 합니다. `load`/`save`만으로 분산 잠금을 제공하지 않습니다.
+- OAuth는 `allowInsecureHttp`를 무시하고 HTTPS 또는 loopback HTTP만 허용합니다. OAuth HTTP 리디렉션도 거부합니다. 다른 MCP URL로 토큰을 보내거나 정적 `Authorization` 헤더와 혼용할 수 없습니다. 서버 배포에서는 신뢰하는 MCP 주소를 허용 목록으로 제한하고 검색된 주소에 대한 네트워크 접근 정책도 적용합니다.
+
 ## 이름과 권한
 
 - 도구의 공개 이름은 `mcp__<serverName>__tool__<원래 이름>`입니다. 서버가 보고한 이름 대신 설정의 `serverName`을 사용합니다.
