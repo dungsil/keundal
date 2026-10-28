@@ -4,6 +4,8 @@ import { createAgentRuntime } from '@keundal/agent-runtime-node'
 import { createChartTools } from '@keundal/plugin-tool-chart'
 import { createWeatherTools } from '@keundal/plugin-tool-weather'
 import { manageRuntimePlugins, createDesktopComposition } from './runtime-plugins.js'
+import { parseMcpServers } from '@keundal/mcp'
+import { createDesktopMcpOAuth, createNativeBridge, desktopMcpControl } from './mcp-oauth.js'
 
 if (process.argv[2] === '--manage-runtime-plugins') {
   try {
@@ -24,13 +26,22 @@ const host = process.env.KEUNDAL_HOST ?? '127.0.0.1'
 const port = Number(process.env.PORT ?? (sidecar ? 0 : 8000))
 if (!host.trim()) throw new Error('KEUNDAL_HOST는 비어 있을 수 없습니다.')
 if (!Number.isSafeInteger(port) || port < 0 || port > 65_535) throw new Error('PORT가 올바르지 않습니다.')
+const mcpOAuth = sidecar && process.env.KEUNDAL_SHUTDOWN_ON_STDIN === '1'
+  ? await createDesktopMcpOAuth(parseMcpServers(JSON.parse(process.env.KEUNDAL_MCP_SERVERS ?? '[]')), createNativeBridge())
+  : undefined
 const agentHost = await createAgentRuntime(process.env, {
   defaultTools: [...createChartTools(), ...createWeatherTools()],
+  mcpAuthentication: mcpOAuth?.authentication,
   compose: createDesktopComposition(process.env.KEUNDAL_MANAGED_PLUGINS)
 })
 const app = agentHost.app
+const control = mcpOAuth && desktopMcpControl(mcpOAuth, process.env.KEUNDAL_API_TOKEN ?? '',
+  (process.env.KEUNDAL_CORS_ORIGINS ?? '').split(',').filter(Boolean))
 
-const server = createServer(app).listen(port, host, () => {
+const server = createServer((request, response) => {
+  if (!control) return app(request, response)
+  void control(request, response).then((handled) => { if (!handled) app(request, response) })
+}).listen(port, host, () => {
   const address = server.address()
   const boundPort = address && typeof address !== 'string' ? address.port : port
   const displayHost = host.includes(':') ? `[${host}]` : host
@@ -57,6 +68,7 @@ if (Number.isSafeInteger(parentPid) && parentPid > 0) {
 
 const shutdown = async () => {
   server.close()
+  await mcpOAuth?.dispose()
   await agentHost.dispose()
   process.exit(0)
 }

@@ -2,6 +2,7 @@ import {
   parseMcpServers,
   type McpAuthentication,
   type McpClientConfig,
+  type McpOAuthManager,
   type McpProbeResult,
   type McpRequestOptions,
   type McpSettingsStorage
@@ -9,6 +10,7 @@ import {
 import type { McpClient } from '@keundal/plugin-mcp-client/browser'
 
 export { metadata } from '@keundal/plugin-mcp-client/browser'
+export { BrowserMcpOAuth } from './mcp-oauth.js'
 
 const storageKey = 'keundal:mcp-servers'
 
@@ -36,8 +38,14 @@ export class McpManager {
     private readonly options: {
       allowStdio?: boolean
       authentication?: Readonly<Record<string, McpAuthentication>>
+      getAuthentication?: (server: McpClientConfig) => Promise<McpAuthentication | undefined>
+      oauth?: McpOAuthManager
     } = {}
   ) {}
+
+  get oauth(): McpOAuthManager | undefined {
+    return this.options.oauth
+  }
 
   get configuration(): McpClientConfig[] {
     return structuredClone(this.servers)
@@ -75,10 +83,10 @@ export class McpManager {
       if (!pending) {
         const lifetime = this.lifetime.signal
         // MCP SDK만 지연 로드하도록 허용한 예외다. 정적 import는 사용 전에도 SDK를 초기 번들에 포함한다.
-        pending = import('@keundal/plugin-mcp-client/browser').then(({ McpClient }) =>
+        pending = import('@keundal/plugin-mcp-client/browser').then(async ({ McpClient }) =>
           McpClient.connect(server, {
             signal: lifetime,
-            authentication: this.options.authentication?.[server.serverName]
+            authentication: await this.authentication(server)
           })
         )
         this.clients.set(server.serverName, pending)
@@ -109,7 +117,11 @@ export class McpManager {
     if (server?.transport !== 'streamable-http') throw new Error('The connection check supports Streamable HTTP only')
     // MCP SDK의 지연 로딩 예외를 연결 확인에도 적용한다.
     const { McpClient } = await import('@keundal/plugin-mcp-client/browser')
-    return McpClient.probe(server, { ...options, authentication: this.options.authentication?.[server.serverName] })
+    return McpClient.probe(server, { ...options, authentication: await this.authentication(server) })
+  }
+
+  private authentication(server: McpClientConfig) {
+    return this.options.getAuthentication?.(server) ?? Promise.resolve(this.options.authentication?.[server.serverName])
   }
 
   async close() {

@@ -249,6 +249,9 @@ importers:
       '@keundal/llm-settings':
         specifier: workspace:*
         version: link:../../packages/llm-settings
+      '@keundal/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@keundal/plugin-chat-browser':
         specifier: workspace:*
         version: link:../../packages/plugin-chat-browser
@@ -258,6 +261,9 @@ importers:
       '@keundal/plugin-llm-browser':
         specifier: workspace:*
         version: link:../../packages/plugin-llm-browser
+      '@keundal/plugin-mcp-client':
+        specifier: workspace:*
+        version: link:../../packages/plugin-mcp-client
       '@keundal/plugin-runtime':
         specifier: workspace:*
         version: link:../../packages/plugin-runtime
