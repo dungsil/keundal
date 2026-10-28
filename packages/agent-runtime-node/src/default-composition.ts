@@ -263,7 +263,10 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       signal.throwIfAborted()
       let pending = mcpClients.get(server.serverName)
       if (!pending) {
-        pending = McpClient.connect(server, { signal: mcpLifetime.signal })
+        pending = McpClient.connect(server, {
+          signal: mcpLifetime.signal,
+          authentication: options.mcpAuthentication?.[server.serverName]
+        })
         mcpClients.set(server.serverName, pending)
         void pending.catch(() => {
           if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
