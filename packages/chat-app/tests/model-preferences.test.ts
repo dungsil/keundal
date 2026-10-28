@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 import { DEFAULT_MODEL_KEY, MODEL_KEY, TITLE_MODEL_KEY, readModelPreference, saveTitleModel, loadModelPreferences, saveDefaultModel } from '@keundal/chat/model-preferences'
+import { MODEL_RECOVERY_KEY, loadModelRecovery, saveModelRecovery } from '@keundal/chat/model-preferences'
 
 function storage() {
   const values = new Map<string, string>()
@@ -57,4 +58,28 @@ test('제목 모델은 채팅 기본 모델과 독립적으로 저장하고 해�
   saveTitleModel(saved, '')
   expect(readModelPreference(saved, TITLE_MODEL_KEY)).toBeUndefined()
   expect(loadModelPreferences(saved).defaultModel).toBe('openai/chat')
+})
+
+test('대체 모델 순서와 재시도 정책을 저장·복원하고 잘못된 정책은 기존 값을 보존한다', () => {
+  const saved = storage()
+  expect(loadModelRecovery(saved)).toBeUndefined()
+  const policy = { retry: { maxRetries: 1, initialDelayMs: 30, maxDelayMs: 90 }, fallbackModels: ['openai@work/vendor/model', 'anthropic/claude-haiku-4.5'] }
+  saveModelRecovery(saved, policy)
+  expect(loadModelRecovery(saved)).toEqual({ ...policy, fallbackModels: ['openai@work/vendor/model', 'anthropic/claude-haiku-4-5'] })
+  const previous = saved.getItem(MODEL_RECOVERY_KEY)
+  for (const invalid of [
+    { ...policy, retry: { maxRetries: 6 } },
+    { ...policy, retry: { initialDelayMs: 91, maxDelayMs: 90 } },
+    { ...policy, retry: { maxRetries: 1.5 } },
+    { ...policy, fallbackModels: ['openai/a', 'openai/a'] },
+    { ...policy, fallbackModels: ['anthropic/claude-haiku-4.5', 'anthropic/claude-haiku-4-5'] },
+    { ...policy, fallbackModels: Array.from({ length: 9 }, (_, i) => `openai/${i}`) }
+  ]) {
+    expect(() => saveModelRecovery(saved, invalid)).toThrow()
+    expect(saved.getItem(MODEL_RECOVERY_KEY)).toBe(previous)
+  }
+  saveModelRecovery(saved, { retry: false, fallbackModels: [] })
+  expect(loadModelRecovery(saved)).toEqual({ retry: false, fallbackModels: [] })
+  saved.setItem(MODEL_RECOVERY_KEY, '{broken')
+  expect(loadModelRecovery(saved)).toBeUndefined()
 })

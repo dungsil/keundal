@@ -216,6 +216,9 @@ await ctx.plugin(agentPlugin, {
 
 - `retry: false` 또는 `maxRetries: 0`이면 같은 모델을 재시도하지 않습니다. 대체 모델 체인은 별도로 유지합니다.
   `maxRetries`는 0~5, 지연 시간은 0~60,000 ms이며 `initialDelayMs`가 `maxDelayMs`보다 클 수 없습니다.
+- `RunAgentInput.forwardedProps.keundalModelRecovery`에 `{ retry, fallbackModels }`를 전달하면 해당 실행의 정책을 대체합니다.
+  계약과 검증은 `@keundal/agent`의 `ModelRecoveryPolicy`와 `parseModelRecoveryPolicy()`를 공유합니다.
+  설정이 없으면 에이전트의 기존 정책을 유지하며, 실행을 시작할 때 복사하므로 이후 설정 변경은 진행 중인 실행에 적용하지 않습니다.
 - 지수 백오프에 50~100% 지터를 적용합니다. 공급자의 `Retry-After`가 있으면 그 시간을 사용합니다.
   서버 대기 시간이 `maxDelayMs`를 넘으면 일찍 재시도하지 않고 다음 대체 모델로 넘어갑니다.
   취소·순회 중단·플러그인 해제는 대기도 중단합니다.

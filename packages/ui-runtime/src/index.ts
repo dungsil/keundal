@@ -10,6 +10,9 @@ import {
   MODEL_KEY,
   TITLE_MODEL_KEY,
   loadModelPreferences,
+  loadModelRecovery,
+  saveModelRecovery,
+  type ModelRecoveryPolicy,
   readModelPreference,
   saveTitleModel
 } from '@keundal/chat/model-preferences'
@@ -96,6 +99,7 @@ export class ChatRuntime extends Service {
   readonly model = ref(FALLBACK_MODEL)
   readonly titleModel = ref('')
   readonly defaultModel = ref('')
+  readonly modelRecovery = ref<ModelRecoveryPolicy>()
   readonly promptPresets = ref<PromptPresetSettings>({ activePresetId: null, presets: [] })
   readonly promptPreset = computed(() =>
     this.promptPresets.value.presets.find((preset) => preset.id === this.promptPresets.value.activePresetId)
@@ -209,6 +213,7 @@ export class ChatRuntime extends Service {
     const preferences = loadModelPreferences(storage)
     this.defaultModel.value = preferences.defaultModel
     this.titleModel.value = readModelPreference(storage, TITLE_MODEL_KEY) ?? ''
+    this.modelRecovery.value = loadModelRecovery(storage)
     const initialModel = preferences.model
     this.model.value = initialModel || FALLBACK_MODEL
     try {
@@ -300,6 +305,12 @@ export class ChatRuntime extends Service {
 
   saveTitleModel(value: string): void {
     if (this.options.storage) this.titleModel.value = saveTitleModel(this.options.storage, value)
+  }
+
+  saveModelRecovery(value: ModelRecoveryPolicy): void {
+    const storage = this.options.storage
+    if (!storage) throw unavailable('Browser storage')
+    this.modelRecovery.value = saveModelRecovery(storage, value)
   }
 
   savePromptPresets(value: PromptPresetSettings): void {

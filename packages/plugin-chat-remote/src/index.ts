@@ -4,6 +4,7 @@ import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
 import { branchChat, chatSummary, validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, ChatSummary, LocalChat } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
+import { parseModelRecoveryPolicy, type ModelRecoveryPolicy } from '@keundal/chat/model-preferences'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
 import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
 import { EventType, parseAGUIEvent, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
@@ -385,6 +386,7 @@ export class RemoteChatStore implements ChatStoreLike {
       messages: ChatMessage[]
       model: string
       titleModel?: string
+      modelRecovery?: ModelRecoveryPolicy
       systemPrompt?: string
       promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
@@ -397,6 +399,8 @@ export class RemoteChatStore implements ChatStoreLike {
   ): AsyncGenerator<AGUIEvent> {
     if (this.active.has(id)) throw new Error('A response is already running')
     const promptPreset = request.promptPreset === undefined ? undefined : parsePromptPreset(request.promptPreset)
+    const modelRecovery =
+      request.modelRecovery === undefined ? undefined : parseModelRecoveryPolicy(request.modelRecovery)
     const abort = new AbortController()
     const combined = signal ? AbortSignal.any([signal, abort.signal]) : abort.signal
     let release!: () => void
@@ -441,6 +445,15 @@ export class RemoteChatStore implements ChatStoreLike {
       }
       combined.throwIfAborted()
       const selected = await this.model(chat.model)
+      const recovery =
+        !resuming && modelRecovery
+          ? {
+              ...modelRecovery,
+              fallbackModels: await Promise.all(
+                (modelRecovery.fallbackModels ?? []).map(async (value) => (await this.model(value)).id)
+              )
+            }
+          : undefined
       const projection = new ChatMessageAssembly(runId)
       const publisher = new ChatMessagePublisher(request.onMessage)
       let finished: Extract<AGUIEvent, { type: 'RUN_FINISHED' }> | undefined
@@ -482,7 +495,7 @@ export class RemoteChatStore implements ChatStoreLike {
                 },
                 context: [],
                 tools: [],
-                forwardedProps: { keundalPromptPreset: promptPreset },
+                forwardedProps: { keundalPromptPreset: promptPreset, keundalModelRecovery: recovery },
                 messages: [
                   {
                     id: 'keundal:web-instructions',

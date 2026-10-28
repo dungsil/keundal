@@ -345,9 +345,11 @@ test('키와 API URL 변경을 재시작 없이 적용하고 삭제한 키와 �
   const ctx = new Context()
   const llm = ctx.plugin(browserLLMPlugin, {
     getSettings: () => settings,
-    getModels: () => [{ value: 'openai/gpt-5-nano', label: 'GPT-5 Nano', icon: '', contextWindow: 32768, maxOutputTokens: 1024 }]
+    getModels: () => [{ value: 'openai/gpt-5-nano', label: 'GPT-5 Nano', icon: '', contextWindow: 32768, maxOutputTokens: 1024, capabilities: { tools: true, reasoning: ['low', 'high'], webSearch: false } }]
   })
   await llm
+  expect((await ctx.llm.getModel('openai/gpt-5-nano')).capabilities).toEqual({ tools: true, reasoning: ['low', 'high'], webSearch: false })
+  expect((await ctx.llm.getModel('openai/unknown')).capabilities).toBeUndefined()
   const store = ctx.plugin(memoryStorePlugin)
   await store
   const chats = new ChatStore(ctx, mountAgent)

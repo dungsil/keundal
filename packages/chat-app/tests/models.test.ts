@@ -51,6 +51,25 @@ test.each([
   }
 })
 
+test.each(['openai', 'openai-chat', 'anthropic', 'google'] as const)('%s 모델의 명시된 기능을 캐시에서도 보존하고 없는 기능은 추정하지 않는다', async (provider) => {
+  const capabilities = { tools: true, reasoning: ['low', 'high'], webSearch: false }
+  const entries = [
+    { id: 'declared', capabilities },
+    { id: 'unknown' },
+    { id: 'unrelated', capabilities: { imageInput: { supported: true } } }
+  ]
+  const { settings, storage } = await fixture((_req, res) => {
+    res.end(JSON.stringify(provider === 'google'
+      ? { models: entries.map(({ id, ...metadata }) => ({ name: `models/${id}`, supportedGenerationMethods: ['generateContent'], ...metadata })) }
+      : { data: entries }))
+  })
+  const models = await loadModels(provider, settings, storage)
+  expect(models[0]!.capabilities).toEqual(capabilities)
+  expect(models[1]!.capabilities).toBeUndefined()
+  expect(models[2]!.capabilities).toBeUndefined()
+  expect(await loadModels(provider, settings, storage)).toEqual(models)
+})
+
 test('모델 캐시는 한 시간 미만에 재사용하고 만료·강제 갱신·키·주소 변경 시 다시 불러온다', async () => {
   const { settings, storage, requests, values } = await fixture((req, res) => {
     res.end(JSON.stringify({ data: [{ id: req.headers.authorization === 'Bearer changed-key' ? 'new-model' : 'old-model' }] }))

@@ -14,6 +14,8 @@ import { expect, onTestFinished, test } from 'vitest'
 import { ChatStore } from '@keundal/plugin-chat-local'
 import { browserLLMPlugin } from '@keundal/plugin-llm-browser'
 import { defaultLLMSettings } from '@keundal/llm-settings'
+import { readTraceSpans } from '@keundal/trace'
+import { ref } from 'vue'
 import { useKeundalChat } from '../../ui-chat/app/lib/use-keundal-chat'
 
 const model = 'openai/gpt-5-nano'
@@ -332,4 +334,46 @@ test.each([undefined, 'anthropic/title', 'anthropic/failing'])('제목 모델 %s
   expect(requests.map(request => request.model)).toEqual([titleModel ?? model, model])
   if (titleModel === 'anthropic/title') expect(requests[0]!.maxOutputTokens).toBe(512)
   expect((await chats.get('separate-models'))!.model).toBe(model)
+})
+
+test('같은 대화의 다음 실행에 변경한 재시도 정책과 대체 모델 순서를 적용한다', async () => {
+  const ctx = new Context()
+  const requests: string[] = []
+  class ScriptedLLM extends LLMService {
+    async getModel() { return { contextWindow: 128_000, maxOutputTokens: 4096, capabilities: { tools: true } } }
+    async countTokens() { return 40 }
+    async* stream(request: LLMRequest): AsyncIterable<LLMEvent> {
+      const title = request.input.messages.some(message => message.role === 'system' && message.content.startsWith('Generate a chat title'))
+      if (!title) {
+        requests.push(request.model)
+        if (request.model !== 'openai/backup') throw Object.assign(new Error('Unavailable'), { status: 503 })
+      }
+      const messageId = crypto.randomUUID()
+      yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' }
+      yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: title ? '제목' : '대체 응답' }
+      yield { type: EventType.TEXT_MESSAGE_END, messageId }
+    }
+  }
+  const llm = await ctx.plugin(ScriptedLLM)
+  const storage = await ctx.plugin(indexedDBStorePlugin, { indexedDB: new IDBFactory(), databaseName: crypto.randomUUID(), locks: navigator.locks })
+  const chats = new ChatStore(ctx, mountAgent)
+  onTestFinished(async () => { await chats.stop(); await storage.dispose(); await llm.dispose() })
+  await chats.create('recovery', user, model)
+  const first = await collect(chats.respond('recovery', { model, messages: [user], modelRecovery: { retry: false, fallbackModels: [] } }))
+  expect(first.at(-1)?.type).toBe(EventType.RUN_ERROR)
+  expect(requests).toEqual([model])
+  requests.length = 0
+  const policy = ref({ retry: { maxRetries: 1, initialDelayMs: 0, maxDelayMs: 0 }, fallbackModels: ['openai/unavailable', 'openai/backup'] })
+  const roles = ref([{ name: 'reviewer', description: 'Review', instructions: 'Check the answer.' }])
+  const second = await collect(chats.respond('recovery', {
+    model, messages: [user],
+    modelRecovery: policy.value, subagentRoles: roles.value
+  }))
+  expect(second.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(requests).toEqual([model, model, 'openai/unavailable', 'openai/unavailable', 'openai/backup'])
+  const spans = readTraceSpans(second).filter(span => span.kind === 'model')
+  expect(spans.map(span => [span.model, span.status])).toEqual(requests.map((name, i) => [name, i === 4 ? 'completed' : 'failed']))
+  const saved = (await chats.get('recovery'))!
+  expect(saved.messages.at(-1)!.parts).toContainEqual({ type: 'text', text: '대체 응답' })
+  expect(readTraceSpans((await chats.getRun(saved.messages.at(-1)!.id))!.journal.map(entry => entry.event))).toEqual(readTraceSpans(second))
 })

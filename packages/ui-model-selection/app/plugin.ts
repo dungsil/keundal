@@ -1,4 +1,5 @@
 import type { Context } from 'cordis'
+import type { ModelRecoveryPolicy } from '@keundal/chat/model-preferences'
 import type {} from '@keundal/ui-composer/slots'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-settings/slots'
@@ -47,6 +48,8 @@ export function apply(ctx: Context) {
       titleModel: runtime.titleModel,
       saveDefaultModel: (value: string) => runtime.saveDefaultModel(value),
       saveTitleModel: (value: string) => runtime.saveTitleModel(value),
+      modelRecovery: runtime.modelRecovery,
+      saveModelRecovery: (value: ModelRecoveryPolicy) => runtime.saveModelRecovery(value),
       loading: runtime.modelsLoading,
       modelError: runtime.modelsError,
       refresh: (force?: boolean) => runtime.refreshModels(force)

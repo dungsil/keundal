@@ -1,6 +1,8 @@
 import type { AGUIEvent, ExecutionOptions, RunAgentInput } from '@keundal/core'
 import { Service, type Context } from 'cordis'
 
+export * from './model-recovery.js'
+
 export interface RunBudget {
   /** Total input + output tokens across all model requests, including children and compaction. */
   readonly maxTokens?: number

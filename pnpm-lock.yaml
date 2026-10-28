@@ -752,6 +752,9 @@ importers:
 
   packages/chat:
     dependencies:
+      '@keundal/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@keundal/core':
         specifier: workspace:*
         version: link:../core

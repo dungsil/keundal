@@ -1,4 +1,4 @@
-import type { RunBudget } from '@keundal/agent'
+import { parseFallbackModels, parseModelRetry, type ModelRecoveryPolicy, type RunBudget } from '@keundal/agent'
 import type { AgentCompactionConfig } from '@keundal/compaction'
 import { parseCompactionConfig } from '@keundal/compaction-summary/controller'
 import { parseDeferredToolsConfig, type DeferredToolsConfig } from '@keundal/deferred-tools'
@@ -12,13 +12,10 @@ import { parsePricing, type AgentPricing } from '@keundal/trace'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 
 import { parseRunBudget } from './budget.js'
-import { parseFallbackModels, parseModelRetry, type ModelRetryConfig } from './retry.js'
 
-export interface AgentConfig {
+export interface AgentConfig extends ModelRecoveryPolicy {
   readonly model: string
   readonly maxOutputTokens: number
-  readonly retry?: ModelRetryConfig | false
-  readonly fallbackModels?: readonly string[]
   readonly budget?: RunBudget
   readonly webSearch?: boolean
   readonly reasoning?: Reasoning
