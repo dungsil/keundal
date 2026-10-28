@@ -5,6 +5,7 @@ import { EventType, parseAGUIEvent, type AGUIEvent, type ExecutionOptions, type 
 import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
+import { MemoryTaskService } from '@keundal/task-memory'
 import { ToolApproval, isToolApprovalRecord } from '@keundal/tool-approval'
 import type { ExecutableTool } from '@keundal/tools'
 import { Context } from 'cordis'
@@ -764,4 +765,152 @@ test.for([329, 440])('병렬 서브에이전트는 토큰 예산 %s의 잔여분
   else await completion
   expect(childCalls).toBe(maxTokens === 329 ? 1 : 2)
   expect(cancelled).toBe(maxTokens === 329)
+})
+
+test.for([1, 2])('백그라운드 작업도 역할별 모델·허용 도구·반복 한도 %i를 적용한다', async (maxToolRounds, t) => {
+  let reads = 0
+  const { ctx, requests } = await setup(
+    t,
+    [],
+    {
+      subagents: true,
+      subagentRoles: [
+        {
+          name: 'reader',
+          description: 'Read',
+          instructions: 'Inspect.',
+          model: 'cheap',
+          allowedTools: ['lookup'],
+          maxToolRounds
+        }
+      ],
+      tools: [
+        tool(() => {
+          reads++
+          return 'read'
+        }),
+        { ...tool(), name: 'write_file' }
+      ]
+    },
+    {
+      async *stream(request) {
+        const results = request.input.messages.filter((message) => message.role === 'tool').length
+        if (request.input.threadId === input.threadId) {
+          if (results === 0)
+            yield* call('background', '{"task":"inspect","role":"reader","background":true}', 'delegate_task')
+          else yield* answer
+        } else if (results < 2) yield* call(`child-read-${results}`)
+        else yield* answer
+      }
+    }
+  )
+  const tasks = new MemoryTaskService(ctx)
+  try {
+    await collect(ctx.agent.run(input))
+    const [task] = await tasks.list({ parentThreadId: input.threadId })
+    await expect.poll(async () => (await tasks.get(task.id))?.status).toBe(maxToolRounds === 1 ? 'failed' : 'completed')
+    const childRequests = requests.filter((request) => request.input.runId === task.runId)
+    expect(childRequests.length).toBe(maxToolRounds + 1)
+    for (const request of childRequests) {
+      expect(request.model).toBe('cheap')
+      expect(request.input.tools.map((tool) => tool.name)).toEqual(['lookup'])
+    }
+    expect(reads).toBe(maxToolRounds)
+    expect((await ctx.generation.get(input.runId))?.status).toBe('completed')
+  } finally {
+    await tasks.dispose()
+  }
+})
+
+test.for([
+  { stopParent: false, queued: false },
+  { stopParent: true, queued: false },
+  { stopParent: true, queued: true }
+])('부모 종료 조건 %j에서도 백그라운드 작업은 도구를 재실행하지 않고 완료한다', async ({ stopParent, queued }, t) => {
+  const release = Promise.withResolvers<void>()
+  const unblock = Promise.withResolvers<void>()
+  let sideEffects = 0
+  const { ctx, agent, requests } = await setup(
+    t,
+    [],
+    {
+      subagents: true,
+      tools: [
+        tool(() => {
+          sideEffects++
+          return 'written'
+        })
+      ]
+    },
+    {
+      stream: async function* (request, options) {
+        if (request.input.threadId === input.threadId) {
+          if (request.input.messages.some((message) => message.role === 'tool')) yield* answer
+          else
+            yield* call(
+              'background',
+              JSON.stringify({ task: 'write once', label: 'Independent job', background: true }),
+              'delegate_task'
+            )
+        } else if (request.input.messages.some((message) => message.role === 'tool')) {
+          await release.promise
+          options?.signal?.throwIfAborted()
+          yield* answer
+        } else {
+          yield* call('write')
+        }
+      }
+    }
+  )
+  const tasks = new MemoryTaskService(ctx, { maxActive: 1 })
+  try {
+    if (queued)
+      await tasks.enqueue(
+        {
+          input: { ...input, threadId: 'blocker', runId: 'blocker-run' },
+          parentThreadId: 'other-parent',
+          parentRunId: 'other-run'
+        },
+        async function* (request) {
+          await unblock.promise
+          yield {
+            type: EventType.RUN_FINISHED,
+            threadId: request.threadId,
+            runId: request.runId,
+            outcome: { type: 'success' }
+          }
+        }
+      )
+    const events: AGUIEvent[] = []
+    for await (const event of ctx.agent.run(input)) {
+      events.push(event)
+      if (stopParent && event.type === EventType.TOOL_CALL_RESULT) break
+    }
+    const result = events.find((event) => event.type === EventType.TOOL_CALL_RESULT)
+    const { taskId } = JSON.parse((result as Extract<AGUIEvent, { type: 'TOOL_CALL_RESULT' }>).content as string)
+    if (queued) expect(sideEffects).toBe(0)
+    else await expect.poll(() => sideEffects).toBe(1)
+    await agent.dispose()
+    expect(await tasks.get(taskId)).toMatchObject({
+      status: queued ? 'queued' : 'running',
+      parentThreadId: 'thread',
+      parentRunId: 'run'
+    })
+    unblock.resolve()
+    release.resolve()
+    await expect.poll(async () => (await tasks.get(taskId))?.status).toBe('completed')
+    expect(await tasks.get(taskId)).toMatchObject({ content: 'done' })
+    expect((await tasks.list({ parentThreadId: 'thread' })).map((task) => task.id)).toEqual([taskId])
+    expect(
+      requests
+        .filter((request) => request.input.threadId !== input.threadId)
+        .every((request) => !request.input.tools.some((tool) => tool.name === 'delegate_task'))
+    ).toBe(true)
+    expect(await tasks.cancel(taskId)).toBe(false)
+    expect(sideEffects).toBe(1)
+  } finally {
+    unblock.resolve()
+    release.resolve()
+    await tasks.dispose()
+  }
 })

@@ -17,6 +17,7 @@ import { createWeatherTools, metadata as weatherMetadata } from '@keundal/plugin
 import type { ChatPlatform } from '@keundal/chat/platform'
 import { loadWebRuntimePlugins } from './runtime-plugins'
 import { metadata as mcpMetadata } from '@keundal/plugin-chat-browser/mcp'
+import { MemoryTaskService } from '@keundal/task-memory'
 
 export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: string, agentToken?: string, pluginConfig?: string } = {}): ChatPlatform {
   const mcp = new McpManager(createBrowserMcpSettingsStorage(storage))
@@ -33,7 +34,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         const store = new RemoteChatStore({ endpoint: runtime.agentEndpoint, token: runtime.agentToken ?? '' })
         try {
           await store.recover()
-          return { store, remoteAgent: true, remoteModels: await store.models(), catalog: execution => store.catalog(execution), dispose: () => store.stop() }
+          return { store, tasks: store.tasks, remoteAgent: true, remoteModels: await store.models(), catalog: execution => store.catalog(execution), dispose: () => store.stop() }
         } catch (error) {
           await store.stop()
           throw error
@@ -98,6 +99,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         }
       })
       const scope = root.plugin(async (ctx: Context) => {
+        new MemoryTaskService(ctx)
         await selectSkills(manager.isEnabled('@keundal/plugin-skill'))
         await composition.setup(ctx)
       })
@@ -124,6 +126,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         platform.runtimePlugins = manager
         return {
           store,
+          tasks: root.tasks,
           remoteAgent: false,
           catalog: async execution => ({
             skills: root.skills ? (await root.skills.prepare(execution)).skills : [],
@@ -132,6 +135,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
           dispose: async () => {
             connected = false
             try {
+              await root.tasks.dispose()
               await store!.stop()
             } finally {
               await skillFiber?.dispose()

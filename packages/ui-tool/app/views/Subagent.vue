@@ -5,6 +5,10 @@ import { useText } from '../locale'
 
 const props = defineProps<{ part: ToolPart }>()
 const { t } = useText()
+const background = computed(() => {
+  const output = props.part.output
+  return !!output && typeof output === 'object' && 'taskId' in output && typeof output.taskId === 'string'
+})
 const status = computed(() => props.part.subagent?.status
   ?? (props.part.state === 'output-available'
     ? 'completed'
@@ -52,7 +56,7 @@ const hasBody = computed(() => showLabel.value || !!task.value || !!answer.value
 <template>
   <UChatTool
     v-if="hasBody"
-    :text="t(labels[status])"
+    :text="t(background ? 'tool.subagentBackground' : labels[status])"
     :suffix="suffix"
     :streaming="status === 'queued' || status === 'running'"
     icon="i-lucide-git-fork"
@@ -65,6 +69,7 @@ const hasBody = computed(() => showLabel.value || !!task.value || !!answer.value
       <p class="whitespace-pre-wrap break-words">
         {{ task }}
       </p>
+      <UButton v-if="background" to="/settings/tasks" :label="t('tool.backgroundTasks')" color="neutral" variant="link" icon="i-lucide-list-todo" />
       <p v-if="answer && status === 'failed'" class="text-muted">
         {{ t('tool.subagentPartial') }}
       </p>

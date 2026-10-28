@@ -2,6 +2,7 @@ import type { ExecutionOptions } from '@keundal/core'
 import type { LLMSettings } from '@keundal/llm-settings'
 import type { McpProbeResult, McpRequestOptions } from '@keundal/mcp'
 import type { SkillProvider, SkillSummary } from '@keundal/skill'
+import type { TaskService } from '@keundal/task'
 
 import type { ChatStoreLike } from './chat-store'
 import type { ModelOption } from './models'
@@ -22,6 +23,7 @@ export type ModelLoader = (
 ) => Promise<ModelOption[]>
 export interface ChatConnection {
   store: ChatStoreLike
+  tasks?: Pick<TaskService, 'list' | 'get' | 'cancel'>
   remoteAgent: boolean
   remoteModels?: ModelOption[]
   selectedModel?: string

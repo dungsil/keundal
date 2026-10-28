@@ -1,4 +1,5 @@
 import { EventType, MessageAssembly, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
+import type { TaskService } from '@keundal/task'
 import { TOOL_APPROVAL_EVENT, isToolApprovalRecord } from '@keundal/tool-approval'
 import type { ExecutableTool } from '@keundal/tools'
 import { readTraceSpans } from '@keundal/trace'
@@ -14,7 +15,9 @@ export function subagentTool(
     role?: SubagentRole
   ) => AsyncIterable<AGUIEvent>,
   maxActive: number,
-  roles: readonly SubagentRole[] = []
+  roles: readonly SubagentRole[] = [],
+  tasks?: TaskService,
+  runBackground = run
 ): ExecutableTool {
   // One tool instance belongs to one parent run. Reserve before any async work.
   let active = 0
@@ -22,6 +25,9 @@ export function subagentTool(
     name: SUBAGENT_TOOL_NAME,
     description:
       'Delegate a self-contained task to a subagent and wait for its final answer. It inherits the parent model and tools unless its configured role overrides them, but receives no parent conversation. Include all necessary context in the task. It cannot delegate further. Independent calls can run in parallel. Check the returned status: failed or rejected tasks are not complete. At capacity, retry in a later round after current tasks finish.' +
+      (tasks
+        ? ' Set background=true to enqueue a separately owned task and return its task ID immediately. It survives parent completion or cancellation, but not process restart. Use get_background_task to check progress and cancel_background_task to cancel. Never treat queued or running as completed.'
+        : '') +
       (roles.length
         ? ` Available roles (name and description): ${JSON.stringify(roles.map(({ name, description }) => ({ name, description })))}`
         : ''),
@@ -29,6 +35,7 @@ export function subagentTool(
       type: 'object',
       properties: {
         task: { type: 'string', description: 'Complete task instructions and necessary context.' },
+        ...(tasks ? { background: { type: 'boolean', description: 'Run independently of this parent run.' } } : {}),
         ...(roles.length
           ? {
               role: {
@@ -53,7 +60,9 @@ export function subagentTool(
       if (
         typeof args.task !== 'string' ||
         !args.task.trim() ||
-        Object.keys(args).some((key) => key !== 'task' && key !== 'label' && key !== 'role')
+        Object.keys(args).some(
+          (key) => key !== 'task' && key !== 'label' && key !== 'role' && !(tasks && key === 'background')
+        )
       ) {
         throw new Error('delegate_task requires a non-empty task and no additional arguments')
       }
@@ -66,6 +75,46 @@ export function subagentTool(
       const role = roles.find((role) => role.name === args.role)
       if (args.role !== undefined && !role) throw new Error('delegate_task role must name a configured role')
       const label = typeof args.label === 'string' ? args.label.trim() : role?.name
+      if (args.background !== undefined && typeof args.background !== 'boolean')
+        throw new Error('background must be a boolean')
+      if (tasks && args.background === true) {
+        const snapshot = await tasks.enqueue(
+          {
+            parentThreadId: context.threadId,
+            parentRunId: context.runId,
+            label,
+            input: {
+              threadId: globalThis.crypto.randomUUID(),
+              runId: globalThis.crypto.randomUUID(),
+              state: {
+                subagent: {
+                  parentThreadId: context.threadId,
+                  parentRunId: context.runId,
+                  toolCallId: context.toolCallId,
+                  ...(role ? { role: role.name } : {}),
+                  ...(label ? { label } : {}),
+                  background: true
+                }
+              },
+              context: [],
+              tools: [],
+              messages: [
+                ...(role
+                  ? [{ id: globalThis.crypto.randomUUID(), role: 'system' as const, content: role.instructions }]
+                  : []),
+                { id: globalThis.crypto.randomUUID(), role: 'user', content: args.task }
+              ]
+            }
+          },
+          (input, options) => runBackground(input, options, role)
+        )
+        return JSON.stringify({
+          taskId: snapshot.id,
+          status: snapshot.status,
+          threadId: snapshot.threadId,
+          runId: snapshot.runId
+        })
+      }
       if (active >= maxActive) {
         const error = {
           code: 'ACTIVE_LIMIT_REACHED',
@@ -160,4 +209,43 @@ export function subagentTool(
       }
     }
   }
+}
+
+/** Lookup and cancellation do not resume or re-execute a task. */
+export function backgroundTaskTools(tasks: TaskService): ExecutableTool[] {
+  return [
+    {
+      name: 'get_background_task',
+      description:
+        'Read a background task status, partial answer, final answer or error by taskId. This never restarts it.',
+      parameters: {
+        type: 'object',
+        properties: { taskId: { type: 'string', minLength: 1 } },
+        required: ['taskId'],
+        additionalProperties: false
+      },
+      async execute(args, context) {
+        context.signal.throwIfAborted()
+        if (typeof args.taskId !== 'string' || !args.taskId || Object.keys(args).length !== 1)
+          throw new Error('taskId is required')
+        return JSON.stringify((await tasks.get(args.taskId)) ?? { error: 'Task not found' })
+      }
+    },
+    {
+      name: 'cancel_background_task',
+      description: 'Cancel a queued or running background task by taskId. This does not undo external side effects.',
+      parameters: {
+        type: 'object',
+        properties: { taskId: { type: 'string', minLength: 1 } },
+        required: ['taskId'],
+        additionalProperties: false
+      },
+      async execute(args, context) {
+        context.signal.throwIfAborted()
+        if (typeof args.taskId !== 'string' || !args.taskId || Object.keys(args).length !== 1)
+          throw new Error('taskId is required')
+        return JSON.stringify({ cancelled: await tasks.cancel(args.taskId) })
+      }
+    }
+  ]
 }

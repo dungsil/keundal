@@ -361,6 +361,9 @@ importers:
       '@keundal/plugin-transcription-browser':
         specifier: workspace:*
         version: link:../../packages/plugin-transcription-browser
+      '@keundal/task-memory':
+        specifier: workspace:*
+        version: link:../../packages/task-memory
       '@keundal/tools':
         specifier: workspace:*
         version: link:../../packages/tools
@@ -496,6 +499,9 @@ importers:
       '@keundal/skill':
         specifier: workspace:*
         version: link:../skill
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
       '@keundal/tool-approval':
         specifier: workspace:*
         version: link:../tool-approval
@@ -509,6 +515,9 @@ importers:
       '@keundal/plugin-store-memory':
         specifier: workspace:*
         version: link:../plugin-store-memory
+      '@keundal/task-memory':
+        specifier: workspace:*
+        version: link:../task-memory
       '@keundal/trace':
         specifier: workspace:*
         version: link:../trace
@@ -569,6 +578,9 @@ importers:
       '@keundal/subagent':
         specifier: workspace:*
         version: link:../subagent
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
       '@keundal/tool-approval':
         specifier: workspace:*
         version: link:../tool-approval
@@ -694,6 +706,9 @@ importers:
       '@keundal/skill':
         specifier: workspace:*
         version: link:../skill
+      '@keundal/task-memory':
+        specifier: workspace:*
+        version: link:../task-memory
       '@keundal/tool-approval':
         specifier: workspace:*
         version: link:../tool-approval
@@ -758,6 +773,9 @@ importers:
       '@keundal/subagent':
         specifier: workspace:*
         version: link:../subagent
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
       '@keundal/tool-approval':
         specifier: workspace:*
         version: link:../tool-approval
@@ -1295,6 +1313,9 @@ importers:
       '@keundal/skill':
         specifier: workspace:*
         version: link:../skill
+      '@keundal/task-memory':
+        specifier: workspace:*
+        version: link:../task-memory
       '@keundal/tool-approval':
         specifier: workspace:*
         version: link:../tool-approval
@@ -1530,6 +1551,9 @@ importers:
       '@keundal/subagent':
         specifier: workspace:*
         version: link:../subagent
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -2677,6 +2701,9 @@ importers:
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
       '@keundal/tool-approval':
         specifier: workspace:*
         version: link:../tool-approval
@@ -2689,6 +2716,62 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.7
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/task:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/task-memory:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -3281,6 +3364,9 @@ importers:
       '@keundal/subagent':
         specifier: workspace:*
         version: link:../subagent
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
       '@vueuse/core':
         specifier: ^14.4.0
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
@@ -3437,6 +3523,9 @@ importers:
       '@keundal/subagent':
         specifier: workspace:*
         version: link:../subagent
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
