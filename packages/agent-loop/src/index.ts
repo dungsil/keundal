@@ -1,4 +1,4 @@
-import { AgentService } from '@keundal/agent'
+import { AgentService, type AgentExecutionOptions } from '@keundal/agent'
 import { SummaryCompactionController } from '@keundal/compaction-summary/controller'
 import type {} from '@keundal/context'
 import {
@@ -24,6 +24,7 @@ import { traceEvent, type TraceSpan } from '@keundal/trace'
 import { TraceRecorder, type TraceParent } from '@keundal/trace/recording'
 import type { Context } from 'cordis'
 
+import { BudgetLedger, parseRunBudget } from './budget.js'
 import type { AgentConfig } from './config.js'
 import { SYSTEM_PROMPT_ID, withSystemPrompt } from './prompt.js'
 
@@ -60,20 +61,34 @@ export class Agent extends AgentService {
     return this.config.systemPrompt
   }
 
-  run(input: RunAgentInput, options: ExecutionOptions = {}): AsyncIterableIterator<AGUIEvent> {
+  run(input: RunAgentInput, options: AgentExecutionOptions = {}): AsyncIterableIterator<AGUIEvent> {
     return this.runInternal(input, options, true)
   }
 
   private runInternal(
     input: RunAgentInput,
-    options: ExecutionOptions & Partial<TraceParent>,
-    allowSubagents: boolean
+    options: AgentExecutionOptions & Partial<TraceParent>,
+    allowSubagents: boolean,
+    budget?: BudgetLedger
   ): AsyncIterableIterator<AGUIEvent> {
     if (this.closed) throw new Error('agent disposed')
     const controller = new globalThis.AbortController()
+    const policy = !budget && (options.budget ?? this.config.budget)
+    let timer: ReturnType<typeof globalThis.setTimeout> | undefined
+    if (policy) {
+      const parsed = parseRunBudget(policy)
+      budget = new BudgetLedger(parsed, this.config.pricing, (reason) => controller.abort(reason))
+      if (parsed.maxDurationMs !== undefined) {
+        timer = globalThis.setTimeout(
+          () => controller.abort(new Error('run budget exceeded: duration')),
+          parsed.maxDurationMs
+        )
+      }
+    }
     const externalSignal = options.signal
     const abort = () => controller.abort(externalSignal?.reason)
     const cleanup = () => {
+      globalThis.clearTimeout(timer)
       externalSignal?.removeEventListener('abort', abort)
       controller.signal.removeEventListener('abort', cleanup)
       this.active.delete(controller)
@@ -91,7 +106,7 @@ export class Agent extends AgentService {
       options.traceId && options.parentSpanId
         ? { traceId: options.traceId, parentSpanId: options.parentSpanId }
         : undefined
-    const iterator = this.execute(input, controller.signal, stop, allowSubagents, traceParent, options.steer)
+    const iterator = this.execute(input, controller.signal, stop, allowSubagents, traceParent, options.steer, budget)
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -114,10 +129,13 @@ export class Agent extends AgentService {
     cleanup: () => void,
     allowSubagents: boolean,
     traceParent?: TraceParent,
-    steer?: SteerQueue
+    steer?: SteerQueue,
+    budget?: BudgetLedger
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     let failedTrace: TraceRecorder | undefined
     let rootFinalized = false
+    const llm = budget ? budget.wrap(this.ctx.llm) : this.ctx.llm
+    const compaction = budget ? new SummaryCompactionController(llm, this.config) : this.compaction
     try {
       signal.throwIfAborted()
       const request = parseRunAgentInput(input)
@@ -162,7 +180,7 @@ export class Agent extends AgentService {
         ...(this.config.subagents && allowSubagents
           ? [
               subagentTool(
-                (child, execution) => this.runInternal(child, execution, false),
+                (child, execution) => this.runInternal(child, execution, false, budget),
                 this.config.maxActiveSubagents ?? 8,
                 request.state?.subagentRoles === undefined
                   ? this.config.subagentRoles
@@ -185,7 +203,7 @@ export class Agent extends AgentService {
         throw new Error('session revision must be a non-negative integer')
       }
 
-      const model = await this.ctx.llm.getModel(this.config.model, options)
+      const model = await llm.getModel(this.config.model, options)
       signal.throwIfAborted()
       const maxOutputTokens = this.config.maxOutputTokens
       if (
@@ -196,7 +214,7 @@ export class Agent extends AgentService {
       ) {
         throw new Error('requested output budget exceeds the model limits')
       }
-      const maxInputTokens = model.contextWindow - maxOutputTokens - (this.compaction.policy.reserveTokens ?? 0)
+      const maxInputTokens = model.contextWindow - maxOutputTokens - (compaction.policy.reserveTokens ?? 0)
       if (!Number.isSafeInteger(maxInputTokens) || maxInputTokens <= 0)
         throw new Error('compaction reserveTokens exceeds the model input budget')
       let step = 1
@@ -208,16 +226,15 @@ export class Agent extends AgentService {
             contextWindow: model.contextWindow
           })
         : preparedInput
-      const fitted = await this.compaction.fitInput(contextualInput, maxInputTokens, signal, false, signal, trace)
+      const fitted = await compaction.fitInput(contextualInput, maxInputTokens, signal, false, signal, trace)
       const previousIds = this.config.context ? new Set(preparedInput.messages.map((message) => message.id)) : undefined
       const initialContext = previousIds
         ? fitted.input.messages.filter(
             (message) => message.id.startsWith(CONTEXT_MESSAGE_PREFIX) && !previousIds.has(message.id)
           )
         : []
-      const llm = this.ctx.llm
       const stream = (request: LLMRequest, execution?: ExecutionOptions) =>
-        this.compaction.streamWithRetry(request, maxInputTokens, execution?.signal ?? signal, trace!)
+        compaction.streamWithRetry(request, maxInputTokens, execution?.signal ?? signal, trace!)
       const maxToolRounds = this.config.maxToolRounds ?? 8
       const maxToolCalls = this.config.maxToolCalls ?? 32
       const parallel = this.config.parallelTools ?? false
@@ -230,8 +247,7 @@ export class Agent extends AgentService {
               contextWindow: model.contextWindow
             })
           : next
-        return (await this.compaction.fitInput(contextual, maxInputTokens, generationSignal, false, signal, trace))
-          .input
+        return (await compaction.fitInput(contextual, maxInputTokens, generationSignal, false, signal, trace)).input
       }
 
       const toolSpans = new Map<string, TraceSpan>()
@@ -338,7 +354,7 @@ export class Agent extends AgentService {
           yield* trace.drain()
         }
         if (event.type === EventType.RUN_FINISHED) {
-          this.compaction.detach(signal)
+          if (!budget) compaction.detach(signal)
         }
         yield event
       }
@@ -351,6 +367,7 @@ export class Agent extends AgentService {
       }
       throw error
     } finally {
+      if (budget) compaction.dispose()
       cleanup()
     }
   }

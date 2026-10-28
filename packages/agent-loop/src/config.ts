@@ -1,3 +1,4 @@
+import type { RunBudget } from '@keundal/agent'
 import type { AgentCompactionConfig } from '@keundal/compaction'
 import { parseCompactionConfig } from '@keundal/compaction-summary/controller'
 import { parseDeferredToolsConfig, type DeferredToolsConfig } from '@keundal/deferred-tools'
@@ -9,9 +10,12 @@ import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 import { parsePricing, type AgentPricing } from '@keundal/trace'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 
+import { parseRunBudget } from './budget.js'
+
 export interface AgentConfig {
   readonly model: string
   readonly maxOutputTokens: number
+  readonly budget?: RunBudget
   readonly webSearch?: boolean
   readonly reasoning?: Reasoning
   readonly compaction?: AgentCompactionConfig
@@ -105,9 +109,11 @@ export function parseAgentConfig(value: unknown): AgentConfig {
   const parallelTools = 'parallelTools' in value ? value.parallelTools : false
   if (typeof parallelTools !== 'boolean') throw new Error('parallelTools must be a boolean')
   const pricing = 'pricing' in value && value.pricing !== undefined ? parsePricing(value.pricing) : undefined
+  const budget = 'budget' in value && value.budget !== undefined ? parseRunBudget(value.budget) : undefined
   return {
     model: value.model,
     maxOutputTokens: value.maxOutputTokens,
+    ...(budget ? { budget } : {}),
     ...('webSearch' in value ? { webSearch: value.webSearch as boolean | undefined } : {}),
     ...('reasoning' in value ? { reasoning: parseReasoning(value.reasoning) } : {}),
     compaction,

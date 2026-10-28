@@ -20,7 +20,7 @@ export class SummaryCompactionController {
   readonly policy: AgentCompactionConfig
 
   constructor(
-    private readonly llm: LLMService,
+    private readonly llm: Pick<LLMService, 'getModel' | 'countTokens' | 'stream'>,
     private readonly config: Pick<LLMRequest, 'model' | 'maxOutputTokens' | 'webSearch' | 'reasoning'> & {
       readonly compaction?: AgentCompactionConfig
     }
