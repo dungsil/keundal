@@ -8,12 +8,23 @@ export interface SkillSummary {
 
 export interface SkillDefinition extends SkillSummary {
   readonly content: string
+  readonly resources?: readonly string[]
 }
 
 /** 목록과 이름별 공급자 선택은 고정하며, 본문은 load를 호출할 때 읽습니다. */
 export interface SkillCatalog {
   readonly skills: readonly SkillSummary[]
   load(name: string, options?: ExecutionOptions): Promise<SkillDefinition | undefined>
+  readResource?(name: string, path: string, options?: ExecutionOptions): Promise<string | undefined>
+}
+
+export function isSkillResourcePath(path: string): boolean {
+  return (
+    /^(references|assets|scripts)\/.+/.test(path) &&
+    !path.includes('\\') &&
+    !path.includes('\0') &&
+    !path.split('/').some((part) => !part || part === '.' || part === '..')
+  )
 }
 
 export interface SkillProvider {

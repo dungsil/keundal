@@ -24,18 +24,26 @@ export class BrowserAgentPluginManager implements AgentPluginManager {
         options?.signal?.throwIfAborted()
         const plugins = await this.inspect()
         options?.signal?.throwIfAborted()
-        const selected = new Map<string, (typeof plugins)[number]['skills'][number]>()
+        const selected = new Map<
+          string,
+          { skill: (typeof plugins)[number]['skills'][number]; plugin: (typeof plugins)[number] }
+        >()
         for (const [index, plugin] of plugins.entries()) {
           if (!this.records[index]!.enabled) continue
-          for (const skill of plugin.skills) if (!selected.has(skill.name)) selected.set(skill.name, skill)
+          for (const skill of plugin.skills) if (!selected.has(skill.name)) selected.set(skill.name, { skill, plugin })
         }
-        const skills = [...selected.values()]
+        const skills = [...selected.values()].map(({ skill }) => skill)
         return {
           skills: skills.map(({ name, description }) => ({ name, description })),
           async load(name, execution) {
             options?.signal?.throwIfAborted()
             execution?.signal?.throwIfAborted()
             return skills.find((skill) => skill.name === name)
+          },
+          async readResource(name, path, execution) {
+            options?.signal?.throwIfAborted()
+            execution?.signal?.throwIfAborted()
+            return selected.get(name)?.plugin.readResource(name, path, execution)
           }
         }
       }

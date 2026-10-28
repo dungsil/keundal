@@ -1,3 +1,4 @@
+import { parseRunBudget, type RunBudget } from '@keundal/agent'
 import type { ChatMessage, ChatMessageAssembly } from '@keundal/chat/chat-message'
 import { branchChat, chatSummary, validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, ChatSummary, LocalChat } from '@keundal/chat/chat-store'
@@ -205,6 +206,7 @@ export class ChatStore implements ChatStoreLike {
       promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
       memoryProjectId?: string
+      budget?: RunBudget
       reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void
@@ -214,6 +216,7 @@ export class ChatStore implements ChatStoreLike {
   ): AsyncGenerator<AGUIEvent> {
     if (this.active.has(id)) throw new Error('A response is already running')
     const promptPreset = request.promptPreset === undefined ? undefined : parsePromptPreset(request.promptPreset)
+    const budget = request.budget === undefined ? undefined : parseRunBudget(request.budget)
     const abort = new AbortController()
     const combined = signal ? AbortSignal.any([signal, abort.signal]) : abort.signal
     let release!: () => void
@@ -292,6 +295,7 @@ export class ChatStore implements ChatStoreLike {
         messages: request.messages,
         promptPreset,
         memoryProjectId: request.memoryProjectId,
+        ...(budget === undefined ? {} : { budget }),
         signal: combined,
         state: { web: chat, ...(request.subagentRoles === undefined ? {} : { subagentRoles: request.subagentRoles }) },
         onMessage: request.onMessage,

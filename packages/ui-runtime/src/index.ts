@@ -1,3 +1,4 @@
+import { parseRunBudget, type RunBudget } from '@keundal/agent'
 import {
   loadPromptPresets,
   parsePromptPresetSettings,
@@ -104,6 +105,7 @@ export class ChatRuntime extends Service {
   )
   readonly subagentRoles = ref<SubagentRole[]>([])
   readonly memoryProject = ref('')
+  readonly runBudget = ref<RunBudget>()
   readonly switching = ref(false)
   readonly workspacesAvailable = ref(false)
   readonly webSearch = computed<boolean>({
@@ -256,6 +258,8 @@ export class ChatRuntime extends Service {
       this.promptPresets.value = loadPromptPresets(storage)
       this.subagentRoles.value = parseSubagentRoles(JSON.parse(storage.getItem('keundal:subagent-roles') ?? '[]'))
       this.memoryProject.value = storage.getItem('keundal:memory-project') ?? ''
+      const budget = storage.getItem('keundal:run-budget')
+      this.runBudget.value = budget === null ? undefined : parseRunBudget(JSON.parse(budget))
       this.settings.value = await platform.settings.load()
     } catch (error) {
       throw new SettingsLoadError(error)
@@ -360,6 +364,16 @@ export class ChatRuntime extends Service {
     if (roles.length) storage.setItem('keundal:subagent-roles', JSON.stringify(roles))
     else storage.removeItem('keundal:subagent-roles')
     this.subagentRoles.value = roles
+  }
+
+  /** Capture saved limits separately for each new response; active runs retain their policy. */
+  saveRunBudget(value: RunBudget | undefined): void {
+    const storage = this.options.storage
+    if (!storage) throw unavailable('Browser storage')
+    const budget = value === undefined ? undefined : parseRunBudget(value)
+    if (budget) storage.setItem('keundal:run-budget', JSON.stringify(budget))
+    else storage.removeItem('keundal:run-budget')
+    this.runBudget.value = budget
   }
 
   /** Switch to the saved default model when the connection can serve it. */

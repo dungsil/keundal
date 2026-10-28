@@ -64,6 +64,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@keundal/agent": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/generation": "workspace:*",
     "@keundal/llm": "workspace:*",

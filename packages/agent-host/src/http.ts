@@ -4,6 +4,7 @@ import { once } from 'node:events'
 import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http'
 import { URL } from 'node:url'
 
+import { parseRunBudget } from '@keundal/agent'
 import {
   EventType,
   parseAGUIEvent,
@@ -413,10 +414,14 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
         const reasoning = parseReasoning(
           rawReasoning === 'true' ? true : rawReasoning === 'false' ? false : rawReasoning
         )
-        const input = parseRunAgentInput(JSON.parse(await readBody(request, maxRequestBodyBytes)))
+        const body: unknown = JSON.parse(await readBody(request, maxRequestBodyBytes))
+        const { budget: rawBudget, ...input } = parseRunAgentInput(body) as RunAgentInput & { budget?: unknown }
+        const budget = rawBudget === undefined ? undefined : parseRunBudget(rawBudget)
         let iterator: AsyncIterator<AGUIEvent>
         try {
-          iterator = services.run(input, { model: requested, reasoning })[Symbol.asyncIterator]()
+          iterator = services
+            .run(input, { model: requested, reasoning, ...(budget === undefined ? {} : { budget }) })
+            [Symbol.asyncIterator]()
         } catch {
           // 같은 대화나 runId에 실행이 이미 있으면 새 실행을 시작하지 않습니다.
           return sendJson(response, 409, { error: 'run is already active' })
