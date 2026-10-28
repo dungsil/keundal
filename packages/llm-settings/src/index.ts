@@ -1,4 +1,4 @@
-import { isContextOverflow } from '@keundal/llm'
+import { isContextOverflow, isTransientLLMError, llmRetryAfterMs } from '@keundal/llm'
 import { z } from 'zod'
 
 export const FALLBACK_MODEL = 'anthropic/claude-haiku-4-5'
@@ -169,5 +169,13 @@ export function providerError(
   const redacted = new Error(
     `${provider} request failed${status ? ` (HTTP ${status})` : ''}. ${detail || "Check your API key, API URL and the endpoint's browser CORS permissions."}`
   )
-  return isContextOverflow(error) ? Object.assign(redacted, { code: 'context_length_exceeded' }) : redacted
+  if (isContextOverflow(error)) return Object.assign(redacted, { code: 'context_length_exceeded' })
+  if (isTransientLLMError(error)) {
+    const retryAfterMs = llmRetryAfterMs(error)
+    return Object.assign(redacted, {
+      code: 'llm_transient_error',
+      ...(retryAfterMs === undefined ? {} : { retryAfterMs })
+    })
+  }
+  return redacted
 }

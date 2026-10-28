@@ -88,6 +88,7 @@ async function setup(
   const agent = await ctx.plugin(agentPlugin, {
     model: 'test',
     maxOutputTokens: 100,
+    retry: false,
     tools: options.tools,
     compaction: { keepRecentMessages: 1, maxSummaryTokens: 50, ...options.compaction }
   })
