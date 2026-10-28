@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url'
 import { loadAgentPlugin, type LoadedAgentPlugin } from '@keundal/agent-plugins'
 import type { ExecutionOptions } from '@keundal/core'
 import { parseMcpServers } from '@keundal/mcp'
+import { createMemoryTools } from '@keundal/memory/tools'
 import agentPlugin, { metadata as agentMetadata } from '@keundal/plugin-agent-chat'
 import anthropic, { metadata as anthropicMetadata } from '@keundal/plugin-llm-anthropic'
 import gemini, { metadata as geminiMetadata } from '@keundal/plugin-llm-gemini'
@@ -245,13 +246,15 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
     }
   }
   const defaultTools = manifest.tools === undefined ? options.defaultTools : undefined
+  let memoryTools: readonly ExecutableTool[] = []
   const suppliedTools: ToolProvider | undefined =
-    defaultTools || options.tools
+    defaultTools || options.tools || options.projectId !== undefined
       ? async (execution) => [
           ...(typeof defaultTools === 'function' ? await defaultTools(execution) : (defaultTools ?? [])).filter(
             (tool) => (chartEnabled || tool.name !== 'chart') && (weatherEnabled || tool.name !== 'weather')
           ),
-          ...(typeof options.tools === 'function' ? await options.tools(execution) : (options.tools ?? []))
+          ...(typeof options.tools === 'function' ? await options.tools(execution) : (options.tools ?? [])),
+          ...memoryTools
         ]
       : undefined
   const deferredToolProvider: ToolProvider = async (execution: ExecutionOptions) => {
@@ -331,6 +334,11 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       })
       runtime = await runtimePromise
       await runtime.setup(ctx)
+      if (options.projectId !== undefined) {
+        const memory = ctx.get('memory')
+        if (!memory) throw new Error('project memory requires a memory service')
+        memoryTools = createMemoryTools(memory, options.projectId)
+      }
       const tasks = new MemoryTaskService(ctx, {
         maxActive: options.maxActiveSubagents ?? 8,
         store: ctx.get('taskStore')
