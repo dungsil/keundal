@@ -10,7 +10,7 @@ const props = defineProps<{
   saveSubagentRoles: (value: readonly SubagentRole[]) => void
 }>()
 
-interface RoleDraft {
+interface RoleDraft extends SubagentRole {
   id: number
   name: string
   description: string
@@ -55,7 +55,10 @@ function save() {
   const roles = drafts.value.map(role => ({
     name: role.name.trim(),
     description: role.description.trim(),
-    instructions: role.instructions.trim()
+    instructions: role.instructions.trim(),
+    ...(role.model === undefined ? {} : { model: role.model }),
+    ...(role.allowedTools === undefined ? {} : { allowedTools: role.allowedTools }),
+    ...(role.maxToolRounds === undefined ? {} : { maxToolRounds: role.maxToolRounds })
   }))
   const names = new Set<string>()
   const duplicates = new Set<string>()

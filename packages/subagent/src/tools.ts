@@ -9,7 +9,8 @@ export const SUBAGENT_TOOL_NAME = 'delegate_task'
 export function subagentTool(
   run: (
     input: RunAgentInput,
-    options: ExecutionOptions & { traceId?: string; parentSpanId?: string }
+    options: ExecutionOptions & { traceId?: string; parentSpanId?: string },
+    role?: SubagentRole
   ) => AsyncIterable<AGUIEvent>,
   maxActive: number,
   roles: readonly SubagentRole[] = []
@@ -19,7 +20,7 @@ export function subagentTool(
   return {
     name: SUBAGENT_TOOL_NAME,
     description:
-      'Delegate a self-contained task to a subagent and wait for its final answer. It has the same model and tools but no parent conversation. Include all necessary context in the task. It cannot delegate further. Independent calls can run in parallel. Check the returned status: failed or rejected tasks are not complete. At capacity, retry in a later round after current tasks finish.' +
+      'Delegate a self-contained task to a subagent and wait for its final answer. It inherits the parent model and tools unless its configured role overrides them, but receives no parent conversation. Include all necessary context in the task. It cannot delegate further. Independent calls can run in parallel. Check the returned status: failed or rejected tasks are not complete. At capacity, retry in a later round after current tasks finish.' +
       (roles.length
         ? ` Available roles (name and description): ${JSON.stringify(roles.map(({ name, description }) => ({ name, description })))}`
         : ''),
@@ -112,7 +113,8 @@ export function subagentTool(
               signal: context.signal,
               ...(context.traceId ? { traceId: context.traceId } : {}),
               ...(context.parentSpanId ? { parentSpanId: context.parentSpanId } : {})
-            }
+            },
+            role
           )) {
             if (event.type === EventType.CUSTOM) {
               const span = readTraceSpans([event], undefined, 1)[0]

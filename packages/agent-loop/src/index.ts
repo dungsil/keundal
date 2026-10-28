@@ -17,7 +17,7 @@ import type { LLMRequest } from '@keundal/llm'
 import { PROMPT_MESSAGE_PREFIX, assemblePrompt, parsePromptPreset } from '@keundal/prompt'
 import type {} from '@keundal/session'
 import { SKILL_CATALOG_ID, skillTool, withSkillCatalog } from '@keundal/skill/tools'
-import { parseSubagentRoles } from '@keundal/subagent'
+import { parseSubagentRoles, type SubagentRole } from '@keundal/subagent'
 import { subagentTool, SUBAGENT_TOOL_NAME } from '@keundal/subagent/tools'
 import { addTools, parseTools, streamWithTools } from '@keundal/tool-execution'
 import { traceEvent, type TraceSpan } from '@keundal/trace'
@@ -67,7 +67,8 @@ export class Agent extends AgentService {
   private runInternal(
     input: RunAgentInput,
     options: ExecutionOptions & Partial<TraceParent>,
-    allowSubagents: boolean
+    allowSubagents: boolean,
+    role?: SubagentRole
   ): AsyncIterableIterator<AGUIEvent> {
     if (this.closed) throw new Error('agent disposed')
     const controller = new globalThis.AbortController()
@@ -91,7 +92,7 @@ export class Agent extends AgentService {
       options.traceId && options.parentSpanId
         ? { traceId: options.traceId, parentSpanId: options.parentSpanId }
         : undefined
-    const iterator = this.execute(input, controller.signal, stop, allowSubagents, traceParent, options.steer)
+    const iterator = this.execute(input, controller.signal, stop, allowSubagents, traceParent, options.steer, role)
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -114,10 +115,18 @@ export class Agent extends AgentService {
     cleanup: () => void,
     allowSubagents: boolean,
     traceParent?: TraceParent,
-    steer?: SteerQueue
+    steer?: SteerQueue,
+    role?: SubagentRole
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     let failedTrace: TraceRecorder | undefined
     let rootFinalized = false
+    const modelName = role?.model ?? this.config.model
+    const compaction = role?.model
+      ? new SummaryCompactionController(this.ctx.llm, { ...this.config, model: modelName })
+      : this.compaction
+    const allowed = (tool: { name: string }) =>
+      (allowSubagents || tool.name !== SUBAGENT_TOOL_NAME) &&
+      (role?.allowedTools === undefined || role.allowedTools.includes(tool.name))
     try {
       signal.throwIfAborted()
       const request = parseRunAgentInput(input)
@@ -143,9 +152,15 @@ export class Agent extends AgentService {
         typeof this.config.tools === 'function' ? await this.config.tools(options) : this.config.tools
       )
       signal.throwIfAborted()
-      const deferredSession = this.config.deferredToolProvider
-        ? await createDeferredToolSession(this.config.deferredToolProvider, options, this.config.deferredTools)
-        : undefined
+      const deferredProvider = this.config.deferredToolProvider
+      const deferredSession =
+        deferredProvider && allowed({ name: 'search_tool' })
+          ? await createDeferredToolSession(
+              async (execution) => (await deferredProvider(execution)).filter(allowed),
+              options,
+              this.config.deferredTools
+            )
+          : undefined
       if (deferredSession && configuredTools.some((tool) => tool.name === 'search_tool')) {
         throw new Error('search_tool is reserved when deferred tools are enabled')
       }
@@ -153,7 +168,8 @@ export class Agent extends AgentService {
         throw new Error('skill tool name is reserved when skills are enabled')
       if (this.config.subagents && configuredTools.some((tool) => tool.name === SUBAGENT_TOOL_NAME))
         throw new Error('delegate_task tool name is reserved when subagents are enabled')
-      const catalog = this.config.skills ? await this.ctx.skills.prepare(options) : undefined
+      const catalog =
+        this.config.skills && allowed({ name: 'skill' }) ? await this.ctx.skills.prepare(options) : undefined
       signal.throwIfAborted()
       const tools = [
         ...configuredTools,
@@ -161,7 +177,7 @@ export class Agent extends AgentService {
         ...(this.config.subagents && allowSubagents
           ? [
               subagentTool(
-                (child, execution) => this.runInternal(child, execution, false),
+                (child, execution, role) => this.runInternal(child, execution, false, role),
                 this.config.maxActiveSubagents ?? 8,
                 request.state?.subagentRoles === undefined
                   ? this.config.subagentRoles
@@ -170,7 +186,7 @@ export class Agent extends AgentService {
             ]
           : []),
         ...(deferredSession ? [deferredSession.searchTool] : [])
-      ]
+      ].filter(allowed)
       let preparedInput = addTools(
         withSystemPrompt(withSkillCatalog(parseRunAgentInput(prepared.input), catalog), this.systemPrompt()),
         tools
@@ -184,7 +200,7 @@ export class Agent extends AgentService {
         throw new Error('session revision must be a non-negative integer')
       }
 
-      const model = await this.ctx.llm.getModel(this.config.model, options)
+      const model = await this.ctx.llm.getModel(modelName, options)
       signal.throwIfAborted()
       const maxOutputTokens = this.config.maxOutputTokens
       if (
@@ -195,7 +211,7 @@ export class Agent extends AgentService {
       ) {
         throw new Error('requested output budget exceeds the model limits')
       }
-      const maxInputTokens = model.contextWindow - maxOutputTokens - (this.compaction.policy.reserveTokens ?? 0)
+      const maxInputTokens = model.contextWindow - maxOutputTokens - (compaction.policy.reserveTokens ?? 0)
       if (!Number.isSafeInteger(maxInputTokens) || maxInputTokens <= 0)
         throw new Error('compaction reserveTokens exceeds the model input budget')
       let step = 1
@@ -207,7 +223,7 @@ export class Agent extends AgentService {
             contextWindow: model.contextWindow
           })
         : preparedInput
-      const fitted = await this.compaction.fitInput(contextualInput, maxInputTokens, signal, false, signal, trace)
+      const fitted = await compaction.fitInput(contextualInput, maxInputTokens, signal, false, signal, trace)
       const previousIds = this.config.context ? new Set(preparedInput.messages.map((message) => message.id)) : undefined
       const initialContext = previousIds
         ? fitted.input.messages.filter(
@@ -216,8 +232,8 @@ export class Agent extends AgentService {
         : []
       const llm = this.ctx.llm
       const stream = (request: LLMRequest, execution?: ExecutionOptions) =>
-        this.compaction.streamWithRetry(request, maxInputTokens, execution?.signal ?? signal, trace!)
-      const maxToolRounds = this.config.maxToolRounds ?? 8
+        compaction.streamWithRetry(request, maxInputTokens, execution?.signal ?? signal, trace!)
+      const maxToolRounds = role?.maxToolRounds ?? this.config.maxToolRounds ?? 8
       const maxToolCalls = this.config.maxToolCalls ?? 32
       const parallel = this.config.parallelTools ?? false
       const prepareNext = async (next: RunAgentInput, generationSignal: AbortSignal) => {
@@ -229,8 +245,7 @@ export class Agent extends AgentService {
               contextWindow: model.contextWindow
             })
           : next
-        return (await this.compaction.fitInput(contextual, maxInputTokens, generationSignal, false, signal, trace))
-          .input
+        return (await compaction.fitInput(contextual, maxInputTokens, generationSignal, false, signal, trace)).input
       }
 
       const toolSpans = new Map<string, TraceSpan>()
@@ -262,7 +277,7 @@ export class Agent extends AgentService {
       const generation = this.ctx.generation.run(
         {
           input: fitted.input,
-          model: this.config.model,
+          model: modelName,
           maxOutputTokens,
           ...(this.config.webSearch === undefined ? {} : { webSearch: this.config.webSearch }),
           ...(this.config.reasoning === undefined ? {} : { reasoning: this.config.reasoning }),
@@ -337,7 +352,7 @@ export class Agent extends AgentService {
           yield* trace.drain()
         }
         if (event.type === EventType.RUN_FINISHED) {
-          this.compaction.detach(signal)
+          compaction.detach(signal)
         }
         yield event
       }
@@ -350,6 +365,7 @@ export class Agent extends AgentService {
       }
       throw error
     } finally {
+      if (compaction !== this.compaction) compaction.dispose()
       cleanup()
     }
   }
