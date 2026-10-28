@@ -11,6 +11,8 @@ import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 import { parsePricing, type AgentPricing } from '@keundal/trace'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 
+import { parseFallbackModels, parseModelRetry, type ModelRetryConfig } from './retry.js'
+
 export interface AgentConfig {
   readonly model: string
   readonly maxOutputTokens: number
