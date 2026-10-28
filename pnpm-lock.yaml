@@ -289,6 +289,9 @@ importers:
       '@keundal/agent-host':
         specifier: workspace:*
         version: link:../../packages/agent-host
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../../packages/task
       '@keundal/tsconfig':
         specifier: workspace:*
         version: link:../../tools/tsconfig
@@ -2142,6 +2145,9 @@ importers:
       '@keundal/session':
         specifier: workspace:*
         version: link:../session
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
       '@keundal/tool-approval':
         specifier: workspace:*
         version: link:../tool-approval
@@ -2237,6 +2243,9 @@ importers:
       '@keundal/session':
         specifier: workspace:*
         version: link:../session
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
       '@keundal/tool-approval':
         specifier: workspace:*
         version: link:../tool-approval
