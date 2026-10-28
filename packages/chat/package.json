@@ -76,6 +76,7 @@
     "@keundal/task": "workspace:*",
     "@keundal/tool-approval": "workspace:*",
     "@keundal/tools": "workspace:*",
+    "@keundal/workspace": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -72,9 +72,14 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
     return value
   }
 
-  const agent = async (id: string, reasoning?: Reasoning): Promise<MountedAgent> => {
+  const agent = async (
+    id: string,
+    reasoning?: Reasoning,
+    codingThreadId?: string,
+    workspacePath?: string
+  ): Promise<MountedAgent> => {
     if (closed) throw new Error('agent host disposed')
-    const key = JSON.stringify([id, reasoning])
+    const key = JSON.stringify([id, reasoning, codingThreadId, workspacePath])
     const existing = agents.get(key)
     if (existing) return existing
     const created = (async () => {
@@ -93,6 +98,8 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
           model: selected.id,
           reasoning,
           toolApproval,
+          codingThreadId,
+          workspacePath,
           maxOutputTokens
         })
       })
@@ -132,6 +139,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
     }
 
     const services: AgentHostServices = {
+      ...(options.workspaces ? { workspaces: options.workspaces } : {}),
       respondToToolApproval(runId, requestId, decision) {
         return toolApproval.respond(runId, requestId, decision)
       },
@@ -151,7 +159,9 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         const signal = execution.signal ? AbortSignal.any([execution.signal, abort.signal]) : abort.signal
         const iterator = (async function* () {
           try {
-            const fiber = await agent(selected.id, reasoning)
+            const workspace = await options.workspaces?.get(input.threadId)
+            signal.throwIfAborted()
+            const fiber = await agent(selected.id, reasoning, workspace?.threadId, workspace?.path)
             yield* fiber.ctx.agent.run(input, { ...execution, signal, steer })
           } finally {
             // 남은 지시는 실행이 끝난 뒤 반영할 수 없으므로 대기열을 닫습니다.

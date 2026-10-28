@@ -14,6 +14,7 @@ import { parsePromptPreset, type PromptPreset } from '@keundal/prompt'
 import { type SessionSnapshot } from '@keundal/session'
 import { type SubagentRole } from '@keundal/subagent'
 import type { TaskService, TaskSnapshot } from '@keundal/task'
+import type { CodingWorkspaceClient, CodingWorkspaceSnapshot } from '@keundal/workspace'
 
 import { boundRemoteResponse, RemoteResponseLimitError, RemoteStreamBudget } from './response-budget'
 
@@ -110,6 +111,36 @@ export class RemoteChatStore implements ChatStoreLike {
   })
   private readonly active = this.runs.active
   private modelsCache: RemoteModel[] | undefined
+
+  readonly workspaces: CodingWorkspaceClient = {
+    get: async (threadId) => {
+      const response = await this.raw(`/workspaces/${encodeURIComponent(threadId)}`)
+      if (response.status === 404) {
+        await response.body?.cancel()
+        return undefined
+      }
+      if (!response.ok) {
+        await response.body?.cancel()
+        throw new Error(`Workspace request failed (HTTP ${response.status})`)
+      }
+      return response.json() as Promise<CodingWorkspaceSnapshot>
+    },
+    create: (threadId, projectPath) => this.workspaceRequest(threadId, '', { projectPath }),
+    review: (threadId) => this.workspaceRequest(threadId, '/review', {}),
+    apply: (threadId, reviewId) => this.workspaceRequest(threadId, '/apply', { reviewId })
+  }
+
+  private async workspaceRequest(threadId: string, suffix: string, body: object): Promise<CodingWorkspaceSnapshot> {
+    const response = await this.raw(`/workspaces/${encodeURIComponent(threadId)}${suffix}`, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    })
+    if (!response.ok) {
+      const result = (await response.json()) as { error?: string }
+      throw new Error(result.error ?? `Workspace request failed (HTTP ${response.status})`)
+    }
+    return response.json() as Promise<CodingWorkspaceSnapshot>
+  }
 
   readonly tasks: Pick<TaskService, 'get' | 'list' | 'cancel'> = {
     list: async (options) => {

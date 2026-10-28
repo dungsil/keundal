@@ -1,0 +1,21 @@
+{
+  "name": "@keundal/ui-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./nuxt.config.ts",
+  "exports": {
+    ".": "./nuxt.config.ts",
+    "./plugin": "./app/plugin.ts"
+  },
+  "dependencies": {
+    "@keundal/ui": "workspace:*",
+    "@keundal/ui-composer": "workspace:*",
+    "@keundal/ui-runtime": "workspace:*",
+    "@keundal/ui-slots": "workspace:*",
+    "@keundal/workspace": "workspace:*",
+    "cordis": "catalog:",
+    "nuxt": "^4.6.2",
+    "vue": "3.5.44"
+  }
+}

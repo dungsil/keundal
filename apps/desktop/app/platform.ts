@@ -26,6 +26,7 @@ export function createDesktopPlatform(storage: Storage, invoke: NativeInvoke): C
         connected = store
         return {
           store,
+          workspaces: store.workspaces,
           tasks: store.tasks,
           remoteAgent: true,
           selectedModel: store.selectedModel,

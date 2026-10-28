@@ -7,6 +7,7 @@ export type DeliveryMode = 'queue' | 'steer'
 
 /** Values a page passes to the `composer` factory. */
 export interface ComposerOwner {
+  threadId?: string
   input: string
   setInput(value: string): void
   status?: ChatStatus
@@ -29,7 +30,9 @@ export interface ComposerOwner {
 
 /** Values every composer action receives. */
 export interface ComposerActionOwner {
+  threadId?: string
   disabled: boolean
+  running: boolean
 }
 
 export type DictationState = 'idle' | 'recording' | 'transcribing'

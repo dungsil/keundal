@@ -2,7 +2,8 @@ import { Buffer } from 'node:buffer'
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { realpathSync } from 'node:fs'
-import { lstat, mkdir, readFile, realpath } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, readlink, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 
@@ -40,7 +41,7 @@ export class GitWorkspaceService extends WorkspaceService {
   private readonly cwd: string
   private readonly worktreeRoot: string
   private readonly review: WorkspaceReviewer | undefined
-  private readonly tasks = new Map<string, { path: string; head: string }>()
+  private readonly tasks = new Map<string, { path: string; head: string; base?: string }>()
   private readonly lifetime = new globalThis.AbortController()
   private mutations: Promise<unknown> = Promise.resolve()
 
@@ -64,17 +65,41 @@ export class GitWorkspaceService extends WorkspaceService {
     return { signal }
   }
 
-  private git(cwd: string, args: readonly string[], options: ExecutionOptions, input?: string): Promise<string> {
+  private async git(
+    cwd: string,
+    args: readonly string[],
+    options: ExecutionOptions,
+    input?: string | Buffer,
+    indexPath?: string
+  ): Promise<string> {
     options.signal?.throwIfAborted()
+    const overrides: string[] = []
+    if (args[0] === 'worktree' && args[1] === 'add') {
+      // Checkout must not execute repository-selected clean/smudge/process programs.
+      const keys = (await this.git(cwd, ['config', '--null', '--name-only', '--list'], options)).split('\0')
+      for (const key of keys.filter((key) => /^filter\..*\.(clean|smudge|process|required)$/i.test(key))) {
+        overrides.push('-c', `${key}=${key.toLowerCase().endsWith('.required') ? 'false' : ''}`)
+      }
+    }
     return new Promise((accept, reject) => {
       const child = execFile(
         'git',
-        ['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', ...args],
+        [
+          '-c',
+          'core.hooksPath=/dev/null',
+          '-c',
+          'core.fsmonitor=false',
+          '-c',
+          'core.quotePath=true',
+          ...overrides,
+          ...args
+        ],
         {
           cwd,
           env: {
             ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
-            GIT_TERMINAL_PROMPT: '0'
+            GIT_TERMINAL_PROMPT: '0',
+            ...(indexPath ? { GIT_INDEX_FILE: indexPath } : {})
           },
           signal: options.signal,
           timeout: 30000,
@@ -93,13 +118,136 @@ export class GitWorkspaceService extends WorkspaceService {
   }
 
   private async directory(options: WorkspaceOptions): Promise<string> {
+    if (options.taskId !== undefined && !this.tasks.has(options.taskId)) {
+      taskName(options.taskId)
+      const data = await readFile(join(this.worktreeRoot, `${options.taskId}.json`), 'utf8').catch(
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === 'ENOENT') throw new Error('unknown task Worktree')
+          throw error
+        }
+      )
+      const record: unknown = JSON.parse(data)
+      if (
+        !record ||
+        typeof record !== 'object' ||
+        !('head' in record) ||
+        typeof record.head !== 'string' ||
+        !/^[a-f0-9]{40,64}$/.test(record.head)
+      ) {
+        throw new Error('invalid task Worktree record')
+      }
+      const base = 'base' in record ? record.base : undefined
+      if (base !== undefined && (typeof base !== 'string' || !/^[a-f0-9]{40,64}$/.test(base)))
+        throw new Error('invalid task base')
+      this.tasks.set(options.taskId, { path: join(this.worktreeRoot, options.taskId), head: record.head, base })
+    }
     const path = options.taskId === undefined ? this.cwd : this.tasks.get(options.taskId)?.path
     if (!path) throw new Error('unknown task Worktree')
     const canonical = await realpath(path)
     if (canonical !== path) throw new Error('workspace path changed')
     const root = (await this.git(path, ['rev-parse', '--show-toplevel'], options)).trim()
     if ((await realpath(root)) !== path) throw new Error('cwd must be a Git working tree root')
+    if (options.taskId !== undefined) {
+      const common = async (cwd: string) =>
+        realpath(resolve(cwd, (await this.git(cwd, ['rev-parse', '--git-common-dir'], options)).trim()))
+      if ((await common(path)) !== (await common(this.cwd))) throw new Error('task belongs to another repository')
+    }
     return path
+  }
+
+  /** Complete base-to-files snapshot, including task commits and untracked files, without touching the real index or running filters. */
+  async fullSnapshot(
+    options: WorkspaceOptions = {}
+  ): Promise<{ path: string; patch: string; changes: readonly WorkspaceChange[]; fingerprint: string; tree: string }> {
+    options = { ...options, ...this.options(options) }
+    const path = await this.directory(options)
+    const head = (await this.git(path, ['rev-parse', 'HEAD'], options)).trim()
+    const task = options.taskId ? this.tasks.get(options.taskId)! : undefined
+    const base = task ? (task.base ?? task.head) : head
+    const scratch = await mkdtemp(join(tmpdir(), 'keundal-git-index-'))
+    const index = join(scratch, 'index')
+    try {
+      await this.git(path, ['read-tree', '--empty'], options, undefined, index)
+      const files = [
+        ...new Set(
+          (await this.git(path, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], options))
+            .split('\0')
+            .filter(Boolean)
+        )
+      ]
+      if (files.length > 10000) throw new Error('workspace exceeds snapshot file limit')
+      const entries: string[] = []
+      let bytes = 0
+      for (const file of files) {
+        options.signal?.throwIfAborted()
+        const target = resolve(path, file)
+        if (!within(path, target) || target === path || file.toLowerCase().split(/[\\/]/).includes('.git'))
+          throw new Error('unsafe workspace path')
+        let parent = dirname(target)
+        while (parent !== path) {
+          if ((await lstat(parent).catch(() => undefined))?.isSymbolicLink())
+            throw new Error('workspace ancestors must not be symlinks')
+          parent = dirname(parent)
+        }
+        const info = await lstat(target).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === 'ENOENT') return undefined
+          throw error
+        })
+        if (!info) continue
+        if (!info.isFile() && !info.isSymbolicLink()) throw new Error('submodules and special files are not supported')
+        bytes += info.size
+        if (bytes > 32 * 1024 * 1024) throw new Error('workspace exceeds snapshot byte limit')
+        const data = info.isSymbolicLink() ? await readlink(target) : await readFile(target, { signal: options.signal })
+        const hash = (await this.git(path, ['hash-object', '-w', '--no-filters', '--stdin'], options, data)).trim()
+        const mode = info.isSymbolicLink() ? '120000' : info.mode & 0o111 ? '100755' : '100644'
+        entries.push(`${mode} ${hash}\t${file}\0`)
+      }
+      await this.git(path, ['update-index', '-z', '--index-info'], options, entries.join(''), index)
+      const tree = (await this.git(path, ['write-tree'], options, undefined, index)).trim()
+      const patch = await this.git(
+        path,
+        ['diff', '--no-ext-diff', '--no-textconv', '--no-renames', '--binary', base, tree, '--'],
+        options
+      )
+      const names = (
+        await this.git(
+          path,
+          ['diff', '--no-ext-diff', '--no-textconv', '--no-renames', '--name-status', '-z', base, tree, '--'],
+          options
+        )
+      ).split('\0')
+      const changes: WorkspaceChange[] = []
+      for (let i = 0; i + 1 < names.length; i += 2)
+        changes.push({ path: names[i + 1]!, index: names[i]!, workingTree: ' ' })
+      return {
+        path,
+        patch,
+        changes,
+        tree,
+        fingerprint: createHash('sha256').update(`${head}:${base}:${tree}`).digest('hex')
+      }
+    } finally {
+      await rm(scratch, { recursive: true, force: true })
+    }
+  }
+
+  /** Advance only the reviewed base, retaining edits made after the reviewed snapshot. */
+  checkpointTask(taskId: string, tree: string, options: ExecutionOptions = {}): Promise<void> {
+    return this.mutate(options, async (guarded) => {
+      await this.directory({ ...guarded, taskId })
+      if (
+        !/^[a-f0-9]{40,64}$/.test(tree) ||
+        (await this.git(this.cwd, ['cat-file', '-t', tree], guarded)).trim() !== 'tree'
+      )
+        throw new Error('invalid task checkpoint')
+      const task = this.tasks.get(taskId)!
+      const record = join(this.worktreeRoot, `${taskId}.json`)
+      // Retain every persisted base across Git GC, including a crash between ref and metadata writes.
+      await this.git(this.cwd, ['update-ref', `refs/keundal-workspaces/${taskId}/base-${tree}`, tree], guarded)
+      await writeFile(`${record}.tmp`, JSON.stringify({ head: task.head, base: tree }), { mode: 0o600 })
+      await rename(`${record}.tmp`, record)
+      task.base = tree
+    })
   }
 
   async status(options: WorkspaceOptions = {}) {
@@ -243,6 +391,8 @@ export class GitWorkspaceService extends WorkspaceService {
       await this.directory(guarded)
       await this.git(this.cwd, ['worktree', 'add', '--detach', '--', path, head], guarded)
       this.tasks.set(taskId, { path, head })
+      await this.git(this.cwd, ['update-ref', `refs/keundal-workspaces/${taskId}/initial`, head], guarded)
+      await writeFile(join(this.worktreeRoot, `${taskId}.json`), JSON.stringify({ head }), { flag: 'wx', mode: 0o600 })
       return { taskId, path }
     })
   }
@@ -266,6 +416,14 @@ export class GitWorkspaceService extends WorkspaceService {
       // Git도 변경 파일과 잠긴 Worktree를 다시 검사합니다. --force는 사용하지 않습니다.
       await this.git(this.cwd, ['worktree', 'remove', '--', path], guarded)
       this.tasks.delete(taskId)
+      await rm(join(this.worktreeRoot, `${taskId}.json`), { force: true })
+      const refs = (
+        await this.git(this.cwd, ['for-each-ref', '--format=%(refname)', `refs/keundal-workspaces/${taskId}/`], guarded)
+      )
+        .split('\n')
+        .filter(Boolean)
+      if (refs.length)
+        await this.git(this.cwd, ['update-ref', '--stdin'], guarded, refs.map((ref) => `delete ${ref}\n`).join(''))
     })
   }
 }
