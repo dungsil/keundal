@@ -10,8 +10,7 @@
     "./app/*": "./app/*"
   },
   "scripts": {
-    "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.test.json"
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@comark/nuxt": "^0.8.1",
@@ -27,7 +26,6 @@
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",
     "@types/node": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }
