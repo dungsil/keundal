@@ -3,7 +3,11 @@ import type en from './en'
 export default {
   'runtime.title': '큰달 플러그인',
   'runtime.unavailable': '이 연결에서는 선택 기능을 관리할 수 없습니다.',
-  'runtime.bundled': '앱에 포함된 기능 플러그인을 선택합니다. 관련 화면은 기능을 따라 켜지고 꺼지며, UI 플러그인은 따로 전환하지 않습니다. 외부 다운로드는 지원하지 않습니다. 필수 항목은 항상 켜져 있습니다.',
+  'runtime.bundled': '실행 기능과 UI 플러그인을 관리합니다. 각 항목에서 의존 대상과 이 항목을 사용하는 플러그인을 확인할 수 있습니다. 의존 대상을 끄면 관련 화면의 동작을 멈추지만 선택과 저장된 데이터는 유지합니다. 필수 서비스와 관리 화면만 항상 켜져 있습니다. 브라우저에서는 외부 다운로드를 지원하지 않습니다.',
+  'runtime.requires': '의존 대상',
+  'runtime.usedBy': '사용하는 플러그인',
+  'runtime.blocked': '의존 대상 비활성',
+  'runtime.blockedDescription': '{names} 활성화가 필요합니다. 저장한 활성화 선택은 유지합니다.',
   'runtime.required': '필수',
   'runtime.requiredDescription': '필수 플러그인입니다. 항상 켜져 있으며 끌 수 없습니다.',
   'runtime.enabled': '활성',

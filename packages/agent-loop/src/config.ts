@@ -24,6 +24,7 @@ export interface AgentConfig {
   readonly maxActiveSubagents?: number
   readonly subagentRoles?: readonly SubagentRole[]
   readonly skills?: boolean
+  readonly promptPresets?: boolean
   readonly context?: boolean
   /** 모든 실행에 앞서 모델에 전달할 시스템 지침입니다. */
   readonly systemPrompt?: string
@@ -58,7 +59,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     throw new Error('model and a positive integer maxOutputTokens are required')
   }
   const compaction = parseCompactionConfig('compaction' in value ? value.compaction : undefined)
-  for (const key of ['webSearch', 'skills', 'context', 'subagents'] as const) {
+  for (const key of ['webSearch', 'skills', 'context', 'subagents', 'promptPresets'] as const) {
     const option = (value as Record<string, unknown>)[key]
     if (option !== undefined && typeof option !== 'boolean') {
       throw new Error(`${key} must be a boolean`)
@@ -117,6 +118,7 @@ export function parseAgentConfig(value: unknown): AgentConfig {
     maxActiveSubagents,
     ...(subagentRoles === undefined ? {} : { subagentRoles }),
     skills,
+    ...('promptPresets' in value ? { promptPresets: value.promptPresets as boolean | undefined } : {}),
     ...('context' in value ? { context: value.context as boolean | undefined } : {}),
     ...(systemPrompt === undefined ? {} : { systemPrompt }),
     maxToolRounds,

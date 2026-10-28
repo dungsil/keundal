@@ -56,9 +56,10 @@ export default defineNuxtPlugin({
     }
     const pluginManager = new UIPluginManager(ctx, {
       stop: () => ctx.chatRuntime.stopResponses(),
-      platform: import.meta.client ? nuxtApp.$chatPlatform?.runtimePlugins : undefined
+      platform: import.meta.client ? nuxtApp.$chatPlatform?.runtimePlugins : undefined,
+      storage: import.meta.client ? localStorage : undefined
     })
-    ctx.chatRuntime.pluginManager = nuxtApp.$chatPlatform?.runtimePlugins ? pluginManager : undefined
+    ctx.chatRuntime.pluginManager = pluginManager
     if (import.meta.client) nuxtApp.hook('app:mounted', () => pluginManager.sync())
 
     let disposal: Promise<void> | undefined
