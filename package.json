@@ -14,9 +14,7 @@
     "lintfix": "oxlint --fix && oxfmt",
     "prepare": "simple-git-hooks",
     "check:boundaries": "node tools/workspace-boundaries/check.mjs",
-    "test:boundaries": "node --test tools/workspace-boundaries/tests/*.test.ts",
-    "lighthouse:local": "pnpm dlx --allow-build=esbuild --allow-build=puppeteer --allow-build=vue-demi @unlighthouse/cli@0.19.1 --site http://localhost:3000 --config-file tools/lighthouse/unlighthouse.config.mjs",
-    "check:a11y": "node tools/a11y/check.mjs"
+    "test:boundaries": "node --test tools/workspace-boundaries/tests/*.test.ts"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",
