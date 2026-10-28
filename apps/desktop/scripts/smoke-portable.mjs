@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -12,6 +12,34 @@ const runtime = join(portable, process.platform === 'win32' ? 'keundal-host.exe'
 const token = 'portable-smoke-test-token'
 const model = 'portable-smoke-model'
 const message = { id: 'smoke-message', role: 'user', content: 'portable persistence check' }
+const sandboxConfig = join(work, 'sandbox.json')
+const workspace = join(work, 'workspace')
+await mkdir(workspace)
+await writeFile(sandboxConfig, JSON.stringify({ workspace }))
+
+if (process.argv.includes('--expect-sandbox-unavailable')) {
+  try {
+    assert.notEqual(process.platform, 'linux', 'Linux must exercise the real sandbox, not the refusal path')
+    const refused = spawnSync(runtime, [join(portable, 'sidecar/main.js')], {
+      cwd: work,
+      env: {
+        ...process.env, NODE_PATH: '', NODE_OPTIONS: '',
+        KEUNDAL_SANDBOX_CONFIG: sandboxConfig,
+        KEUNDAL_MODEL: model, KEUNDAL_PROVIDER: 'openai', KEUNDAL_API_TOKEN: token
+      },
+      encoding: 'utf8', timeout: 10_000
+    })
+    if (refused.error) throw refused.error
+    assert.equal(refused.status, 1)
+    assert.match(refused.stderr, /LinuxSandboxProvider requires Linux/)
+    assert.doesNotMatch(refused.stdout, /keundal-sidecar|listening/)
+    console.log('PASS: unsupported OS refuses local execution without an unsandboxed fallback')
+  } finally {
+    await rm(work, { recursive: true, force: true })
+  }
+  process.exit(0)
+}
+
 let host
 let app
 
@@ -39,6 +67,7 @@ async function startHost() {
       ...process.env,
       NODE_PATH: '',
       NODE_OPTIONS: '',
+      KEUNDAL_SANDBOX_CONFIG: sandboxConfig,
       KEUNDAL_HOST: '127.0.0.1',
       PORT: '0',
       KEUNDAL_SIDECAR: '1',
@@ -47,7 +76,7 @@ async function startHost() {
       OPENAI_API_KEY: 'test-only-no-provider-request',
       KEUNDAL_MODEL: model,
       KEUNDAL_API_TOKEN: token,
-      KEUNDAL_SQLITE_PATH: join(work, 'smoke.sqlite')
+      KEUNDAL_SQLITE_PATH: join(workspace, 'smoke.sqlite')
     },
     stdio: ['ignore', 'pipe', 'pipe']
   })

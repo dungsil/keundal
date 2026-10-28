@@ -1,9 +1,13 @@
-import { createAgentRuntime, createNodeComposition, type AgentRuntime } from '@keundal/agent-runtime-node'
+import { createSandboxedAgentRuntime, type SandboxedAgentRuntime } from '@keundal/agent-runtime-node/sandbox'
 
-let runtime: Promise<AgentRuntime> | undefined
+let runtime: Promise<SandboxedAgentRuntime> | undefined
 
 export async function getAgentApp() {
-  const current = runtime ??= createAgentRuntime(process.env, { compose: createNodeComposition })
+  const current = runtime ??= (async () => {
+    const workerSource = await useStorage('assets:agent-host').getItem<string>('sandbox-worker.txt')
+    if (!workerSource) throw new Error('Sandbox worker asset is missing')
+    return createSandboxedAgentRuntime({ workerSource })
+  })()
   try {
     return (await current).app
   } catch (error) {

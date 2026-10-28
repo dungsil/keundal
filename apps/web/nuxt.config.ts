@@ -30,6 +30,12 @@ export default defineNuxtConfig({
       if (String(config.preset ?? '').startsWith('cloudflare')) {
         config.alias ??= {}
         config.alias['#agent-host-runtime'] = fileURLToPath(new URL('./server/agent/runtime-unavailable.ts', import.meta.url))
+      } else {
+        config.serverAssets ??= []
+        config.serverAssets.push({
+          baseName: 'agent-host',
+          dir: fileURLToPath(new URL('.', import.meta.resolve('@keundal/agent-runtime-node/worker')))
+        })
       }
     }
   }

@@ -1,9 +1,8 @@
+import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 
-import { createAgentRuntime } from '@keundal/agent-runtime-node'
-import { createChartTools } from '@keundal/plugin-tool-chart'
-import { createWeatherTools } from '@keundal/plugin-tool-weather'
-import { manageRuntimePlugins, createDesktopComposition } from './runtime-plugins.js'
+import { createSandboxedAgentRuntime } from '@keundal/agent-runtime-node/sandbox'
+import { manageRuntimePlugins } from './runtime-plugins.js'
 
 if (process.argv[2] === '--manage-runtime-plugins') {
   try {
@@ -24,9 +23,8 @@ const host = process.env.KEUNDAL_HOST ?? '127.0.0.1'
 const port = Number(process.env.PORT ?? (sidecar ? 0 : 8000))
 if (!host.trim()) throw new Error('KEUNDAL_HOST는 비어 있을 수 없습니다.')
 if (!Number.isSafeInteger(port) || port < 0 || port > 65_535) throw new Error('PORT가 올바르지 않습니다.')
-const agentHost = await createAgentRuntime(process.env, {
-  defaultTools: [...createChartTools(), ...createWeatherTools()],
-  compose: createDesktopComposition(process.env.KEUNDAL_MANAGED_PLUGINS)
+const agentHost = await createSandboxedAgentRuntime({
+  workerSource: await readFile(new URL('./sandbox-worker.js', import.meta.url), 'utf8')
 })
 const app = agentHost.app
 

@@ -9,7 +9,15 @@ import { expect, onTestFinished, test } from 'vitest'
 
 const token = 'test-only-sidecar-token'
 
-test.each(['SIGTERM', 'SIGKILL'] as const)('sidecar를 %s 후 다시 실행해도 작업 결과와 중단된 부분 응답을 조회한다', async (signal) => {
+function sandbox(workspace: string) {
+  const control = mkdtempSync(join(tmpdir(), 'keundal-sidecar-policy-'))
+  onTestFinished(() => rmSync(control, { recursive: true, force: true }))
+  const path = join(control, 'sandbox.json')
+  writeFileSync(path, JSON.stringify({ workspace }))
+  return { KEUNDAL_SANDBOX_CONFIG: path }
+}
+
+test.skipIf(process.platform !== 'linux').each(['SIGTERM', 'SIGKILL'] as const)('sidecar를 %s 후 다시 실행해도 작업 결과와 중단된 부분 응답을 조회한다', async (signal) => {
   const directory = mkdtempSync(join(tmpdir(), 'keundal-task-restart-'))
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
   const calls = join(directory, 'calls.txt')
@@ -37,7 +45,7 @@ test.each(['SIGTERM', 'SIGKILL'] as const)('sidecar를 %s 후 다시 실행해�
   ], agent: { module: 'builtin:agent' } }))
   const start = async () => {
     const child = spawn(process.execPath, ['dist-sidecar/main.js'], {
-      env: { PORT: '0', KEUNDAL_SIDECAR: '1', KEUNDAL_PROVIDER: 'openai', KEUNDAL_MODEL: 'test',
+      env: { ...sandbox(directory), PORT: '0', KEUNDAL_SIDECAR: '1', KEUNDAL_PROVIDER: 'openai', KEUNDAL_MODEL: 'test',
         KEUNDAL_API_TOKEN: token, KEUNDAL_SQLITE_PATH: join(directory, 'tasks.sqlite'),
         KEUNDAL_BASE_URL: 'http://127.0.0.1:1', KEUNDAL_PLUGIN_CONFIG: manifest },
       stdio: ['ignore', 'pipe', 'pipe']
@@ -68,14 +76,16 @@ test.each(['SIGTERM', 'SIGKILL'] as const)('sidecar를 %s 후 다시 실행해�
   expect(readFileSync(calls, 'utf8')).toBe('completed\nrunning\n')
   expect(await second.list()).toEqual(after)
   await second.stop()
-})
+}, 15_000)
 
-test('실행 파일은 토큰 누락·빈 토큰·빈 바인딩 주소에서 시작하지 않는다', () => {
+test.skipIf(process.platform !== 'linux')('실행 파일은 토큰 누락·빈 토큰·빈 바인딩 주소에서 시작하지 않는다', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-sidecar-invalid-'))
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
   for (const config of [
-    {},
-    { KEUNDAL_API_TOKEN: '' },
-    { KEUNDAL_API_TOKEN: ' ' },
-    { KEUNDAL_API_TOKEN: token, KEUNDAL_HOST: '' }
+    sandbox(directory),
+    { ...sandbox(directory), KEUNDAL_API_TOKEN: '' },
+    { ...sandbox(directory), KEUNDAL_API_TOKEN: ' ' },
+    { ...sandbox(directory), KEUNDAL_API_TOKEN: token, KEUNDAL_HOST: '' }
   ]) {
     const result = spawnSync(process.execPath, ['dist-sidecar/main.js'], {
       env: { PORT: '0', KEUNDAL_MODEL: 'test', OPENAI_API_KEY: 'test-only', ...config },
@@ -89,10 +99,11 @@ test('실행 파일은 토큰 누락·빈 토큰·빈 바인딩 주소에서 시
   }
 })
 
-test.each([undefined, '0.0.0.0'])('실행 파일은 기본 loopback과 명시적 외부 바인딩(%s)을 적용한다', async (host) => {
+test.skipIf(process.platform !== 'linux').each([undefined, '0.0.0.0'])('실행 파일은 기본 loopback과 명시적 외부 바인딩(%s)을 적용한다', async (host) => {
   const directory = mkdtempSync(join(tmpdir(), 'keundal-sidecar-'))
   const child = spawn(process.execPath, ['dist-sidecar/main.js'], {
     env: {
+      ...sandbox(directory),
       PORT: '0',
       KEUNDAL_MODEL: 'test',
       OPENAI_API_KEY: 'test-only',
@@ -142,13 +153,14 @@ test.each([undefined, '0.0.0.0'])('실행 파일은 기본 loopback과 명시적
   }
 })
 
-test('명시한 공급자는 키 없는 사용자 지정 API를 사용하고 같은 SQLite를 새 공급자에서도 보존한다', async () => {
+test.skipIf(process.platform !== 'linux')('명시한 공급자는 키 없는 사용자 지정 API를 사용하고 같은 SQLite를 새 공급자에서도 보존한다', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'keundal-sidecar-switch-'))
   const path = join(directory, 'test.sqlite')
   onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
   const start = async (provider: string, model: string) => {
     const child = spawn(process.execPath, ['dist-sidecar/main.js'], {
       env: {
+        ...sandbox(directory),
         PORT: '0',
         KEUNDAL_SIDECAR: '1',
         KEUNDAL_PROVIDER: provider,
@@ -199,9 +211,12 @@ test('명시한 공급자는 키 없는 사용자 지정 API를 사용하고 같
   await second.stop()
 })
 
-test('종료 제어 파이프가 닫히면 sidecar가 정상 종료한다', async () => {
+test.skipIf(process.platform !== 'linux')('종료 제어 파이프가 닫히면 sidecar가 정상 종료한다', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-sidecar-shutdown-'))
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
   const child = spawn(process.execPath, ['dist-sidecar/main.js'], {
     env: {
+      ...sandbox(directory),
       PORT: '0', KEUNDAL_SIDECAR: '1', KEUNDAL_SHUTDOWN_ON_STDIN: '1',
       KEUNDAL_PROVIDER: 'openai', KEUNDAL_MODEL: 'test', KEUNDAL_API_TOKEN: token,
       KEUNDAL_SQLITE_PATH: ':memory:',

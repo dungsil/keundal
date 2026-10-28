@@ -38,12 +38,15 @@ HTTP 400 오류는 공급자 JSON의 `error.message`·문자열 `error`·`messag
 
 ## 웹 서버의 에이전트 모드
 
-웹 앱은 기본으로 브라우저에서 에이전트를 실행합니다. Node.js로 실행하는 Nitro 서버는 `@keundal/agent-host`를 직접 조립하여 `/api/agent/**`에서 대화와 실행을 처리할 수 있습니다. 별도 HTTP 서버나 프록시 주소는 필요하지 않습니다.
+웹 앱은 기본으로 브라우저에서 에이전트를 실행합니다. Node.js로 실행하는 Nitro 서버는 OS 샌드박스 안에 실행 호스트를 조립하여 `/api/agent/**`에서 대화와 실행을 처리할 수 있습니다. 별도 HTTP 서버나 프록시 주소는 필요하지 않습니다.
+
+서버 실행 호스트는 현재 Linux와 bubblewrap이 필요합니다. [OS 샌드박스 설정](../../packages/agent-runtime-node/README.md#os-샌드박스)에 따라 작업공간 밖에 정책 파일을 만들고 필요한 공급자 목적지와 데이터 경로만 허용합니다. 앱 설치 디렉터리와 코딩 작업공간은 분리합니다. Windows·macOS와 격리 설정이 없는 환경은 서버 API 시작을 거부하며 브라우저 실행은 유지합니다.
 
 ```sh
 export OPENAI_API_KEY="sk-..."             # 또는 GEMINI_API_KEY, ANTHROPIC_API_KEY
 export KEUNDAL_MODEL="gpt-4.1-mini"
 export KEUNDAL_API_TOKEN="your-random-bearer-token"
+export KEUNDAL_SANDBOX_CONFIG="/absolute/operator/sandbox.json"
 export KEUNDAL_SQLITE_PATH=".data/keundal.sqlite"
 export NUXT_PUBLIC_AGENT_ENDPOINT="/api/agent"
 export NUXT_PUBLIC_AGENT_TOKEN="$KEUNDAL_API_TOKEN"
@@ -51,7 +54,7 @@ pnpm --filter @keundal/web build
 pnpm --filter @keundal/web preview
 ```
 
-호스트는 첫 API 요청 때 만들어지고 같은 웹 서버 프로세스에서 재사용합니다. 서버가 종료되면 호스트도 정리합니다. 모델 공급자의 키는 서버 환경 변수에서 읽으며 브라우저에 전달하지 않습니다. 호스트 설정이 없으면 API는 `503`을 반환하며 브라우저 모드는 계속 사용할 수 있습니다.
+호스트는 첫 API 요청 때 격리 프로세스로 만들어지고 같은 웹 서버에서 재사용합니다. 자식의 현재 디렉터리는 정책의 `workspace`이므로 위 상대 SQLite 경로도 작업공간 기준입니다. 서버가 종료되면 호스트와 자손도 정리합니다. 모델 공급자의 키는 서버 환경 변수에서 읽으며 브라우저에 전달하지 않습니다. 호스트 설정이 없으면 API는 `503`을 반환하며 브라우저 모드는 계속 사용할 수 있습니다.
 
 모든 API 요청에는 `Authorization: Bearer <토큰>`이 필요합니다. 위 UI 설정의 `NUXT_PUBLIC_AGENT_TOKEN`은 브라우저에 전달되므로 이 모드는 신뢰할 수 있는 단일 사용자 환경에서 사용합니다. 토큰을 가진 호출자는 호스트의 모든 대화와 실행 기록에 접근합니다. 외부에 공개할 때는 접근 제어와 TLS를 별도로 구성해야 합니다. 다른 origin에서 직접 호출하려면 `KEUNDAL_CORS_ORIGINS`에 허용할 origin을 추가합니다.
 

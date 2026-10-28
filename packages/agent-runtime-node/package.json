@@ -9,7 +9,16 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./sandbox": {
+      "types": "./dist/sandbox.d.ts",
+      "import": "./dist/sandbox.js"
+    },
+    "./sandbox-child": {
+      "types": "./dist/sandbox-child.d.ts",
+      "import": "./dist/sandbox-child.js"
+    },
+    "./worker": "./dist/worker/sandbox-worker.txt"
   },
   "scripts": {
     "build": "tsdown",
@@ -28,14 +37,17 @@
     "@keundal/plugin-llm-openai-chat": "workspace:*",
     "@keundal/plugin-mcp-client": "workspace:*",
     "@keundal/plugin-runtime": "workspace:*",
+    "@keundal/plugin-sandbox-linux": "workspace:*",
     "@keundal/plugin-skill": "workspace:*",
     "@keundal/plugin-store-sqlite": "workspace:*",
+    "@keundal/sandbox": "workspace:*",
     "@keundal/skill": "workspace:*",
     "@keundal/task-memory": "workspace:*",
     "@keundal/tool-approval": "workspace:*",
     "@keundal/tools": "workspace:*",
     "cordis": "catalog:",
-    "import-meta-resolve": "4.2.0"
+    "import-meta-resolve": "4.2.0",
+    "undici": "8.12.3"
   },
   "devDependencies": {
     "@keundal/llm": "workspace:*",

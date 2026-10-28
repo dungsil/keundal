@@ -110,7 +110,8 @@
     {
       "files": ["apps/web/server/**"],
       "globals": {
-        "defineNitroPlugin": "readonly"
+        "defineNitroPlugin": "readonly",
+        "useStorage": "readonly"
       }
     },
     {

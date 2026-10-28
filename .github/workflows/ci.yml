@@ -272,7 +272,7 @@ jobs:
           $extracted = Join-Path $smokeRoot 'extracted app'
           Compress-Archive -Path 'apps/desktop/src-tauri/target/release/portable/*' -DestinationPath $archive -Force
           Expand-Archive -Path $archive -DestinationPath $extracted -Force
-          & (Join-Path $extracted 'keundal-host.exe') 'apps/desktop/scripts/smoke-portable.mjs' $extracted
+          & (Join-Path $extracted 'keundal-host.exe') 'apps/desktop/scripts/smoke-portable.mjs' $extracted --expect-sandbox-unavailable
           if ($LASTEXITCODE -ne 0) { throw 'Portable smoke test failed' }
 
       - name: 데스크톱 배포 파일 업로드
@@ -390,6 +390,14 @@ jobs:
           restore-keys: |
             turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
             turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: OS 격리 의존성 설치
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y bubblewrap
+          if command -v apparmor_parser >/dev/null && [ -f /etc/apparmor.d/bwrap ]; then
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap
+          fi
 
       - name: 테스트
         env:

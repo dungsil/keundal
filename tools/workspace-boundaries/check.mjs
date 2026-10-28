@@ -34,6 +34,7 @@ const implementationIndependent = new Set([
   '@keundal/agent-host',
   '@keundal/fs',
   '@keundal/shell',
+  '@keundal/sandbox',
   '@keundal/workspace',
   '@keundal/transcription'
 ])
