@@ -266,10 +266,11 @@ export async function restoreDataBackup(options: BackupOptions, value: unknown):
   const catalog = (await plugins?.list()) ?? []
   const undo: (() => void | Promise<void>)[] = []
   const skipped: string[] = []
-  const write = (key: string, value: string) => {
+  const write = (key: string, value: string | null) => {
     const previous = storage.getItem(key)
     undo.push(() => (previous === null ? storage.removeItem(key) : storage.setItem(key, previous)))
-    storage.setItem(key, value)
+    if (value === null) storage.removeItem(key)
+    else storage.setItem(key, value)
   }
   try {
     undo.push(async () => {
@@ -285,9 +286,9 @@ export async function restoreDataBackup(options: BackupOptions, value: unknown):
     await platform.mcp.save(backup.settings.mcp, async () => {})
     write(PROMPT_PRESETS_KEY, JSON.stringify(backup.settings.promptPresets))
     write('keundal:subagent-roles', JSON.stringify(backup.settings.subagentRoles))
-    write(MODEL_KEY, backup.settings.models.selected)
-    write(DEFAULT_MODEL_KEY, backup.settings.models.default)
-    write(TITLE_MODEL_KEY, backup.settings.models.title)
+    write(MODEL_KEY, backup.settings.models.selected || null)
+    write(DEFAULT_MODEL_KEY, backup.settings.models.default || null)
+    write(TITLE_MODEL_KEY, backup.settings.models.title || null)
     for (const selection of backup.settings.plugins) {
       const entry = catalog.find((entry) => entry.module === selection.module && !entry.source && !entry.required)
       if (!entry) {

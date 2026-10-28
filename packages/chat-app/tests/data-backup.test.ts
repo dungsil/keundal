@@ -86,6 +86,7 @@ test('백업은 비밀 설정을 제외하고 대화·프리셋·로컬 스킬·
   expect((await target.ctx.backup.export()).runs).toEqual(backup.history.runs)
   expect(await target.store.get('unrelated')).toBeDefined()
   expect(await target.platform.settings.load()).toEqual(backup.settings.providers)
+  expect(target.storage.getItem('keundal:model')).toBeNull()
   expect(target.platform.skills.load()).toEqual({ skills: [{ name: 'review', description: 'Review code',
     content: 'Check public behavior.', enabled: true }], disabledFiles: [], loadLocal: false })
   expect(loadPromptPresets(target.storage).presets[0]?.blocks[0]).toMatchObject({ content: 'Answer concisely.' })
