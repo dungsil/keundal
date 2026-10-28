@@ -1,4 +1,4 @@
-import { AgentService, type AgentExecutionOptions } from '@keundal/agent'
+import { AgentService, parseRunBudget, type AgentExecutionOptions } from '@keundal/agent'
 import { SummaryCompactionController } from '@keundal/compaction-summary/controller'
 import type {} from '@keundal/context'
 import {
@@ -25,7 +25,7 @@ import { traceEvent, type TraceSpan } from '@keundal/trace'
 import { TraceRecorder, type TraceParent } from '@keundal/trace/recording'
 import type { Context } from 'cordis'
 
-import { BudgetLedger, parseRunBudget } from './budget.js'
+import { BudgetLedger } from './budget.js'
 import type { AgentConfig } from './config.js'
 import { SYSTEM_PROMPT_ID, withSystemPrompt } from './prompt.js'
 

@@ -1,3 +1,4 @@
+import { parseRunBudget, type RunBudget } from '@keundal/agent'
 import { ChatMessageAssembly } from '@keundal/chat/chat-message'
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
@@ -388,6 +389,7 @@ export class RemoteChatStore implements ChatStoreLike {
       systemPrompt?: string
       promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
+      budget?: RunBudget
       reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void
@@ -397,6 +399,7 @@ export class RemoteChatStore implements ChatStoreLike {
   ): AsyncGenerator<AGUIEvent> {
     if (this.active.has(id)) throw new Error('A response is already running')
     const promptPreset = request.promptPreset === undefined ? undefined : parsePromptPreset(request.promptPreset)
+    const runBudget = request.budget === undefined ? undefined : parseRunBudget(request.budget)
     const abort = new AbortController()
     const combined = signal ? AbortSignal.any([signal, abort.signal]) : abort.signal
     let release!: () => void
@@ -476,6 +479,7 @@ export class RemoteChatStore implements ChatStoreLike {
               body: JSON.stringify({
                 threadId: id,
                 runId,
+                ...(runBudget === undefined ? {} : { budget: runBudget }),
                 state: {
                   web: chat,
                   ...(request.subagentRoles === undefined ? {} : { subagentRoles: request.subagentRoles })

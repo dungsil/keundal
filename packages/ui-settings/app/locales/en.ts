@@ -1,5 +1,20 @@
 export default {
   'settings.appearance': 'Appearance',
   'settings.colorMode': 'Color mode',
+  'budget.title': 'Execution budget',
+  'budget.enabled': 'Set a budget for each request',
+  'budget.scope': 'Saved limits apply to each new response, including subagents and compaction. Active runs are unchanged. Turn off to use the execution environment’s defaults; leave a limit blank for no limit.',
+  'budget.tokens': 'Total input and output tokens',
+  'budget.cost': 'Maximum cost',
+  'budget.currency': 'Currency',
+  'budget.duration': 'Maximum duration (seconds)',
+  'budget.noLimit': 'No limit',
+  'budget.unknownPricing': 'Unknown prices or currency mismatch',
+  'budget.reject': 'Reject model calls',
+  'budget.allow': 'Allow (cost limit not guaranteed)',
+  'budget.warning': 'Costs use estimates. Unknown prices are rejected by default when a cost limit is set. Allowing them cannot guarantee the limit. Charges and tool side effects cannot be undone.',
+  'budget.invalid': 'Use positive whole tokens, non-negative cost with a currency, and a duration from 0.001 to 2,147,483.647 seconds.',
+  'budget.saved': 'Execution budget saved',
+  'budget.saveFailed': 'Could not save the execution budget. Check browser storage and try again.',
   'settings.back': 'Back to chat'
 }

@@ -512,6 +512,12 @@ importers:
       '@keundal/plugin-agent-chat':
         specifier: workspace:*
         version: link:../plugin-agent-chat
+      '@keundal/plugin-chat-local':
+        specifier: workspace:*
+        version: link:../plugin-chat-local
+      '@keundal/plugin-chat-remote':
+        specifier: workspace:*
+        version: link:../plugin-chat-remote
       '@keundal/plugin-store-memory':
         specifier: workspace:*
         version: link:../plugin-store-memory
@@ -749,6 +755,9 @@ importers:
 
   packages/chat:
     dependencies:
+      '@keundal/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -1527,6 +1536,9 @@ importers:
 
   packages/plugin-chat-remote:
     dependencies:
+      '@keundal/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@keundal/chat':
         specifier: workspace:*
         version: link:../chat
@@ -3346,6 +3358,9 @@ importers:
 
   packages/ui-runtime:
     dependencies:
+      '@keundal/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@keundal/chat':
         specifier: workspace:*
         version: link:../chat
@@ -3398,15 +3413,24 @@ importers:
 
   packages/ui-settings:
     dependencies:
+      '@keundal/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
       '@keundal/ui-layout':
         specifier: workspace:*
         version: link:../ui-layout
+      '@keundal/ui-runtime':
+        specifier: workspace:*
+        version: link:../ui-runtime
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
+      '@vueuse/core':
+        specifier: ^14.4.0
+        version: 14.4.0(vue@3.5.44(typescript@6.0.3))
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
@@ -3520,6 +3544,9 @@ importers:
 
   packages/ui-subagents:
     dependencies:
+      '@keundal/chat':
+        specifier: workspace:*
+        version: link:../chat
       '@keundal/subagent':
         specifier: workspace:*
         version: link:../subagent

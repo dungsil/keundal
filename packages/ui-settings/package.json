@@ -10,9 +10,12 @@
     "./slots": "./app/slots.ts"
   },
   "dependencies": {
+    "@keundal/agent": "workspace:*",
     "@keundal/ui": "workspace:*",
     "@keundal/ui-layout": "workspace:*",
+    "@keundal/ui-runtime": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
+    "@vueuse/core": "^14.4.0",
     "cordis": "catalog:",
     "nuxt": "^4.6.2",
     "vue": "3.5.44"

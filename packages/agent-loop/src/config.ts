@@ -1,4 +1,4 @@
-import type { RunBudget } from '@keundal/agent'
+import { parseRunBudget, type RunBudget } from '@keundal/agent'
 import type { AgentCompactionConfig } from '@keundal/compaction'
 import { parseCompactionConfig } from '@keundal/compaction-summary/controller'
 import { parseDeferredToolsConfig, type DeferredToolsConfig } from '@keundal/deferred-tools'
@@ -10,8 +10,6 @@ import { parseTools } from '@keundal/tool-execution'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 import { parsePricing, type AgentPricing } from '@keundal/trace'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-
-import { parseRunBudget } from './budget.js'
 
 export interface AgentConfig {
   readonly model: string
