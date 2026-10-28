@@ -9,6 +9,11 @@
 세션 메시지, revision, 실행 종료 기록을 하나의 `readwrite` transaction으로 저장한 뒤
 전달합니다.
 
+`ctx.taskStore`는 백그라운드 작업의 상태·부분 응답·결과·오류를 `tasks`에 저장합니다.
+기존 데이터베이스는 버전 2로 올리며 대화와 journal을 유지합니다. 앱이 작업 실행 서비스에
+`ctx.taskStore`를 주입하면 초기화 시 미완료 작업을 `interrupted`로 복구합니다. 다른 탭에서
+대기·실행 중인 작업은 Web Lock으로 보호하며 자동으로 다시 실행하지 않습니다.
+
 ```ts
 import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
 

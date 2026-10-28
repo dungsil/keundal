@@ -1,5 +1,5 @@
 import { EventType, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
-import { TaskService, type TaskRequest } from '@keundal/task'
+import { TaskService, TaskStore, type TaskRequest, type TaskSnapshot } from '@keundal/task'
 import taskMemory, { MemoryTaskService, apply, type MemoryTaskOptions } from '@keundal/task-memory'
 import { Context } from 'cordis'
 import { expect, test, vi, type TestContext } from 'vitest'
@@ -46,6 +46,67 @@ test('플러그인은 TaskService 계약을 ctx.tasks에 등록한다', async (t
   expect(await tasks.get('missing')).toBeUndefined()
   expect(await tasks.cancel('missing')).toBe(false)
   expect(await tasks.list()).toEqual([])
+})
+
+test('영속 저장을 확정한 뒤에만 실행하며 종료 시 대기·실행 작업은 interrupted로 보존한다', async (t) => {
+  const saved = new Map<string, TaskSnapshot>()
+  class Store extends TaskStore {
+    async save(snapshot: TaskSnapshot) {
+      saved.set(snapshot.id, { ...snapshot })
+    }
+    async get(id: string) {
+      const task = saved.get(id)
+      return task && { ...task }
+    }
+    async list() {
+      return [...saved.values()].map((task) => ({ ...task }))
+    }
+    async recover() {}
+  }
+  const store = new Store(new Context())
+  const { tasks, hold } = await setup(t, { store, maxActive: 1 })
+  const gate = hold()
+  const running = await tasks.enqueue(request('running'), async function* (input) {
+    expect([...saved.values()][0]?.status).toBe('running')
+    yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'partial', delta: 'saved partial' }
+    await gate.promise
+    yield finished(input)
+  })
+  await vi.waitFor(async () => expect((await tasks.get(running.id))?.content).toBe('saved partial'))
+  const skipped = vi.fn(success)
+  const queued = await tasks.enqueue(request('queued'), skipped)
+  expect(saved.get(queued.id)?.status).toBe('queued')
+  const draining = tasks.dispose()
+  gate.resolve()
+  await draining
+  expect(await tasks.get(running.id)).toMatchObject({ status: 'interrupted', content: 'saved partial' })
+  expect(await tasks.get(queued.id)).toMatchObject({ status: 'interrupted', content: '' })
+  expect(skipped).not.toHaveBeenCalled()
+  const reopened = new MemoryTaskService(new Context(), { store })
+  expect(await reopened.list()).toEqual(await tasks.list())
+  expect(await reopened.cancel(running.id)).toBe(false)
+  await reopened.dispose()
+})
+
+test('등록 상태를 저장하지 못하면 실행하지 않고 저장 오류를 전달한다', async () => {
+  class Store extends TaskStore {
+    async save(): Promise<void> {
+      throw new Error('disk full')
+    }
+    async get() {
+      return undefined
+    }
+    async list() {
+      return []
+    }
+    async recover() {}
+  }
+  const tasks = new MemoryTaskService(new Context(), { store: new Store(new Context()) })
+  const run = vi.fn(success)
+  await expect(tasks.enqueue(request('unsaved'), run)).rejects.toThrow('disk full')
+  expect(run).not.toHaveBeenCalled()
+  await expect(tasks.list()).rejects.toThrow('disk full')
+  await expect(tasks.dispose()).rejects.toThrow('disk full')
 })
 
 test('부모 스레드가 달라도 전체 동시 실행 수를 제한하고 FIFO 순서로 시작한다', async (t) => {
