@@ -140,6 +140,52 @@ test('현재 목록으로 기존 메시지를 대체하고 빈 목록과 사용 
   )
 })
 
+test('스킬이 안내한 보조 자료를 명시적으로 읽어 후속 모델 요청과 세션에 기록한다', async (t) => {
+  const resourceCall: LLMEvent[] = [
+    { type: EventType.TOOL_CALL_START, toolCallId: 'resource', toolCallName: 'skill' },
+    {
+      type: EventType.TOOL_CALL_ARGS,
+      toolCallId: 'resource',
+      delta: JSON.stringify({
+        name: 'review',
+        path: 'references/guide.md'
+      })
+    },
+    { type: EventType.TOOL_CALL_END, toolCallId: 'resource' }
+  ]
+  const { ctx, requests } = await setup(t, [call('review'), resourceCall, answer])
+  ctx.skills.registerProvider(
+    provider(async () => ({
+      skills: [{ name: 'review', description: 'Review reports' }],
+      async load() {
+        return {
+          name: 'review',
+          description: 'Review reports',
+          content: 'Read references/guide.md.',
+          resources: ['references/guide.md']
+        }
+      },
+      async readResource(name, path) {
+        return name === 'review' && path === 'references/guide.md'
+          ? 'Check the report totals against the source.'
+          : undefined
+      }
+    }))
+  )
+  const events = await collect(ctx.agent.run(input))
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(requests[1].input.messages).toContainEqual(
+    expect.objectContaining({
+      role: 'tool',
+      content: expect.stringContaining('Supporting files')
+    })
+  )
+  expect(JSON.stringify(requests[1])).not.toContain('Check the report totals against the source.')
+  const result = { role: 'tool', toolCallId: 'resource', content: 'Check the report totals against the source.' }
+  expect(requests[2].input.messages).toContainEqual(expect.objectContaining(result))
+  expect((await ctx.session.get('thread'))?.messages).toContainEqual(expect.objectContaining(result))
+})
+
 test('없는 스킬은 도구 결과로 안내하고 큰 본문은 후속 생성 전에 예산 초과로 거부한다', async (t) => {
   const { ctx, requests } = await setup(t, [call('missing'), answer, call('huge')], (request) =>
     request.input.messages.some((message) => message.content?.includes('Oversized body')) ? 2001 : 10
