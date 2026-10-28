@@ -1,3 +1,4 @@
+import { parseRunBudget, type RunBudget } from '@keundal/agent'
 import {
   loadPromptPresets,
   parsePromptPresetSettings,
@@ -106,6 +107,7 @@ export class ChatRuntime extends Service {
     this.promptPresets.value.presets.find((preset) => preset.id === this.promptPresets.value.activePresetId)
   )
   readonly subagentRoles = ref<SubagentRole[]>([])
+  readonly runBudget = ref<RunBudget>()
   readonly switching = ref(false)
   readonly workspacesAvailable = ref(false)
   readonly webSearch = computed<boolean>({
@@ -225,6 +227,8 @@ export class ChatRuntime extends Service {
     try {
       this.promptPresets.value = loadPromptPresets(storage)
       this.subagentRoles.value = parseSubagentRoles(JSON.parse(storage.getItem('keundal:subagent-roles') ?? '[]'))
+      const budget = storage.getItem('keundal:run-budget')
+      this.runBudget.value = budget === null ? undefined : parseRunBudget(JSON.parse(budget))
       this.settings.value = await platform.settings.load()
     } catch (error) {
       throw new SettingsLoadError(error)
@@ -331,6 +335,16 @@ export class ChatRuntime extends Service {
     this.subagentRoles.value = roles
   }
 
+  /** Capture saved limits separately for each new response; active runs retain their policy. */
+  saveRunBudget(value: RunBudget | undefined): void {
+    const storage = this.options.storage
+    if (!storage) throw unavailable('Browser storage')
+    const budget = value === undefined ? undefined : parseRunBudget(value)
+    if (budget) storage.setItem('keundal:run-budget', JSON.stringify(budget))
+    else storage.removeItem('keundal:run-budget')
+    this.runBudget.value = budget
+  }
+
   /** Switch to the saved default model when the connection can serve it. */
   applyDefaultModel(): void {
     this.selection.applyDefaultModel()
@@ -383,6 +397,7 @@ export class ChatRuntime extends Service {
     this.settings.value = backup.settings.providers
     this.promptPresets.value = backup.settings.promptPresets
     this.subagentRoles.value = backup.settings.subagentRoles
+    this.runBudget.value = backup.settings.runBudget
     this.defaultModel.value = backup.settings.models.default
     this.titleModel.value = backup.settings.models.title
     this.model.value = backup.settings.models.selected || backup.settings.models.default || FALLBACK_MODEL

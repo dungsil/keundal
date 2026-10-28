@@ -1,5 +1,6 @@
+import type { ExecutionOptions } from '@keundal/core'
 import { parseMcpServers, type McpClientConfig } from '@keundal/mcp'
-import type { SkillDefinition } from '@keundal/skill'
+import { isSkillResourcePath, type SkillDefinition } from '@keundal/skill'
 
 import { pluginSkill } from './skill-metadata.js'
 import { manifest, mcpServers, server, type PluginDiagnostic } from './validation.js'
@@ -18,11 +19,20 @@ export async function inspectAgentPlugin(files: Readonly<Record<string, string>>
   }
   const metadata = manifest(JSON.parse(files['plugin.json'] ?? 'null'), report)
   const skills: SkillDefinition[] = []
+  const directories = new Map<string, string>()
   for (const path of Object.keys(files).sort()) {
     const match = /^skills\/([^/]+)\/SKILL\.md$/.exec(path)
     if (!match) continue
     try {
-      skills.push(await pluginSkill(files[path]!, match[1]!))
+      const skill = await pluginSkill(files[path]!, match[1]!)
+      const prefix = `skills/${match[1]!}/`
+      const resources = Object.keys(files)
+        .filter((file) => file.startsWith(prefix))
+        .map((file) => file.slice(prefix.length))
+        .filter(isSkillResourcePath)
+        .sort()
+      skills.push(resources.length ? { ...skill, resources } : skill)
+      directories.set(skill.name, prefix)
     } catch (error) {
       report('skills', error instanceof Error ? error.message : String(error), match[1])
     }
@@ -58,5 +68,24 @@ export async function inspectAgentPlugin(files: Readonly<Record<string, string>>
       report('mcp', error instanceof Error ? error.message : String(error))
     }
   }
-  return { manifest: metadata, skills, servers, diagnostics }
+  return {
+    manifest: metadata,
+    skills,
+    servers,
+    diagnostics,
+    async readResource(name: string, path: string, options?: ExecutionOptions) {
+      options?.signal?.throwIfAborted()
+      if (!isSkillResourcePath(path)) throw new Error('invalid skill resource path')
+      const prefix = directories.get(name)
+      if (!prefix) return undefined
+      const key = `${prefix}${path}`
+      if (!Object.hasOwn(files, key)) return undefined
+      const content = files[key]!
+      if (new globalThis.TextEncoder().encode(content).length > 1024 * 1024)
+        throw new Error('skill resource exceeds 1 MiB')
+      if (content.includes('\0') || content.includes('\uFFFD'))
+        throw new Error('skill resource must contain UTF-8 text')
+      return content
+    }
+  }
 }

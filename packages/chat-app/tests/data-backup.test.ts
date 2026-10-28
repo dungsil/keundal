@@ -44,6 +44,8 @@ test('백업은 비밀 설정을 제외하고 대화·프리셋·로컬 스킬·
   await source.platform.settings.save(settings)
   source.storage.setItem('keundal:system-prompt', 'Answer concisely.')
   source.storage.setItem('keundal:default-model', 'openai/custom')
+  const budget = { maxTokens: 12345, maxCost: { amount: 0.25, currency: 'USD' }, maxDurationMs: 2500, unknownPricing: 'reject' }
+  source.storage.setItem('keundal:run-budget', JSON.stringify(budget))
   await source.plugins.setEnabled('@keundal/plugin-tool-chart', false)
   await source.platform.mcp.save([{ serverName: 'docs', transport: 'streamable-http',
     url: 'https://mcp.example.com/?token=synthetic-url-secret', headers: { authorization: 'synthetic-mcp-secret' },
@@ -87,6 +89,7 @@ test('백업은 비밀 설정을 제외하고 대화·프리셋·로컬 스킬·
   expect(await target.store.get('unrelated')).toBeDefined()
   expect(await target.platform.settings.load()).toEqual(backup.settings.providers)
   expect(target.storage.getItem('keundal:model')).toBeNull()
+  expect(JSON.parse(target.storage.getItem('keundal:run-budget')!)).toEqual(budget)
   expect(target.platform.skills.load()).toEqual({ skills: [{ name: 'review', description: 'Review code',
     content: 'Check public behavior.', enabled: true }], disabledFiles: [], loadLocal: false })
   expect(loadPromptPresets(target.storage).presets[0]?.blocks[0]).toMatchObject({ content: 'Answer concisely.' })
@@ -111,8 +114,10 @@ test('미지원 버전·손상된 대화·인증 정보가 있는 파일은 거�
   const credentials = structuredClone(backup)
   credentials.settings.providers.openai.apiKey = 'unexpected-secret'
   expect(() => parseDataBackup(credentials)).toThrow('credentials')
+  expect(() => parseDataBackup({ ...backup, settings: { ...backup.settings, runBudget: { maxTokens: 0 } } })).toThrow('budget')
   const target = await setup(t)
   target.storage.setItem('keundal:system-prompt', 'Previous prompt')
+  target.storage.setItem('keundal:run-budget', JSON.stringify({ maxTokens: 6789 }))
   await target.platform.settings.save({ ...defaultLLMSettings(), openai: { apiKey: 'previous-secret', baseURL: '' } })
   const previousProviders = await target.platform.settings.load()
   const previousSkills = target.platform.skills.load()
@@ -128,5 +133,6 @@ test('미지원 버전·손상된 대화·인증 정보가 있는 파일은 거�
   expect(target.platform.skills.load()).toEqual(previousSkills)
   expect(await target.plugins.list()).toEqual(previousPlugins)
   expect(await target.ctx.backup.export()).toEqual(history)
+  expect(JSON.parse(target.storage.getItem('keundal:run-budget')!)).toEqual({ maxTokens: 6789 })
   expect(loadPromptPresets(target.storage).presets[0]?.blocks[0]).toMatchObject({ content: 'Previous prompt' })
 })

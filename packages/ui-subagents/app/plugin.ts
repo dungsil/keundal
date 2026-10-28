@@ -7,7 +7,7 @@ import { localizedText } from '@keundal/ui/app/utils/locale.ts'
 
 import { messages } from './locale'
 
-const SubagentSettings = lazyView(() => import('./views/SubagentSettings.vue'), ['subagentRoles', 'saveSubagentRoles'])
+const SubagentSettings = lazyView(() => import('./views/SubagentSettings.vue'), ['subagentRoles', 'saveSubagentRoles', 'models'])
 const BackgroundTasks = lazyView(() => import('./views/BackgroundTasks.vue'), ['listTasks', 'cancelTask'])
 
 export const name = 'ui-subagents'
@@ -23,6 +23,7 @@ export function apply(ctx: Context) {
     meta: { label: localizedText(messages, 'subagents.title'), icon: 'i-lucide-users', group: 'general' },
     inject: () => ({
       subagentRoles: runtime.subagentRoles,
+      models: runtime.models,
       saveSubagentRoles: (value: readonly SubagentRole[]) => runtime.saveSubagentRoles(value)
     })
   }, SubagentSettings))

@@ -63,7 +63,7 @@ export function apply(ctx: Context) {
       rename: (id: string, title: string) => runtime.renameChat(id, title),
       remove: (id: string) => runtime.deleteChat(id),
       getChat: () => runtime.store.get(chatId),
-      respond: (request: Parameters<ChatStoreLike['respond']>[1], signal?: AbortSignal) => runtime.store.respond(chatId, request, signal),
+      respond: (request: Parameters<ChatStoreLike['respond']>[1], signal?: AbortSignal) => runtime.store.respond(chatId, { ...request, budget: runtime.runBudget.value }, signal),
       steer: (message: ChatMessage) => runtime.store.steer(chatId, message),
       respondToToolApproval: (runId: string, requestId: string, decision: 'allow' | 'deny') => runtime.store.respondToToolApproval?.(runId, requestId, decision) ?? Promise.resolve(false),
       enqueue: (message: ChatMessage) => runtime.store.enqueue(chatId, message),

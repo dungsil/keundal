@@ -36,6 +36,14 @@ const definition = await catalog.load('review', { signal })
 
 파일을 사용하려면 [파일시스템 공급자](../plugin-skill-filesystem/README.md)를 등록합니다. 모델 연결은 [에이전트의 스킬 설정](../agent/README.md#스킬-사용)을 사용합니다.
 
+## 보조 자료 계약
+
+보조 자료를 제공하는 공급자는 `SkillDefinition.resources`에 스킬 상대 경로 목록을 넣고, `SkillCatalog.readResource(name, path, options)`로 요청한 파일의 텍스트를 반환합니다. 둘 다 선택 사항이므로 기존 본문 전용 공급자는 그대로 사용할 수 있습니다.
+
+경로는 `references/`, `assets/`, `scripts/` 아래로 제한합니다. 레지스트리는 경로 형식과 공급자 선택을 검사하며, 실제 파일 경계·형식·크기는 공급자가 검사합니다. 보조 자료도 본문과 같은 공급자에서 읽으며 읽기 실패 시 다른 공급자로 전환하지 않습니다. 취소와 공급자 해제 규칙도 같습니다.
+
+`skill` 도구는 `name`만 받으면 지침과 파일 목록을 반환하고, `path`도 받으면 해당 보조 자료만 반환합니다. 읽기는 스크립트 실행이나 실행 권한을 제공하지 않습니다. [Agent Plugins](../agent-plugins/README.md#스킬-보조-자료)는 호스트와 브라우저에서 이 계약을 구현합니다.
+
 ## 선택과 오류
 
 - 목록은 이름순으로 정렬합니다. 동명 스킬은 먼저 등록한 공급자가 제공합니다.

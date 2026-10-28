@@ -1,3 +1,4 @@
+import { parseRunBudget } from '@keundal/agent'
 import { parseHistoryBackup, type HistoryBackup } from '@keundal/backup'
 import { llmSettingsSchema, type LLMSettings } from '@keundal/llm-settings'
 import { parseMcpServers, type McpClientConfig } from '@keundal/mcp'
@@ -88,6 +89,7 @@ const envelope = z
         promptPresets: z.unknown(),
         skills: skillSettingsSchema,
         subagentRoles: z.unknown(),
+        runBudget: z.unknown().optional(),
         mcp: z.unknown(),
         preferences: preferencesSchema,
         plugins: z.array(z.object({ module: z.string().min(1), enabled: z.boolean() }).strict()),
@@ -145,6 +147,7 @@ export function parseDataBackup(value: unknown) {
       providers,
       promptPresets: parsePromptPresetSettings(parsed.settings.promptPresets),
       subagentRoles: parseSubagentRoles(parsed.settings.subagentRoles),
+      runBudget: parsed.settings.runBudget === undefined ? undefined : parseRunBudget(parsed.settings.runBudget),
       mcp
     }
   }
@@ -226,6 +229,8 @@ export async function exportDataBackup(options: BackupOptions): Promise<DataBack
       promptPresets: loadPromptPresets(storage),
       skills: { skills: [...portable.values()], loadLocal: false, disabledFiles: [] },
       subagentRoles: JSON.parse(storage.getItem('keundal:subagent-roles') ?? '[]'),
+      runBudget:
+        storage.getItem('keundal:run-budget') === null ? undefined : JSON.parse(storage.getItem('keundal:run-budget')!),
       mcp: portableMcp(platform.mcp.configuration),
       preferences: options.preferences ?? { locale: 'en', colorMode: 'system', webSearch: true, reasoning: 'medium' },
       plugins: ((await plugins?.list()) ?? [])
@@ -286,6 +291,7 @@ export async function restoreDataBackup(options: BackupOptions, value: unknown):
     await platform.mcp.save(backup.settings.mcp, async () => {})
     write(PROMPT_PRESETS_KEY, JSON.stringify(backup.settings.promptPresets))
     write('keundal:subagent-roles', JSON.stringify(backup.settings.subagentRoles))
+    write('keundal:run-budget', backup.settings.runBudget ? JSON.stringify(backup.settings.runBudget) : null)
     write(MODEL_KEY, backup.settings.models.selected || null)
     write(DEFAULT_MODEL_KEY, backup.settings.models.default || null)
     write(TITLE_MODEL_KEY, backup.settings.models.title || null)
