@@ -1,3 +1,4 @@
+import { StoredMemoryService } from '@keundal/plugin-memory'
 import type { Context } from 'cordis'
 
 import { sqliteStoreConfigSchema, type SqliteStoreConfig } from './config.js'
@@ -28,6 +29,7 @@ export const sqliteStorePlugin = Object.assign(
     const store = new SqliteStore(config.path)
     ctx.fiber.effect(() => () => store.release())
     new SqliteSessionService(ctx, store)
+    new StoredMemoryService(ctx, store.memoryAdapter)
     ctx.inject(['llm', 'session'], (injected) => {
       new SqliteGenerationService(injected, store)
     })

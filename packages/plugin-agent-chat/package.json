@@ -28,6 +28,7 @@
     "@keundal/deferred-tools": "workspace:*",
     "@keundal/generation": "workspace:*",
     "@keundal/llm": "workspace:*",
+    "@keundal/memory": "workspace:*",
     "@keundal/plugin-context": "workspace:*",
     "@keundal/plugin-skill": "workspace:*",
     "@keundal/plugin-skill-filesystem": "workspace:*",

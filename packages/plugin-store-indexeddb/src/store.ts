@@ -5,14 +5,17 @@ import {
   type GenerationSnapshot,
   type GenerationStatus
 } from '@keundal/generation'
+import { parseMemoryEntry } from '@keundal/memory'
+import type { MemoryAdapter } from '@keundal/plugin-memory'
 import { assertGenerationMessageIds, type SessionCommit, type SessionSnapshot } from '@keundal/session'
 
 import { recordJournal } from './messages.js'
 
-const DATABASE_VERSION = 1
+const DATABASE_VERSION = 2
 const THREADS = 'threads'
 const RUNS = 'runs'
 const JOURNAL = 'journal'
+const MEMORIES = 'memories'
 
 export interface WebLockManager {
   request<T>(
@@ -61,6 +64,42 @@ export class IndexedDBStore {
   private readonly lockManager?: WebLockManager
   private database?: Promise<IDBDatabase>
   private closed = false
+
+  readonly memoryAdapter: MemoryAdapter = {
+    list: async (options) =>
+      this.transaction(
+        [MEMORIES],
+        'readonly',
+        async (transaction) => {
+          const entries = await request<unknown[]>(transaction.objectStore(MEMORIES).getAll())
+          return entries.map(parseMemoryEntry)
+        },
+        options?.signal
+      ),
+    save: async (entry, options) =>
+      this.transaction(
+        [MEMORIES],
+        'readwrite',
+        async (transaction) => {
+          const parsed = parseMemoryEntry(entry)
+          const store = transaction.objectStore(MEMORIES)
+          const current = await request<unknown>(store.get(parsed.id))
+          if ((current !== undefined) !== options.update)
+            throw new Error(options.update ? 'memory entry does not exist' : 'memory entry already exists')
+          await request(store.put(parsed))
+        },
+        options.signal
+      ),
+    delete: async (id, options) =>
+      this.transaction(
+        [MEMORIES],
+        'readwrite',
+        async (transaction) => {
+          await request(transaction.objectStore(MEMORIES).delete(id))
+        },
+        options?.signal
+      )
+  }
 
   constructor(options: IndexedDBStoreOptions = {}) {
     this.databaseName = options.databaseName ?? 'keundal'
@@ -401,6 +440,7 @@ export class IndexedDBStore {
       const request = this.idb.open(this.databaseName, DATABASE_VERSION)
       request.onupgradeneeded = () => {
         const database = request.result
+        if (!database.objectStoreNames.contains(MEMORIES)) database.createObjectStore(MEMORIES, { keyPath: 'id' })
         if (!database.objectStoreNames.contains(THREADS)) database.createObjectStore(THREADS, { keyPath: 'threadId' })
         if (!database.objectStoreNames.contains(RUNS)) database.createObjectStore(RUNS, { keyPath: 'runId' })
         if (!database.objectStoreNames.contains(JOURNAL)) {

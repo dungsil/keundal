@@ -1,5 +1,6 @@
 import { SteerQueue, EventType, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import { parseReasoning, type Reasoning } from '@keundal/llm'
+import { retrieveMemories } from '@keundal/memory/retrieval'
 import { ToolApproval } from '@keundal/tool-approval'
 import { Context, type Fiber } from 'cordis'
 
@@ -171,6 +172,19 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         list: (runOptions) => servicesContext.generation.list(runOptions),
         recover: (runOptions) => servicesContext.generation.recover(runOptions)
       },
+      ...(servicesContext.memory
+        ? {
+            memory: {
+              list: (execution) => servicesContext.memory.list(execution),
+              save: (draft, id, execution) => servicesContext.memory.save(draft, id, execution),
+              delete: (id, execution) => servicesContext.memory.delete(id, execution),
+              search: ({ model: selected, ...query }, execution) =>
+                selected
+                  ? retrieveMemories(servicesContext.memory, servicesContext.llm, query, model(selected).id, execution)
+                  : servicesContext.memory.search(query, execution)
+            } satisfies NonNullable<AgentHostServices['memory']>
+          }
+        : {}),
       ...(servicesContext.tasks
         ? {
             tasks: {

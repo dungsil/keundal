@@ -1,6 +1,7 @@
 import type { ExecutionOptions } from '@keundal/core'
 import type { LLMSettings } from '@keundal/llm-settings'
 import type { McpProbeResult, McpRequestOptions } from '@keundal/mcp'
+import type { MemoryService } from '@keundal/memory'
 import type { SkillProvider, SkillSummary } from '@keundal/skill'
 import type { TaskService } from '@keundal/task'
 
@@ -23,6 +24,9 @@ export type ModelLoader = (
 ) => Promise<ModelOption[]>
 export interface ChatConnection {
   store: ChatStoreLike
+  memory?: Pick<MemoryService, 'list' | 'save' | 'delete'> & {
+    search(query: Parameters<MemoryService['search']>[0] & { model?: string }): ReturnType<MemoryService['search']>
+  }
   tasks?: Pick<TaskService, 'list' | 'get' | 'cancel'>
   remoteAgent: boolean
   remoteModels?: ModelOption[]

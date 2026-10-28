@@ -204,6 +204,7 @@ export class ChatStore implements ChatStoreLike {
       systemPrompt?: string
       promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
+      memoryProjectId?: string
       reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void
@@ -290,6 +291,7 @@ export class ChatStore implements ChatStoreLike {
         runId,
         messages: request.messages,
         promptPreset,
+        memoryProjectId: request.memoryProjectId,
         signal: combined,
         state: { web: chat, ...(request.subagentRoles === undefined ? {} : { subagentRoles: request.subagentRoles }) },
         onMessage: request.onMessage,

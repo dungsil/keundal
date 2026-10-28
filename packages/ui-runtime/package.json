@@ -21,6 +21,7 @@
     "@keundal/core": "workspace:*",
     "@keundal/llm": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
+    "@keundal/memory": "workspace:*",
     "@keundal/skill": "workspace:*",
     "@keundal/subagent": "workspace:*",
     "@keundal/task": "workspace:*",

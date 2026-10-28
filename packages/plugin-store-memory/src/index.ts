@@ -1,3 +1,4 @@
+import { StoredMemoryService } from '@keundal/plugin-memory'
 import type { Context } from 'cordis'
 
 import { memoryStoreConfigSchema, type MemoryStoreConfig } from './config.js'
@@ -20,6 +21,7 @@ export const memoryStorePlugin = Object.assign(
   function memoryStorePlugin(ctx: Context, config: MemoryStoreConfig = {}) {
     const store = config.store ?? new MemoryStore()
     new MemorySessionService(ctx, store)
+    new StoredMemoryService(ctx, store.memoryAdapter)
     ctx.inject(['llm'], (injected) => {
       new MemoryGenerationService(injected, store)
     })

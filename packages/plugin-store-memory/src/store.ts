@@ -1,5 +1,7 @@
 import type { AgentMessage, RunAgentInput } from '@keundal/core'
 import type { GenerationJournalEntry, GenerationRequest, GenerationStatus } from '@keundal/generation'
+import { parseMemoryEntry, type MemoryEntry } from '@keundal/memory'
+import type { MemoryAdapter } from '@keundal/plugin-memory'
 
 /** 스레드 하나의 저장 상태입니다. */
 export interface StoredThread {
@@ -36,4 +38,23 @@ export class MemoryStore {
   readonly threads = new Map<string, StoredThread>()
   /** 실행 기록입니다. 실행이 시작되면 running 상태로 추가됩니다. */
   readonly runs = new Map<string, StoredRun>()
+
+  private readonly memories = new Map<string, MemoryEntry>()
+
+  readonly memoryAdapter: MemoryAdapter = {
+    list: async (options) => {
+      options?.signal?.throwIfAborted()
+      return [...this.memories.values()].map(parseMemoryEntry)
+    },
+    save: async (entry, options) => {
+      options.signal?.throwIfAborted()
+      if (this.memories.has(entry.id) !== options.update)
+        throw new Error(options.update ? 'memory entry does not exist' : 'memory entry already exists')
+      this.memories.set(entry.id, parseMemoryEntry(entry))
+    },
+    delete: async (id, options) => {
+      options?.signal?.throwIfAborted()
+      this.memories.delete(id)
+    }
+  }
 }

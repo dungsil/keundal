@@ -32,6 +32,7 @@ export interface ChatStoreLike {
       /** Ordered prompt recipe, captured for this response only. */
       promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
+      memoryProjectId?: string
       reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void

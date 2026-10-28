@@ -25,6 +25,7 @@ import {
   providerIcon,
   type LLMSettings
 } from '@keundal/llm-settings'
+import type { MemoryDraft } from '@keundal/memory'
 import { type SkillSummary } from '@keundal/skill'
 import { parseSubagentRoles, type SubagentRole } from '@keundal/subagent'
 import type { TaskSnapshot } from '@keundal/task'
@@ -101,6 +102,7 @@ export class ChatRuntime extends Service {
     this.promptPresets.value.presets.find((preset) => preset.id === this.promptPresets.value.activePresetId)
   )
   readonly subagentRoles = ref<SubagentRole[]>([])
+  readonly memoryProject = ref('')
   readonly switching = ref(false)
   readonly webSearch = computed<boolean>({
     get: () => this.options.preferences.webSearch.value ?? true,
@@ -197,6 +199,38 @@ export class ChatRuntime extends Service {
     return this.connection.tasks.cancel(id)
   }
 
+  listMemories() {
+    if (!this.connection?.memory) throw unavailable('Memory')
+    return this.connection.memory.list()
+  }
+
+  saveMemory(draft: MemoryDraft, id?: string) {
+    if (!this.connection?.memory) throw unavailable('Memory')
+    return this.connection.memory.save(draft, id)
+  }
+
+  deleteMemory(id: string) {
+    if (!this.connection?.memory) throw unavailable('Memory')
+    return this.connection.memory.delete(id)
+  }
+
+  searchMemories(text: string, projectId?: string, threadId?: string, semantic = false) {
+    if (!this.connection?.memory) throw unavailable('Memory')
+    return this.connection.memory.search({
+      text,
+      projectId,
+      threadId,
+      ...(semantic ? { model: this.model.value } : {})
+    })
+  }
+
+  saveMemoryProject(id: string) {
+    id = id.trim()
+    if (id.length > 200) throw new Error('Project identifier must contain at most 200 characters')
+    this.options.storage?.setItem('keundal:memory-project', id)
+    this.memoryProject.value = id
+  }
+
   /**
    * Load preferences and settings, then connect the platform. Call once in the browser before mounting.
    * @throws {SettingsLoadError} when saved settings cannot be read.
@@ -214,6 +248,7 @@ export class ChatRuntime extends Service {
     try {
       this.promptPresets.value = loadPromptPresets(storage)
       this.subagentRoles.value = parseSubagentRoles(JSON.parse(storage.getItem('keundal:subagent-roles') ?? '[]'))
+      this.memoryProject.value = storage.getItem('keundal:memory-project') ?? ''
       this.settings.value = await platform.settings.load()
     } catch (error) {
       throw new SettingsLoadError(error)

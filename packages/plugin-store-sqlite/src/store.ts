@@ -2,6 +2,8 @@ import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlit
 
 import { MessageAssembly, type AGUIEvent, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import { type GenerationJournalEntry, type GenerationRequest, type GenerationStatus } from '@keundal/generation'
+import { parseMemoryEntry } from '@keundal/memory'
+import type { MemoryAdapter } from '@keundal/plugin-memory'
 
 /** 스레드 하나의 확정된 저장 상태입니다. */
 export interface StoredThread {
@@ -36,6 +38,11 @@ export interface RunOwnership {
 }
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS memories (
+  id TEXT PRIMARY KEY,
+  entry TEXT NOT NULL
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS threads (
   thread_id TEXT PRIMARY KEY,
   revision INTEGER NOT NULL,
@@ -175,6 +182,32 @@ export class SqliteStore {
 
   private readonly prepared = new Map<string, StatementSync>()
   private references = 1
+
+  readonly memoryAdapter: MemoryAdapter = {
+    list: async (options) => {
+      options?.signal?.throwIfAborted()
+      return this.database
+        .prepare('SELECT entry FROM memories ORDER BY id')
+        .all()
+        .map((row) => parseMemoryEntry(JSON.parse(row.entry as string)))
+    },
+    save: async (entry, options) => {
+      options.signal?.throwIfAborted()
+      const parsed = parseMemoryEntry(entry)
+      if (options.update) {
+        const result = this.database
+          .prepare('UPDATE memories SET entry = ? WHERE id = ?')
+          .run(JSON.stringify(parsed), parsed.id)
+        if (!result.changes) throw new Error('memory entry does not exist')
+      } else {
+        this.database.prepare('INSERT INTO memories (id, entry) VALUES (?, ?)').run(parsed.id, JSON.stringify(parsed))
+      }
+    },
+    delete: async (id, options) => {
+      options?.signal?.throwIfAborted()
+      this.database.prepare('DELETE FROM memories WHERE id = ?').run(id)
+    }
+  }
 
   constructor(path: string) {
     try {

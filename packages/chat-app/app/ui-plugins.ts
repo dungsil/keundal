@@ -8,6 +8,7 @@ import * as home from '@keundal/ui-home/plugin'
 import * as layout from '@keundal/ui-layout/plugin'
 import * as markdown from '@keundal/ui-markdown-comark/plugin'
 import * as mcp from '@keundal/ui-mcp/plugin'
+import * as memory from '@keundal/ui-memory/plugin'
 import * as modelSelection from '@keundal/ui-model-selection/plugin'
 import * as settings from '@keundal/ui-settings/plugin'
 import * as settingsLlm from '@keundal/ui-settings-llm/plugin'
@@ -47,6 +48,7 @@ export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-settings-llm', plugin: settingsLlm, requires: ['@keundal/ui-settings'] },
   { module: '@keundal/ui-settings-llm/prompt-plugin', plugin: prompt, feature: 'prompt', requires: ['@keundal/ui-settings'] },
   { module: '@keundal/ui-subagents', plugin: subagents, feature: 'subagents', requires: ['@keundal/ui-settings'] },
+  { module: '@keundal/ui-memory', plugin: memory, requires: ['@keundal/ui-settings'] },
   { module: '@keundal/ui-agent-plugins', plugin: agentPlugins, required: true, requires: ['@keundal/ui-settings'] },
   { module: '@keundal/ui-agent-plugins/agent-plugin-settings', plugin: agentPlugins.agentPluginSettings, requires: ['@keundal/ui-settings'] },
   { module: '@keundal/ui-skill', plugin: skill, feature: 'skills', requires: ['@keundal/ui-settings'] },

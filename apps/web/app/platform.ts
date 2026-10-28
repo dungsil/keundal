@@ -18,6 +18,7 @@ import type { ChatPlatform } from '@keundal/chat/platform'
 import { loadWebRuntimePlugins } from './runtime-plugins'
 import { metadata as mcpMetadata } from '@keundal/plugin-chat-browser/mcp'
 import { MemoryTaskService } from '@keundal/task-memory'
+import { retrieveMemories } from '@keundal/memory/retrieval'
 
 export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: string, agentToken?: string, pluginConfig?: string } = {}): ChatPlatform {
   const mcp = new McpManager(createBrowserMcpSettingsStorage(storage))
@@ -34,7 +35,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         const store = new RemoteChatStore({ endpoint: runtime.agentEndpoint, token: runtime.agentToken ?? '' })
         try {
           await store.recover()
-          return { store, tasks: store.tasks, remoteAgent: true, remoteModels: await store.models(), catalog: execution => store.catalog(execution), dispose: () => store.stop() }
+          return { store, memory: store.memory, tasks: store.tasks, remoteAgent: true, remoteModels: await store.models(), catalog: execution => store.catalog(execution), dispose: () => store.stop() }
         } catch (error) {
           await store.stop()
           throw error
@@ -126,6 +127,12 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         platform.runtimePlugins = manager
         return {
           store,
+          ...(root.memory ? { memory: {
+            list: () => root.memory.list(),
+            save: (draft, id) => root.memory.save(draft, id),
+            delete: id => root.memory.delete(id),
+            search: query => query.model ? retrieveMemories(root.memory, root.llm, query, query.model) : root.memory.search(query)
+          } satisfies NonNullable<import('@keundal/chat/platform').ChatConnection['memory']> } : {}),
           tasks: root.tasks,
           remoteAgent: false,
           catalog: async execution => ({

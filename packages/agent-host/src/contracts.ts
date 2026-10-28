@@ -2,6 +2,7 @@ import type { AgentExecutionOptions } from '@keundal/agent'
 import type { AGUIEvent, AgentMessage, ExecutionOptions, RunAgentInput } from '@keundal/core'
 import type { GenerationJournalEntry, GenerationService, GenerationSubscriptionOptions } from '@keundal/generation'
 import type { Reasoning } from '@keundal/llm'
+import type { MemoryService } from '@keundal/memory'
 import type { SessionService } from '@keundal/session'
 import type { SkillSummary } from '@keundal/skill'
 import type { TaskService } from '@keundal/task'
@@ -57,6 +58,12 @@ export interface AgentHostServices {
   subscribe(runId: string, options?: GenerationSubscriptionOptions): AsyncIterable<GenerationJournalEntry>
   session: Pick<SessionService, 'get' | 'list' | 'commit' | 'delete'>
   generation: Pick<GenerationService, 'get' | 'list' | 'recover'>
+  memory?: Pick<MemoryService, 'list' | 'save' | 'delete'> & {
+    search(
+      query: Parameters<MemoryService['search']>[0] & { model?: string },
+      options?: ExecutionOptions
+    ): ReturnType<MemoryService['search']>
+  }
   tasks?: Pick<TaskService, 'get' | 'list' | 'cancel'>
   models(): readonly AgentHostModel[]
   catalog?(options?: ExecutionOptions): Promise<{ skills: readonly SkillSummary[]; tools: readonly SkillSummary[] }>

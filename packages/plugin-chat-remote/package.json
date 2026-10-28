@@ -20,6 +20,7 @@
     "@keundal/core": "workspace:*",
     "@keundal/generation": "workspace:*",
     "@keundal/llm": "workspace:*",
+    "@keundal/memory": "workspace:*",
     "@keundal/prompt": "workspace:*",
     "@keundal/session": "workspace:*",
     "@keundal/skill": "workspace:*",
