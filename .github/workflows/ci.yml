@@ -159,7 +159,7 @@ jobs:
           overwrite: true
 
   build-platforms:
-    needs: changes
+    needs: [changes, sandbox-guest]
     if: needs.changes.outputs.installers == 'true'
     name: 빌드 (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
@@ -262,6 +262,20 @@ jobs:
           cp apps/desktop/src-tauri/binaries/keundal-host-x86_64-pc-windows-msvc.exe "$portable/keundal-host.exe"
           cp -R apps/desktop/src-tauri/sidecar "$portable/"
 
+      - name: Download Linux VM for packaged host smoke
+        if: runner.os == 'Windows'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sandbox-guest
+          path: ${{ runner.temp }}/keundal-guest
+
+      - name: Prepare packaged host VM
+        if: runner.os == 'Windows'
+        run: |
+          choco install qemu --no-progress -y
+          cargo build --release --locked --manifest-path packages/plugin-sandbox-vm/file-broker/Cargo.toml
+          node packages/plugin-sandbox-vm/scripts/configure-test.mjs "$RUNNER_TEMP/keundal-guest" "$RUNNER_TEMP/portable-vm-config.json" >> "$GITHUB_ENV"
+
       - name: Windows 포터블 실행 검증
         if: runner.os == 'Windows'
         shell: pwsh
@@ -272,7 +286,7 @@ jobs:
           $extracted = Join-Path $smokeRoot 'extracted app'
           Compress-Archive -Path 'apps/desktop/src-tauri/target/release/portable/*' -DestinationPath $archive -Force
           Expand-Archive -Path $archive -DestinationPath $extracted -Force
-          & (Join-Path $extracted 'keundal-host.exe') 'apps/desktop/scripts/smoke-portable.mjs' $extracted --expect-sandbox-unavailable
+          & (Join-Path $extracted 'keundal-host.exe') 'apps/desktop/scripts/smoke-portable.mjs' $extracted --host-only
           if ($LASTEXITCODE -ne 0) { throw 'Portable smoke test failed' }
 
       - name: 데스크톱 배포 파일 업로드
@@ -353,12 +367,59 @@ jobs:
           retention-days: 3
           overwrite: true
 
-  test:
+  sandbox-guest:
     needs: changes
+    if: needs.changes.outputs.source == 'true'
+    uses: ./.github/workflows/sandbox-guest.yml
+
+  sandbox-vm:
+    needs: [changes, sandbox-guest]
+    if: needs.changes.outputs.source == 'true'
+    name: Linux VM isolation (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+        with:
+          cache: true
+          save-cache: false
+          require-lockfile: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sandbox-guest
+          path: ${{ runner.temp }}/keundal-guest
+      - name: Install QEMU on Windows
+        if: runner.os == 'Windows'
+        run: choco install qemu --no-progress -y
+      - name: Install QEMU on macOS
+        if: runner.os == 'macOS'
+        run: brew install qemu
+      - name: Build and test native file boundary
+        run: |
+          cargo test --locked --manifest-path packages/plugin-sandbox-vm/file-broker/Cargo.toml
+          cargo build --release --locked --manifest-path packages/plugin-sandbox-vm/file-broker/Cargo.toml
+      - name: Configure VM integration tests
+        run: node packages/plugin-sandbox-vm/scripts/configure-test.mjs "$RUNNER_TEMP/keundal-guest" "$RUNNER_TEMP/vm-config.json" >> "$GITHUB_ENV"
+      - name: Build execution host
+        run: pnpm exec turbo run build --filter=@keundal/agent-runtime-node
+      - name: Run VM and existing-plugin integration tests
+        run: |
+          pnpm --filter @keundal/plugin-sandbox-vm test
+          pnpm --filter @keundal/agent-runtime-node exec vitest run tests/sandbox.test.ts
+
+  test:
+    needs: [changes, sandbox-guest]
     if: needs.changes.outputs.source == 'true'
     name: 테스트
     runs-on: ubuntu-26.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: 저장소 가져오기
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -394,10 +455,23 @@ jobs:
       - name: OS 격리 의존성 설치
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y bubblewrap
+          sudo apt-get install --no-install-recommends -y bubblewrap qemu-system-x86 qemu-utils
           if command -v apparmor_parser >/dev/null && [ -f /etc/apparmor.d/bwrap ]; then
             sudo apparmor_parser -r /etc/apparmor.d/bwrap
           fi
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sandbox-guest
+          path: ${{ runner.temp }}/keundal-guest
+
+      - name: Build and test native file boundary
+        run: |
+          cargo test --locked --manifest-path packages/plugin-sandbox-vm/file-broker/Cargo.toml
+          cargo build --release --locked --manifest-path packages/plugin-sandbox-vm/file-broker/Cargo.toml
+
+      - name: Configure VM integration tests
+        run: node packages/plugin-sandbox-vm/scripts/configure-test.mjs "$RUNNER_TEMP/keundal-guest" "$RUNNER_TEMP/vm-config.json" >> "$GITHUB_ENV"
 
       - name: 테스트
         env:

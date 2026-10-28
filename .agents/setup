@@ -34,3 +34,40 @@ echo 'Installing workspace dependencies from the lockfile'
 SECONDS=0
 pnpm install --frozen-lockfile
 echo "Dependencies ready in ${SECONDS}s"
+
+echo 'Preparing the Linux execution VM test assets'
+SECONDS=0
+missing=()
+for package in qemu-system-x86 qemu-utils linux-image-cloud-amd64 cpio busybox-static e2fsprogs file gzip; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed'; then
+    missing+=("$package")
+  fi
+done
+if (( ${#missing[@]} )); then
+  sudo apt-get update
+  sudo apt-get install --no-install-recommends -y "${missing[@]}"
+fi
+export PATH="$HOME/.cargo/bin:$PATH"
+if ! command -v cargo >/dev/null; then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+fi
+cargo build --release --locked --manifest-path packages/plugin-sandbox-vm/file-broker/Cargo.toml
+pnpm exec turbo run build --filter=@keundal/plugin-sandbox-vm
+cache="$HOME/.cache/keundal/sandbox-vm"
+mkdir -p "$cache"
+image_key="$(cat packages/plugin-sandbox-vm/dist/guest/guest.js packages/plugin-sandbox-vm/scripts/build-image.mjs packages/plugin-sandbox-vm/image/* /boot/vmlinuz-* | sha256sum | cut -d' ' -f1)"
+assets="$cache/$image_key"
+if [[ ! -f "$assets/manifest.json" ]]; then
+  rm -rf "$assets"
+  pnpm --filter @keundal/plugin-sandbox-vm build:image --output "$assets" --guest dist/guest/guest.js
+fi
+rm -f "$cache/test-config.json"
+node packages/plugin-sandbox-vm/scripts/configure-test.mjs "$assets" "$cache/test-config.json"
+if ! grep -Fq '# Keundal VM test assets' "$HOME/.bash_profile"; then
+  cat >> "$HOME/.bash_profile" <<'EOF'
+
+# Keundal VM test assets
+export KEUNDAL_TEST_VM_CONFIG="$HOME/.cache/keundal/sandbox-vm/test-config.json"
+EOF
+fi
+echo "VM test assets ready in ${SECONDS}s"

@@ -23,5 +23,9 @@ export interface SandboxProcessRequest {
 
 /** Providers must isolate filesystem, network and host processes before executing any application code. */
 export interface SandboxProvider {
+  /** Includes cold guest boot and file import, not model execution. */
+  readonly startupTimeoutMs?: number
   start(request: SandboxProcessRequest): ChildProcessWithoutNullStreams
+  /** Gracefully persists and exports guest state; rejects when export cannot complete safely. */
+  stop?(child: ChildProcessWithoutNullStreams): Promise<void>
 }

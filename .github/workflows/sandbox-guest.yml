@@ -1,0 +1,42 @@
+name: Linux sandbox guest image
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+        with:
+          cache: true
+          save-cache: false
+          require-lockfile: true
+      - name: Build trusted guest controller
+        run: pnpm exec turbo run build --filter=@keundal/plugin-sandbox-vm
+      - name: Build minimal Linux image
+        shell: bash
+        run: |
+          node_version="$(node -p 'require("./package.json").devEngines.runtime.version')"
+          mkdir -p "$RUNNER_TEMP/keundal-guest"
+          docker run --rm --platform linux/amd64 \
+            --mount "type=bind,source=$PWD/packages/plugin-sandbox-vm,target=/source,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/keundal-guest,target=/output" \
+            "node:$node_version-bookworm-slim" sh -ec '
+              apt-get update
+              apt-get install --no-install-recommends -y linux-image-cloud-amd64 cpio busybox-static e2fsprogs file gzip binutils
+              node /source/scripts/build-image.mjs --output /output --guest /source/dist/guest/guest.js
+            '
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sandbox-guest
+          path: ${{ runner.temp }}/keundal-guest/*
+          if-no-files-found: error
+          retention-days: 3

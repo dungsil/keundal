@@ -1,0 +1,41 @@
+#!/bin/sh
+# No shell or kernel diagnostic output is ever sent to the virtio control port.
+export PATH=/usr/bin:/bin:/sbin
+mount -t devtmpfs -o nosuid,noexec,mode=0755 devtmpfs /dev || exit 1
+exec </dev/null >/dev/null 2>&1
+die() {
+  if [ -n "$CONTROL" ] && [ -c "$CONTROL" ]; then
+    printf '%s\n' '{"type":"fatal","message":"VM initialization failed; state disk retained"}' >"$CONTROL"
+  fi
+  sync; poweroff -f; while :; do sleep 60; done
+}
+mount -t proc -o nosuid,nodev,noexec,hidepid=2 proc /proc || die
+mount -t sysfs -o ro,nosuid,nodev,noexec sysfs /sys || die
+mount -t tmpfs -o nosuid,nodev,mode=0755 tmpfs /run || die
+mount -t tmpfs -o nosuid,nodev,mode=1777 tmpfs /tmp || die
+# Explicit dependency-ordered module list generated from modules.dep on the build host.
+while read -r module; do insmod "$module" || die; done </modules.load
+ip link set lo up || die
+count=0
+CONTROL=
+while [ ! -b /dev/vda ] || [ -z "$CONTROL" ]; do
+  for port in /sys/class/virtio-ports/*; do
+    [ -r "$port/name" ] || continue
+    read -r name <"$port/name"
+    if [ "$name" = keundal.control ] && [ -c "/dev/${port##*/}" ]; then CONTROL="/dev/${port##*/}"; fi
+  done
+  if [ -b /dev/vda ] && [ -n "$CONTROL" ]; then break; fi
+  count=$((count + 1)); [ "$count" -lt 100 ] || die
+  sleep 0.1
+done
+mkdir -p /dev/virtio-ports
+ln -s "$CONTROL" /dev/virtio-ports/keundal.control || die
+chmod 0600 /dev/vda "$CONTROL"
+chown 0:0 /dev/vda "$CONTROL"
+chmod 0666 /dev/null /dev/zero
+chmod 0444 /dev/urandom /dev/random
+/usr/bin/node /prepare-state.mjs || die
+mount -t ext4 -o rw,nosuid,nodev /dev/vda /state || die
+chmod 0700 /state
+exec /usr/bin/node /guest.mjs
+die

@@ -8,16 +8,16 @@ import type { TaskSnapshot } from '@keundal/task'
 import { expect, onTestFinished, test, vi } from 'vitest'
 
 const token = 'test-only-sidecar-token'
-// OS filesystem preparation precedes the worker's own 20-second readiness deadline.
-const startupTimeout = 30_000
-vi.setConfig({ testTimeout: 2 * startupTimeout + 5_000 })
+// Includes cold Linux guest boot and byte-only workspace import.
+const startupTimeout = 180_000
+vi.setConfig({ testTimeout: 2 * startupTimeout + 5_000, hookTimeout: 130_000 })
 
 function sandbox(workspace: string) {
   const control = mkdtempSync(join(tmpdir(), 'keundal-sidecar-policy-'))
   onTestFinished(() => rmSync(control, { recursive: true, force: true }))
   const path = join(control, 'sandbox.json')
   writeFileSync(path, JSON.stringify({ workspace }))
-  return { KEUNDAL_SANDBOX_CONFIG: path }
+  return { KEUNDAL_SANDBOX_CONFIG: path, KEUNDAL_SANDBOX_VM_CONFIG: process.env.KEUNDAL_TEST_VM_CONFIG }
 }
 
 test.skipIf(process.platform !== 'linux').each(['SIGTERM', 'SIGKILL'] as const)('sidecar를 %s 후 다시 실행해도 작업 결과와 중단된 부분 응답을 조회한다', async (signal) => {
@@ -31,7 +31,7 @@ test.skipIf(process.platform !== 'linux').each(['SIGTERM', 'SIGKILL'] as const)(
       for (const id of ['completed', 'running']) {
         await ctx.tasks.enqueue({ input: { threadId: 'child-' + id, runId: id, state: {}, messages: [], tools: [], context: [] },
           parentThreadId: 'parent', parentRunId: 'parent-run', label: id }, async function* (input, { signal }) {
-          appendFileSync(${JSON.stringify(calls)}, id + '\\n')
+          appendFileSync('calls.txt', id + '\\n')
           yield { type: 'TEXT_MESSAGE_CONTENT', messageId: id, delta: id === 'completed' ? 'saved result' : 'saved partial' }
           if (id === 'running') await new Promise((resolve, reject) => {
             if (signal.aborted) reject(signal.reason)
@@ -138,21 +138,25 @@ test.skipIf(process.platform !== 'linux').each([undefined, '0.0.0.0'])('실행 �
   expect(denied.status).toBe(401)
   await denied.text()
 
+  // Orb port forwarding can expose loopback listeners through its external
+  // address. Check the kernel bind, independently of that external proxy.
+  const listener = `${host === undefined ? '0100007F' : '00000000'}:${Number(port).toString(16).toUpperCase().padStart(4, '0')}`
+  const bound = readFileSync(`/proc/${child.pid}/net/tcp`, 'utf8').split('\n')
+    .some(line => {
+      const fields = line.trim().split(/\s+/)
+      return fields[1] === listener && fields[3] === '0A'
+    })
+  expect(bound).toBe(true)
   const external = Object.values(networkInterfaces())
     .flat()
     .find(address => address?.family === 'IPv4' && !address.internal)
-  if (external) {
-    const request = fetch(`http://${external.address}:${port}/threads`, {
+  if (external && host !== undefined) {
+    const exposed = await fetch(`http://${external.address}:${port}/threads`, {
       headers: { authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(2000)
     })
-    if (host === undefined) {
-      await expect(request).rejects.toThrow()
-    } else {
-      const exposed = await request
-      expect(exposed.status).toBe(200)
-      expect(await exposed.json()).toEqual([])
-    }
+    expect(exposed.status).toBe(200)
+    expect(await exposed.json()).toEqual([])
   }
 })
 

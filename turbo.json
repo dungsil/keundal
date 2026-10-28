@@ -60,10 +60,12 @@
     },
     "test": {
       "dependsOn": ["build"],
+      "env": ["KEUNDAL_TEST_VM_CONFIG"],
       "inputs": ["$TURBO_DEFAULT$", "!README.md"]
     },
     "@keundal/desktop#test": {
       "dependsOn": ["^build", "build:sidecar"],
+      "env": ["KEUNDAL_TEST_VM_CONFIG"],
       "inputs": ["$TURBO_DEFAULT$", "!src-tauri/**", "!README.md"]
     },
     "@keundal/desktop#build:native": {

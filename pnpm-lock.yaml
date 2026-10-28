@@ -700,9 +700,9 @@ importers:
       '@keundal/plugin-runtime':
         specifier: workspace:*
         version: link:../plugin-runtime
-      '@keundal/plugin-sandbox-linux':
+      '@keundal/plugin-sandbox-vm':
         specifier: workspace:*
-        version: link:../plugin-sandbox-linux
+        version: link:../plugin-sandbox-vm
       '@keundal/plugin-skill':
         specifier: workspace:*
         version: link:../plugin-skill
@@ -2042,6 +2042,31 @@ importers:
         version: 6.0.3
 
   packages/plugin-sandbox-linux:
+    dependencies:
+      '@keundal/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/plugin-sandbox-vm:
     dependencies:
       '@keundal/sandbox':
         specifier: workspace:*

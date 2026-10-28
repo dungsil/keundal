@@ -65,9 +65,9 @@ impl SidecarState {
 
 impl Drop for Sidecar {
     fn drop(&mut self) {
-        // Closing the control pipe lets the host dispose MCP sessions and children.
+        // Closing the control pipe also persists and exports the private VM disk.
         self.child.stdin.take();
-        let deadline = Instant::now() + Duration::from_secs(5);
+        let deadline = Instant::now() + Duration::from_secs(130);
         while Instant::now() < deadline {
             if matches!(self.child.try_wait(), Ok(Some(_))) {
                 return;
@@ -348,7 +348,8 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
         }
     });
 
-    match receiver.recv_timeout(Duration::from_secs(20)) {
+    // Cold software-emulated boot and workspace import share the provider's startup budget.
+    match receiver.recv_timeout(Duration::from_secs(190)) {
         Ok(Ok(ready)) => Ok(Sidecar {
             endpoint: ready.url,
             token,

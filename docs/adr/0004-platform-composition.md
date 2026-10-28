@@ -10,7 +10,7 @@
 
 desktop은 npm을 앱에 포함하고 설치 스크립트를 실행하지 않는다. 패키지와 ZIP은 전용 디렉터리에 의존성과 함께 설치하며, JavaScript 파일 경로는 원본을 참조한다. 외부 코드는 설치 직후에는 실행하지 않고, 사용자가 활성화할 때 기본 내보내기를 Cordis 플러그인으로 등록한다. 활성화 오류는 관리 화면에 표시하고 이전 선택을 복구한다. 플러그인은 실행 호스트의 OS 샌드박스 권한과 공급자 자격 증명을 공유하므로 설치 화면에서 신뢰 여부를 확인한다. 삭제할 때는 관리하는 복사본만 지우고 원본 경로와 대화 기록은 유지한다.
 
-Node.js 웹 API와 desktop sidecar는 외부 모듈을 읽기 전에 실행 호스트 전체를 OS 샌드박스에 조립한다. Cordis 등록과 서비스 교체는 유지하며 도구 팩토리로 제한하지 않는다. 운영자 정책은 Tool Approval과 분리하고, 격리에 실패해도 비격리 실행으로 바꾸지 않는다. 공급자는 `@keundal/sandbox` 계약으로 분리하며 현재 `@keundal/plugin-sandbox-linux`만 제공한다. Windows·macOS 공급자는 미구현이므로 로컬 실행을 거부한다. 구체적인 권한·배포 조건과 한계는 `packages/agent-runtime-node/README.md`의 OS 샌드박스 절을 따른다.
+Node.js 웹 API와 desktop sidecar는 외부 모듈을 읽기 전에 실행 호스트 전체를 OS 샌드박스에 조립한다. Cordis 등록과 서비스 교체는 유지하며 도구 팩토리로 제한하지 않는다. 운영자 정책은 Tool Approval과 분리하고, 격리에 실패해도 비격리 실행으로 바꾸지 않는다. 공급자는 `@keundal/sandbox` 계약으로 분리하며 기본 구현은 `@keundal/plugin-sandbox-vm`이다. Linux·Windows·macOS 호스트에서 같은 Linux 게스트를 실행하며, 호스트 폴더를 마운트하지 않고 네이티브 파일 브로커로 시작·정상 종료 시 내용을 교환한다. Linux 호환 플러그인을 사용하고 Windows·macOS 전용 실행 파일은 지원하지 않는다. 별도 `@keundal/plugin-sandbox-linux`의 live bind 공급자를 VM 실패 시 대체로 선택하지 않는다. 구체적인 권한·배포 조건과 한계는 `packages/agent-runtime-node/README.md`의 OS 샌드박스 절을 따른다.
 
 선택 기능의 목록은 배포 매니페스트와 분리한다. 실행 목록과 UI 목록을 함께 표시하고 번들된 실행·UI 플러그인을 모두 관리한다. 필수 서비스인 LLM·저장소와 선택을 복구하는 관리 셸인 `@keundal/ui-layout`, `@keundal/ui-settings`, `@keundal/ui-agent-plugins`만 끌 수 없다. 채팅 에이전트는 선택 기능이며, 끄면 새 응답을 막되 기존 세션과 기능 목록·관리 화면은 유지한다. desktop에서는 사용자가 설치한 외부 항목도 추가한다. Nuxt 레이어는 UI 선택과 관계없이 빌드에 유지한다.
 

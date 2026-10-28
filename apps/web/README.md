@@ -40,7 +40,7 @@ HTTP 400 오류는 공급자 JSON의 `error.message`·문자열 `error`·`messag
 
 웹 앱은 기본으로 브라우저에서 에이전트를 실행합니다. Node.js로 실행하는 Nitro 서버는 OS 샌드박스 안에 실행 호스트를 조립하여 `/api/agent/**`에서 대화와 실행을 처리할 수 있습니다. 별도 HTTP 서버나 프록시 주소는 필요하지 않습니다.
 
-서버 실행 호스트는 현재 Linux와 bubblewrap이 필요합니다. [OS 샌드박스 설정](../../packages/agent-runtime-node/README.md#os-샌드박스)에 따라 작업공간 밖에 정책 파일을 만들고 필요한 공급자 목적지와 데이터 경로만 허용합니다. 앱 설치 디렉터리와 코딩 작업공간은 분리합니다. Windows·macOS와 격리 설정이 없는 환경은 서버 API 시작을 거부하며 브라우저 실행은 유지합니다.
+서버 실행 호스트는 QEMU·네이티브 파일 브로커·신뢰한 Linux 게스트 이미지가 필요합니다. [OS 샌드박스 설정](../../packages/agent-runtime-node/README.md#os-샌드박스)에 따라 `KEUNDAL_SANDBOX_VM_CONFIG`와 작업공간 밖의 정책 파일을 지정하고 필요한 공급자 목적지와 데이터 경로만 허용합니다. 앱 설치 디렉터리와 코딩 작업공간은 분리합니다. 파일은 시작에 복사하고 정상 종료에 내보내며 호스트 폴더를 실시간 공유하지 않습니다. VM 자산이나 격리 설정이 없으면 서버 API 시작을 거부하며 브라우저 실행은 유지합니다.
 
 ```sh
 export OPENAI_API_KEY="sk-..."             # 또는 GEMINI_API_KEY, ANTHROPIC_API_KEY

@@ -1,3 +1,5 @@
+import console from 'node:console'
+import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { Agent, request, type RequestListener } from 'node:http'
@@ -8,7 +10,7 @@ import process from 'node:process'
 import { clearTimeout, setTimeout } from 'node:timers'
 import { fileURLToPath, URL } from 'node:url'
 
-import { LinuxSandboxProvider } from '@keundal/plugin-sandbox-linux'
+import { LinuxVmSandboxProvider, type LinuxVmOptions } from '@keundal/plugin-sandbox-vm'
 import type { SandboxPolicy, SandboxProvider } from '@keundal/sandbox'
 
 import { createSandboxNetwork } from './sandbox-network.js'
@@ -58,12 +60,23 @@ export async function createSandboxedAgentRuntime(
 ): Promise<SandboxedAgentRuntime> {
   const env = options.env ?? process.env
   const policy = options.policy ?? (await readSandboxPolicy(env))
-  // An unsupported platform or unavailable isolation facility must never fall back to spawn(node).
-  const provider = options.provider ?? new LinuxSandboxProvider()
+  // There is no live-bind or ordinary-process fallback when guest assets are unavailable.
+  if (!options.provider && !env.KEUNDAL_SANDBOX_VM_CONFIG)
+    throw new Error('KEUNDAL_SANDBOX_VM_CONFIG is required for the Linux execution VM')
+  const provider =
+    options.provider ??
+    new LinuxVmSandboxProvider(JSON.parse(await readFile(env.KEUNDAL_SANDBOX_VM_CONFIG!, 'utf8')) as LinuxVmOptions)
   const workerSource =
     options.workerSource ?? (await readFile(new URL('./worker/sandbox-worker.txt', import.meta.url), 'utf8'))
   const network = createSandboxNetwork(policy.allowedHosts)
   const bridge = await mkdtemp(join(tmpdir(), 'keundal-sandbox-'))
+  const bridgeId = randomUUID()
+  const endpoints = Object.fromEntries(
+    ['api', 'network'].map((name) => [
+      name,
+      process.platform === 'win32' ? `\\\\.\\pipe\\keundal-${bridgeId}-${name}` : join(bridge, `${name}.sock`)
+    ])
+  ) as Record<'api' | 'network', string>
   const sockets = new Set<Socket>()
   const idle: Socket[] = []
   type ConnectionCallback = (error: Error | null, socket?: Socket) => void
@@ -119,21 +132,27 @@ export async function createSandboxedAgentRuntime(
       for (const socket of sockets) socket.destroy()
       network.close()
       api.close()
-      if (child && child.exitCode === null && child.signalCode === null) {
-        child.kill('SIGTERM')
-        const timer = setTimeout(() => child?.kill('SIGKILL'), 1000)
-        await exited
-        clearTimeout(timer)
+      try {
+        if (child) {
+          if (provider.stop) await provider.stop(child)
+          else if (child.exitCode === null && child.signalCode === null) {
+            child.kill('SIGTERM')
+            const timer = setTimeout(() => child?.kill('SIGKILL'), 1000)
+            await exited
+            clearTimeout(timer)
+          }
+        }
+      } finally {
+        await rm(bridge, { recursive: true, force: true })
       }
-      await rm(bridge, { recursive: true, force: true })
     })()
     return disposal
   }
   try {
     await writeFile(join(bridge, 'worker.mjs'), workerSource, { mode: 0o600 })
-    api.listen(join(bridge, 'api.sock'))
+    api.listen(endpoints.api)
     await once(api, 'listening')
-    network.server.listen(join(bridge, 'network.sock'))
+    network.server.listen(endpoints.network)
     await once(network.server, 'listening')
     const environment: Record<string, string> = {}
     for (const key of [
@@ -164,12 +183,13 @@ export async function createSandboxedAgentRuntime(
       protectedPaths: [
         dirname(fileURLToPath(import.meta.url)),
         ...(process.argv[1] ? [dirname(resolve(process.argv[1]))] : []),
-        ...(env.KEUNDAL_SANDBOX_CONFIG ? [resolve(env.KEUNDAL_SANDBOX_CONFIG)] : [])
+        ...(env.KEUNDAL_SANDBOX_CONFIG ? [resolve(env.KEUNDAL_SANDBOX_CONFIG)] : []),
+        ...(env.KEUNDAL_SANDBOX_VM_CONFIG ? [resolve(env.KEUNDAL_SANDBOX_VM_CONFIG)] : [])
       ],
-      // All bridge endpoints are created by the parent and mounted read-only. The child cannot
-      // substitute a host socket path and trick the parent into connecting to another service.
+      // The VM brokers only these parent-owned endpoints, without host mounts.
+      // A child cannot substitute a path to make the parent connect to another host service.
       mounts: ['worker.mjs', 'api.sock', 'network.sock'].map((name) => ({
-        source: join(bridge, name),
+        source: name === 'worker.mjs' ? join(bridge, name) : endpoints[name === 'api.sock' ? 'api' : 'network'],
         target: `/run/keundal/${name}`,
         writable: false
       }))
@@ -182,7 +202,7 @@ export async function createSandboxedAgentRuntime(
       const timer = setTimeout(() => {
         cleanup()
         reject(new Error('Sandbox host startup timed out'))
-      }, 20_000)
+      }, provider.startupTimeoutMs ?? 20_000)
       const onData = (chunk: Buffer) => {
         output = (output + chunk.toString('utf8')).slice(-65536)
         if (output.split('\n').includes('keundal-sandbox-ready')) {
@@ -210,7 +230,7 @@ export async function createSandboxedAgentRuntime(
     })
     started.stdout.resume()
     started.once('exit', () => {
-      void dispose()
+      void dispose().catch((error: unknown) => console.error('Sandbox cleanup failed:', error))
     })
     return {
       dispose,
@@ -246,7 +266,11 @@ export async function createSandboxedAgentRuntime(
       }
     }
   } catch (error) {
-    await dispose()
+    try {
+      await dispose()
+    } catch (cleanupError) {
+      console.error('Sandbox cleanup failed:', cleanupError)
+    }
     throw error
   }
 }

@@ -17,36 +17,20 @@ const workspace = join(work, 'workspace')
 await mkdir(workspace)
 await writeFile(sandboxConfig, JSON.stringify({ workspace }))
 
-if (process.argv.includes('--expect-sandbox-unavailable')) {
-  try {
-    assert.notEqual(process.platform, 'linux', 'Linux must exercise the real sandbox, not the refusal path')
-    const refused = spawnSync(runtime, [join(portable, 'sidecar/main.js')], {
-      cwd: work,
-      env: {
-        ...process.env, NODE_PATH: '', NODE_OPTIONS: '',
-        KEUNDAL_SANDBOX_CONFIG: sandboxConfig,
-        KEUNDAL_MODEL: model, KEUNDAL_PROVIDER: 'openai', KEUNDAL_API_TOKEN: token
-      },
-      encoding: 'utf8', timeout: 10_000
-    })
-    if (refused.error) throw refused.error
-    assert.equal(refused.status, 1)
-    assert.match(refused.stderr, /LinuxSandboxProvider requires Linux/)
-    assert.doesNotMatch(refused.stdout, /keundal-sidecar|listening/)
-    console.log('PASS: unsupported OS refuses local execution without an unsandboxed fallback')
-  } finally {
-    await rm(work, { recursive: true, force: true })
-  }
-  process.exit(0)
-}
+const vmConfig = process.env.KEUNDAL_SANDBOX_VM_CONFIG ?? process.env.KEUNDAL_TEST_VM_CONFIG
+assert.ok(vmConfig, 'Configure operator-installed Linux VM assets before running the packaged host smoke')
 
 let host
 let app
 
 async function stop(child) {
   if (!child || child.exitCode !== null || child.signalCode !== null) return
-  const exited = once(child, 'exit')
-  if (process.platform === 'win32') {
+  const exited = once(child, 'exit', { signal: AbortSignal.timeout(130_000) })
+  if (child === host) {
+    // Windows has no SIGTERM handler: use the sidecar's shutdown pipe so the
+    // supervisor can export generated files before the packaged host exits.
+    child.stdin.end()
+  } else if (process.platform === 'win32') {
     // Terminate the sidecar and WebView processes before removing their working directory.
     const result = spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
       encoding: 'utf8',
@@ -57,7 +41,8 @@ async function stop(child) {
   } else {
     child.kill()
   }
-  await exited
+  const [code] = await exited
+  if (child === host) assert.equal(code, 0, 'Packaged host must finish VM export before exiting')
 }
 
 async function startHost() {
@@ -68,9 +53,11 @@ async function startHost() {
       NODE_PATH: '',
       NODE_OPTIONS: '',
       KEUNDAL_SANDBOX_CONFIG: sandboxConfig,
+      KEUNDAL_SANDBOX_VM_CONFIG: vmConfig,
       KEUNDAL_HOST: '127.0.0.1',
       PORT: '0',
       KEUNDAL_SIDECAR: '1',
+      KEUNDAL_SHUTDOWN_ON_STDIN: '1',
       KEUNDAL_PARENT_PID: String(process.pid),
       KEUNDAL_PROVIDER: 'openai',
       OPENAI_API_KEY: 'test-only-no-provider-request',
@@ -78,7 +65,7 @@ async function startHost() {
       KEUNDAL_API_TOKEN: token,
       KEUNDAL_SQLITE_PATH: join(workspace, 'smoke.sqlite')
     },
-    stdio: ['ignore', 'pipe', 'pipe']
+    stdio: ['pipe', 'pipe', 'pipe']
   })
   host = child
   let stdout = ''
@@ -87,7 +74,7 @@ async function startHost() {
   child.stderr.on('data', data => (stderr += data))
   let spawnError
   child.on('error', error => (spawnError = error))
-  const deadline = Date.now() + 30_000
+  const deadline = Date.now() + 190_000
   while (Date.now() < deadline) {
     if (spawnError) throw spawnError
     assert.equal(child.exitCode, null, `Host exited before readiness:\n${stdout}\n${stderr}`)
@@ -156,7 +143,7 @@ try {
   assert.deepEqual(snapshot.messages, [message])
   console.log('PASS: packaged host starts outside the repository; auth, models and SQLite restart work')
 
-  if (process.platform === 'win32') {
+  if (process.platform === 'win32' && !process.argv.includes('--host-only')) {
     app = spawn(join(portable, 'keundal-desktop.exe'), [], {
       cwd: work,
       stdio: 'inherit'
