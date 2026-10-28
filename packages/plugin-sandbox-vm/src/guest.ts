@@ -29,6 +29,7 @@ const descriptor = openSync(control, 'r+')
 const input = createReadStream(control, { fd: descriptor, autoClose: false })
 const output = createWriteStream(control, { fd: descriptor, autoClose: false })
 const channel = new LineChannel(input, output)
+const home = '/home/keundal'
 const roots = new Map<number, Root>()
 const entries: Entry[] = []
 const seen = new Set<string>()
@@ -135,7 +136,8 @@ async function configure(frame: Record<string, unknown>) {
     '/modules.load',
     '/init',
     '/guest.mjs',
-    '/prepare-state.mjs'
+    '/prepare-state.mjs',
+    home
   ]
   for (const value of frame.roots) {
     if (!value || typeof value !== 'object') fail()
@@ -338,6 +340,13 @@ async function bridge(name: 'api' | 'network') {
 }
 async function launch() {
   await merge()
+  // Plugin-managed state and Git worktrees must survive without exposing a
+  // live host home directory or adding them to the host file export.
+  await fs.mkdir('/state/home', { recursive: true, mode: 0o700 })
+  await fs.chown('/state/home', 1000, 1000)
+  await fs.mkdir(home, { recursive: true, mode: 0o755 })
+  command('/bin/mount', ['--bind', '/state/home', home])
+  command('/bin/mount', ['-o', 'remount,bind,rw,nosuid,nodev', home])
   for (const root of roots.values()) {
     const target = await safePath('/', relative(root.target.slice(1)))
     const existing = await stat(target)
@@ -366,7 +375,7 @@ async function launch() {
     gid: 1000,
     cwd: workspace,
     env: {
-      HOME: '/tmp',
+      HOME: home,
       TMPDIR: '/tmp',
       ...(configuration.environment as Record<string, string>),
       PATH: '/usr/bin:/bin'
@@ -468,6 +477,7 @@ async function exportRoot(root: Root, path = ''): Promise<void> {
 function poweroff() {
   spawnSync('/bin/sync', [], { stdio: 'ignore' })
   for (const root of [...roots.values()].reverse()) spawnSync('/bin/umount', [root.target], { stdio: 'ignore' })
+  spawnSync('/bin/umount', [home], { stdio: 'ignore' })
   spawnSync('/bin/umount', ['/state'], { stdio: 'ignore' })
   spawnSync('/bin/poweroff', ['-f'], { stdio: 'ignore' })
   // PID 1 must never exit, even if reboot(2) unexpectedly fails.

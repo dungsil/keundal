@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@keundal/agent": "workspace:*",
+    "@keundal/automation": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/generation": "workspace:*",
     "@keundal/llm": "workspace:*",
@@ -33,10 +34,13 @@
     "@keundal/skill": "workspace:*",
     "@keundal/task": "workspace:*",
     "@keundal/tool-approval": "workspace:*",
+    "@keundal/workspace": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {
     "@keundal/plugin-agent-chat": "workspace:*",
+    "@keundal/plugin-chat-local": "workspace:*",
+    "@keundal/plugin-chat-remote": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/task-memory": "workspace:*",
     "@keundal/trace": "workspace:*",

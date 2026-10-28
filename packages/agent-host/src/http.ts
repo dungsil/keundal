@@ -4,6 +4,8 @@ import { once } from 'node:events'
 import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http'
 import { URL } from 'node:url'
 
+import { parseRunBudget } from '@keundal/agent'
+import type { AutomationDefinition, AutomationEvent } from '@keundal/automation'
 import {
   EventType,
   parseAGUIEvent,
@@ -51,6 +53,14 @@ const sendJson = (response: ServerResponse, status: number, body: unknown): void
     'cache-control': 'private, no-store'
   })
   response.end(JSON.stringify(body))
+}
+
+const workspaceError = (response: ServerResponse, error: unknown): void => {
+  const message =
+    error instanceof Error && error.name === 'CodingWorkspaceError'
+      ? error.message
+      : 'Workspace operation failed. Check the project and review its changes again.'
+  sendJson(response, 409, { error: message })
 }
 
 // Summary projections contain only explicitly requested scalar leaves, never object subtrees.
@@ -273,6 +283,92 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
         return sendJson(response, 200, { models: models() })
       }
 
+      if (services.automation) {
+        const automation = services.automation
+        if (segments[0] === 'automations') {
+          const id = segments[1] === undefined ? undefined : decodeURIComponent(segments[1])
+          if (request.method === 'GET' && segments.length === 1) return sendJson(response, 200, await automation.list())
+          if (request.method === 'PUT' && segments.length === 2 && id) {
+            const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as AutomationDefinition
+            return sendJson(response, 200, await automation.put(id, body))
+          }
+          if (request.method === 'DELETE' && segments.length === 2 && id) {
+            await automation.delete(id)
+            response.writeHead(204).end()
+            return
+          }
+          if (request.method === 'GET' && segments.length === 3 && id && segments[2] === 'history')
+            return sendJson(response, 200, await automation.history(id))
+          if (request.method === 'POST' && segments.length === 3 && id && segments[2] === 'webhook') {
+            const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as AutomationEvent
+            const attempts = await automation.webhook(id, body)
+            return attempts.length
+              ? sendJson(response, 202, attempts)
+              : sendJson(response, 404, { error: 'enabled webhook not found' })
+          }
+        }
+        if (request.method === 'POST' && segments.join('/') === 'automation-events') {
+          const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as AutomationEvent & { name: string }
+          if (!body || typeof body.name !== 'string' || !body.name.trim() || body.name.length > 256)
+            throw new Error('invalid event name')
+          return sendJson(response, 202, await automation.emit(body.name, body))
+        }
+      }
+
+      if (segments[0] === 'workspaces' && segments[1] && segments.length <= 3) {
+        if (!services.workspaces) return sendJson(response, 404, { error: 'coding workspaces are not supported' })
+        const threadId = decodeURIComponent(segments[1])
+        if (request.method === 'GET' && segments.length === 2) {
+          try {
+            const snapshot = await services.workspaces.get(threadId)
+            return snapshot
+              ? sendJson(response, 200, snapshot)
+              : sendJson(response, 404, { error: 'workspace not found' })
+          } catch (error) {
+            return workspaceError(response, error)
+          }
+        }
+        if (request.method === 'POST') {
+          const operation = segments[2]
+          if (operation !== undefined && operation !== 'review' && operation !== 'apply') {
+            return sendJson(response, 400, { error: 'unknown workspace operation' })
+          }
+          const raw = await readBody(request, maxRequestBodyBytes)
+          const body: unknown = operation === 'review' && !raw ? {} : JSON.parse(raw)
+          if (
+            operation === 'review' &&
+            (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length)
+          )
+            return sendJson(response, 400, { error: 'review does not accept arguments' })
+          const key = operation === 'apply' ? 'reviewId' : 'projectPath'
+          if (
+            operation !== 'review' &&
+            (!body ||
+              typeof body !== 'object' ||
+              Array.isArray(body) ||
+              Object.keys(body).length !== 1 ||
+              !(key in body) ||
+              typeof (body as Record<string, unknown>)[key] !== 'string' ||
+              !(body as Record<string, string>)[key]?.trim())
+          ) {
+            return sendJson(response, 400, { error: `a nonempty ${key} is required` })
+          }
+          try {
+            const value = (body as Record<string, string>)[key]!
+            const snapshot =
+              operation === 'review'
+                ? await services.workspaces.review(threadId)
+                : operation === 'apply'
+                  ? await services.workspaces.apply(threadId, value)
+                  : await services.workspaces.create(threadId, value)
+            return sendJson(response, 200, snapshot)
+          } catch (error) {
+            // Workspace implementations expose safe, user-actionable messages; never relay Git stderr.
+            return workspaceError(response, error)
+          }
+        }
+      }
+
       if (segments[0] === 'tasks' && services.tasks) {
         if (request.method === 'GET' && segments.length === 1) {
           const parentThreadId = url.searchParams.get('parentThreadId') ?? undefined
@@ -311,10 +407,14 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
         const reasoning = parseReasoning(
           rawReasoning === 'true' ? true : rawReasoning === 'false' ? false : rawReasoning
         )
-        const input = parseRunAgentInput(JSON.parse(await readBody(request, maxRequestBodyBytes)))
+        const body: unknown = JSON.parse(await readBody(request, maxRequestBodyBytes))
+        const { budget: rawBudget, ...input } = parseRunAgentInput(body) as RunAgentInput & { budget?: unknown }
+        const budget = rawBudget === undefined ? undefined : parseRunBudget(rawBudget)
         let iterator: AsyncIterator<AGUIEvent>
         try {
-          iterator = services.run(input, { model: requested, reasoning })[Symbol.asyncIterator]()
+          iterator = services
+            .run(input, { model: requested, reasoning, ...(budget === undefined ? {} : { budget }) })
+            [Symbol.asyncIterator]()
         } catch {
           // 같은 대화나 runId에 실행이 이미 있으면 새 실행을 시작하지 않습니다.
           return sendJson(response, 409, { error: 'run is already active' })

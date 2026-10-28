@@ -18,7 +18,7 @@ const runtime = await createAgentRuntime(process.env, { compose: createNodeCompo
 
 기본 공급자는 [Linux VM](../plugin-sandbox-vm/README.md)입니다. Linux·Windows·macOS 호스트에서 QEMU로 같은 Linux 실행 환경을 시작하며, 호스트 디렉터리를 마운트하거나 네트워크 어댑터를 연결하지 않습니다. 기존 Cordis 플러그인 형식은 유지하지만 Windows·macOS 전용 실행 파일이나 다른 OS용 native addon은 실행하지 못합니다. 격리 도구나 정책이 없거나 시작에 실패해도 비격리 프로세스나 bubblewrap으로 대체하지 않습니다. 웹의 브라우저 실행 방식과 원격 호스트 연결은 이 변경의 대상이 아닙니다.
 
-운영자는 QEMU·네이티브 파일 브로커·신뢰한 게스트 이미지를 설치하고 `KEUNDAL_SANDBOX_VM_CONFIG`에 자산 설정 파일의 절대 경로를 지정합니다. 설치 방법과 Windows 경로 매핑은 [VM 공급자 문서](../plugin-sandbox-vm/README.md#operator-installation)를 따릅니다. 최소 이미지에는 Node와 BusyBox만 있으므로 git·Python 등 필요한 Linux 도구와 라이브러리는 게스트 이미지에 추가해야 합니다. 앱이 시작할 때 설치하거나 호스트 도구를 대신 실행하지 않습니다.
+운영자는 QEMU·네이티브 파일 브로커·신뢰한 게스트 이미지를 설치하고 `KEUNDAL_SANDBOX_VM_CONFIG`에 자산 설정 파일의 절대 경로를 지정합니다. 설치 방법과 Windows 경로 매핑은 [VM 공급자 문서](../plugin-sandbox-vm/README.md#operator-installation)를 따릅니다. 최소 이미지에는 Node·BusyBox 명령·Git의 로컬 작업공간 명령을 포함합니다. Git 전송 helper·Python 등 추가 Linux 도구와 라이브러리는 게스트 이미지에 설치해야 합니다. 앱이 시작할 때 설치하거나 호스트 도구를 대신 실행하지 않습니다. 기본 HOME은 VM 디스크의 비공개 `/home/keundal`이며 플러그인 상태와 Git Worktree를 재시작 후에도 보존합니다. 작업공간 API에는 허용한 게스트 디렉터리 경로를 사용합니다.
 
 운영자가 작업공간 밖의 JSON 파일을 만들고 `KEUNDAL_SANDBOX_CONFIG`에 절대 경로를 지정합니다.
 
@@ -42,6 +42,15 @@ const runtime = await createAgentRuntime(process.env, { compose: createNodeCompo
 - 부모 환경 전체를 상속하지 않습니다. 기존 LLM·HTTP·저장소·플러그인·승인 설정에 필요한 환경과 `environment`에 운영자가 명시한 항목만 전달합니다. 실행 호스트 안의 플러그인끼리는 같은 권한과 공급자 자격 증명을 공유합니다. Tool Approval의 허용은 이 OS 정책을 넓히지 않습니다.
 
 부모는 직렬 채널로 HTTP/SSE와 목적지 제한 프록시만 중계합니다. VM이 지정한 호스트 경로에는 접속하지 않으며 호스트 소켓·named pipe나 프로세스를 노출하지 않습니다. 실행 호스트는 게스트 uid/gid 1000으로 시작하고 제어 프로세스·직렬 장치·디스크 장치에 접근할 수 없습니다. `dispose()`나 부모 종료 시에는 Shell의 분리된 자손까지 종료한 뒤 파일을 내보냅니다. 자식의 잘못된 HTTP 응답은 해당 연결만 종료하며 부모의 다음 요청은 유지합니다. VM에는 메모리 1 GiB와 sparse 디스크 8 GiB를 할당하지만 CPU 시간·프로세스 수·전송량·호스트 디스크 사용량의 작업별 할당량은 아직 제공하지 않습니다.
+
+## 프로젝트 메모리
+
+`KEUNDAL_PROJECT_ID` 또는 `createNodeAgentHost()`의 `projectId`를 지정하면 프로젝트 범위의
+`memory_save`, `memory_search`, `memory_get`, `memory_update`, `memory_delete` 도구를 제공합니다.
+같은 SQLite 파일과 프로젝트 ID를 사용하는 대화는 저장한 정보와 출처를 공유합니다.
+생략하면 도구를 제공하지 않으며, 빈 ID나 `memory` 서비스가 없는 저장소 구성은 거부합니다.
+프로젝트 선택은 모델이나 HTTP 요청이 아니라 호스트를 조립하는 앱이 담당합니다.
+검색 규칙과 승인 설정은 [메모리 문서](../memory/README.md)를 참고하세요.
 
 ## 런타임 플러그인
 
@@ -95,3 +104,19 @@ OAuth를 쓰는 호스트는 `mcpAuthentication: { documents: account }`로 서�
 `maxActiveSubagents`의 기본값은 8이며 부모 실행별 동시 자식 수를 제한합니다.
 `createAgentRuntime(env, { compose: createNodeComposition, subagents: false })`에도 같은 설정을 전달할 수 있습니다.
 자세한 결과 형식과 취소 동작은 [에이전트 문서](../agent-loop/README.md#서브에이전트)를 참고하세요.
+
+## 예약 실행과 이벤트 기반 작업
+
+기본 Node 조립은 SQLite에 등록한 Cron·Webhook·이름 기반 이벤트를 `TaskService`의 백그라운드 작업으로 제출합니다. 예약 실행은 호스트가 켜져 있을 때만 동작합니다. `automation: false` 옵션으로 끌 수 있습니다. 등록 API, 중복 실행 방지와 복구 정책은 [자동화 문서](../automation/README.md)를 참고하세요.
+
+## 코딩 작업공간
+
+기본 Node.js 구성과 데스크톱 sidecar는 대화마다 Git Worktree를 연결할 수 있습니다. 채팅 입력창의 **코딩 작업공간**에서 호스트에 있는 Git 저장소의 최상위 폴더 경로를 입력하고 **Worktree 만들기**를 선택합니다. 커밋이 하나 이상 있는 신뢰할 수 있는 프로젝트만 선택하세요. 원본의 미커밋 변경은 복사하지 않습니다.
+
+프로젝트를 연결한 대화는 코딩 에이전트로 실행합니다. 파일 도구는 해당 Worktree 안에서만 읽기·생성·수정을 허용하고, 기존 파일을 수정하려면 먼저 읽어야 합니다. Git 메타데이터와 외부 경로는 거부합니다. 이 구성은 Shell·MCP·서브에이전트 도구를 제공하지 않습니다.
+
+응답이 끝나면 **코딩 에이전트 → 변경사항 검토**에서 추가·수정·삭제된 파일의 Diff를 확인하고 **프로젝트에 적용**을 선택합니다. 원본의 index는 유지하며 자동 커밋하지 않습니다. 검토 뒤 Worktree나 원본이 바뀌면 적용을 거부하고 다시 검토하도록 안내합니다. 적용 후에도 같은 Worktree에서 작업을 이어갈 수 있습니다.
+
+Worktree와 대화 연결은 기본적으로 사용자 홈의 `.keundal/workspaces` 아래에 저장합니다. SQLite 경로별로 분리하며 `KEUNDAL_WORKSPACE_ROOT`나 `NodeHostOptions.workspaceRoot`로 위치를 지정할 수 있습니다. 호스트·sidecar를 다시 시작해도 작업을 복원하지만 검토 승인은 복원하지 않습니다. 대화를 삭제하거나 앱을 종료해도 Worktree를 자동 삭제하지 않습니다. 남은 파일은 `git worktree list`로 확인한 뒤 보존할 변경을 직접 정리하세요.
+
+웹은 `NUXT_PUBLIC_AGENT_ENDPOINT`와 `NUXT_PUBLIC_AGENT_TOKEN`으로 연결한 Node.js 호스트의 폴더를 사용합니다. 같은 Node.js 웹 서버의 API를 쓰려면 endpoint를 `/api/agent`로 지정하고 token을 호스트의 `KEUNDAL_API_TOKEN`과 맞춥니다. 인증된 사용자는 호스트 권한으로 프로젝트 파일을 다루므로 개인용·신뢰할 수 있는 호스트에서만 노출하세요. 브라우저 단독 실행이나 Cloudflare 배포는 로컬 Git 폴더를 열 수 없으며 화면에 이 제한을 표시합니다.

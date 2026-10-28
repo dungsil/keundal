@@ -75,3 +75,36 @@ test('호출 취소와 서비스 해제를 준비된 본문 로딩에 전달한�
   await plugin.dispose()
   await expect(another.load('review')).rejects.toThrow('skill service disposed')
 })
+
+test('보조 자료는 본문과 같은 공급자에서 읽고 해제와 취소 후 다른 공급자로 전환하지 않는다', async (t) => {
+  const { ctx } = await setup(t)
+  const resourceProvider = (name: string): SkillProvider => ({
+    name,
+    async prepare() {
+      return {
+        skills: [definition('review')],
+        async load() {
+          return { ...definition('review'), resources: ['references/guide.md'] }
+        },
+        async readResource(_name, path) {
+          return path === 'references/guide.md' ? name : undefined
+        }
+      }
+    }
+  })
+  const dispose = ctx.skills.registerProvider(resourceProvider('first'))
+  ctx.skills.registerProvider(resourceProvider('second'))
+  const catalog = await ctx.skills.prepare()
+  expect((await catalog.load('review'))?.resources).toEqual(['references/guide.md'])
+  expect(await catalog.readResource!('review', 'references/guide.md')).toBe('first')
+  expect(await catalog.readResource!('missing', 'references/guide.md')).toBeUndefined()
+  await expect(catalog.readResource!('review', 'references/../SKILL.md')).rejects.toThrow('path')
+  await expect(
+    catalog.readResource!('review', 'references/guide.md', {
+      signal: AbortSignal.abort(new Error('cancel resource'))
+    })
+  ).rejects.toThrow('cancel resource')
+  dispose()
+  await expect(catalog.readResource!('review', 'references/guide.md')).rejects.toThrow('disposed')
+  expect(await (await ctx.skills.prepare()).readResource!('review', 'references/guide.md')).toBe('second')
+})

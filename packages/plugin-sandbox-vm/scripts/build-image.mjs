@@ -78,22 +78,13 @@ try {
   await copy('/usr/bin/busybox', '/bin/busybox', true) // Debian busybox-static, no host configuration.
   const busybox = run('/usr/bin/file', ['/usr/bin/busybox'])
   if (!busybox.includes('statically linked')) throw new Error('busybox-static is required')
-  for (const applet of [
-    'sh',
-    'mount',
-    'umount',
-    'insmod',
-    'ip',
-    'mkdir',
-    'ln',
-    'chmod',
-    'chown',
-    'sync',
-    'poweroff',
-    'sleep'
-  ])
+  for (const applet of run('/usr/bin/busybox', ['--list'])
+    .trim()
+    .split('\n')
+    .filter((name) => name !== 'busybox'))
     await fs.symlink('busybox', join(root, 'bin', applet))
   await binary(process.execPath, '/usr/bin/node')
+  await binary('/usr/bin/git', '/usr/bin/git')
   await binary('/sbin/mke2fs', '/sbin/mke2fs')
   await binary('/sbin/e2fsck', '/sbin/e2fsck')
   // Supply only fixed, non-host-specific filesystem defaults.

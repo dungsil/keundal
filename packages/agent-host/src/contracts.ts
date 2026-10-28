@@ -1,4 +1,5 @@
 import type { AgentExecutionOptions } from '@keundal/agent'
+import type { AutomationService } from '@keundal/automation'
 import type { AGUIEvent, AgentMessage, ExecutionOptions, RunAgentInput } from '@keundal/core'
 import type { GenerationJournalEntry, GenerationService, GenerationSubscriptionOptions } from '@keundal/generation'
 import type { Reasoning } from '@keundal/llm'
@@ -6,6 +7,7 @@ import type { SessionService } from '@keundal/session'
 import type { SkillSummary } from '@keundal/skill'
 import type { TaskService } from '@keundal/task'
 import type { ToolApproval } from '@keundal/tool-approval'
+import type { CodingWorkspaceClient } from '@keundal/workspace'
 import type { Context, Fiber } from 'cordis'
 
 export interface AgentHostModel {
@@ -20,12 +22,15 @@ export type AgentHostProvider = string
 export interface AgentMountConfig {
   readonly model: string
   readonly maxOutputTokens: number
+  readonly codingThreadId?: string
+  readonly workspacePath?: string
   readonly reasoning?: Reasoning
   readonly toolApproval?: ToolApproval
 }
 
 export interface AgentHostOptions {
   readonly toolApproval?: ToolApproval
+  readonly workspaces?: CodingWorkspaceClient
   readonly model: string
   readonly models: readonly AgentHostModel[]
   readonly maxOutputTokens?: number
@@ -47,6 +52,7 @@ export interface AgentHostTitleRequest {
 
 /** HTTP 계층과 sidecar가 공통으로 사용하는 에이전트 표면입니다. */
 export interface AgentHostServices {
+  readonly workspaces?: CodingWorkspaceClient
   respondToToolApproval?(runId: string, requestId: string, decision: 'allow' | 'deny'): boolean
   run(input: RunAgentInput, options?: AgentHostRunOptions): AsyncIterable<AGUIEvent>
   /** 실행 중인 실행에 지시를 넣고, 받아들인 메시지 수를 돌려줍니다. 실행이 없으면 0입니다. */
@@ -58,6 +64,7 @@ export interface AgentHostServices {
   session: Pick<SessionService, 'get' | 'list' | 'commit' | 'delete'>
   generation: Pick<GenerationService, 'get' | 'list' | 'recover'>
   tasks?: Pick<TaskService, 'get' | 'list' | 'cancel'>
+  automation?: Pick<AutomationService, 'list' | 'put' | 'delete' | 'webhook' | 'emit' | 'history'>
   models(): readonly AgentHostModel[]
   catalog?(options?: ExecutionOptions): Promise<{ skills: readonly SkillSummary[]; tools: readonly SkillSummary[] }>
   title(request: AgentHostTitleRequest, options?: ExecutionOptions): Promise<string>

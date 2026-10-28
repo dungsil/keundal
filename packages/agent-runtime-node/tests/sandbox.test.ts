@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -116,6 +117,19 @@ async function fixture(t: TestContext, approval: 'allow' | 'ask') {
       tools: [{ module: './probe.mjs' }]
     })
   )
+  execFileSync('git', ['init', '-q', '--template=', workspace])
+  execFileSync('git', ['-C', workspace, '-c', 'core.autocrlf=false', 'add', '.'])
+  execFileSync('git', [
+    '-C',
+    workspace,
+    '-c',
+    'user.name=VM fixture',
+    '-c',
+    'user.email=vm@example.invalid',
+    'commit',
+    '-qm',
+    'initial'
+  ])
   const runtime = await createSandboxedAgentRuntime({
     policy: { workspace, allowedHosts: [`127.0.0.1:${address.port}`] },
     env: {
@@ -212,6 +226,17 @@ test.for(['allow', 'ask'] as const)(
     expect(await (await request('/threads/thread')).json()).toMatchObject({
       messages: expect.arrayContaining([expect.objectContaining({ role: 'assistant', content: text })])
     })
+    const projectPath = process.platform === 'win32' ? '/workspaces/0' : workspace
+    const coding = await request('/workspaces/coding', {
+      method: 'POST',
+      body: JSON.stringify({ projectPath })
+    })
+    expect(await coding.json()).toMatchObject({
+      threadId: 'coding',
+      projectPath,
+      path: expect.stringContaining('/home/keundal/')
+    })
+    expect(coding.status).toBe(200)
     await runtime.dispose()
     expect(await readFile(join(workspace, 'inside.txt'), 'utf8')).toBe('workspace-write')
   }

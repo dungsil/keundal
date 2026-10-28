@@ -62,7 +62,7 @@ export async function supervise(Channel: typeof LineChannel): Promise<void> {
       throw new Error('VM grants must be disjoint directories')
     const target = process.platform === 'win32' ? `/workspaces/${roots.length}` : path
     if (
-      ['/state', '/run', '/proc', '/sys', '/dev', '/usr', '/bin', '/lib', '/lib64', '/etc'].some(
+      ['/state', '/run', '/proc', '/sys', '/dev', '/usr', '/bin', '/lib', '/lib64', '/etc', '/home/keundal'].some(
         (root) => target === root || target.startsWith(root + '/')
       )
     ) {
@@ -249,7 +249,12 @@ export async function supervise(Channel: typeof LineChannel): Promise<void> {
     return root ? root.target + value.slice(root.path.length).split(sep).join('/') : value
   }
   const environment = { ...request.environment }
-  for (const key of ['KEUNDAL_SQLITE_PATH', 'KEUNDAL_PLUGIN_CONFIG', 'KEUNDAL_MANAGED_PLUGINS']) {
+  for (const key of [
+    'KEUNDAL_SQLITE_PATH',
+    'KEUNDAL_PLUGIN_CONFIG',
+    'KEUNDAL_MANAGED_PLUGINS',
+    'KEUNDAL_WORKSPACE_ROOT'
+  ]) {
     if (environment[key] && isAbsolute(environment[key])) environment[key] = translate(environment[key]!)
   }
   const endpoints = new Map(request.mounts.map((mount) => [mount.target, mount]))

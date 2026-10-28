@@ -170,6 +170,8 @@ export async function createSandboxedAgentRuntime(
       'KEUNDAL_TOOL_APPROVAL',
       'KEUNDAL_PLUGIN_CONFIG',
       'KEUNDAL_MANAGED_PLUGINS',
+      'KEUNDAL_PROJECT_ID',
+      'KEUNDAL_WORKSPACE_ROOT',
       'OPENAI_API_KEY',
       'GEMINI_API_KEY',
       'ANTHROPIC_API_KEY'

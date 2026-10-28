@@ -25,11 +25,13 @@ const implementationIndependent = new Set([
   '@keundal/prompt',
   '@keundal/subagent',
   '@keundal/task',
+  '@keundal/automation',
   '@keundal/agent',
   '@keundal/agent-loop',
   '@keundal/tools',
   '@keundal/context',
   '@keundal/mcp',
+  '@keundal/memory',
   '@keundal/llm-settings',
   '@keundal/agent-host',
   '@keundal/fs',
@@ -46,6 +48,7 @@ const isImplementation = (name) =>
   name === '@keundal/agent-loop' ||
   name === '@keundal/agent-runtime-node' ||
   name === '@keundal/task-memory' ||
+  name === '@keundal/automation-node' ||
   name.startsWith('@tauri-apps/')
 
 const ignored = new Set(['node_modules', 'dist', 'target', 'coverage'])

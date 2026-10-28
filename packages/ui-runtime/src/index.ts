@@ -1,3 +1,4 @@
+import { parseRunBudget, type RunBudget } from '@keundal/agent'
 import {
   loadPromptPresets,
   parsePromptPresetSettings,
@@ -28,6 +29,7 @@ import {
 import { type SkillSummary } from '@keundal/skill'
 import { parseSubagentRoles, type SubagentRole } from '@keundal/subagent'
 import type { TaskSnapshot } from '@keundal/task'
+import type { CodingWorkspaceClient } from '@keundal/workspace'
 import { useStorage } from '@vueuse/core'
 import { Service, type Context } from 'cordis'
 import { computed, effectScope, reactive, ref, shallowRef, watch, type Ref } from 'vue'
@@ -101,7 +103,9 @@ export class ChatRuntime extends Service {
     this.promptPresets.value.presets.find((preset) => preset.id === this.promptPresets.value.activePresetId)
   )
   readonly subagentRoles = ref<SubagentRole[]>([])
+  readonly runBudget = ref<RunBudget>()
   readonly switching = ref(false)
+  readonly workspacesAvailable = ref(false)
   readonly webSearch = computed<boolean>({
     get: () => this.options.preferences.webSearch.value ?? true,
     set: (value) => {
@@ -187,6 +191,11 @@ export class ChatRuntime extends Service {
     return this.connection?.remoteAgent ?? false
   }
 
+  get workspaces(): CodingWorkspaceClient {
+    if (!this.connection?.workspaces) throw unavailable('Coding workspaces')
+    return this.connection.workspaces
+  }
+
   async listBackgroundTasks(): Promise<TaskSnapshot[]> {
     if (!this.connection?.tasks) throw unavailable('Background tasks')
     return this.connection.tasks.list()
@@ -214,6 +223,8 @@ export class ChatRuntime extends Service {
     try {
       this.promptPresets.value = loadPromptPresets(storage)
       this.subagentRoles.value = parseSubagentRoles(JSON.parse(storage.getItem('keundal:subagent-roles') ?? '[]'))
+      const budget = storage.getItem('keundal:run-budget')
+      this.runBudget.value = budget === null ? undefined : parseRunBudget(JSON.parse(budget))
       this.settings.value = await platform.settings.load()
     } catch (error) {
       throw new SettingsLoadError(error)
@@ -230,6 +241,7 @@ export class ChatRuntime extends Service {
       skills: platform.skills.providers
     })
     this.connection = connection
+    this.workspacesAvailable.value = !!connection.workspaces
     if (connection.selectedModel) this.model.value = connection.selectedModel
     if (connection.remoteModels) {
       this.remoteModels.value = connection.remoteModels
@@ -317,6 +329,16 @@ export class ChatRuntime extends Service {
     if (roles.length) storage.setItem('keundal:subagent-roles', JSON.stringify(roles))
     else storage.removeItem('keundal:subagent-roles')
     this.subagentRoles.value = roles
+  }
+
+  /** Capture saved limits separately for each new response; active runs retain their policy. */
+  saveRunBudget(value: RunBudget | undefined): void {
+    const storage = this.options.storage
+    if (!storage) throw unavailable('Browser storage')
+    const budget = value === undefined ? undefined : parseRunBudget(value)
+    if (budget) storage.setItem('keundal:run-budget', JSON.stringify(budget))
+    else storage.removeItem('keundal:run-budget')
+    this.runBudget.value = budget
   }
 
   /** Switch to the saved default model when the connection can serve it. */

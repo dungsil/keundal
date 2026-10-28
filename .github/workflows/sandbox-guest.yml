@@ -31,7 +31,7 @@ jobs:
             --mount "type=bind,source=$RUNNER_TEMP/keundal-guest,target=/output" \
             "node:$node_version-bookworm-slim" sh -ec '
               apt-get update
-              apt-get install --no-install-recommends -y linux-image-cloud-amd64 cpio busybox-static e2fsprogs file gzip binutils
+              apt-get install --no-install-recommends -y linux-image-cloud-amd64 cpio busybox-static e2fsprogs file gzip binutils git
               node /source/scripts/build-image.mjs --output /output --guest /source/dist/guest/guest.js
             '
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

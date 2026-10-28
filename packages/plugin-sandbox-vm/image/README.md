@@ -58,10 +58,12 @@ Unfinished private staging is discarded on the next configuration; persistent
 guest roots are never cleared or recursively overwritten.
 
 The worker runs `/usr/bin/node` with uid/gid 1000, no supplementary privilege,
-and `no_new_privs`. Roots must be disjoint absolute directories, must not cover
+and `no_new_privs`. Its private `/home/keundal` is backed by the state disk and
+persists plugin state and Git worktrees without sharing the host home. Roots
+must be disjoint absolute directories, must not cover
 guest runtime/control paths, and may live below `/tmp` (but cannot replace
 `/tmp` itself). Read-only roots receive read-only bind mounts before startup.
-There is no guest package installation; only bundled Node code and BusyBox are
+There is no guest package installation; only bundled Node, Git and BusyBox are
 available, and imported executable bits never include setuid or setgid.
 
 Shutdown terminates every uid-1000 process, including detached sessions, gives
@@ -74,6 +76,7 @@ waiting for an export acknowledgement. Host crashes must retain the private
 qcow2 disk and baseline for the next import; never replace them to resolve a
 merge conflict.
 
-This small userspace does not install CA certificates, DNS configuration, native
-Node addons, or a general Linux toolchain. All host networking must pass through
+This small userspace includes BusyBox commands and Git's local built-in workspace
+operations, but not Git transport helpers, CA certificates, DNS configuration,
+native Node addons, or a general Linux toolchain. All host networking must pass through
 the dedicated Unix-socket bridge; no virtual NIC or host share is needed.

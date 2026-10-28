@@ -38,7 +38,7 @@ echo "Dependencies ready in ${SECONDS}s"
 echo 'Preparing the Linux execution VM test assets'
 SECONDS=0
 missing=()
-for package in qemu-system-x86 qemu-utils linux-image-cloud-amd64 cpio busybox-static e2fsprogs file gzip; do
+for package in qemu-system-x86 qemu-utils linux-image-cloud-amd64 cpio busybox-static e2fsprogs file gzip git; do
   if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed'; then
     missing+=("$package")
   fi

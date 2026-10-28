@@ -20,7 +20,7 @@ pnpm exec turbo run build --filter=@keundal/plugin-sandbox-vm
 
 Build the Linux image on Debian bookworm x64 with the repository's pinned Node
 version, `linux-image-cloud-amd64`, `busybox-static`, `cpio`, `e2fsprogs`, `file`,
-and `gzip`. Building inside the corresponding official Node bookworm container
+`gzip`, and `git`. Building inside the corresponding official Node bookworm container
 avoids copying a host-specific Node/glibc runtime. CI's
 [guest-image workflow](../../.github/workflows/sandbox-guest.yml) does this.
 
@@ -64,7 +64,7 @@ remain invisible to the running workload and are not touched by export.
 
 Grants must be existing, disjoint directories, not system/control/state paths.
 Linux/macOS preserve their absolute grant paths inside the guest; Windows grants
-map in policy order to `/workspaces/0`, `/workspaces/1`, etc. The workspace is root 0. The standard SQLite, plugin-config and managed-plugin environment paths are
+map in policy order to `/workspaces/0`, `/workspaces/1`, etc. The workspace is root 0. The standard SQLite, plugin-config, managed-plugin and worktree-state environment paths are
 translated; arbitrary absolute paths embedded in plugin data or commands are
 not. Use relative, guest-compatible paths for portable configuration.
 
@@ -72,6 +72,11 @@ The worker runs as uid/gid 1000 with no-new-privileges. Root-owned guest control
 files, serial transport, and the state block device are inaccessible to it. Before
 export the controller terminates all uid-1000 processes, including detached Shell
 descendants. Read-only grants remain read-only inside the VM.
+
+The worker's default HOME, `/home/keundal`, is private persistent guest storage,
+not the host home. Plugin state and default managed Git worktrees survive VM
+restarts there without being exported as host files. Workspace API project paths
+must name imported guest directories; Windows host paths are not guest paths.
 
 Files are **not live-synchronized**. Host changes become visible at the next
 startup; guest changes are exported on graceful disposal. A three-way hash merge
@@ -98,7 +103,8 @@ pathname. Host loopback, Unix sockets/named pipes, direct TCP/UDP and unrelated
 processes are not exposed. Tool Approval cannot add VM capabilities. Plugins in
 one VM still share the explicitly provided environment and provider credentials.
 
-The minimal image includes Node and BusyBox, not git, Python, npm, or arbitrary
+The minimal image includes Node, BusyBox commands and Git's local built-in
+workspace operations, not Git transport helpers, Python, npm, or arbitrary
 shared libraries. Provision additional trusted Linux tools in the guest image as
 needed. Existing Cordis registration, service replacement and tool factories are
 unchanged, but Windows/macOS binaries, native addons built for another OS/ABI,

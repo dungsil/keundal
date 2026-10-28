@@ -1,14 +1,47 @@
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 import type { ExecutionOptions } from '@keundal/core'
-import type { SkillDefinition, SkillProvider } from '@keundal/skill'
+import { isSkillResourcePath, type SkillDefinition, type SkillProvider } from '@keundal/skill'
 
 import { contained, exists } from './files.js'
 import { pluginSkill } from './skill-metadata.js'
 import type { Report } from './validation.js'
 
 export function skills(root: string, signal: AbortSignal, report: Report): SkillProvider {
+  const resourceRoot = (directory: string) => contained(root, `skills/${directory}`, 'directory')
+  const listResources = async (directory: string, signal: AbortSignal): Promise<string[]> => {
+    const base = await resourceRoot(directory)
+    const paths: string[] = []
+    const visit = async (path: string) => {
+      signal.throwIfAborted()
+      try {
+        const actual = await contained(base, path, 'directory')
+        for (const entry of await readdir(actual, { withFileTypes: true })) {
+          signal.throwIfAborted()
+          const child = `${path}/${entry.name}`
+          if (!isSkillResourcePath(child)) continue
+          if (entry.isDirectory()) await visit(child)
+          else if (entry.isFile() || entry.isSymbolicLink()) {
+            try {
+              await contained(base, child, 'file')
+              paths.push(child)
+            } catch (error) {
+              report('skills', error instanceof Error ? error.message : String(error), child)
+            }
+          }
+        }
+      } catch (error) {
+        signal.throwIfAborted()
+        report('skills', error instanceof Error ? error.message : String(error), path)
+      }
+    }
+    for (const path of ['references', 'assets', 'scripts']) {
+      if (await exists(resolve(base, path))) await visit(path)
+    }
+    signal.throwIfAborted()
+    return paths.sort()
+  }
   const read = async (directory: string, options?: ExecutionOptions): Promise<SkillDefinition> => {
     const combined = globalThis.AbortSignal.any([signal, ...(options?.signal ? [options.signal] : [])])
     combined.throwIfAborted()
@@ -55,7 +88,24 @@ export function skills(root: string, signal: AbortSignal, report: Report): Skill
           if (!directory) return undefined
           const definition = await read(directory, { signal: loadSignal })
           if (definition.name !== name) throw new Error('skill name changed')
-          return definition
+          const resources = await listResources(directory, loadSignal)
+          return resources.length ? { ...definition, resources } : definition
+        },
+        async readResource(name, path, execution) {
+          const readSignal = globalThis.AbortSignal.any([combined, ...(execution?.signal ? [execution.signal] : [])])
+          readSignal.throwIfAborted()
+          if (!isSkillResourcePath(path)) throw new Error('invalid skill resource path')
+          const directory = selected.get(name)
+          if (!directory) return undefined
+          const base = await resourceRoot(directory)
+          const target = await contained(base, path, 'file')
+          if ((await stat(target)).size > 1024 * 1024) throw new Error('skill resource exceeds 1 MiB')
+          const bytes = await readFile(target, { signal: readSignal })
+          readSignal.throwIfAborted()
+          if (bytes.length > 1024 * 1024) throw new Error('skill resource exceeds 1 MiB')
+          const content = new globalThis.TextDecoder('utf-8', { fatal: true }).decode(bytes)
+          if (content.includes('\0')) throw new Error('skill resource must contain UTF-8 text')
+          return content
         }
       }
     }
