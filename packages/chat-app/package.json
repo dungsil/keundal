@@ -35,6 +35,7 @@
     "@keundal/ui-tool": "workspace:*",
     "@keundal/ui-trace": "workspace:*",
     "@keundal/ui-weather": "workspace:*",
+    "@keundal/ui-workspace": "workspace:*",
     "@nuxt/ui": "^4.11.3",
     "cordis": "catalog:",
     "motion-v": "^2.6.0",

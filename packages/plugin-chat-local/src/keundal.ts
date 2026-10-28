@@ -1,5 +1,5 @@
+import type { RunBudget } from '@keundal/agent'
 import type { AgentConfig } from '@keundal/agent-loop'
-import '@keundal/agent'
 import { ChatMessageAssembly, type ChatMessage } from '@keundal/chat/chat-message'
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
 import { validateChatTitle } from '@keundal/chat/chat-store'
@@ -26,6 +26,7 @@ export interface KeundalChatRequest {
   instructions: string
   promptPreset?: PromptPreset
   modelRecovery?: ModelRecoveryPolicy
+  budget?: RunBudget
   signal?: AbortSignal
   runId?: string
   state?: unknown
@@ -144,7 +145,11 @@ export async function createKeundalChat(
               ),
               forwardedProps: { keundalPromptPreset: request.promptPreset, keundalModelRecovery: request.modelRecovery }
             },
-            { signal: request.signal, steer: request.steer }
+            {
+              signal: request.signal,
+              steer: request.steer,
+              ...(request.budget === undefined ? {} : { budget: request.budget })
+            }
           )) {
           projection.apply(event)
           publisher.update(event, projection.message)

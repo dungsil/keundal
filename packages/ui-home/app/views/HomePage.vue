@@ -64,6 +64,7 @@ async function onSubmit() {
 }
 
 const composer = computed<ComposerOwner>(() => ({
+  threadId: chatId,
   input: input.value,
   setInput: (value) => { input.value = value },
   disabled: loading.value || props.switching.value,

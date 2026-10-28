@@ -1,6 +1,6 @@
 # @keundal/plugin-workspace-git
 
-로컬 Git 실행으로 [`WorkspaceService`](../workspace/README.md)를 구현합니다. 시스템에 Git이 있어야 합니다. 앱이 저장소 경로와 검토 콜백을 선택하며 기본 앱 구성에는 자동 등록하지 않습니다.
+로컬 Git 실행으로 [`WorkspaceService`](../workspace/README.md)를 구현합니다. 시스템에 Git이 있어야 합니다. 앱이 저장소 경로와 검토 콜백을 선택합니다. 기본 Node.js 호스트의 대화별 연결은 [코딩 작업공간 문서](../agent-runtime-node/README.md#코딩-작업공간)를 참고합니다.
 
 ## 조립
 
@@ -39,6 +39,6 @@ export async function installWorkspace(ctx: Context, review: WorkspaceReviewer) 
 - 검토 전에 HEAD를 고정하고 승인된 커밋으로 detached Worktree를 만듭니다. 기본 저장소의 미커밋 파일과 index는 복사하지 않습니다. 커밋이 없는 저장소에서는 Worktree를 만들 수 없습니다.
 - 반환한 `path`에 앱이 파일·Shell 서비스를 별도로 조립하면 해당 작업에서 사용할 수 있습니다. 기존 파일·Shell 서비스의 경로를 자동으로 바꾸지 않습니다.
 - 변경 파일·새 파일·무시된 파일이 있거나 HEAD가 생성 시점과 다르면 삭제를 거부합니다. `--force`는 사용하지 않으며 기본 저장소는 삭제 대상이 아닙니다.
-- 작업 등록은 서비스 수명 동안만 유지합니다. 해제할 때 Worktree를 지우지 않습니다. 재시작 뒤 남은 작업은 `git worktree list`로 확인하고 변경을 보존한 뒤 수동으로 관리합니다. 기존 경로나 작업 ID를 덮어쓰지 않습니다.
+- 작업 등록과 적용 기준은 Worktree 디렉터리 옆의 JSON 파일에 저장합니다. 재시작하면 같은 저장소에 속한 Worktree인지 확인한 뒤 복원하며, 해제할 때 작업 파일을 지우지 않습니다. 기존 경로나 작업 ID를 덮어쓰지 않습니다.
 
 Git은 Shell 문자열이 아닌 인자 배열로 실행합니다. 상속한 `GIT_*` 환경 변수의 저장소 우회, Git 훅·fsmonitor·외부 Diff·textconv 실행을 차단합니다. 다만 저장소의 checkout 필터 등 Git 설정 전체를 격리하지는 않습니다. 신뢰할 수 있는 저장소에서 사용하고, 신뢰할 수 없는 코드에는 별도의 OS 격리를 적용합니다.

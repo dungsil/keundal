@@ -12,6 +12,15 @@ const runtime = await createAgentRuntime(process.env, { compose: createNodeCompo
 
 `KEUNDAL_MODEL`, 공급자 API 키, `KEUNDAL_API_TOKEN`과 기존 환경 변수 형식은 유지합니다. API 키 없이 연결할 때는 `KEUNDAL_PROVIDER`를 명시합니다. 자세한 설정은 [웹 앱 문서](../../apps/web/README.md)를 참고합니다.
 
+## 프로젝트 메모리
+
+`KEUNDAL_PROJECT_ID` 또는 `createNodeAgentHost()`의 `projectId`를 지정하면 프로젝트 범위의
+`memory_save`, `memory_search`, `memory_get`, `memory_update`, `memory_delete` 도구를 제공합니다.
+같은 SQLite 파일과 프로젝트 ID를 사용하는 대화는 저장한 정보와 출처를 공유합니다.
+생략하면 도구를 제공하지 않으며, 빈 ID나 `memory` 서비스가 없는 저장소 구성은 거부합니다.
+프로젝트 선택은 모델이나 HTTP 요청이 아니라 호스트를 조립하는 앱이 담당합니다.
+검색 규칙과 승인 설정은 [메모리 문서](../memory/README.md)를 참고하세요.
+
 ## 런타임 플러그인
 
 기본 구성은 `KEUNDAL_PLUGIN_CONFIG`가 가리키는 JSON 파일을 시작할 때 읽습니다. 경로는 절대 경로 또는 현재 작업 디렉터리 기준 상대 경로입니다. 변수를 설정하지 않으면 현재 작업 디렉터리의 `keundal.plugins.json`을 찾습니다. 파일이 없으면 기본 구성을 사용합니다.
@@ -64,3 +73,15 @@ OAuth를 쓰는 호스트는 `mcpAuthentication: { documents: account }`로 서�
 `maxActiveSubagents`의 기본값은 8이며 부모 실행별 동시 자식 수를 제한합니다.
 `createAgentRuntime(env, { compose: createNodeComposition, subagents: false })`에도 같은 설정을 전달할 수 있습니다.
 자세한 결과 형식과 취소 동작은 [에이전트 문서](../agent-loop/README.md#서브에이전트)를 참고하세요.
+
+## 코딩 작업공간
+
+기본 Node.js 구성과 데스크톱 sidecar는 대화마다 Git Worktree를 연결할 수 있습니다. 채팅 입력창의 **코딩 작업공간**에서 호스트에 있는 Git 저장소의 최상위 폴더 경로를 입력하고 **Worktree 만들기**를 선택합니다. 커밋이 하나 이상 있는 신뢰할 수 있는 프로젝트만 선택하세요. 원본의 미커밋 변경은 복사하지 않습니다.
+
+프로젝트를 연결한 대화는 코딩 에이전트로 실행합니다. 파일 도구는 해당 Worktree 안에서만 읽기·생성·수정을 허용하고, 기존 파일을 수정하려면 먼저 읽어야 합니다. Git 메타데이터와 외부 경로는 거부합니다. 이 구성은 Shell·MCP·서브에이전트 도구를 제공하지 않습니다.
+
+응답이 끝나면 **코딩 에이전트 → 변경사항 검토**에서 추가·수정·삭제된 파일의 Diff를 확인하고 **프로젝트에 적용**을 선택합니다. 원본의 index는 유지하며 자동 커밋하지 않습니다. 검토 뒤 Worktree나 원본이 바뀌면 적용을 거부하고 다시 검토하도록 안내합니다. 적용 후에도 같은 Worktree에서 작업을 이어갈 수 있습니다.
+
+Worktree와 대화 연결은 기본적으로 사용자 홈의 `.keundal/workspaces` 아래에 저장합니다. SQLite 경로별로 분리하며 `KEUNDAL_WORKSPACE_ROOT`나 `NodeHostOptions.workspaceRoot`로 위치를 지정할 수 있습니다. 호스트·sidecar를 다시 시작해도 작업을 복원하지만 검토 승인은 복원하지 않습니다. 대화를 삭제하거나 앱을 종료해도 Worktree를 자동 삭제하지 않습니다. 남은 파일은 `git worktree list`로 확인한 뒤 보존할 변경을 직접 정리하세요.
+
+웹은 `NUXT_PUBLIC_AGENT_ENDPOINT`와 `NUXT_PUBLIC_AGENT_TOKEN`으로 연결한 Node.js 호스트의 폴더를 사용합니다. 같은 Node.js 웹 서버의 API를 쓰려면 endpoint를 `/api/agent`로 지정하고 token을 호스트의 `KEUNDAL_API_TOKEN`과 맞춥니다. 인증된 사용자는 호스트 권한으로 프로젝트 파일을 다루므로 개인용·신뢰할 수 있는 호스트에서만 노출하세요. 브라우저 단독 실행이나 Cloudflare 배포는 로컬 Git 폴더를 열 수 없으며 화면에 이 제한을 표시합니다.

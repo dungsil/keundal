@@ -376,4 +376,10 @@ test('같은 대화의 다음 실행에 변경한 재시도 정책과 대체 모
   const saved = (await chats.get('recovery'))!
   expect(saved.messages.at(-1)!.parts).toContainEqual({ type: 'text', text: '대체 응답' })
   expect(readTraceSpans((await chats.getRun(saved.messages.at(-1)!.id))!.journal.map(entry => entry.event))).toEqual(readTraceSpans(second))
+  requests.length = 0
+  const limited = await collect(chats.respond('recovery', {
+    model, messages: saved.messages, modelRecovery: policy.value, budget: { maxTokens: 1 }
+  }))
+  expect(limited.at(-1)).toMatchObject({ type: EventType.RUN_ERROR, message: expect.stringContaining('run budget exceeded: tokens') })
+  expect(requests).toEqual([])
 })

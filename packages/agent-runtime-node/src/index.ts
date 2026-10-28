@@ -44,6 +44,10 @@ export interface NodeHostOptions {
   /** 사용할 수 있는 모델과 한도입니다. */
   readonly models?: Readonly<Record<string, Omit<AgentHostModel, 'id' | 'provider'>>>
   readonly sqlitePath: string
+  /** Stable project scope for opt-in persistent memory tools. Omit to leave them disabled. */
+  readonly projectId?: string
+  /** Durable workspace state outside selected repositories. */
+  readonly workspaceRoot?: string
   readonly maxOutputTokens?: number
   readonly tools?: readonly ExecutableTool[] | ToolProvider
   readonly defaultTools?: readonly ExecutableTool[] | ToolProvider
@@ -58,7 +62,7 @@ export interface NodeHostOptions {
   readonly requireProviderApiKey?: boolean
 }
 
-export type HostComposition = Pick<AgentHostOptions, 'setup' | 'mountAgent' | 'toolCatalog'> & {
+export type HostComposition = Pick<AgentHostOptions, 'setup' | 'mountAgent' | 'toolCatalog' | 'workspaces'> & {
   plugins?: readonly LoadedAgentPlugin[]
 }
 export type HostCompositionFactory = (options: NodeHostOptions) => HostComposition
@@ -145,6 +149,8 @@ export async function createAgentRuntime(
       model,
       models: { [model]: { contextWindow, maxOutputTokens } },
       sqlitePath,
+      projectId: env.KEUNDAL_PROJECT_ID,
+      workspaceRoot: env.KEUNDAL_WORKSPACE_ROOT,
       maxOutputTokens,
       baseURL: env.KEUNDAL_BASE_URL || undefined,
       headers: env.KEUNDAL_HEADERS ? (JSON.parse(env.KEUNDAL_HEADERS) as Record<string, string>) : undefined

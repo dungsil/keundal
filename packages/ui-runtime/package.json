@@ -17,6 +17,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
+    "@keundal/agent": "workspace:*",
     "@keundal/chat": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/llm": "workspace:*",
@@ -24,6 +25,7 @@
     "@keundal/skill": "workspace:*",
     "@keundal/subagent": "workspace:*",
     "@keundal/task": "workspace:*",
+    "@keundal/workspace": "workspace:*",
     "@vueuse/core": "^14.4.0",
     "cordis": "catalog:"
   },

@@ -1,5 +1,11 @@
 import { type ExecutionOptions } from '@keundal/core'
-import { SkillService, type SkillCatalog, type SkillProvider, type SkillSummary } from '@keundal/skill'
+import {
+  isSkillResourcePath,
+  SkillService,
+  type SkillCatalog,
+  type SkillProvider,
+  type SkillSummary
+} from '@keundal/skill'
 import type { Context } from 'cordis'
 
 export const metadata = {
@@ -101,11 +107,31 @@ export class RegistrySkillService extends SkillService {
           typeof definition.description !== 'string' ||
           !definition.description.trim() ||
           typeof definition.content !== 'string' ||
-          !definition.content.trim()
+          !definition.content.trim() ||
+          (definition.resources !== undefined &&
+            (!Array.isArray(definition.resources) ||
+              definition.resources.some((path) => typeof path !== 'string' || !isSkillResourcePath(path))))
         ) {
           throw new Error(`invalid skill definition: ${name}`)
         }
-        return { name, description: definition.description, content: definition.content }
+        return {
+          name,
+          description: definition.description,
+          content: definition.content,
+          ...(definition.resources === undefined ? {} : { resources: [...definition.resources] })
+        }
+      },
+      readResource: async (name, path, execution) => {
+        const readSignal = globalThis.AbortSignal.any([signal, ...(execution?.signal ? [execution.signal] : [])])
+        readSignal.throwIfAborted()
+        if (!isSkillResourcePath(path)) throw new Error('invalid skill resource path')
+        const entry = selected.get(name)
+        if (!entry) return undefined
+        const providerSignal = globalThis.AbortSignal.any([readSignal, entry.signal])
+        providerSignal.throwIfAborted()
+        const content = await entry.catalog.readResource?.(name, path, { signal: providerSignal })
+        providerSignal.throwIfAborted()
+        return content
       }
     }
   }

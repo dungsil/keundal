@@ -1,3 +1,4 @@
+import type { RunBudget } from '@keundal/agent'
 import type { ExecutionOptions, AGUIEvent } from '@keundal/core'
 import type { GenerationSnapshot } from '@keundal/generation'
 import type { Reasoning } from '@keundal/llm'
@@ -34,6 +35,8 @@ export interface ChatStoreLike {
       /** Ordered prompt recipe, captured for this response only. */
       promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
+      /** Replaces the agent default for this response; excluded from title generation. */
+      budget?: RunBudget
       reasoning?: Reasoning
       webSearch?: boolean
       onMessage?: (message: ChatMessage) => void
