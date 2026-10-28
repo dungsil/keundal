@@ -24,6 +24,8 @@ export function apply(ctx: Context) {
       configuration: () => runtime.platform.mcp.configuration,
       saveSettings: (next: unknown) => runtime.saveMcpSettings(next),
       canProbe: () => typeof runtime.platform.mcp.probe === 'function',
+      oauth: () => runtime.platform.mcp.oauth,
+      stopResponses: () => runtime.stopResponses(),
       probe: (server: unknown, options?: McpRequestOptions) => runtime.platform.mcp.probe!(server, options)
     })
   }, McpSettingsSection))

@@ -794,6 +794,10 @@ test('MCP 설정 검증은 잘못된 권한과 전송 설정을 거부하고 원
   server.permissions.tools.push('delete')
   expect(parsed[0]?.permissions?.tools).toEqual(['search'])
   expect(parseMcpServers([{ ...server, maxResultBytes: 256 }])[0]?.maxResultBytes).toBe(256)
+  expect(parseMcpServers([{ ...server, oauth: {} }])[0]).toMatchObject({ oauth: {} })
+  expect(parseMcpServers([{ ...server, oauth: { clientId: 'public-client', scope: 'read write' } }])[0]).toMatchObject({
+    oauth: { clientId: 'public-client', scope: 'read write' }
+  })
   for (const change of [
     { transport: 'sse' },
     { url: 'file:///tmp/server' },
@@ -802,7 +806,14 @@ test('MCP 설정 검증은 잘못된 권한과 전송 설정을 거부하고 원
     { maxResultBytes: 0 },
     { maxResultBytes: 0.5 },
     { maxResultBytes: Number.MAX_SAFE_INTEGER + 1 },
-    { headers: { Authorization: 'line\nbreak' } }
+    { headers: { Authorization: 'line\nbreak' } },
+    { oauth: 'enabled' },
+    { oauth: { clientSecret: 'not-a-public-client' } },
+    { oauth: { clientId: '' } },
+    { oauth: { scope: 123 } },
+    { oauth: {}, headers: { aUtHoRiZaTiOn: 'Bearer conflicting' } },
+    { oauth: {}, url: 'http://192.168.0.2/mcp', allowInsecureHttp: true },
+    { oauth: {}, transport: 'stdio', command: 'node' }
   ]) {
     expect(() => parseMcpServers([{ ...server, ...change }])).toThrow()
   }

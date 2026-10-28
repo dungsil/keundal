@@ -1,4 +1,18 @@
 export default {
+  'mcp.useOAuth': 'Sign in with OAuth',
+  'mcp.clientId': 'Client ID (optional for dynamic registration)',
+  'mcp.oauthScope': 'Scope (optional)',
+  'mcp.connectAccount': 'Connect account',
+  'mcp.reauthenticate': 'Sign in again',
+  'mcp.disconnectAccount': 'Disconnect account',
+  'mcp.oauth.disconnected': 'Not connected',
+  'mcp.oauth.authorizing': 'Signing in…',
+  'mcp.oauth.connected': 'Account connected',
+  'mcp.oauth.reauthentication-required': 'Sign in required',
+  'mcp.oauth.unavailable': 'Account status unavailable',
+  'mcp.oauthWeb': 'Save the server, then connect your account. Allow popups and CORS for this app origin. OAuth credentials stay in memory; reloading or closing this app requires signing in again.',
+  'mcp.oauthDesktop': 'Save the server, then sign in in your system browser. OAuth credentials stay in the OS secret store.',
+  'mcp.oauthFailed': 'Could not connect the account. Allow popups, check the server and secret store, then try again. Closing or denying sign-in cancels the connection.',
   'mcp.name': 'Server name',
   'mcp.transport': 'Transport',
   'mcp.command': 'Command',
@@ -19,7 +33,7 @@ export default {
   'mcp.check': 'Check connection',
   'mcp.checkCancel': 'Cancel check',
   'mcp.checkDesktopLimit':
-    'On desktop, only Streamable HTTP servers can be checked. The check runs from this app window, so the server must allow this app origin through CORS. The local host that answers chats is not involved. stdio commands are never started by the check.',
+    'On desktop, the local host checks Streamable HTTP servers using your connected account. stdio commands are never started by the check.',
   'mcp.checkStdioUnsupported': 'stdio servers cannot be checked here. You can still save.',
   'mcp.checkFailed':
     'Could not reach the server. Check the URL, that the server is running, and that it allows CORS requests and MCP headers from this app. You can still save.',

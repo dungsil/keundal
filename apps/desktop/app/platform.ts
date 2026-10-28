@@ -1,6 +1,6 @@
 import { McpManager } from '@keundal/plugin-chat-browser/mcp'
 import { SkillManager } from '@keundal/plugin-chat-browser/skills'
-import { createNativeMcpSettingsStorage } from '@keundal/plugin-chat-desktop/mcp'
+import { createNativeMcpOAuth, createNativeMcpSettingsStorage } from '@keundal/plugin-chat-desktop/mcp'
 import { createDesktopChatStore, createNativeRuntimePluginManager } from '@keundal/plugin-chat-desktop'
 import { createNativeSettingsStorage } from '@keundal/plugin-chat-desktop/settings'
 import { createNativeSkillSource } from '@keundal/plugin-chat-desktop/skills'
@@ -12,9 +12,16 @@ import type { ChatPlatform, NativeInvoke } from '@keundal/chat/platform'
 
 export function createDesktopPlatform(storage: Storage, invoke: NativeInvoke): ChatPlatform {
   let connected: Awaited<ReturnType<typeof createDesktopChatStore>> | undefined
+  const oauth = createNativeMcpOAuth(invoke, undefined, async () => {
+    // Account changes close the old transports. Replace the host so cached tool clients cannot survive.
+    if (connected) await connected.reloadSettings()
+    else await invoke('sidecar_current_info', { restart: true })
+  })
   const platform: ChatPlatform = {
     runtimePlugins: createNativeRuntimePluginManager(invoke, async () => { await connected?.reloadSettings() }),
-    mcp: new McpManager(createNativeMcpSettingsStorage(invoke), { allowStdio: true }),
+    mcp: Object.assign(new McpManager(createNativeMcpSettingsStorage(invoke), { allowStdio: true, oauth }), {
+      probe: oauth.probe
+    }),
     settings: createNativeSettingsStorage(storage, invoke),
     skills: new SkillManager(storage, createNativeSkillSource(invoke)),
     loadModels,

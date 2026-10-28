@@ -9,6 +9,7 @@ fn main() {
             "read_skill_file",
             "runtime_plugins",
             "sidecar_info",
+            "sidecar_current_info",
         ]),
     ))
     .expect("failed to build Tauri application");

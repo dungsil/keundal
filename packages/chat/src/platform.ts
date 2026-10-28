@@ -1,6 +1,6 @@
 import type { ExecutionOptions } from '@keundal/core'
 import type { LLMSettings } from '@keundal/llm-settings'
-import type { McpProbeResult, McpRequestOptions } from '@keundal/mcp'
+import type { McpOAuthManager, McpProbeResult, McpRequestOptions } from '@keundal/mcp'
 import type { SkillProvider, SkillSummary } from '@keundal/skill'
 import type { TaskService } from '@keundal/task'
 import type { CodingWorkspaceClient } from '@keundal/workspace'
@@ -101,6 +101,7 @@ export interface ChatPlatform {
   runtimePlugins?: RuntimePluginManager
   mcp: {
     readonly configuration: import('@keundal/mcp').McpClientConfig[]
+    readonly oauth?: McpOAuthManager
     load(): Promise<void>
     save(value: unknown, restart: () => Promise<void>): Promise<void>
     /** Checks an unsaved configuration over a temporary connection; absent when the platform cannot do it. */

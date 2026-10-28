@@ -20,6 +20,7 @@ export type McpClientConfig = {
       readonly transport: 'streamable-http'
       readonly url: string
       readonly headers?: Record<string, string>
+      readonly oauth?: { readonly clientId?: string; readonly scope?: string }
       readonly redirect?: 'error'
       readonly allowInsecureHttp?: boolean
     }
@@ -49,6 +50,13 @@ export interface McpCredentialStorage {
 }
 
 export type McpAuthenticationState = 'disconnected' | 'authorizing' | 'connected' | 'reauthentication-required'
+
+/** Account actions never expose tokens to the settings UI. */
+export interface McpOAuthManager {
+  status(serverName: string, options?: McpRequestOptions): Promise<McpAuthenticationState>
+  connect(serverName: string, options?: McpRequestOptions): Promise<void>
+  disconnect(serverName: string, options?: McpRequestOptions): Promise<void>
+}
 
 /** A tool the server reports; listing it never grants permission to run it. */
 export interface McpToolSummary {
@@ -116,6 +124,18 @@ export function parseMcpServers(value: unknown, allowStdio = true): McpClientCon
     if (server.transport === 'streamable-http') {
       if (typeof server.url !== 'string') throw new Error('MCP HTTP URL is required')
       parseMcpHttpUrl(server.url, server.allowInsecureHttp as boolean | undefined)
+      if (server.oauth !== undefined) {
+        if (
+          !record(server.oauth) ||
+          Object.entries(server.oauth).some(
+            ([key, value]) => !['clientId', 'scope'].includes(key) || typeof value !== 'string' || !value.trim()
+          )
+        )
+          throw new Error('MCP OAuth requires a client ID and scope as nonempty strings when provided')
+        parseMcpHttpUrl(server.url)
+        if (record(server.headers) && Object.keys(server.headers).some((key) => key.toLowerCase() === 'authorization'))
+          throw new Error('MCP OAuth cannot be combined with an Authorization header')
+      }
       if (
         server.headers !== undefined &&
         (!dictionary(server.headers) ||
@@ -125,6 +145,7 @@ export function parseMcpServers(value: unknown, allowStdio = true): McpClientCon
       )
         throw new Error('Invalid MCP HTTP headers')
     } else if (server.transport === 'stdio' && allowStdio) {
+      if (server.oauth !== undefined) throw new Error('MCP OAuth requires Streamable HTTP')
       if (typeof server.command !== 'string' || !server.command.trim()) throw new Error('MCP command is required')
       if (server.args !== undefined && !strings(server.args)) throw new Error('MCP arguments must be strings')
       if (server.env !== undefined && !dictionary(server.env)) throw new Error('MCP environment values must be strings')

@@ -1,4 +1,4 @@
-import { McpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-chat-browser/mcp'
+import { BrowserMcpOAuth, McpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-chat-browser/mcp'
 import { SkillManager } from '@keundal/plugin-chat-browser/skills'
 import { BrowserAgentPluginManager } from '@keundal/plugin-chat-browser/plugins'
 import { Context, type Fiber } from 'cordis'
@@ -20,7 +20,11 @@ import { metadata as mcpMetadata } from '@keundal/plugin-chat-browser/mcp'
 import { MemoryTaskService } from '@keundal/task-memory'
 
 export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: string, agentToken?: string, pluginConfig?: string } = {}): ChatPlatform {
-  const mcp = new McpManager(createBrowserMcpSettingsStorage(storage))
+  const oauth: BrowserMcpOAuth = new BrowserMcpOAuth(() => mcp.configuration, () => mcp.close())
+  const mcp: McpManager = new McpManager(createBrowserMcpSettingsStorage(storage), {
+    oauth,
+    getAuthentication: server => oauth.authentication(server)
+  })
   const plugins = runtime.agentEndpoint ? undefined : new BrowserAgentPluginManager(storage)
   const platform: ChatPlatform = {
     mcp,

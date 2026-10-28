@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,7 @@ struct Sidecar {
     endpoint: String,
     token: String,
     child: Child,
+    input: Arc<Mutex<Option<ChildStdin>>>,
     selection: Option<Selection>,
 }
 
@@ -66,7 +67,7 @@ impl SidecarState {
 impl Drop for Sidecar {
     fn drop(&mut self) {
         // Closing the control pipe lets the host dispose MCP sessions and children.
-        self.child.stdin.take();
+        if let Ok(mut input) = self.input.lock() { input.take(); }
         let deadline = Instant::now() + Duration::from_secs(5);
         while Instant::now() < deadline {
             if matches!(self.child.try_wait(), Ok(Some(_))) {
@@ -254,7 +255,7 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
         .env("KEUNDAL_PROVIDER", provider.name)
         .env(
             "KEUNDAL_CORS_ORIGINS",
-            "http://tauri.localhost,https://tauri.localhost,tauri://localhost,http://localhost:1420",
+            "http://tauri.localhost,https://tauri.localhost,tauri://localhost,http://localhost:1420,http://127.0.0.1:1420",
         )
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -300,6 +301,8 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
     let mut child = command
         .spawn()
         .map_err(|_| "Could not start the local Keundal host".to_string())?;
+    let input = Arc::new(Mutex::new(child.stdin.take()));
+    let bridge_input = Arc::clone(&input);
     let stdout = child
         .stdout
         .take()
@@ -318,6 +321,20 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
                     return;
                 }
                 Ok(_) => {
+                    if line.contains("\"kind\":\"keundal-native-request\"") {
+                        if let Ok(request) = serde_json::from_str::<crate::mcp_oauth::Request>(&line) {
+                            let result = crate::mcp_oauth::execute(&request);
+                            let reply = serde_json::json!({
+                                "kind": "keundal-native-result", "id": request.id,
+                                "ok": result.is_ok(), "value": result.ok()
+                            });
+                            if let Ok(mut input) = bridge_input.lock() {
+                                if let Some(input) = input.as_mut() { let _ = writeln!(input, "{reply}"); }
+                            }
+                        }
+                        // Never log bridge messages: they may contain grants, refresh tokens or PKCE state.
+                        continue;
+                    }
                     if line.contains("\"kind\":\"keundal-sidecar\"") {
                         match serde_json::from_str::<Ready>(&line) {
                             Ok(ready) => {
@@ -331,10 +348,7 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
                                 return;
                             }
                         }
-                        for line in reader.lines().map_while(Result::ok) {
-                            eprintln!("[keundal-host] {line}");
-                        }
-                        return;
+                        continue;
                     }
                     eprintln!("[keundal-host] {line}");
                 }
@@ -353,6 +367,7 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
             endpoint: ready.url,
             token,
             child,
+            input,
             selection,
         }),
         Ok(Err(error)) => {
@@ -366,6 +381,21 @@ fn start(app: &tauri::AppHandle, selection: Option<Selection>) -> Result<Sidecar
             Err("The local Keundal host did not become ready".to_string())
         }
     }
+}
+
+#[tauri::command]
+pub async fn sidecar_current_info(app: tauri::AppHandle, restart: Option<bool>) -> Result<SidecarInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<SidecarState>();
+        let mut current = state.0.lock().map_err(|_| "Sidecar state is poisoned")?;
+        if restart.unwrap_or(false) {
+            let selection = current.as_ref().ok_or("The local host is not running")?.selection.clone();
+            let replacement = start(&app, selection)?;
+            *current = Some(replacement);
+        }
+        let sidecar = current.as_ref().ok_or("The local host is not running")?;
+        Ok(SidecarInfo { endpoint: sidecar.endpoint.clone(), token: sidecar.token.clone() })
+    }).await.map_err(|_| "Could not access the local host".to_string())?
 }
 
 #[tauri::command]

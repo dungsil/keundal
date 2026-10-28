@@ -27,7 +27,7 @@
           "identifier": "sidecar-info",
           "description": "Allow the local main window to obtain the sidecar connection information",
           "windows": ["main"],
-          "permissions": ["allow-sidecar-info"]
+          "permissions": ["allow-sidecar-info", "allow-sidecar-current-info"]
         },
         {
           "identifier": "llm-settings",

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useMounted } from '@vueuse/core'
-import type { McpClientConfig, McpProbeResult, McpRequestOptions } from '@keundal/mcp'
+import { useIntervalFn, useMounted } from '@vueuse/core'
+import type { McpAuthenticationState, McpClientConfig, McpOAuthManager, McpProbeResult, McpRequestOptions } from '@keundal/mcp'
 
 import { useText } from '../locale'
 
@@ -15,6 +15,8 @@ const props = defineProps<{
   /** The platform can check an unsaved server. */
   canProbe: () => boolean
   probe: (server: unknown, options?: McpRequestOptions) => Promise<McpProbeResult>
+  oauth: () => McpOAuthManager | undefined
+  stopResponses: () => Promise<void>
 }>()
 
 const { t } = useText()
@@ -24,12 +26,66 @@ const hosted = computed(() => mounted.value && props.remoteAgent && !desktop)
 const servers = ref<McpClientConfig[]>([])
 onMounted(() => {
   servers.value = props.configuration()
+  void refreshAccounts()
 })
 const editing = ref<number | null>(null)
 const name = ref('')
 const transport = ref('streamable-http')
 const address = ref('')
 const allowInsecureHttp = ref(false)
+const useOAuth = ref(false)
+const clientId = ref('')
+const oauthScope = ref('')
+const accounts = ref<Record<string, McpAuthenticationState | 'unavailable'>>({})
+const authBusy = ref('')
+const authError = ref('')
+let authAbort: AbortController | undefined
+let refreshingAccounts = false
+async function refreshAccounts() {
+  const oauth = props.oauth()
+  if (!oauth || hosted.value || refreshingAccounts) return
+  refreshingAccounts = true
+  try {
+    for (const server of servers.value) {
+      if (server.transport !== 'streamable-http' || !server.oauth) continue
+      try {
+        accounts.value[server.serverName] = await oauth.status(server.serverName)
+      } catch {
+        accounts.value[server.serverName] = 'unavailable'
+      }
+    }
+  } finally {
+    refreshingAccounts = false
+  }
+}
+useIntervalFn(refreshAccounts, 3000)
+async function accountAction(serverName: string, disconnect = false) {
+  const oauth = props.oauth()
+  if (!oauth) return
+  const restoreFocus = holdFocus()
+  authError.value = ''
+  if (disconnect) authAbort?.abort()
+  const controller = new AbortController()
+  authAbort = controller
+  authBusy.value = serverName
+  let action: Promise<void> | undefined
+  try {
+    // connect opens the browser before the first await so popup blockers accept the user gesture.
+    action = disconnect ? oauth.disconnect(serverName) : oauth.connect(serverName, { signal: controller.signal })
+    await Promise.all([action, props.stopResponses()])
+  } catch {
+    if (!controller.signal.aborted) authError.value = t('mcp.oauthFailed')
+    controller.abort()
+    await action?.catch(() => {})
+  } finally {
+    if (authAbort === controller) {
+      authBusy.value = ''
+      authAbort = undefined
+    }
+    await refreshAccounts()
+    void restoreFocus()
+  }
+}
 const args = ref('[]')
 const credentials = ref('{}')
 const tools = ref('')
@@ -67,6 +123,9 @@ function reset() {
   name.value = ''
   address.value = ''
   allowInsecureHttp.value = false
+  useOAuth.value = false
+  clientId.value = ''
+  oauthScope.value = ''
   args.value = '[]'
   credentials.value = '{}'
   tools.value = ''
@@ -80,6 +139,9 @@ function edit(server: McpClientConfig, index: number) {
   name.value = server.serverName
   transport.value = server.transport
   allowInsecureHttp.value = server.transport === 'streamable-http' && server.allowInsecureHttp === true
+  useOAuth.value = server.transport === 'streamable-http' && !!server.oauth
+  clientId.value = server.transport === 'streamable-http' ? server.oauth?.clientId ?? '' : ''
+  oauthScope.value = server.transport === 'streamable-http' ? server.oauth?.scope ?? '' : ''
   address.value = server.transport === 'stdio' ? server.command : server.url
   args.value = JSON.stringify(server.transport === 'stdio' ? server.args ?? [] : [])
   credentials.value = JSON.stringify(server.transport === 'stdio' ? server.env ?? {} : server.headers ?? {})
@@ -91,10 +153,14 @@ function edit(server: McpClientConfig, index: number) {
 watch(transport, () => {
   credentials.value = '{}'
   allowInsecureHttp.value = false
+  useOAuth.value = false
 }, { flush: 'sync' })
 // A result describes the connection values it was made with, so any change to them discards it.
-watch([transport, address, credentials, allowInsecureHttp, args, cwd, timeoutMs], clearCheck)
-onBeforeUnmount(cancelCheck)
+watch([transport, address, credentials, allowInsecureHttp, args, cwd, timeoutMs, useOAuth, clientId, oauthScope], clearCheck)
+onBeforeUnmount(() => {
+  cancelCheck()
+  authAbort?.abort()
+})
 const scope = (value: string) => value.trim() === '*' ? '*' as const : value.split('\n').map(item => item.trim()).filter(Boolean)
 // Controls disable while a request runs, which drops keyboard focus to the page; give it back when the request ends.
 function holdFocus() {
@@ -112,6 +178,7 @@ async function apply(next: unknown) {
   try {
     await props.saveSettings(next)
     servers.value = props.configuration()
+    await refreshAccounts()
     success.value = true
     reset()
   } catch {
@@ -127,7 +194,8 @@ function buildServer(serverName: string) {
     permissions: { tools: scope(tools.value), resources: scope(resources.value) },
     ...(transport.value === 'stdio'
       ? { command: address.value, args: JSON.parse(args.value), env: JSON.parse(credentials.value), ...(cwd.value ? { cwd: cwd.value } : {}) }
-      : { url: address.value, headers: JSON.parse(credentials.value), ...(allowInsecureHttp.value ? { allowInsecureHttp: true } : {}) })
+      : { url: address.value, headers: JSON.parse(credentials.value), ...(allowInsecureHttp.value ? { allowInsecureHttp: true } : {}),
+          ...(useOAuth.value ? { oauth: { ...(clientId.value.trim() ? { clientId: clientId.value.trim() } : {}), ...(oauthScope.value.trim() ? { scope: oauthScope.value.trim() } : {}) } } : {}) })
   }
 }
 async function save() {
@@ -205,13 +273,34 @@ const unknownAllowed = computed(() => {
     <template v-if="!hosted">
       <ul class="space-y-2">
         <li v-for="(server, index) in servers" :key="server.serverName" class="flex flex-wrap items-center gap-2">
-          <span class="min-w-0 grow [overflow-wrap:anywhere]">{{ server.serverName }} <span class="text-sm text-muted">{{ server.transport }}</span></span>
+          <span class="min-w-0 w-full [overflow-wrap:anywhere]">{{ server.serverName }} <span class="text-sm text-muted">{{ server.transport }}</span></span>
+          <template v-if="server.transport === 'streamable-http' && server.oauth">
+            <span role="status" class="text-sm text-muted">{{ t(`mcp.oauth.${accounts[server.serverName] ?? 'disconnected'}`) }}</span>
+            <UButton
+              :label="t(accounts[server.serverName] === 'connected' || accounts[server.serverName] === 'reauthentication-required' ? 'mcp.reauthenticate' : 'mcp.connectAccount')"
+              :aria-label="`${t(accounts[server.serverName] === 'connected' || accounts[server.serverName] === 'reauthentication-required' ? 'mcp.reauthenticate' : 'mcp.connectAccount')} ${server.serverName}`"
+              color="neutral"
+              variant="soft"
+              :disabled="saving || !!authBusy || !props.oauth()"
+              :loading="authBusy === server.serverName"
+              @click="accountAction(server.serverName)"
+            />
+            <UButton
+              v-if="(accounts[server.serverName] && accounts[server.serverName] !== 'disconnected') || authBusy === server.serverName"
+              :label="t('mcp.disconnectAccount')"
+              :aria-label="`${t('mcp.disconnectAccount')} ${server.serverName}`"
+              color="neutral"
+              variant="ghost"
+              :disabled="saving || (!!authBusy && authBusy !== server.serverName)"
+              @click="accountAction(server.serverName, true)"
+            />
+          </template>
           <UButton
             :label="t('mcp.edit')"
             :aria-label="`${t('mcp.edit')} ${server.serverName}`"
             color="neutral"
             variant="soft"
-            :disabled="saving"
+            :disabled="saving || !!authBusy"
             @click="edit(server, index)"
           />
           <UButton
@@ -219,11 +308,12 @@ const unknownAllowed = computed(() => {
             :aria-label="`${t('mcp.remove')} ${server.serverName}`"
             color="error"
             variant="soft"
-            :disabled="saving"
+            :disabled="saving || !!authBusy"
             @click="apply(servers.filter((_, i) => i !== index))"
           />
         </li>
       </ul>
+      <UAlert v-if="authError" color="error" :title="authError" role="alert" />
       <form class="space-y-4" @submit.prevent="save">
         <UFormField :label="t('mcp.name')" name="serverName" required>
           <UInput
@@ -252,6 +342,18 @@ const unknownAllowed = computed(() => {
           :description="t('mcp.allowInsecureHttpWarning')"
           :disabled="saving"
         />
+        <template v-if="transport === 'streamable-http'">
+          <UCheckbox v-model="useOAuth" :label="t('mcp.useOAuth')" :disabled="saving" />
+          <template v-if="useOAuth">
+            <p class="text-xs text-muted">{{ t(desktop ? 'mcp.oauthDesktop' : 'mcp.oauthWeb') }}</p>
+            <UFormField :label="t('mcp.clientId')" name="oauthClientId">
+              <UInput v-model="clientId" class="w-full" :disabled="saving" />
+            </UFormField>
+            <UFormField :label="t('mcp.oauthScope')" name="oauthScope">
+              <UInput v-model="oauthScope" class="w-full" :disabled="saving" />
+            </UFormField>
+          </template>
+        </template>
         <template v-if="transport === 'stdio'">
           <UFormField :label="t('mcp.args')" name="args">
             <UTextarea v-model="args" class="w-full" :disabled="saving" />
@@ -356,7 +458,7 @@ const unknownAllowed = computed(() => {
         <UAlert v-if="error" color="error" :title="error" role="alert" />
         <UAlert v-if="success" color="success" :title="t('mcp.saved')" role="status" />
         <div class="flex gap-2">
-          <UButton type="submit" :label="t(editing === null ? 'mcp.add' : 'mcp.save')" :loading="saving" />
+          <UButton type="submit" :label="t(editing === null ? 'mcp.add' : 'mcp.save')" :loading="saving" :disabled="!!authBusy" />
           <UButton
             v-if="editing !== null"
             :label="t('mcp.cancel')"
