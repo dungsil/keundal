@@ -1,6 +1,13 @@
 export { parseMcpServers } from '@keundal/mcp'
 import { parseMcpHttpUrl } from '@keundal/mcp'
-import type { McpPermissions, McpClientConfig, McpProbeResult, McpRequestOptions, McpToolSummary } from '@keundal/mcp'
+import type {
+  McpPermissions,
+  McpClientConfig,
+  McpConnectOptions,
+  McpProbeResult,
+  McpRequestOptions,
+  McpToolSummary
+} from '@keundal/mcp'
 import type { ExecutableTool } from '@keundal/tools'
 import { Client, StreamableHTTPClientTransport, type RequestOptions } from '@modelcontextprotocol/client'
 import type { Transport } from '@modelcontextprotocol/client'
@@ -8,7 +15,15 @@ import type { Transport } from '@modelcontextprotocol/client'
 import { CatalogDiscovery } from './catalog-budget.js'
 import { createHttpTransport } from './http-transport.js'
 import { boundedMcpPages, DEFAULT_MAX_RESULT_BYTES, McpResultBudget, resultBytes } from './result-budget.js'
-export type { McpPermissions, McpClientConfig, McpProbeResult, McpRequestOptions, McpToolSummary } from '@keundal/mcp'
+export type {
+  McpPermissions,
+  McpClientConfig,
+  McpConnectOptions,
+  McpProbeResult,
+  McpRequestOptions,
+  McpToolSummary
+} from '@keundal/mcp'
+export { McpOAuth, McpAuthenticationRequiredError, type McpOAuthOptions } from './oauth.js'
 
 export const metadata = {
   name: { en: 'MCP connections', ko: 'MCP 연결' },
@@ -76,7 +91,7 @@ export class McpClient {
 
   static async connect(
     config: McpClientConfig,
-    options: McpRequestOptions = {},
+    options: McpConnectOptions = {},
     createTransport?: (config: McpClientConfig) => Transport
   ): Promise<McpClient> {
     options.signal?.throwIfAborted()
@@ -88,11 +103,13 @@ export class McpClient {
     const maxResultBytes = config.maxResultBytes ?? DEFAULT_MAX_RESULT_BYTES
     if (!Number.isSafeInteger(maxResultBytes) || maxResultBytes <= 0)
       throw new Error('maxResultBytes must be a positive integer')
+    if (options.authentication && config.transport !== 'streamable-http')
+      throw new Error('MCP OAuth requires Streamable HTTP')
     if (config.transport === 'stdio' && !createTransport) throw new Error('stdio requires the Node.js MCP client')
     if (config.transport === 'streamable-http') parseMcpHttpUrl(config.url, config.allowInsecureHttp)
     const transport = createTransport
       ? createTransport(config)
-      : createHttpTransport(config as Extract<McpClientConfig, { transport: 'streamable-http' }>)
+      : createHttpTransport(config as Extract<McpClientConfig, { transport: 'streamable-http' }>, options)
     const client = new Client(
       { name: 'keundal-mcp-client', version: '0.0.0' },
       { capabilities: {}, versionNegotiation: { mode: 'auto' } }
@@ -122,7 +139,7 @@ export class McpClient {
    * Connects with the given configuration, reports what the server offers, and always closes the connection.
    * The whole check, including the connection, ends after `timeoutMs` and when `options.signal` aborts.
    */
-  static async probe(config: McpClientConfig, options: McpRequestOptions = {}): Promise<McpProbeResult> {
+  static async probe(config: McpClientConfig, options: McpConnectOptions = {}): Promise<McpProbeResult> {
     const timeoutMs = config.timeoutMs ?? 60_000
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw new Error('timeoutMs must be a positive integer')
     const deadline = globalThis.AbortSignal.timeout(timeoutMs)
@@ -132,7 +149,7 @@ export class McpClient {
       // The deadline bounds the whole check, so each request gets a little longer and the deadline reports first.
       client = await this.connect(
         { ...config, timeoutMs: timeoutMs + PROBE_REQUEST_MARGIN_MS, permissions: {} },
-        { signal }
+        { ...options, signal }
       )
       return await client.inspect({ signal })
     } catch (error) {

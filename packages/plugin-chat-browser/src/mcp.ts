@@ -1,5 +1,6 @@
 import {
   parseMcpServers,
+  type McpAuthentication,
   type McpClientConfig,
   type McpProbeResult,
   type McpRequestOptions,
@@ -32,7 +33,10 @@ export class McpManager {
 
   constructor(
     private readonly storage?: McpSettingsStorage,
-    private readonly options: { allowStdio?: boolean } = {}
+    private readonly options: {
+      allowStdio?: boolean
+      authentication?: Readonly<Record<string, McpAuthentication>>
+    } = {}
   ) {}
 
   get configuration(): McpClientConfig[] {
@@ -72,7 +76,10 @@ export class McpManager {
         const lifetime = this.lifetime.signal
         // MCP SDK만 지연 로드하도록 허용한 예외다. 정적 import는 사용 전에도 SDK를 초기 번들에 포함한다.
         pending = import('@keundal/plugin-mcp-client/browser').then(({ McpClient }) =>
-          McpClient.connect(server, { signal: lifetime })
+          McpClient.connect(server, {
+            signal: lifetime,
+            authentication: this.options.authentication?.[server.serverName]
+          })
         )
         this.clients.set(server.serverName, pending)
         void pending.catch(() => {
@@ -102,7 +109,7 @@ export class McpManager {
     if (server?.transport !== 'streamable-http') throw new Error('The connection check supports Streamable HTTP only')
     // MCP SDK의 지연 로딩 예외를 연결 확인에도 적용한다.
     const { McpClient } = await import('@keundal/plugin-mcp-client/browser')
-    return McpClient.probe(server, options)
+    return McpClient.probe(server, { ...options, authentication: this.options.authentication?.[server.serverName] })
   }
 
   async close() {

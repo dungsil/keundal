@@ -6,6 +6,8 @@
 
 `McpManager.probe(config, { signal })`는 저장하지 않은 설정을 검증한 뒤 임시 연결로 도구 목록을 조회합니다. 저장된 설정, 저장소, 진행 중인 응답의 연결에는 영향을 주지 않습니다. Streamable HTTP만 확인하며 stdio 설정은 연결하기 전에 거부합니다.
 
+`new McpManager(settingsStorage, { authentication: { issues: account } })`로 서버 이름에 대응하는 `McpAuthentication`을 주입합니다. 연결과 `probe()`가 같은 계정 컨트롤러를 사용하며 자격 증명은 서버 설정에 직렬화하지 않습니다. OAuth 로그인·콜백과 보안 저장소는 앱에서 조립합니다. 설정을 localStorage에 저장하더라도 OAuth 저장소로 재사용하지 않습니다. 계정 연결을 해제하거나 재인증한 뒤에는 `manager.close()`로 캐시를 비우고 다음 조회에서 새 연결을 만듭니다. 자세한 계정 수명과 저장소 경계는 [MCP 클라이언트 문서](../plugin-mcp-client/README.md#oauth-계정-연결)를 참고합니다.
+
 MCP SDK는 도구를 조회하거나 연결을 확인할 때만 불러옵니다. 설정을 읽거나 MCP 설정 화면을 여는 작업은 SDK를 불러오지 않습니다. SDK를 불러오는 동안 관리자를 닫으면 대기 중인 연결도 취소합니다.
 
 `./skills`의 `SkillManager`는 스킬 설정 저장과 파일 로딩을 담당합니다. 스키마와 타입은 `@keundal/chat/skills`에서 가져옵니다.
