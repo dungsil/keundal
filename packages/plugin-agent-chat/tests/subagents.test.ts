@@ -45,14 +45,18 @@ async function setup(
   t: TestContext,
   scripts: readonly (readonly LLMEvent[])[],
   config: Partial<AgentConfig> = {},
-  overrides: { stream?: LLMService['stream']; countTokens?: LLMService['countTokens'] } = {}
+  overrides: {
+    stream?: LLMService['stream']
+    countTokens?: LLMService['countTokens']
+    getModel?: LLMService['getModel']
+  } = {}
 ) {
   const ctx = new Context()
   const requests: LLMRequest[] = []
   const counted: LLMRequest[] = []
   class LLM extends LLMService {
-    async getModel() {
-      return { contextWindow: 2000, maxOutputTokens: 200 }
+    async getModel(model: string, options?: ExecutionOptions) {
+      return overrides.getModel ? overrides.getModel(model, options) : { contextWindow: 2000, maxOutputTokens: 200 }
     }
     async countTokens(request: LLMRequest, options?: ExecutionOptions) {
       counted.push(globalThis.structuredClone(request))
@@ -213,6 +217,208 @@ test('다음 요청의 역할 변경과 삭제는 이전 세션이나 설정의 
   expect(definitions[1].parameters).toMatchObject({ properties: { role: { enum: ['writer'] } } })
   expect(definitions[2].parameters.properties).not.toHaveProperty('role')
   expect(definitions[2].description).not.toContain('Review changes')
+})
+
+test.for(['config', 'request'] as const)(
+  '역할별 모델과 읽기 도구를 %s에서 지정해도 부모 설정은 유지한다',
+  async (source, t) => {
+    const executed: string[] = []
+    const roles = [
+      {
+        name: 'reader',
+        description: 'Read only',
+        instructions: 'Inspect files.',
+        model: 'cheap',
+        allowedTools: ['lookup']
+      }
+    ]
+    const { ctx, requests, counted } = await setup(
+      t,
+      [
+        call('delegate', JSON.stringify({ task: 'inspect', role: 'reader' }), 'delegate_task'),
+        call('read'),
+        answer,
+        call('parent-write', '{}', 'write_file'),
+        answer
+      ],
+      {
+        subagents: true,
+        ...(source === 'config' ? { subagentRoles: roles } : {}),
+        tools: () => [
+          tool(() => {
+            executed.push('read')
+            return 'read result'
+          }),
+          {
+            ...tool(() => {
+              executed.push('write')
+              return 'written'
+            }),
+            name: 'write_file'
+          }
+        ]
+      }
+    )
+    await collect(ctx.agent.run({ ...input, state: source === 'request' ? { subagentRoles: roles } : input.state }))
+    expect(requests.map((request) => request.model)).toEqual(['test', 'cheap', 'cheap', 'test', 'test'])
+    expect(
+      counted
+        .filter((request) => request.input.threadId !== input.threadId)
+        .every((request) => request.model === 'cheap')
+    ).toBe(true)
+    expect(requests[1].input.tools.map((tool) => tool.name)).toEqual(['lookup'])
+    expect(requests[3].input.tools.map((tool) => tool.name)).toEqual(['lookup', 'write_file', 'delegate_task'])
+    expect(executed).toEqual(['read', 'write'])
+    expect((await ctx.generation.get(requests[1].input.runId))?.status).toBe('completed')
+  }
+)
+
+test.for(['limits', 'compaction'] as const)(
+  '역할 모델의 %s 예산을 넘으면 부모 모델로 실행하지 않고 실패한다',
+  async (kind, t) => {
+    const { ctx, requests } = await setup(
+      t,
+      [call('delegate', JSON.stringify({ task: 'inspect', role: 'reader' }), 'delegate_task'), answer],
+      {
+        subagents: true,
+        subagentRoles: [{ name: 'reader', description: 'Read', instructions: 'Inspect.', model: 'cheap' }],
+        ...(kind === 'compaction' ? { compaction: { models: { cheap: { reserveTokens: 1950 } } } } : {})
+      },
+      {
+        async getModel(model) {
+          return { contextWindow: 2000, maxOutputTokens: kind === 'limits' && model === 'cheap' ? 50 : 200 }
+        }
+      }
+    )
+    const events = await collect(ctx.agent.run(input))
+    expect(requests.map((request) => request.model)).toEqual(['test', 'test'])
+    const result = events.find((event) => event.type === EventType.TOOL_CALL_RESULT && event.toolCallId === 'delegate')
+    expect(result?.type === EventType.TOOL_CALL_RESULT && JSON.parse(result.content as string)).toMatchObject({
+      status: 'failed',
+      error: {
+        message:
+          kind === 'limits'
+            ? 'requested output budget exceeds the model limits'
+            : 'compaction reserveTokens exceeds the model input budget'
+      }
+    })
+  }
+)
+
+test.for([[], ['lookup']] as string[][])('허용 목록 %j 밖의 도구 호출은 실행하지 않는다', async (allowedTools, t) => {
+  let writes = 0
+  const { ctx, requests } = await setup(
+    t,
+    [
+      call('delegate', JSON.stringify({ task: 'inspect', role: 'reader' }), 'delegate_task'),
+      call('write', '{}', 'write_file'),
+      answer
+    ],
+    {
+      subagents: true,
+      subagentRoles: [{ name: 'reader', description: 'Read only', instructions: 'Inspect files.', allowedTools }],
+      tools: [
+        tool(),
+        {
+          ...tool(() => {
+            writes++
+            return 'written'
+          }),
+          name: 'write_file'
+        }
+      ],
+      deferredTools: {},
+      deferredToolProvider: () => [{ ...tool(), name: 'remote_read' }]
+    }
+  )
+  await collect(ctx.agent.run(input))
+  expect(requests[1].input.tools.map((tool) => tool.name)).toEqual(allowedTools)
+  expect(writes).toBe(0)
+})
+
+test('지연 도구의 검색과 실행에도 역할 허용 목록을 적용한다', async (t) => {
+  const executed: string[] = []
+  const { ctx, requests } = await setup(
+    t,
+    [
+      call('delegate', JSON.stringify({ task: 'inspect', role: 'reader' }), 'delegate_task'),
+      call('search', '{"query":"remote"}', 'search_tool'),
+      call('read', '{}', 'remote_read'),
+      call('write', '{}', 'remote_write'),
+      answer
+    ],
+    {
+      subagents: true,
+      subagentRoles: [
+        {
+          name: 'reader',
+          description: 'Read only',
+          instructions: 'Inspect files.',
+          allowedTools: ['search_tool', 'remote_read', 'delegate_task']
+        }
+      ],
+      deferredTools: {},
+      deferredToolProvider: () =>
+        ['remote_read', 'remote_write', 'delegate_task'].map((name) => ({
+          ...tool(() => {
+            executed.push(name)
+            return name
+          }),
+          name,
+          description: 'remote tool'
+        }))
+    }
+  )
+  const events = await collect(ctx.agent.run(input))
+  expect(requests[1].input.tools.map((tool) => tool.name)).toEqual(['search_tool'])
+  expect(requests[2].input.tools.map((tool) => tool.name)).toEqual(['search_tool', 'remote_read'])
+  expect(requests[2].input.messages).toContainEqual(
+    expect.objectContaining({
+      role: 'tool',
+      content: JSON.stringify([{ name: 'remote_read', description: 'remote tool' }])
+    })
+  )
+  expect(executed).toEqual(['remote_read'])
+  const result = events.find((event) => event.type === EventType.TOOL_CALL_RESULT && event.toolCallId === 'delegate')
+  expect(result?.type === EventType.TOOL_CALL_RESULT && JSON.parse(result.content as string).status).toBe('failed')
+})
+
+test.for([1, 2])('역할의 도구 반복 한도 %i를 부모와 별도로 적용한다', async (maxToolRounds, t) => {
+  let reads = 0
+  const { ctx } = await setup(
+    t,
+    [],
+    {
+      subagents: true,
+      maxToolRounds: 3,
+      subagentRoles: [{ name: 'reader', description: 'Read', instructions: 'Inspect.', maxToolRounds }],
+      tools: [
+        tool(() => {
+          reads++
+          return 'read'
+        })
+      ]
+    },
+    {
+      async *stream(request) {
+        const results = request.input.messages.filter((message) => message.role === 'tool').length
+        if (request.input.threadId === input.threadId) {
+          if (results === 0)
+            yield* call('delegate', JSON.stringify({ task: 'inspect', role: 'reader' }), 'delegate_task')
+          else if (results === 1) yield* call('parent-read')
+          else yield* answer
+        } else if (results < 2) yield* call(`child-read-${results}`)
+        else yield* answer
+      }
+    }
+  )
+  const events = await collect(ctx.agent.run(input))
+  const result = events.find((event) => event.type === EventType.TOOL_CALL_RESULT && event.toolCallId === 'delegate')
+  expect(result?.type === EventType.TOOL_CALL_RESULT && JSON.parse(result.content as string).status).toBe(
+    maxToolRounds === 1 ? 'failed' : 'completed'
+  )
+  expect(reads).toBe(maxToolRounds + 1)
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
 })
 
 test('등록하지 않은 역할은 서브에이전트를 시작하지 않는다', async (t) => {
@@ -499,6 +705,36 @@ test.for([
   expect((await ctx.generation.get(input.runId))?.status === 'completed').toBe(limit === 330)
 })
 
+test.for([274, 275])('역할별 모델 비용을 부모와 공유하는 예산 %s에 합산한다', async (amount, t) => {
+  const { ctx, requests } = await setup(
+    t,
+    [call('delegate', '{"task":"inspect","role":"reader"}', 'delegate_task'), answer, answer],
+    {
+      subagents: true,
+      subagentRoles: [
+        { name: 'reader', description: 'Read', instructions: 'Inspect.', model: 'cheap', allowedTools: [] }
+      ],
+      pricing: {
+        currency: 'USD',
+        models: {
+          test: { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 },
+          cheap: { inputPerMillion: 500_000, outputPerMillion: 500_000 }
+        }
+      },
+      budget: { maxCost: { currency: 'USD', amount } }
+    }
+  )
+  // Each request reserves 10 input + 100 output tokens: parent 110 + child 55 + parent 110 = 275.
+  const completion = collect(ctx.agent.run(input))
+  if (amount === 274) await expect(completion).rejects.toThrow('run budget exceeded: cost')
+  else await completion
+  expect(requests.map((request) => request.model)).toEqual(
+    amount === 274 ? ['test', 'cheap'] : ['test', 'cheap', 'test']
+  )
+  expect(requests[1].input.tools).toEqual([])
+  expect((await ctx.generation.get(input.runId))?.status === 'completed').toBe(amount === 275)
+})
+
 test.for([329, 440])('병렬 서브에이전트는 토큰 예산 %s의 잔여분을 중복 예약하지 않는다', async (maxTokens, t) => {
   let childCalls = 0
   let cancelled = false
@@ -529,6 +765,61 @@ test.for([329, 440])('병렬 서브에이전트는 토큰 예산 %s의 잔여분
   else await completion
   expect(childCalls).toBe(maxTokens === 329 ? 1 : 2)
   expect(cancelled).toBe(maxTokens === 329)
+})
+
+test.for([1, 2])('백그라운드 작업도 역할별 모델·허용 도구·반복 한도 %i를 적용한다', async (maxToolRounds, t) => {
+  let reads = 0
+  const { ctx, requests } = await setup(
+    t,
+    [],
+    {
+      subagents: true,
+      subagentRoles: [
+        {
+          name: 'reader',
+          description: 'Read',
+          instructions: 'Inspect.',
+          model: 'cheap',
+          allowedTools: ['lookup'],
+          maxToolRounds
+        }
+      ],
+      tools: [
+        tool(() => {
+          reads++
+          return 'read'
+        }),
+        { ...tool(), name: 'write_file' }
+      ]
+    },
+    {
+      async *stream(request) {
+        const results = request.input.messages.filter((message) => message.role === 'tool').length
+        if (request.input.threadId === input.threadId) {
+          if (results === 0)
+            yield* call('background', '{"task":"inspect","role":"reader","background":true}', 'delegate_task')
+          else yield* answer
+        } else if (results < 2) yield* call(`child-read-${results}`)
+        else yield* answer
+      }
+    }
+  )
+  const tasks = new MemoryTaskService(ctx)
+  try {
+    await collect(ctx.agent.run(input))
+    const [task] = await tasks.list({ parentThreadId: input.threadId })
+    await expect.poll(async () => (await tasks.get(task.id))?.status).toBe(maxToolRounds === 1 ? 'failed' : 'completed')
+    const childRequests = requests.filter((request) => request.input.runId === task.runId)
+    expect(childRequests.length).toBe(maxToolRounds + 1)
+    for (const request of childRequests) {
+      expect(request.model).toBe('cheap')
+      expect(request.input.tools.map((tool) => tool.name)).toEqual(['lookup'])
+    }
+    expect(reads).toBe(maxToolRounds)
+    expect((await ctx.generation.get(input.runId))?.status).toBe('completed')
+  } finally {
+    await tasks.dispose()
+  }
 })
 
 test.for([

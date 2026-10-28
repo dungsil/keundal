@@ -295,7 +295,10 @@ subagentRoles: [
   {
     name: 'reviewer',
     description: 'Review code changes for correctness.',
-    instructions: 'Check the supplied diff for bugs and missing tests. Report concrete risks.'
+    instructions: 'Check the supplied diff for bugs and missing tests. Report concrete risks.',
+    model: 'gpt-4.1-mini',
+    allowedTools: ['read_file', 'search_tool', 'search_code'],
+    maxToolRounds: 3
   }
 ]
 // delegate_task({ task: 'Review this diff: ...', role: 'reviewer' })
@@ -306,7 +309,23 @@ subagentRoles: [
 `RunAgentInput.state.subagentRoles`를 전달하면 해당 실행에서는 설정의 목록 대신 사용합니다.
 빈 배열은 설정의 역할도 제공하지 않습니다. 실행이 시작된 뒤에는 역할 목록이 바뀌지 않습니다.
 
-자식은 같은 모델, 시스템 지침, 등록된 도구, 스킬과 축약 정책을 사용합니다.
+역할에 다음 실행 설정을 선택적으로 지정할 수 있습니다.
+
+- `model`: 서브에이전트가 사용할 모델입니다. 생략하면 부모 모델을 사용합니다. 모델 한도 조회,
+  토큰 계산, 모델별 축약 정책과 생성에 함께 적용합니다. 출력 예산은 부모의 `maxOutputTokens`를
+  유지하며 선택한 모델의 한도를 초과하면 실행을 거부합니다.
+- `allowedTools`: 이름이 일치하는 도구만 모델에 노출하고 실행합니다. 생략하면 기존 도구를 유지하며
+  `[]`이면 도구를 모두 금지합니다. 일반 도구와 `skill`, `search_tool`에도 적용합니다.
+  지연 도구는 `search_tool`과 대상 도구 이름을 모두 허용해야 검색·실행할 수 있습니다.
+  목록에 이름을 넣어도 공급자가 제공하지 않은 도구나 재위임 권한을 추가하지는 않습니다.
+- `maxToolRounds`: 도구 실행 뒤 후속 생성을 요청할 최대 횟수인 양의 안전한 정수입니다.
+  생략하면 부모 설정을 사용하며 지정한 값은 해당 서브에이전트에만 적용합니다.
+
+이 설정은 `subagentRoles` 또는 `RunAgentInput.state.subagentRoles`에서 지정합니다.
+현재 역할 설정 화면은 이름·설명·지침만 편집하며 저장할 때 기존 실행 설정은 유지합니다.
+역할 설정은 실행별 선택 기능이며 서버의 인증·인가 경계를 대신하지 않습니다.
+
+서브에이전트는 기본적으로 같은 모델, 시스템 지침, 등록된 도구, 스킬과 축약 정책을 사용합니다.
 부모의 대화 기록, 요청 도구, 상태와 문맥은 복사하지 않으므로 필요한 정보는 `task`에 넣어야 합니다.
 자식의 대화와 실행 기록은 별도 ID로 저장하며, 상태의 `subagent`에 부모의 `threadId`, `runId`와
 위임한 `toolCallId`를 기록합니다. 부모에게는 자식의 응답 스트림 대신 실행 상태와 도구 결과를 전달합니다.

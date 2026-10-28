@@ -10,6 +10,13 @@ test('역할 정의의 앞뒤 공백을 제거하고 빈 목록으로 역할을 
   expect(parseSubagentRoles([])).toEqual([])
 })
 
+test('역할별 실행 설정을 검증하고 도구가 없는 역할도 허용한다', () => {
+  expect(parseSubagentRoles([{ ...role, model: ' cheap ', allowedTools: [' read_file '], maxToolRounds: 2 }])).toEqual([
+    { ...role, model: 'cheap', allowedTools: ['read_file'], maxToolRounds: 2 }
+  ])
+  expect(parseSubagentRoles([{ ...role, allowedTools: [] }])).toEqual([{ ...role, allowedTools: [] }])
+})
+
 test.for([
   null,
   {},
@@ -21,7 +28,17 @@ test.for([
   [{ ...role, instructions: ' ' }],
   [{ ...role, instructions: 'a'.repeat(20_001) }],
   [role, { ...role, name: ' reviewer ' }],
-  [{ ...role, model: 'other' }],
+  [{ ...role, model: ' ' }],
+  [{ ...role, model: 42 }],
+  [{ ...role, allowedTools: 'read_file' }],
+  [{ ...role, allowedTools: [' '] }],
+  [{ ...role, allowedTools: [42] }],
+  [{ ...role, maxToolRounds: 0 }],
+  [{ ...role, maxToolRounds: -1 }],
+  [{ ...role, maxToolRounds: 1.5 }],
+  [{ ...role, maxToolRounds: Number.MAX_SAFE_INTEGER + 1 }],
+  [{ ...role, maxToolRounds: '2' }],
+  [{ ...role, unknown: true }],
   Array.from({ length: 33 }, (_, i) => ({ ...role, name: `role-${i}` }))
 ])('잘못된 역할 목록 %#을 거부한다', (value) => {
   expect(() => parseSubagentRoles(value)).toThrow()
