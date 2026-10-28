@@ -1,5 +1,6 @@
 import type { Context } from 'cordis'
 
+import { SqliteAutomationStore } from './automation.js'
 import { sqliteStoreConfigSchema, type SqliteStoreConfig } from './config.js'
 import { SqliteGenerationService } from './generation.js'
 import { SqliteMemoryService } from './memory.js'
@@ -21,6 +22,7 @@ export { SqliteMemoryService } from './memory.js'
 export { SqliteSessionService } from './session.js'
 export { SqliteStore, type RunOwnership, type StoredRun, type StoredThread } from './store.js'
 export { SqliteTaskStore } from './tasks.js'
+export { SqliteAutomationStore } from './automation.js'
 
 /**
  * session과 generation 서비스를 하나의 SQLite 데이터베이스 파일로 함께 제공합니다. 두 서비스가 같은
@@ -33,6 +35,7 @@ export const sqliteStorePlugin = Object.assign(
     ctx.fiber.effect(() => () => store.release())
     new SqliteSessionService(ctx, store)
     new SqliteTaskStore(ctx, store)
+    new SqliteAutomationStore(ctx, store)
     new SqliteMemoryService(ctx, store)
     ctx.inject(['llm', 'session'], (injected) => {
       new SqliteGenerationService(injected, store)
