@@ -1,0 +1,31 @@
+{
+  "name": "@keundal/agent-eval",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./coding": "./src/coding.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "eval": "node src/cli.ts"
+  },
+  "dependencies": {
+    "@keundal/agent": "workspace:*",
+    "@keundal/core": "workspace:*",
+    "@keundal/llm": "workspace:*",
+    "@keundal/plugin-agent-coding": "workspace:*",
+    "@keundal/plugin-llm-openai": "workspace:*",
+    "@keundal/plugin-store-memory": "workspace:*",
+    "@keundal/tools": "workspace:*",
+    "@keundal/trace": "workspace:*",
+    "cordis": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
