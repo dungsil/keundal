@@ -1,0 +1,39 @@
+{
+  "name": "@keundal/plugin-agent-acp",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "2.1.0",
+    "@keundal/agent": "workspace:*",
+    "@keundal/core": "workspace:*",
+    "@keundal/generation": "workspace:*",
+    "@keundal/llm": "workspace:*",
+    "@keundal/session": "workspace:*",
+    "@keundal/tool-approval": "workspace:*",
+    "cordis": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/plugin-store-memory": "workspace:*",
+    "@keundal/tsconfig": "workspace:*",
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

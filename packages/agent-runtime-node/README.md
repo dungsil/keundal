@@ -41,6 +41,12 @@ const runtime = await createAgentRuntime(process.env, { compose: createNodeCompo
 
 `builtin:llm`, `builtin:store`, `builtin:skills`, `builtin:agent`는 기본 플러그인 별칭입니다. `tools` 항목은 각 도구 목록 조회 때 실행됩니다. 매니페스트에 `tools`가 있으면 `options.tools`와 결합합니다. 없으면 `defaultTools`를 `options.tools`와 결합합니다. MCP 도구와 Agent Plugins 도구도 함께 전달됩니다.
 
+### 외부 ACP 에이전트
+
+`agent.module`에 `builtin:acp`를 지정하고 `config`에 `command`, `args`, 절대 경로 `cwd`를 설정하면 외부 ACP 에이전트가 응답을 생성합니다. 연결한 코딩 작업공간이 있으면 해당 Worktree를 `cwd`로 사용하며 내장 코딩 에이전트로 바꾸지 않습니다. 로컬 LLM은 제목 생성에만 사용합니다. 큰달의 도구·MCP 설정은 외부 에이전트에 자동 전달하지 않습니다.
+
+승인 정책을 명시하지 않으면 외부 권한 요청을 거부합니다. `KEUNDAL_TOOL_APPROVAL='{"default":"ask"}'` 또는 `NodeHostOptions.toolApproval`로 기존 승인 흐름에 연결할 수 있습니다. 외부 에이전트는 큰달의 파일 정책을 우회하므로 신뢰하는 명령만 등록하세요. 세션 수명과 제한, 전체 설정은 [`plugin-agent-acp` 문서](../plugin-agent-acp/README.md)를 참고하세요.
+
 ## MCP 연결
 
 `createNodeAgentHost(options, createNodeComposition)`의 `mcpServers` 옵션에 `@keundal/mcp`의 서버 설정 배열을 전달합니다. 환경 설정을 사용하는 웹 서버와 데스크톱 sidecar에서는 같은 배열을 JSON으로 직렬화한 `KEUNDAL_MCP_SERVERS`를 사용합니다. 설정을 생략하면 MCP에 연결하지 않습니다.
