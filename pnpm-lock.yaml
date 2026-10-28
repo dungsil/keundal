@@ -3673,6 +3673,49 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  tools/agent-eval:
+    dependencies:
+      '@keundal/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@keundal/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
+      '@keundal/plugin-agent-coding':
+        specifier: workspace:*
+        version: link:../../packages/plugin-agent-coding
+      '@keundal/plugin-llm-openai':
+        specifier: workspace:*
+        version: link:../../packages/plugin-llm-openai
+      '@keundal/plugin-store-memory':
+        specifier: workspace:*
+        version: link:../../packages/plugin-store-memory
+      '@keundal/tools':
+        specifier: workspace:*
+        version: link:../../packages/tools
+      '@keundal/trace':
+        specifier: workspace:*
+        version: link:../../packages/trace
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   tools/store-conformance:
     dependencies:
       '@keundal/core':
