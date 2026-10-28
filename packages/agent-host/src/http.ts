@@ -273,6 +273,20 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
         return sendJson(response, 200, { models: models() })
       }
 
+      if (segments[0] === 'tasks' && services.tasks) {
+        if (request.method === 'GET' && segments.length === 1) {
+          const parentThreadId = url.searchParams.get('parentThreadId') ?? undefined
+          return sendJson(response, 200, await services.tasks.list({ parentThreadId }))
+        }
+        if (request.method === 'GET' && segments.length === 2 && segments[1]) {
+          const task = await services.tasks.get(decodeURIComponent(segments[1]))
+          return task ? sendJson(response, 200, task) : sendJson(response, 404, { error: 'task not found' })
+        }
+        if (request.method === 'POST' && segments.length === 3 && segments[1] && segments[2] === 'cancel') {
+          return sendJson(response, 200, { cancelled: await services.tasks.cancel(decodeURIComponent(segments[1])) })
+        }
+      }
+
       if (request.method === 'GET' && segments.join('/') === 'catalog') {
         const abort = new AbortController()
         const disconnect = () => abort.abort()

@@ -51,6 +51,7 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
     for (const run of runs.values()) run.abort.abort(new Error('agent host disposed'))
     runs.clear()
     threads.clear()
+    await ctx.tasks?.dispose()
     const created = await Promise.allSettled(agents.values())
     agents.clear()
     const disposed = await Promise.allSettled(
@@ -164,6 +165,15 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         list: (runOptions) => servicesContext.generation.list(runOptions),
         recover: (runOptions) => servicesContext.generation.recover(runOptions)
       },
+      ...(servicesContext.tasks
+        ? {
+            tasks: {
+              get: (id: string) => servicesContext.tasks.get(id),
+              list: (query?: { parentThreadId?: string }) => servicesContext.tasks.list(query),
+              cancel: (id: string) => servicesContext.tasks.cancel(id)
+            }
+          }
+        : {}),
       models: () => models,
       async catalog(execution = {}) {
         if (closed) throw new Error('agent host disposed')

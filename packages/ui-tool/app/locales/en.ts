@@ -1,4 +1,6 @@
 export default {
+  'tool.subagentBackground': 'Background task submitted',
+  'tool.backgroundTasks': 'View background tasks',
   'tool.subagentPartial': 'Partial response (task not completed)',
   'tool.subagentQueued': 'Subagent queued',
   'tool.subagentRunning': 'Subagent running',

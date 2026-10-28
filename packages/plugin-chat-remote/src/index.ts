@@ -12,6 +12,7 @@ import { type Reasoning, STREAM_LIMITS } from '@keundal/llm'
 import { parsePromptPreset, type PromptPreset } from '@keundal/prompt'
 import { type SessionSnapshot } from '@keundal/session'
 import { type SubagentRole } from '@keundal/subagent'
+import type { TaskService, TaskSnapshot } from '@keundal/task'
 
 import { boundRemoteResponse, RemoteResponseLimitError, RemoteStreamBudget } from './response-budget'
 
@@ -65,6 +66,31 @@ export class RemoteChatStore implements ChatStoreLike {
   })
   private readonly active = this.runs.active
   private modelsCache: RemoteModel[] | undefined
+
+  readonly tasks: Pick<TaskService, 'get' | 'list' | 'cancel'> = {
+    list: async (options) => {
+      const query = options?.parentThreadId ? `?parentThreadId=${encodeURIComponent(options.parentThreadId)}` : ''
+      return (await this.call(`/tasks${query}`)).json() as Promise<TaskSnapshot[]>
+    },
+    get: async (id) => {
+      const response = await this.raw(`/tasks/${encodeURIComponent(id)}`)
+      if (response.status === 404) {
+        await response.body?.cancel()
+        return undefined
+      }
+      if (!response.ok) {
+        await response.body?.cancel()
+        throw new Error(`Keundal task request failed (HTTP ${response.status})`)
+      }
+      return response.json() as Promise<TaskSnapshot>
+    },
+    cancel: async (id) => {
+      const result = (await (
+        await this.call(`/tasks/${encodeURIComponent(id)}/cancel`, { method: 'POST' })
+      ).json()) as { cancelled: boolean }
+      return result.cancelled
+    }
+  }
 
   constructor(
     private connection: RemoteAgentInfo,

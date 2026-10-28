@@ -23,6 +23,7 @@
     "@keundal/chat": "workspace:*",
     "@keundal/plugin-runtime": "workspace:*",
     "@keundal/tools": "workspace:*",
+    "@keundal/task-memory": "workspace:*",
     "@keundal/plugin-agent-chat": "workspace:*",
     "@keundal/plugin-tool-chart": "workspace:*",
     "@keundal/plugin-tool-weather": "workspace:*",

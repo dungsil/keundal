@@ -31,11 +31,13 @@
     "@keundal/llm": "workspace:*",
     "@keundal/session": "workspace:*",
     "@keundal/skill": "workspace:*",
+    "@keundal/task": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {
     "@keundal/plugin-agent-chat": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",
+    "@keundal/task-memory": "workspace:*",
     "@keundal/trace": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",

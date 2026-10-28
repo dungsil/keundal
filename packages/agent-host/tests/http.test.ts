@@ -8,6 +8,7 @@ import { type GenerationSnapshot } from '@keundal/generation'
 import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
+import { MemoryTaskService } from '@keundal/task-memory'
 import { readTraceSpans, TRACE_EVENT } from '@keundal/trace'
 import { Context, type Fiber } from 'cordis'
 
@@ -23,7 +24,7 @@ const input = {
   state: {},
   tools: [],
   context: [],
-  messages: [{ id: 'q1', role: 'user', content: 'hello' }]
+  messages: [{ id: 'q1', role: 'user' as const, content: 'hello' }]
 }
 
 const reply: LLMEvent[] = [
@@ -738,5 +739,56 @@ test('호스트는 JSON과 스트림과 인증 오류의 캐시 저장을 금지
     const response = await fetch(`${base}${path}`, init)
     expect(response.headers.get('cache-control')).toBe('private, no-store')
     await response.text()
+  }
+})
+
+test('인증된 작업 API는 부모별 조회와 개별 취소를 제공하고 조회로 실행을 시작하지 않는다', async (t) => {
+  const { requestJson, services, base } = await setup(t)
+  const ctx = new Context()
+  const tasks = new MemoryTaskService(ctx, { maxActive: 1 })
+  services.tasks = tasks
+  const release = Promise.withResolvers<void>()
+  let executions = 0
+  try {
+    const first = await tasks.enqueue(
+      { input, parentThreadId: 'parent-a', parentRunId: 'parent-run' },
+      async function* () {
+        executions++
+        yield { type: EventType.TEXT_MESSAGE_START, messageId: 'partial', role: 'assistant' }
+        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'partial', delta: 'partial result' }
+        await release.promise
+      }
+    )
+    const queued = await tasks.enqueue(
+      {
+        input: { ...input, threadId: 'second', runId: 'second-run' },
+        parentThreadId: 'parent-b',
+        parentRunId: 'parent-run'
+      },
+      async function* () {
+        executions++
+        yield { type: EventType.RUN_FINISHED, threadId: 'second', runId: 'second-run', outcome: { type: 'success' } }
+      }
+    )
+    await expect
+      .poll(async () => ((await requestJson('GET', `/tasks/${first.id}`)).json as { content: string }).content)
+      .toBe('partial result')
+    expect(await requestJson('GET', '/tasks?parentThreadId=parent-b')).toMatchObject({
+      status: 200,
+      json: [{ id: queued.id, status: 'queued' }]
+    })
+    expect((await fetch(`${base}/tasks`)).status).toBe(401)
+    expect(await requestJson('POST', `/tasks/${queued.id}/cancel`)).toEqual({ status: 200, json: { cancelled: true } })
+    expect(await requestJson('POST', `/tasks/${first.id}/cancel`)).toEqual({ status: 200, json: { cancelled: true } })
+    expect(await requestJson('GET', `/tasks/${first.id}`)).toMatchObject({
+      status: 200,
+      json: { status: 'cancelled', content: 'partial result' }
+    })
+    expect((await requestJson('GET', '/tasks/missing')).status).toBe(404)
+    expect(await requestJson('POST', `/tasks/${first.id}/cancel`)).toEqual({ status: 200, json: { cancelled: false } })
+    expect(executions).toBe(1)
+  } finally {
+    release.resolve()
+    await tasks.dispose()
   }
 })

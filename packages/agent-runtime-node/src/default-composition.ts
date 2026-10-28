@@ -16,6 +16,7 @@ import { loadRuntimePlugins, parseRuntimePluginManifest, type RuntimePluginManif
 import skillPlugin, { metadata as skillMetadata } from '@keundal/plugin-skill'
 import sqlite, { metadata as storeMetadata } from '@keundal/plugin-store-sqlite'
 import type { SkillProvider } from '@keundal/skill'
+import { MemoryTaskService } from '@keundal/task-memory'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 import type { Context, Fiber } from 'cordis'
 import { resolve as resolveModule } from 'import-meta-resolve'
@@ -257,6 +258,7 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
     toolCatalog: async (execution) =>
       (await runtime?.tools?.(execution))?.map(({ name, description }) => ({ name, description })) ?? [],
     async setup(ctx) {
+      new MemoryTaskService(ctx, { maxActive: options.maxActiveSubagents ?? 8 })
       ctx.effect(() => async () => {
         mcpLifetime.abort()
         await Promise.allSettled([...mcpClients.values()].map(async (client) => (await client).close()))

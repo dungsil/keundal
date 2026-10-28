@@ -3,6 +3,7 @@ import { EventType, parseAGUIEvent, type AGUIEvent, type ExecutionOptions, type 
 import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
+import { MemoryTaskService } from '@keundal/task-memory'
 import type { ExecutableTool } from '@keundal/tools'
 import { Context } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
@@ -440,4 +441,97 @@ test.for(['', ' '.repeat(2), 'x'.repeat(81), 1])('잘못된 작업 이름 %j는 
   )
   await expect(collect(ctx.agent.run(input))).rejects.toThrow('delegate_task label')
   expect(requests).toHaveLength(1)
+})
+
+test.for([
+  { stopParent: false, queued: false },
+  { stopParent: true, queued: false },
+  { stopParent: true, queued: true }
+])('부모 종료 조건 %j에서도 백그라운드 작업은 도구를 재실행하지 않고 완료한다', async ({ stopParent, queued }, t) => {
+  const release = Promise.withResolvers<void>()
+  const unblock = Promise.withResolvers<void>()
+  let sideEffects = 0
+  const { ctx, agent, requests } = await setup(
+    t,
+    [],
+    {
+      subagents: true,
+      tools: [
+        tool(() => {
+          sideEffects++
+          return 'written'
+        })
+      ]
+    },
+    {
+      stream: async function* (request, options) {
+        if (request.input.threadId === input.threadId) {
+          if (request.input.messages.some((message) => message.role === 'tool')) yield* answer
+          else
+            yield* call(
+              'background',
+              JSON.stringify({ task: 'write once', label: 'Independent job', background: true }),
+              'delegate_task'
+            )
+        } else if (request.input.messages.some((message) => message.role === 'tool')) {
+          await release.promise
+          options?.signal?.throwIfAborted()
+          yield* answer
+        } else {
+          yield* call('write')
+        }
+      }
+    }
+  )
+  const tasks = new MemoryTaskService(ctx, { maxActive: 1 })
+  try {
+    if (queued)
+      await tasks.enqueue(
+        {
+          input: { ...input, threadId: 'blocker', runId: 'blocker-run' },
+          parentThreadId: 'other-parent',
+          parentRunId: 'other-run'
+        },
+        async function* (request) {
+          await unblock.promise
+          yield {
+            type: EventType.RUN_FINISHED,
+            threadId: request.threadId,
+            runId: request.runId,
+            outcome: { type: 'success' }
+          }
+        }
+      )
+    const events: AGUIEvent[] = []
+    for await (const event of ctx.agent.run(input)) {
+      events.push(event)
+      if (stopParent && event.type === EventType.TOOL_CALL_RESULT) break
+    }
+    const result = events.find((event) => event.type === EventType.TOOL_CALL_RESULT)
+    const { taskId } = JSON.parse((result as Extract<AGUIEvent, { type: 'TOOL_CALL_RESULT' }>).content as string)
+    if (queued) expect(sideEffects).toBe(0)
+    else await expect.poll(() => sideEffects).toBe(1)
+    await agent.dispose()
+    expect(await tasks.get(taskId)).toMatchObject({
+      status: queued ? 'queued' : 'running',
+      parentThreadId: 'thread',
+      parentRunId: 'run'
+    })
+    unblock.resolve()
+    release.resolve()
+    await expect.poll(async () => (await tasks.get(taskId))?.status).toBe('completed')
+    expect(await tasks.get(taskId)).toMatchObject({ content: 'done' })
+    expect((await tasks.list({ parentThreadId: 'thread' })).map((task) => task.id)).toEqual([taskId])
+    expect(
+      requests
+        .filter((request) => request.input.threadId !== input.threadId)
+        .every((request) => !request.input.tools.some((tool) => tool.name === 'delegate_task'))
+    ).toBe(true)
+    expect(await tasks.cancel(taskId)).toBe(false)
+    expect(sideEffects).toBe(1)
+  } finally {
+    unblock.resolve()
+    release.resolve()
+    await tasks.dispose()
+  }
 })

@@ -4,6 +4,7 @@ import type { GenerationJournalEntry, GenerationService, GenerationSubscriptionO
 import type { Reasoning } from '@keundal/llm'
 import type { SessionService } from '@keundal/session'
 import type { SkillSummary } from '@keundal/skill'
+import type { TaskService } from '@keundal/task'
 import type { Context, Fiber } from 'cordis'
 
 export interface AgentHostModel {
@@ -52,6 +53,7 @@ export interface AgentHostServices {
   subscribe(runId: string, options?: GenerationSubscriptionOptions): AsyncIterable<GenerationJournalEntry>
   session: Pick<SessionService, 'get' | 'list' | 'commit' | 'delete'>
   generation: Pick<GenerationService, 'get' | 'list' | 'recover'>
+  tasks?: Pick<TaskService, 'get' | 'list' | 'cancel'>
   models(): readonly AgentHostModel[]
   catalog?(options?: ExecutionOptions): Promise<{ skills: readonly SkillSummary[]; tools: readonly SkillSummary[] }>
   title(request: AgentHostTitleRequest, options?: ExecutionOptions): Promise<string>

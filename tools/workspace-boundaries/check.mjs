@@ -24,6 +24,7 @@ const implementationIndependent = new Set([
   '@keundal/trace',
   '@keundal/prompt',
   '@keundal/subagent',
+  '@keundal/task',
   '@keundal/agent',
   '@keundal/agent-loop',
   '@keundal/tools',
@@ -42,6 +43,7 @@ const isImplementation = (name) =>
   name.startsWith('@keundal/plugin-') ||
   name === '@keundal/agent-loop' ||
   name === '@keundal/agent-runtime-node' ||
+  name === '@keundal/task-memory' ||
   name.startsWith('@tauri-apps/')
 
 const ignored = new Set(['node_modules', 'dist', 'target', 'coverage'])

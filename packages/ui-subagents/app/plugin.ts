@@ -8,6 +8,7 @@ import { localizedText } from '@keundal/ui/app/utils/locale.ts'
 import { messages } from './locale'
 
 const SubagentSettings = lazyView(() => import('./views/SubagentSettings.vue'), ['subagentRoles', 'saveSubagentRoles'])
+const BackgroundTasks = lazyView(() => import('./views/BackgroundTasks.vue'), ['listTasks', 'cancelTask'])
 
 export const name = 'ui-subagents'
 export const inject = ['slots', 'chatRuntime']
@@ -25,4 +26,14 @@ export function apply(ctx: Context) {
       saveSubagentRoles: (value: readonly SubagentRole[]) => runtime.saveSubagentRoles(value)
     })
   }, SubagentSettings))
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    key: 'tasks',
+    order: 31,
+    meta: { label: localizedText(messages, 'tasks.title'), icon: 'i-lucide-list-todo', group: 'general' },
+    inject: () => ({
+      listTasks: () => runtime.listBackgroundTasks(),
+      cancelTask: (id: string) => runtime.cancelBackgroundTask(id)
+    })
+  }, BackgroundTasks))
 }

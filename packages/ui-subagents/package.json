@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@keundal/subagent": "workspace:*",
+    "@keundal/task": "workspace:*",
     "@keundal/ui": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
     "@keundal/ui-settings": "workspace:*",

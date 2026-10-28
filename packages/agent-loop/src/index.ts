@@ -18,7 +18,8 @@ import { PROMPT_MESSAGE_PREFIX, assemblePrompt, parsePromptPreset } from '@keund
 import type {} from '@keundal/session'
 import { SKILL_CATALOG_ID, skillTool, withSkillCatalog } from '@keundal/skill/tools'
 import { parseSubagentRoles } from '@keundal/subagent'
-import { subagentTool, SUBAGENT_TOOL_NAME } from '@keundal/subagent/tools'
+import { backgroundTaskTools, subagentTool, SUBAGENT_TOOL_NAME } from '@keundal/subagent/tools'
+import type {} from '@keundal/task'
 import { addTools, parseTools, streamWithTools } from '@keundal/tool-execution'
 import { traceEvent, type TraceSpan } from '@keundal/trace'
 import { TraceRecorder, type TraceParent } from '@keundal/trace/recording'
@@ -153,6 +154,10 @@ export class Agent extends AgentService {
         throw new Error('skill tool name is reserved when skills are enabled')
       if (this.config.subagents && configuredTools.some((tool) => tool.name === SUBAGENT_TOOL_NAME))
         throw new Error('delegate_task tool name is reserved when subagents are enabled')
+      const tasks = this.ctx.get('tasks')
+      const taskTools = tasks && this.config.subagents && allowSubagents ? backgroundTaskTools(tasks) : []
+      if (configuredTools.some((tool) => taskTools.some((reserved) => reserved.name === tool.name)))
+        throw new Error('background task tool names are reserved when tasks are enabled')
       const catalog = this.config.skills ? await this.ctx.skills.prepare(options) : undefined
       signal.throwIfAborted()
       const tools = [
@@ -165,10 +170,13 @@ export class Agent extends AgentService {
                 this.config.maxActiveSubagents ?? 8,
                 request.state?.subagentRoles === undefined
                   ? this.config.subagentRoles
-                  : parseSubagentRoles(request.state.subagentRoles)
+                  : parseSubagentRoles(request.state.subagentRoles),
+                tasks,
+                tasks ? (child, execution) => this.runBackground(child, execution) : undefined
               )
             ]
           : []),
+        ...taskTools,
         ...(deferredSession ? [deferredSession.searchTool] : [])
       ]
       let preparedInput = addTools(
@@ -351,6 +359,30 @@ export class Agent extends AgentService {
       throw error
     } finally {
       cleanup()
+    }
+  }
+
+  private async *runBackground(input: RunAgentInput, options: ExecutionOptions): AsyncGenerator<AGUIEvent> {
+    // The task service, not the parent's cached agent scope, owns this agent.
+    const ctx = this.ctx.extend({ fiber: this.ctx.root.fiber }).isolate('agent')
+    let agent: Agent | undefined
+    const scope = ctx.inject(
+      [
+        'llm',
+        'session',
+        'generation',
+        ...(this.config.skills ? ['skills'] : []),
+        ...(this.config.context ? ['requestContext'] : [])
+      ],
+      (owned: Context) => {
+        agent = new Agent(owned, { ...this.config, systemPrompt: this.systemPrompt() })
+      }
+    )
+    try {
+      await scope
+      yield* agent!.runInternal(input, options, false)
+    } finally {
+      await scope.dispose()
     }
   }
 }
