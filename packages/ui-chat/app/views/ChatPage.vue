@@ -243,6 +243,7 @@ async function removeQueuedMessage(messageId: string) {
 const running = computed(() => status.value === 'submitted' || status.value === 'streaming')
 
 const composer = computed<ComposerOwner>(() => ({
+  threadId: chatId,
   input: input.value,
   setInput: (value) => {
     input.value = value

@@ -19,7 +19,7 @@ web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도�
 
 `@keundal/llm`, `@keundal/session`, `@keundal/generation`, `@keundal/skill`은 각 서비스 계약과 Cordis Context 확장을 소유합니다. `@keundal/agent`, `@keundal/tools`, `@keundal/context`, `@keundal/mcp`, `@keundal/shell`, `@keundal/transcription`, `@keundal/fs`, `@keundal/workspace`도 구현 플러그인에 의존하지 않습니다. `@keundal/core`는 AG-UI 프로토콜과 공통 실행·메시지만 제공하며 기능별 계약을 다시 내보내지 않습니다.
 
-Git 작업공간은 `@keundal/workspace` 계약, `@keundal/plugin-workspace-git` 로컬 구현, `@keundal/plugin-tool-workspace` 에이전트 도구로 분리합니다. 앱이 저장소 경로·Worktree 디렉터리·검토 콜백을 선택하며 기본 앱 구성에는 자동 등록하지 않습니다. 승인 화면이나 공통 승인 서비스는 이 계약에 포함하지 않습니다. 조립과 검토 경계는 [Git 작업공간 문서](../packages/plugin-workspace-git/README.md)를 참고합니다.
+Git 작업공간은 `@keundal/workspace` 계약, `@keundal/plugin-workspace-git` 로컬 구현, `@keundal/plugin-tool-workspace` 에이전트 도구로 분리합니다. 기본 Node.js 구성은 대화별 Worktree와 코딩 에이전트를 조립하고, `@keundal/ui-workspace`가 프로젝트 선택·Diff 검토·원본 적용을 연결합니다. 원본 적용은 모델 도구로 제공하지 않으며 사용자가 검토한 변경만 적용합니다. 조립과 검토 경계는 [Git 작업공간 문서](../packages/plugin-workspace-git/README.md)와 [Node.js 호스트 문서](../packages/agent-runtime-node/README.md)를 참고합니다.
 
 기본 실행 루프는 `@keundal/agent-loop`가 소유하고, 요약 축약은 `@keundal/compaction-summary`, 도구 반복은 `@keundal/tool-execution`, 지연 도구는 `@keundal/deferred-tools`, 실행 추적은 `@keundal/trace`를 조합합니다. 독립적인 에이전트는 `AgentService`를 구현하고, 기본 루프를 재사용할 때는 `agent-loop`의 `Agent`를 상속합니다. 계약과 구현의 전체 경계와 가져오기 경로 변경은 [ADR-0005](adr/0005-service-package-boundaries.md)를 참고합니다.
 

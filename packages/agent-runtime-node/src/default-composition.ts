@@ -1,4 +1,6 @@
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
@@ -7,6 +9,9 @@ import { loadAgentPlugin, type LoadedAgentPlugin } from '@keundal/agent-plugins'
 import type { ExecutionOptions } from '@keundal/core'
 import { parseMcpServers } from '@keundal/mcp'
 import agentPlugin, { metadata as agentMetadata } from '@keundal/plugin-agent-chat'
+import codingAgentPlugin from '@keundal/plugin-agent-coding'
+import { LocalFileSystemService } from '@keundal/plugin-fs-local'
+import { PolicyFileSystemService } from '@keundal/plugin-fs-policy'
 import anthropic, { metadata as anthropicMetadata } from '@keundal/plugin-llm-anthropic'
 import gemini, { metadata as geminiMetadata } from '@keundal/plugin-llm-gemini'
 import openai, { metadata as openaiMetadata } from '@keundal/plugin-llm-openai'
@@ -15,6 +20,7 @@ import { McpClient, metadata as mcpMetadata } from '@keundal/plugin-mcp-client'
 import { loadRuntimePlugins, parseRuntimePluginManifest, type RuntimePluginManifest } from '@keundal/plugin-runtime'
 import skillPlugin, { metadata as skillMetadata } from '@keundal/plugin-skill'
 import sqlite, { metadata as storeMetadata } from '@keundal/plugin-store-sqlite'
+import { FileSystemToolsService } from '@keundal/plugin-tool-fs'
 import type { SkillProvider } from '@keundal/skill'
 import { MemoryTaskService } from '@keundal/task-memory'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
@@ -22,6 +28,7 @@ import type { Context, Fiber } from 'cordis'
 import { resolve as resolveModule } from 'import-meta-resolve'
 
 import type { HostCompositionFactory, NodeHostOptions } from './index.js'
+import { NodeCodingWorkspaces } from './workspaces.js'
 
 const providerPlugins = { openai, 'openai-chat': openaiChat, anthropic, gemini }
 
@@ -145,6 +152,11 @@ export function getRequiredNodePluginModules(options: NodeHostOptions): string[]
 }
 
 export const createNodeComposition: HostCompositionFactory = (options) => {
+  const workspaceRoot = resolve(
+    options.workspaceRoot ??
+      join(homedir(), '.keundal', 'workspaces', createHash('sha256').update(resolve(options.sqlitePath)).digest('hex'))
+  )
+  const workspaces = new NodeCodingWorkspaces(workspaceRoot)
   const plugins: LoadedAgentPlugin[] = []
   const skillProviders: SkillProvider[] = []
   const promptPresetsEnabled = options.bundledPlugins?.['@keundal/prompt'] !== false
@@ -293,9 +305,11 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
 
   return {
     plugins,
+    workspaces,
     toolCatalog: async (execution) =>
       (await runtime?.tools?.(execution))?.map(({ name, description }) => ({ name, description })) ?? [],
     async setup(ctx) {
+      workspaces.setup(ctx)
       ctx.effect(() => async () => {
         mcpLifetime.abort()
         await Promise.allSettled([...mcpClients.values()].map(async (client) => (await client).close()))
@@ -341,6 +355,50 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
     async mountAgent(ctx, config) {
       if (!agentEnabled) throw new Error('Agent is disabled; enable the agent plugin to generate responses')
       if (!runtime) throw new Error('runtime plugins are not initialized')
+      if (config.codingThreadId && config.workspacePath) {
+        const backendContext = ctx.isolate('fs')
+        let backend!: LocalFileSystemService
+        await backendContext.plugin((child: Context) => {
+          backend = new LocalFileSystemService(child, { cwd: config.workspacePath })
+        })
+        const files = ctx.isolate('fs')
+        await files.plugin((child: Context) => {
+          new PolicyFileSystemService(child, {
+            backend,
+            roots: [config.workspacePath!],
+            writableRoots: [config.workspacePath!]
+          })
+        })
+        let tools!: readonly ExecutableTool[]
+        await files.plugin(
+          Object.assign(
+            (child: Context) => {
+              tools = new FileSystemToolsService(child).tools.map((tool) => ({
+                ...tool,
+                async execute(args, execution) {
+                  const path = args.path
+                  if (typeof path !== 'string' || path.split(/[\\/]/).some((part) => part.toLowerCase() === '.git'))
+                    throw new Error('Git metadata is not accessible to file tools')
+                  const canonical = await child.fs.resolve(path, { signal: execution.signal })
+                  if (canonical.split(/[\\/]/).some((part) => part.toLowerCase() === '.git'))
+                    throw new Error('Git metadata is not accessible to file tools')
+                  return tool.execute(args, execution)
+                }
+              }))
+            },
+            { inject: ['fs'] }
+          )
+        )
+        const { codingThreadId: _thread, workspacePath: _path, ...agentConfig } = config
+        return files.plugin(codingAgentPlugin, {
+          ...agentConfig,
+          maxToolRounds: options.maxToolRounds ?? 8,
+          skills: false,
+          promptPresets: false,
+          subagents: false,
+          tools
+        })
+      }
       return runtime.mountAgent(ctx, {
         ...config,
         ...(!skillsEnabled ? { skills: false } : {}),

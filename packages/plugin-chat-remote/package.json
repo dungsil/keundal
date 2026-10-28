@@ -24,7 +24,8 @@
     "@keundal/session": "workspace:*",
     "@keundal/skill": "workspace:*",
     "@keundal/subagent": "workspace:*",
-    "@keundal/task": "workspace:*"
+    "@keundal/task": "workspace:*",
+    "@keundal/workspace": "workspace:*"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",
