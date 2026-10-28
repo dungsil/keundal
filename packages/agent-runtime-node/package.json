@@ -31,6 +31,7 @@
     "@keundal/plugin-skill": "workspace:*",
     "@keundal/plugin-store-sqlite": "workspace:*",
     "@keundal/skill": "workspace:*",
+    "@keundal/task-memory": "workspace:*",
     "@keundal/tool-approval": "workspace:*",
     "@keundal/tools": "workspace:*",
     "cordis": "catalog:",

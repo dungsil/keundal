@@ -27,6 +27,7 @@ import {
 } from '@keundal/llm-settings'
 import { type SkillSummary } from '@keundal/skill'
 import { parseSubagentRoles, type SubagentRole } from '@keundal/subagent'
+import type { TaskSnapshot } from '@keundal/task'
 import { useStorage } from '@vueuse/core'
 import { Service, type Context } from 'cordis'
 import { computed, effectScope, reactive, ref, shallowRef, watch, type Ref } from 'vue'
@@ -184,6 +185,16 @@ export class ChatRuntime extends Service {
   /** The connection runs the agent on a host rather than in the browser. */
   get remoteAgent(): boolean {
     return this.connection?.remoteAgent ?? false
+  }
+
+  async listBackgroundTasks(): Promise<TaskSnapshot[]> {
+    if (!this.connection?.tasks) throw unavailable('Background tasks')
+    return this.connection.tasks.list()
+  }
+
+  async cancelBackgroundTask(id: string) {
+    if (!this.connection?.tasks) throw unavailable('Background tasks')
+    return this.connection.tasks.cancel(id)
   }
 
   /**

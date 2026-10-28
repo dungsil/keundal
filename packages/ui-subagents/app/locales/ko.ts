@@ -1,6 +1,21 @@
 import type en from './en'
 
 export default {
+  'tasks.title': '백그라운드 작업',
+  'tasks.memoryOnly': '작업과 상태는 현재 프로세스나 브라우저 탭이 열려 있는 동안만 보관합니다. 재시작 복구와 자동 재시도는 지원하지 않습니다. 취소해도 도구가 이미 수행한 작업은 되돌리지 않습니다.',
+  'tasks.refresh': '새로고침',
+  'tasks.cancel': '작업 취소',
+  'tasks.empty': '백그라운드 작업이 없습니다.',
+  'tasks.loading': '작업을 불러오는 중…',
+  'tasks.loadFailed': '작업을 불러오지 못했습니다. 연결을 확인하고 다시 시도하세요.',
+  'tasks.cancelFailed': '작업을 취소하지 못했습니다. 새로고침하여 상태를 확인하세요.',
+  'tasks.partial': '부분 응답',
+  'tasks.parent': '부모 대화 열기',
+  'tasks.queued': '대기 중',
+  'tasks.running': '실행 중',
+  'tasks.completed': '완료',
+  'tasks.failed': '실패',
+  'tasks.cancelled': '취소됨',
   'subagents.title': '서브에이전트',
   'subagents.addRole': '역할 추가',
   'subagents.empty': '추가한 서브에이전트 역할이 없습니다.',

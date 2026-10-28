@@ -23,6 +23,7 @@
     "@keundal/llm-settings": "workspace:*",
     "@keundal/skill": "workspace:*",
     "@keundal/subagent": "workspace:*",
+    "@keundal/task": "workspace:*",
     "@vueuse/core": "^14.4.0",
     "cordis": "catalog:"
   },

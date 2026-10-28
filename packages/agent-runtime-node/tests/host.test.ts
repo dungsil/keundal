@@ -632,6 +632,8 @@ test.for([false, true])(
     expect(requests[0]?.tools).toEqual([
       expect.objectContaining({ name: 'weather', type: 'function' }),
       expect.objectContaining({ name: 'delegate_task', type: 'function' }),
+      expect.objectContaining({ name: 'get_background_task', type: 'function' }),
+      expect.objectContaining({ name: 'cancel_background_task', type: 'function' }),
       ...(deferred ? [expect.objectContaining({ name: 'search_tool', type: 'function' })] : [])
     ])
     expect(requests[1]?.input).toContainEqual({

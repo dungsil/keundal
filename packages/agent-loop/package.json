@@ -28,6 +28,7 @@
     "@keundal/session": "workspace:*",
     "@keundal/skill": "workspace:*",
     "@keundal/subagent": "workspace:*",
+    "@keundal/task": "workspace:*",
     "@keundal/tool-approval": "workspace:*",
     "@keundal/tool-execution": "workspace:*",
     "@keundal/tools": "workspace:*",
