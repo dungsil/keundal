@@ -1,4 +1,4 @@
-import { AgentService } from '@keundal/agent'
+import { AgentService, type AgentExecutionOptions } from '@keundal/agent'
 import { SummaryCompactionController } from '@keundal/compaction-summary/controller'
 import type {} from '@keundal/context'
 import {
@@ -24,6 +24,7 @@ import { traceEvent, type TraceSpan } from '@keundal/trace'
 import { TraceRecorder, type TraceParent } from '@keundal/trace/recording'
 import type { Context } from 'cordis'
 
+import { BudgetLedger, parseRunBudget } from './budget.js'
 import type { AgentConfig } from './config.js'
 import { SYSTEM_PROMPT_ID, withSystemPrompt } from './prompt.js'
 
@@ -60,21 +61,35 @@ export class Agent extends AgentService {
     return this.config.systemPrompt
   }
 
-  run(input: RunAgentInput, options: ExecutionOptions = {}): AsyncIterableIterator<AGUIEvent> {
+  run(input: RunAgentInput, options: AgentExecutionOptions = {}): AsyncIterableIterator<AGUIEvent> {
     return this.runInternal(input, options, true)
   }
 
   private runInternal(
     input: RunAgentInput,
-    options: ExecutionOptions & Partial<TraceParent>,
+    options: AgentExecutionOptions & Partial<TraceParent>,
     allowSubagents: boolean,
+    budget?: BudgetLedger,
     role?: SubagentRole
   ): AsyncIterableIterator<AGUIEvent> {
     if (this.closed) throw new Error('agent disposed')
     const controller = new globalThis.AbortController()
+    const policy = !budget && (options.budget ?? this.config.budget)
+    let timer: ReturnType<typeof globalThis.setTimeout> | undefined
+    if (policy) {
+      const parsed = parseRunBudget(policy)
+      budget = new BudgetLedger(parsed, this.config.pricing, (reason) => controller.abort(reason))
+      if (parsed.maxDurationMs !== undefined) {
+        timer = globalThis.setTimeout(
+          () => controller.abort(new Error('run budget exceeded: duration')),
+          parsed.maxDurationMs
+        )
+      }
+    }
     const externalSignal = options.signal
     const abort = () => controller.abort(externalSignal?.reason)
     const cleanup = () => {
+      globalThis.clearTimeout(timer)
       externalSignal?.removeEventListener('abort', abort)
       controller.signal.removeEventListener('abort', cleanup)
       this.active.delete(controller)
@@ -92,7 +107,16 @@ export class Agent extends AgentService {
       options.traceId && options.parentSpanId
         ? { traceId: options.traceId, parentSpanId: options.parentSpanId }
         : undefined
-    const iterator = this.execute(input, controller.signal, stop, allowSubagents, traceParent, options.steer, role)
+    const iterator = this.execute(
+      input,
+      controller.signal,
+      stop,
+      allowSubagents,
+      traceParent,
+      options.steer,
+      budget,
+      role
+    )
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -116,21 +140,25 @@ export class Agent extends AgentService {
     allowSubagents: boolean,
     traceParent?: TraceParent,
     steer?: SteerQueue,
+    budget?: BudgetLedger,
     role?: SubagentRole
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     let failedTrace: TraceRecorder | undefined
     let rootFinalized = false
+    const llm = budget ? budget.wrap(this.ctx.llm) : this.ctx.llm
     const modelName = role?.model ?? this.config.model
-    const compaction = role?.model
-      ? new SummaryCompactionController(this.ctx.llm, { ...this.config, model: modelName })
-      : this.compaction
+    const compaction =
+      budget || role?.model
+        ? new SummaryCompactionController(llm, { ...this.config, model: modelName })
+        : this.compaction
     const allowed = (tool: { name: string }) =>
       (allowSubagents || tool.name !== SUBAGENT_TOOL_NAME) &&
       (role?.allowedTools === undefined || role.allowedTools.includes(tool.name))
     try {
       signal.throwIfAborted()
       const request = parseRunAgentInput(input)
-      const presetValue: unknown = request.forwardedProps?.keundalPromptPreset
+      const presetValue: unknown =
+        this.config.promptPresets === false ? undefined : request.forwardedProps?.keundalPromptPreset
       const promptPreset = presetValue === undefined ? undefined : parsePromptPreset(presetValue)
       const trace = new TraceRecorder(request.runId, traceParent, this.config.pricing)
       failedTrace = trace
@@ -177,7 +205,7 @@ export class Agent extends AgentService {
         ...(this.config.subagents && allowSubagents
           ? [
               subagentTool(
-                (child, execution, role) => this.runInternal(child, execution, false, role),
+                (child, execution, role) => this.runInternal(child, execution, false, budget, role),
                 this.config.maxActiveSubagents ?? 8,
                 request.state?.subagentRoles === undefined
                   ? this.config.subagentRoles
@@ -200,7 +228,7 @@ export class Agent extends AgentService {
         throw new Error('session revision must be a non-negative integer')
       }
 
-      const model = await this.ctx.llm.getModel(modelName, options)
+      const model = await llm.getModel(modelName, options)
       signal.throwIfAborted()
       const maxOutputTokens = this.config.maxOutputTokens
       if (
@@ -230,7 +258,6 @@ export class Agent extends AgentService {
             (message) => message.id.startsWith(CONTEXT_MESSAGE_PREFIX) && !previousIds.has(message.id)
           )
         : []
-      const llm = this.ctx.llm
       const stream = (request: LLMRequest, execution?: ExecutionOptions) =>
         compaction.streamWithRetry(request, maxInputTokens, execution?.signal ?? signal, trace!)
       const maxToolRounds = role?.maxToolRounds ?? this.config.maxToolRounds ?? 8
@@ -274,6 +301,7 @@ export class Agent extends AgentService {
           return traceEvent(ended)
         }
       }
+      const approval = this.config.toolApproval
       const generation = this.ctx.generation.run(
         {
           input: fitted.input,
@@ -304,6 +332,7 @@ export class Agent extends AgentService {
                     (next) => prepareNext(next, generationSignal),
                     generationSignal,
                     {
+                      approval,
                       parallel,
                       stream,
                       maxToolCalls,
@@ -352,7 +381,7 @@ export class Agent extends AgentService {
           yield* trace.drain()
         }
         if (event.type === EventType.RUN_FINISHED) {
-          compaction.detach(signal)
+          if (!budget) compaction.detach(signal)
         }
         yield event
       }

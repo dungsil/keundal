@@ -3,6 +3,12 @@ import type { TraceSpan } from '@keundal/trace'
 
 export const TOOL_PROGRESS_EVENT = 'keundal.tool.progress'
 
+export interface ToolOperation {
+  readonly kind: string
+  readonly command?: string
+  readonly paths?: readonly string[]
+}
+
 export interface ToolExecutionContext {
   readonly threadId: string
   readonly runId: string
@@ -15,6 +21,7 @@ export interface ToolExecutionContext {
 }
 
 export interface ExecutableTool extends AgentTool {
+  readonly describeOperation?: (args: Record<string, unknown>) => ToolOperation
   /** JSON 객체 인자를 검증하고 실행하여 도구 결과 문자열을 반환합니다. */
   readonly execute: (args: Record<string, unknown>, context: ToolExecutionContext) => string | Promise<string>
 }

@@ -128,6 +128,55 @@ test('원격 스트림이 끊기면 afterSequence로 다시 구독해 누락·�
   expect(saved.messages[1]!.parts).toContainEqual({ type: 'text', text: '앞부분 뒷부분' })
 })
 
+test('새 클라이언트가 pendingRunId의 journal을 구독하면 모델과 도구를 다시 실행하지 않는다', async () => {
+  const entered = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  let executed = 0
+  const { host, requests, endpoint } = await start(async function* (_request, index) {
+    if (index === 0) {
+      yield { type: EventType.TOOL_CALL_START, toolCallId: 'once', toolCallName: 'work' }
+      yield { type: EventType.TOOL_CALL_ARGS, toolCallId: 'once', delta: '{}' }
+      yield { type: EventType.TOOL_CALL_END, toolCallId: 'once' }
+    } else {
+      yield { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' }
+      yield text('reply', '완료')
+      yield { type: EventType.TEXT_MESSAGE_END, messageId: 'reply' }
+    }
+  }, [{
+    name: 'work', description: 'work', parameters: { type: 'object' },
+    async execute() {
+      executed++
+      entered.resolve()
+      await release.promise
+      return 'done'
+    }
+  }])
+  const store = new RemoteChatStore({ endpoint, token })
+  const chat = await store.create('chat', user, model)
+  const snapshot = (await host.services.session.get('chat'))!
+  const saved = await host.services.session.commit({
+    threadId: 'chat', expectedRevision: snapshot.revision, mode: 'replace', messages: snapshot.messages,
+    state: { web: { ...chat, started: true, pendingRunId: 'existing-run' } }
+  })
+  const running = (async () => {
+    for await (const _event of host.services.run({
+      threadId: 'chat', runId: 'existing-run', state: saved.state, context: [], tools: [],
+      messages: [{ id: 'user', role: 'user', content: '질문' }]
+    })) { /* The host owns this execution independently of the client. */ }
+  })()
+  await entered.promise
+  const received: ChatMessage[] = []
+  for await (const event of store.respond('chat', { model: 'openai/other-selection', messages: [user], onMessage: message => received.push(message) })) {
+    if (event.type === EventType.TOOL_CALL_END) release.resolve()
+  }
+  await running
+  expect(executed).toBe(1)
+  expect(requests).toHaveLength(2)
+  expect((await host.services.generation.list()).map(run => run.request.input.runId)).toEqual(['existing-run'])
+  expect((await store.get('chat'))!.messages[1]!.parts).toContainEqual({ type: 'text', text: '완료' })
+  expect(received.at(-1)?.id).toBe('existing-run')
+})
+
 test('원격 중단은 연결 종료와 달리 명시적인 취소로 호스트 실행을 cancelled로 확정한다', async () => {
   const started = Promise.withResolvers<undefined>()
   let aborted = false

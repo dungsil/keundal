@@ -18,6 +18,7 @@
   "dependencies": {
     "@keundal/core": "workspace:*",
     "@keundal/llm": "workspace:*",
+    "@keundal/tool-approval": "workspace:*",
     "@keundal/tools": "workspace:*",
     "@keundal/trace": "workspace:*"
   },

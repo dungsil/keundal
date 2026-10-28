@@ -81,7 +81,9 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
       manager = new BrowserRuntimePluginManager(storage, [
         { module: '@keundal/plugin-llm-browser', metadata: llmMetadata, enabled: true, required: true },
         { module: '@keundal/plugin-store-indexeddb', metadata: storeMetadata, enabled: true, required: true },
-        { module: '@keundal/plugin-agent-chat', metadata: agentMetadata, enabled: true, required: true },
+        { module: '@keundal/plugin-agent-chat', metadata: agentMetadata, enabled: true, feature: 'agent', requires: ['@keundal/plugin-llm-browser', '@keundal/plugin-store-indexeddb'] },
+        { module: '@keundal/prompt', metadata: { name: { en: 'Prompt presets', ko: '프롬프트 프리셋' }, description: { en: 'Applies the selected prompt recipe to model requests.', ko: '선택한 프롬프트 프리셋을 모델 요청에 적용합니다.' } }, enabled: true, feature: 'prompt', requires: ['@keundal/plugin-agent-chat'] },
+        { module: '@keundal/subagent', metadata: { name: { en: 'Subagents', ko: '서브에이전트' }, description: { en: 'Delegates independent tasks to subagents.', ko: '독립 작업을 서브에이전트에 위임합니다.' } }, enabled: true, feature: 'subagents', requires: ['@keundal/plugin-agent-chat'] },
         { module: '@keundal/plugin-skill', metadata: skillMetadata, enabled: !!composition.skills, feature: 'skills' },
         { module: '@keundal/plugin-tool-chart', metadata: chartMetadata, enabled: true },
         { module: '@keundal/plugin-tool-weather', metadata: weatherMetadata, enabled: true },
@@ -104,13 +106,19 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         for (const service of ['llm', 'session', 'generation'] as const) {
           if (!root[service]) throw new Error(`Missing browser service: ${service}`)
         }
-        store = new ChatStore(root, (ctx, config) => composition.mountAgent(ctx, {
-          model: config.model,
-          maxOutputTokens: config.maxOutputTokens,
-          reasoning: config.reasoning,
-          webSearch: config.webSearch,
-          skills: config.skills
-        }))
+        store = new ChatStore(root, (ctx, config) => {
+          if (!manager.isEnabled('@keundal/plugin-agent-chat')) throw new Error('Chat agent is disabled. Enable it in plugin settings to generate responses.')
+          return composition.mountAgent(ctx, {
+            model: config.model,
+            toolApproval: config.toolApproval,
+            maxOutputTokens: config.maxOutputTokens,
+            reasoning: config.reasoning,
+            webSearch: config.webSearch,
+            skills: manager.isEnabled('@keundal/plugin-skill') && config.skills,
+            ...(!manager.isEnabled('@keundal/prompt') ? { promptPresets: false } : {}),
+            ...(!manager.isEnabled('@keundal/subagent') ? { subagents: false } : {})
+          })
+        })
         await store.recover()
         connected = true
         platform.runtimePlugins = manager

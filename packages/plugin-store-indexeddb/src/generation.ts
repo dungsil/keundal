@@ -12,6 +12,7 @@ import {
   type TerminalGeneration
 } from '@keundal/generation'
 import { StreamBudget } from '@keundal/llm'
+import { TOOL_APPROVAL_EVENT } from '@keundal/tool-approval'
 import { reconcileTerminalTraceJournal } from '@keundal/trace'
 import type { Context } from 'cordis'
 
@@ -220,7 +221,10 @@ export class IndexedDBGenerationService extends GenerationService {
         if (!this.isCurrent(runId, token)) return
         this.hub.publish(runId, recorder.record(event))
         appendJournal(event)
-        if (shouldFlush()) await this.flush(active)
+        if (event.type === EventType.CUSTOM && event.name === TOOL_APPROVAL_EVENT) {
+          // An in-flight batch may not contain this event. Drain again until this barrier is durable.
+          while (active.journal.length) await this.drain(active)
+        } else if (shouldFlush()) await this.flush(active)
         if (this.closed || !this.isCurrent(runId, token)) return
         yield event
       }

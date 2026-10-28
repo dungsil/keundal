@@ -6,6 +6,19 @@ import { Context, type Fiber } from 'cordis'
 import { IDBFactory, IDBVersionChangeEvent } from 'fake-indexeddb'
 import { expect, test, type TestContext } from 'vitest'
 
+test('승인 이벤트를 전달하기 전에 IndexedDB 배치를 확정한다', async (t) => {
+  const event: LLMEvent = { type: EventType.CUSTOM, name: 'keundal.tool.approval', value: { status: 'requested' } }
+  const { ctx, store } = await setup(t, [event])
+  const iterator = ctx.generation.run(request())[Symbol.asyncIterator]()
+  try {
+    await iterator.next()
+    expect((await iterator.next()).value).toEqual(event)
+    expect((await store.getRun('run'))?.journal.map((entry) => entry.event)).toContainEqual(event)
+  } finally {
+    await iterator.return?.()
+  }
+})
+
 test('지정한 이벤트 공급자의 도구 결과를 저장하고 복구할 때 다시 실행하지 않는다', async (t) => {
   const { ctx, calls, store, fibers } = await setup(t)
   let invoked = 0

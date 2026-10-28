@@ -13,7 +13,7 @@ declare module '@keundal/ui-slots' {
 }
 
 // Node has no Nuxt SFC compiler. The fixtures below still use real Cordis fibers and slots.
-vi.mock('@keundal/ui-agent-plugins/plugin', () => ({ apply() {} }))
+vi.mock('@keundal/ui-agent-plugins/plugin', () => ({ apply() {}, agentPluginSettings: { apply() {} } }))
 vi.mock('@keundal/ui-chat/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-chat-list/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-chart/plugin', () => ({ apply() {} }))
@@ -25,6 +25,7 @@ vi.mock('@keundal/ui-mcp/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-model-selection/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-settings/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-settings-llm/plugin', () => ({ apply() {} }))
+vi.mock('@keundal/ui-settings-llm/prompt-plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-skill/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-subagents/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-tool/plugin', () => ({ apply() {} }))
@@ -38,7 +39,7 @@ afterEach(async () => {
 
 function platform() {
   const records: RuntimePluginInfo[] = [
-    { module: '@keundal/plugin-agent-chat', enabled: true, required: true },
+    { module: '@keundal/plugin-agent-chat', enabled: true },
     { module: '@keundal/plugin-skill', enabled: true, feature: 'skills' },
     { module: '@keundal/plugin-mcp-client', enabled: true, feature: 'mcp' },
     { module: '@keundal/plugin-tool-chart', enabled: true },
@@ -55,12 +56,13 @@ async function fixture(options: {
   feature?: (ctx: Context) => void
   platform?: RuntimePluginManager | null
   entries?: UIPluginEntry[]
+  storage?: Pick<Storage, 'getItem' | 'setItem'>
 } = {}) {
   const ctx = new Context()
   const slots = await ctx.plugin(SlotService)
   const stop = vi.fn(async () => {})
   const catalog: UIPluginEntry[] = [
-    { module: '@keundal/ui-layout', plugin: { inject: ['slots'], apply(ctx) {
+    { module: '@keundal/ui-layout', required: true, plugin: { inject: ['slots'], apply(ctx) {
       ctx.slots.register({ name: 'root', children: {
         'page.feature': 'single', 'page.settings': 'single', 'page.mcp': 'single', 'page.tool': 'single'
       } }, {})
@@ -68,7 +70,7 @@ async function fixture(options: {
     { module: '@keundal/ui-skill', feature: 'skills', plugin: { inject: ['slots'], apply: options.feature ?? (ctx => {
       ctx.slots.inject('page.feature', () => ctx.slots.register({ name: 'page.feature' }, {}))
     }) } },
-    { module: '@keundal/ui-agent-plugins', plugin: { inject: ['slots'], apply(ctx) {
+    { module: '@keundal/ui-agent-plugins', required: true, plugin: { inject: ['slots'], apply(ctx) {
       ctx.slots.inject('page.settings', () => ctx.slots.register({ name: 'page.settings' }, {}))
     } } },
     { module: '@keundal/ui-mcp', feature: 'mcp', plugin: { inject: ['slots'], apply(ctx) {
@@ -80,7 +82,7 @@ async function fixture(options: {
     ...options.entries ?? []
   ]
   const runtime = options.platform === null ? undefined : options.platform ?? platform().manager
-  const manager = new UIPluginManager(ctx, { stop, platform: runtime }, catalog)
+  const manager = new UIPluginManager(ctx, { stop, platform: runtime, storage: options.storage }, catalog)
   cleanups.push(async () => {
     await manager.close()
     await slots.dispose()
@@ -89,16 +91,20 @@ async function fixture(options: {
   return { ctx, manager, stop }
 }
 
-test('기능 카탈로그만 노출하며 UI 개별 전환과 필수 기능 비활성화는 거부한다', async () => {
+test('실행과 UI 플러그인을 모두 노출하고 관리 화면만 비활성화를 거부한다', async () => {
   const runtime = platform()
   const { ctx, manager } = await fixture({ platform: runtime.manager })
-  expect(await manager.list()).toEqual(runtime.records)
-  for (const module of ['@keundal/ui-skill', '@keundal/ui-layout', '@keundal/ui-agent-plugins', 'https://example.com/plugin.mjs']) {
-    await expect(manager.setEnabled(module, false)).rejects.toThrow('Unknown bundled')
+  expect((await manager.list()).map(entry => entry.module)).toEqual([
+    ...runtime.records.map(entry => entry.module), '@keundal/ui-layout', '@keundal/ui-skill',
+    '@keundal/ui-agent-plugins', '@keundal/ui-mcp', '@keundal/ui-tool'
+  ])
+  for (const module of ['@keundal/ui-layout', '@keundal/ui-agent-plugins']) {
+    await expect(manager.setEnabled(module, false)).rejects.toThrow('Required')
   }
-  await expect(manager.setEnabled('@keundal/plugin-agent-chat', false)).rejects.toThrow('Required')
-  expect((await manager.list()).every(entry => entry.enabled)).toBe(true)
-  expect(ctx.slots.describe('page.feature')).toHaveLength(1)
+  await expect(manager.setEnabled('https://example.com/plugin.mjs', true)).rejects.toThrow('Unknown bundled')
+  await manager.setEnabled('@keundal/plugin-agent-chat', false)
+  await manager.setEnabled('@keundal/ui-skill', false)
+  expect(ctx.slots.describe('page.feature')).toEqual([])
   expect(ctx.slots.describe('page.settings')).toHaveLength(1)
 })
 
@@ -142,9 +148,9 @@ test('서버와 클라이언트의 초기 UI는 같고 동기화 후 저장된 �
   expect(reopened.ctx.slots.describe('page.tool')).toHaveLength(1)
   expect((await reopened.manager.list()).find(entry => entry.module === '@keundal/plugin-tool-chart')?.enabled).toBe(false)
   expect((await reopened.manager.list()).find(entry => entry.module === '@keundal/plugin-tool-weather')?.enabled).toBe(false)
-  // A remote connection without a selection API keeps the default views, not local UI switches.
+  // A remote connection still exposes local UI selections, never server execution controls.
   await server.manager.sync()
-  expect(await server.manager.list()).toEqual([])
+  expect((await server.manager.list()).every(entry => entry.module.startsWith('@keundal/ui-'))).toBe(true)
   expect(server.ctx.slots.describe('page.feature')).toHaveLength(1)
 })
 
@@ -221,7 +227,7 @@ test('초기 기능 UI가 실패해도 부분 효과를 정리하고 기능 항�
   await manager.sync()
   expect(ctx.slots.describe('page.feature')).toEqual([])
   expect(ctx.slots.describe('page.settings')).toHaveLength(1)
-  expect((await manager.list()).find(entry => entry.module === '@keundal/plugin-skill')).toMatchObject({
+  expect((await manager.list()).find(entry => entry.module === '@keundal/ui-skill')).toMatchObject({
     enabled: true, error: expect.stringContaining('startup activation failed')
   })
 })
@@ -244,11 +250,35 @@ test('외부 설치 기능은 제공하는 실행 방식에서만 노출하고 �
   await expect(manager.install!(source)).rejects.toThrow('stop failed')
   expect((await manager.list()).some(entry => entry.source)).toBe(false)
   await manager.install!(source)
-  expect(await manager.list()).toContainEqual({ module: 'external:example', source, enabled: false })
+  expect(await manager.list()).toContainEqual(expect.objectContaining({ module: 'external:example', source, enabled: false }))
   await manager.setEnabled('external:example', true)
   expect((await manager.list()).find(entry => entry.source)?.enabled).toBe(true)
   await manager.remove!('external:example')
   expect((await manager.list()).some(entry => entry.source)).toBe(false)
   expect(ctx.slots.describe('page.feature')).toHaveLength(1)
   expect(ctx.slots.describe('page.settings')).toHaveLength(1)
+})
+
+test('의존 대상 중단은 UI 선택을 보존하고 독립 UI 선택은 재시작 뒤에도 유지한다', async () => {
+  const data = new Map<string, string>()
+  const storage = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value) } }
+  const runtime = platform()
+  const first = await fixture({ platform: runtime.manager, storage })
+  await first.manager.setEnabled('@keundal/plugin-skill', false)
+  expect((await first.manager.list()).find(entry => entry.module === '@keundal/ui-skill')).toMatchObject({
+    enabled: true, requires: ['@keundal/ui-layout', '@keundal/plugin-skill'], blockedBy: ['@keundal/plugin-skill']
+  })
+  expect(first.ctx.slots.describe('page.feature')).toEqual([])
+  await first.manager.setEnabled('@keundal/plugin-skill', true)
+  expect(first.ctx.slots.describe('page.feature')).toHaveLength(1)
+  await first.manager.setEnabled('@keundal/ui-skill', false)
+  await first.manager.setEnabled('@keundal/plugin-skill', false)
+  await first.manager.setEnabled('@keundal/plugin-skill', true)
+  expect(first.ctx.slots.describe('page.feature')).toEqual([])
+  const reopened = await fixture({ platform: runtime.manager, storage })
+  await reopened.manager.sync()
+  expect(reopened.ctx.slots.describe('page.feature')).toEqual([])
+  expect((await reopened.manager.list()).find(entry => entry.module === '@keundal/plugin-skill')?.enabled).toBe(true)
+  await reopened.manager.setEnabled('@keundal/ui-skill', true)
+  expect(reopened.ctx.slots.describe('page.feature')).toHaveLength(1)
 })

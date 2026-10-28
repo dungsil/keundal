@@ -27,6 +27,9 @@ const sourceItems = computed(() => [
   { label: t('runtime.path'), value: 'path' }
 ])
 const localSource = computed(() => sourceType.value === 'zip' || sourceType.value === 'path')
+const pluginName = (module: string) => plugins.value.find(plugin => plugin.module === module)?.metadata?.name[locale.value] || module
+const dependents = (module: string) => plugins.value.filter(plugin => plugin.requires?.includes(module))
+const pluginId = (module: string) => `runtime-plugin-${module}`
 
 async function installPlugin() {
   if (!installAvailable.value || !trusted.value || !sourceValue.value.trim()) return
@@ -98,14 +101,14 @@ onMounted(() => {
         </form>
         <p v-else class="text-sm text-muted">{{ t('runtime.bundled') }}</p>
         <ul class="divide-y divide-default rounded-lg border border-default">
-          <li v-for="plugin in plugins" :key="plugin.module" class="space-y-2 p-3">
+          <li v-for="plugin in plugins" :id="pluginId(plugin.module)" :key="plugin.module" class="space-y-2 p-3 scroll-mt-4">
             <div class="flex items-center gap-3">
               <div class="min-w-0 flex-1 space-y-1">
                 <p class="text-sm font-medium break-words">{{ plugin.metadata?.name[locale] || plugin.module }}</p>
                 <p v-if="plugin.metadata?.description[locale]" class="text-sm text-muted break-words">{{ plugin.metadata.description[locale] }}</p>
                 <p v-if="plugin.source" class="text-xs text-muted break-all">{{ t('runtime.source') }}: {{ sourceItems.find(item => item.value === plugin.source?.type)?.label }} · {{ plugin.source.value }}</p>
                 <p v-if="plugin.source && plugin.version" class="text-xs text-muted break-words">{{ t('runtime.version') }}: {{ plugin.version }}</p>
-                <p class="text-xs text-muted" role="status">{{ t(plugin.required ? 'runtime.required' : plugin.error ? 'runtime.failed' : plugin.enabled ? 'runtime.enabled' : 'runtime.disabled') }}</p>
+                <p class="text-xs text-muted" role="status">{{ t(plugin.required ? 'runtime.required' : plugin.error ? 'runtime.failed' : !plugin.enabled ? 'runtime.disabled' : plugin.blockedBy?.length ? 'runtime.blocked' : 'runtime.enabled') }}</p>
               </div>
               <USwitch
                 :model-value="plugin.enabled"
@@ -116,6 +119,23 @@ onMounted(() => {
                 @update:model-value="run(() => setEnabled(plugin.module, $event))"
               />
             </div>
+            <dl v-if="plugin.requires?.length || dependents(plugin.module).length" class="space-y-2 text-xs">
+              <div v-if="plugin.requires?.length" class="flex flex-wrap items-baseline gap-2">
+                <dt class="font-medium text-muted">{{ t('runtime.requires') }}</dt>
+                <dd v-for="module in plugin.requires" :key="module">
+                  <a :href="`#${encodeURIComponent(pluginId(module))}`" class="break-all text-primary underline underline-offset-2">{{ pluginName(module) }}</a>
+                </dd>
+              </div>
+              <div v-if="dependents(plugin.module).length" class="flex flex-wrap items-baseline gap-2">
+                <dt class="font-medium text-muted">{{ t('runtime.usedBy') }}</dt>
+                <dd v-for="dependent in dependents(plugin.module)" :key="dependent.module">
+                  <a :href="`#${encodeURIComponent(pluginId(dependent.module))}`" class="break-all text-primary underline underline-offset-2">{{ pluginName(dependent.module) }}</a>
+                </dd>
+              </div>
+            </dl>
+            <p v-if="plugin.enabled && plugin.blockedBy?.length" class="text-xs text-warning" role="status">
+              {{ t('runtime.blockedDescription', { names: plugin.blockedBy.map(pluginName).join(', ') }) }}
+            </p>
             <UAlert v-if="plugin.error" color="error" :title="plugin.error" :ui="{ title: 'break-words' }" />
             <template v-if="installAvailable && plugin.source && !plugin.required">
               <div v-if="deleting === plugin.module" class="flex flex-wrap items-center gap-3">

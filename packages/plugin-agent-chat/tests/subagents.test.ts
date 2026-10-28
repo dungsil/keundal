@@ -1,8 +1,11 @@
+import { setTimeout as delay } from 'node:timers/promises'
+
 import { AgentConfigSchema, type AgentConfig } from '@keundal/agent-loop'
 import { EventType, parseAGUIEvent, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
 import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
+import { ToolApproval, isToolApprovalRecord } from '@keundal/tool-approval'
 import type { ExecutableTool } from '@keundal/tools'
 import { Context } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
@@ -83,6 +86,39 @@ async function setup(
   })
   return { ctx, requests, counted, agent }
 }
+
+test('서브에이전트의 승인 요청을 부모에게 전달하고 자식 runId로 승인한 뒤에만 실행한다', async (t) => {
+  let executed = 0
+  const approval = new ToolApproval({ default: 'ask', tools: { delegate_task: 'allow' } })
+  const { ctx, requests } = await setup(
+    t,
+    [call('delegate', '{"task":"inspect"}', 'delegate_task'), call('child-lookup'), answer, answer],
+    {
+      subagents: true,
+      toolApproval: approval,
+      tools: [
+        tool(() => {
+          executed++
+          return 'result'
+        })
+      ]
+    }
+  )
+  let answered = false
+  for await (const event of ctx.agent.run(input)) {
+    if (event.type !== EventType.CUSTOM || event.name !== 'keundal.tool.progress') continue
+    const record = event.value?.value?.approval
+    if (!isToolApprovalRecord(record) || record.status !== 'requested') continue
+    expect(executed).toBe(0)
+    expect(record.runId).not.toBe(input.runId)
+    expect(approval.respond(input.runId, record.requestId, 'allow')).toBe(false)
+    expect(approval.respond(record.runId, record.requestId, 'allow')).toBe(true)
+    answered = true
+  }
+  expect(answered).toBe(true)
+  expect(executed).toBe(1)
+  expect(requests).toHaveLength(4)
+})
 
 test('서브에이전트는 독립된 대화에서 도구를 실행하고 최종 답변만 부모에게 돌려준다', async (t) => {
   const { ctx, requests } = await setup(
@@ -646,4 +682,86 @@ test.for(['', ' '.repeat(2), 'x'.repeat(81), 1])('잘못된 작업 이름 %j는 
   )
   await expect(collect(ctx.agent.run(input))).rejects.toThrow('delegate_task label')
   expect(requests).toHaveLength(1)
+})
+
+test.for([
+  { kind: 'tokens', limit: 219, calls: 1 },
+  { kind: 'tokens', limit: 329, calls: 2 },
+  { kind: 'tokens', limit: 330, calls: 3 },
+  { kind: 'cost', limit: 219, calls: 1 },
+  { kind: 'cost', limit: 329, calls: 2 },
+  { kind: 'cost', limit: 330, calls: 3 }
+])('서브에이전트와 후속 부모 호출은 $kind 예산 $limit을 공유한다', async ({ kind, limit, calls }, t) => {
+  const { ctx, requests } = await setup(t, [call('delegate', '{"task":"inspect"}', 'delegate_task'), answer, answer], {
+    subagents: true,
+    pricing: { currency: 'USD', models: { test: { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 } } },
+    budget: kind === 'tokens' ? { maxTokens: limit } : { maxCost: { currency: 'USD', amount: limit } }
+  })
+  const completion = collect(ctx.agent.run(input))
+  if (limit < 330) await expect(completion).rejects.toThrow(`run budget exceeded: ${kind}`)
+  else await completion
+  expect(requests).toHaveLength(calls)
+  expect((await ctx.generation.get(input.runId))?.status === 'completed').toBe(limit === 330)
+})
+
+test.for([274, 275])('역할별 모델 비용을 부모와 공유하는 예산 %s에 합산한다', async (amount, t) => {
+  const { ctx, requests } = await setup(
+    t,
+    [call('delegate', '{"task":"inspect","role":"reader"}', 'delegate_task'), answer, answer],
+    {
+      subagents: true,
+      subagentRoles: [
+        { name: 'reader', description: 'Read', instructions: 'Inspect.', model: 'cheap', allowedTools: [] }
+      ],
+      pricing: {
+        currency: 'USD',
+        models: {
+          test: { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 },
+          cheap: { inputPerMillion: 500_000, outputPerMillion: 500_000 }
+        }
+      },
+      budget: { maxCost: { currency: 'USD', amount } }
+    }
+  )
+  // Each request reserves 10 input + 100 output tokens: parent 110 + child 55 + parent 110 = 275.
+  const completion = collect(ctx.agent.run(input))
+  if (amount === 274) await expect(completion).rejects.toThrow('run budget exceeded: cost')
+  else await completion
+  expect(requests.map((request) => request.model)).toEqual(
+    amount === 274 ? ['test', 'cheap'] : ['test', 'cheap', 'test']
+  )
+  expect(requests[1].input.tools).toEqual([])
+  expect((await ctx.generation.get(input.runId))?.status === 'completed').toBe(amount === 275)
+})
+
+test.for([329, 440])('병렬 서브에이전트는 토큰 예산 %s의 잔여분을 중복 예약하지 않는다', async (maxTokens, t) => {
+  let childCalls = 0
+  let cancelled = false
+  const { ctx } = await setup(
+    t,
+    [],
+    { subagents: true, parallelTools: true, budget: { maxTokens } },
+    {
+      stream: async function* (request, options) {
+        if (request.input.state.subagent) {
+          childCalls++
+          try {
+            await delay(20, undefined, { signal: options?.signal })
+            yield* answer
+          } finally {
+            cancelled ||= options?.signal?.aborted ?? false
+          }
+        } else if (request.input.messages.some((message) => message.role === 'tool')) yield* answer
+        else {
+          yield* call('first', '{"task":"first"}', 'delegate_task')
+          yield* call('second', '{"task":"second"}', 'delegate_task')
+        }
+      }
+    }
+  )
+  const completion = collect(ctx.agent.run(input))
+  if (maxTokens === 329) await expect(completion).rejects.toThrow('run budget exceeded: tokens')
+  else await completion
+  expect(childCalls).toBe(maxTokens === 329 ? 1 : 2)
+  expect(cancelled).toBe(maxTokens === 329)
 })

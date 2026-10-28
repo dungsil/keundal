@@ -108,7 +108,7 @@ export class TraceRecorder {
   }
 }
 
-function usageFromEvent(value: unknown): { usage: TraceUsage; cost?: TraceCost } | undefined {
+export function usageFromEvent(value: unknown): { usage: TraceUsage; cost?: TraceCost } | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
   const source = value as Record<string, unknown>
   if (source.source !== 'provider' && source.source !== 'estimate') return undefined
@@ -202,7 +202,7 @@ export async function* tracedModelStream(
 }
 
 export function tracedCompactionLLM(
-  llm: LLMService,
+  llm: Pick<LLMService, 'getModel' | 'countTokens' | 'stream'>,
   trace: TraceRecorder,
   parentSpanId: string,
   signal: AbortSignal,

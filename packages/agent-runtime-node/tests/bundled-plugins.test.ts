@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { EventType } from '@keundal/core'
+import { EventType, type AGUIEvent } from '@keundal/core'
 import { type LLMEvent } from '@keundal/llm'
 import { expect, onTestFinished, test, vi } from 'vitest'
 
@@ -212,7 +212,16 @@ test('스킬을 끄면 명시적 builtin:skills 매니페스트와 Agent Plugins
         agent: { module: 'builtin:agent', config: { skills: true } }
       }
     },
-    createNodeComposition
+    (options) => {
+      const composition = createNodeComposition(options)
+      return {
+        ...composition,
+        mountAgent: (ctx, config) => {
+          const overridden = { ...config, skills: true }
+          return composition.mountAgent(ctx, overridden)
+        }
+      }
+    }
   )
   onTestFinished(() => host.dispose())
   expect(await host.services.catalog!()).toEqual({ skills: [], tools: [] })
@@ -243,3 +252,135 @@ test('스킬을 끄면 명시적 builtin:skills 매니페스트와 Agent Plugins
   expect(events.at(-1)?.type).toBe('RUN_FINISHED')
   expect(stream).toHaveBeenCalledTimes(1)
 })
+
+test('에이전트를 끈 호스트는 실행만 거부하고 세션과 카탈로그를 보존한다', async () => {
+  const host = await createNodeAgentHost(
+    {
+      provider: 'openai',
+      apiKey: '',
+      model: 'test',
+      sqlitePath: ':memory:',
+      bundledPlugins: { '@keundal/plugin-agent-chat': false }
+    },
+    createNodeComposition
+  )
+  onTestFinished(() => host.dispose())
+  const stream = vi.spyOn(host.ctx.llm, 'stream')
+  await host.services.session.commit({
+    threadId: 'saved',
+    expectedRevision: 0,
+    state: {},
+    messages: [{ id: 'user', role: 'user', content: 'keep' }]
+  })
+  const events: AGUIEvent[] = []
+  await expect(
+    (async () => {
+      for await (const event of host.services.run({
+        threadId: 'saved',
+        runId: 'disabled',
+        state: {},
+        context: [],
+        tools: [],
+        messages: []
+      }))
+        events.push(event)
+    })()
+  ).rejects.toThrow('Agent is disabled')
+  expect(events).toEqual([])
+  expect(stream).not.toHaveBeenCalled()
+  expect(await host.services.generation.get('disabled')).toBeUndefined()
+  expect((await host.services.session.get('saved'))?.messages).toEqual([{ id: 'user', role: 'user', content: 'keep' }])
+  expect(await host.services.catalog!()).toEqual({ skills: [], tools: [] })
+  expect(host.services.models()).toMatchObject([{ id: 'test' }])
+})
+
+test.each([
+  { prompt: false, subagent: false, operator: true },
+  { prompt: false, subagent: true, operator: true },
+  { prompt: true, subagent: false, operator: true },
+  { prompt: true, subagent: true, operator: true },
+  { prompt: true, subagent: true, operator: false }
+])(
+  'prompt=$prompt subagent=$subagent 선택은 매니페스트를 제한하고 operator=$operator 설정을 보존한다',
+  async (selection) => {
+    const host = await createNodeAgentHost(
+      {
+        provider: 'openai',
+        apiKey: '',
+        model: 'test',
+        sqlitePath: ':memory:',
+        bundledPlugins: { '@keundal/prompt': selection.prompt, '@keundal/subagent': selection.subagent },
+        runtimePlugins: {
+          plugins: [{ module: 'builtin:llm' }, { module: 'builtin:store' }],
+          agent: {
+            module: 'builtin:agent',
+            config: { promptPresets: selection.operator, subagents: selection.operator }
+          }
+        }
+      },
+      (options) => {
+        const composition = createNodeComposition(options)
+        return {
+          ...composition,
+          mountAgent: (ctx, config) =>
+            composition.mountAgent(ctx, {
+              ...config,
+              ...(!selection.prompt ? { promptPresets: true } : {}),
+              ...(!selection.subagent ? { subagents: true } : {})
+            })
+        }
+      }
+    )
+    onTestFinished(() => host.dispose())
+    const promptApplied = selection.prompt && selection.operator
+    const count = vi.spyOn(host.ctx.llm, 'countTokens').mockResolvedValue(10)
+    const stream = vi
+      .spyOn(host.ctx.llm, 'stream')
+      .mockImplementation(async function* (request): AsyncIterable<LLMEvent> {
+        expect(request.input.tools.some((tool) => tool.name === 'delegate_task')).toBe(
+          selection.subagent && selection.operator
+        )
+        expect(request.input.messages.some((message) => message.content === 'preset instruction')).toBe(promptApplied)
+        yield { type: EventType.TEXT_MESSAGE_START, messageId: 'answer', role: 'assistant' }
+        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'answer', delta: 'ok' }
+        yield { type: EventType.TEXT_MESSAGE_END, messageId: 'answer' }
+      })
+    onTestFinished(() => {
+      count.mockRestore()
+      stream.mockRestore()
+    })
+    for (const [index, preset] of [
+      {
+        id: 'preset',
+        name: 'Preset',
+        variables: {},
+        blocks: [
+          {
+            id: 'instruction',
+            name: 'Instruction',
+            enabled: true,
+            type: 'text',
+            role: 'system',
+            content: 'preset instruction'
+          },
+          { id: 'history', name: 'History', enabled: true, type: 'history' }
+        ]
+      },
+      ...(!promptApplied ? [{ invalid: true }] : [])
+    ].entries()) {
+      const events = []
+      for await (const event of host.services.run({
+        threadId: `selection-${index}`,
+        runId: `selection-${index}`,
+        state: {},
+        context: [],
+        tools: [],
+        messages: [{ id: 'user', role: 'user', content: 'hello' }],
+        forwardedProps: { keundalPromptPreset: preset }
+      }))
+        events.push(event)
+      expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+    }
+    expect(stream).toHaveBeenCalledTimes(promptApplied ? 1 : 2)
+  }
+)

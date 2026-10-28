@@ -2,6 +2,12 @@ import { EventType, type RunAgentInput } from '@keundal/core'
 import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStore from '@keundal/plugin-store-memory'
+import {
+  ToolApproval,
+  TOOL_APPROVAL_EVENT,
+  isToolApprovalRecord,
+  type ToolApprovalPolicy
+} from '@keundal/tool-approval'
 import { readTraceSpans } from '@keundal/trace'
 import { expect, test } from 'vitest'
 
@@ -27,7 +33,8 @@ type AgentTools = Parameters<typeof agentPlugin>[1]['tools']
 
 async function host(
   stream: (request: LLMRequest, signal?: AbortSignal) => AsyncIterable<LLMEvent>,
-  tools: AgentTools = []
+  tools: AgentTools = [],
+  policy?: ToolApprovalPolicy
 ) {
   class LLM extends LLMService {
     async getModel() {
@@ -41,6 +48,7 @@ async function host(
     }
   }
   return createAgentHost({
+    ...(policy === undefined ? {} : { toolApproval: new ToolApproval(policy) }),
     model: 'test',
     models: [{ id: 'test', provider: 'test', contextWindow: 2000, maxOutputTokens: 200 }],
     setup: async (ctx) => {
@@ -50,6 +58,152 @@ async function host(
     mountAgent: async (ctx, config) => ctx.plugin(agentPlugin, { ...config, tools })
   })
 }
+
+test.for([
+  { policy: 'allow', response: undefined, executions: 1 },
+  { policy: 'deny', response: undefined, executions: 0 },
+  { policy: 'ask', response: 'allow', executions: 1 },
+  { policy: 'ask', response: 'deny', executions: 0 }
+] as const)(
+  '도구별 $policy 정책과 $response 응답을 journal에 남기고 승인된 호출만 실행한다',
+  async ({ policy, response, executions }) => {
+    let executed = 0
+    const requests: LLMRequest[] = []
+    const agentHost = await host(
+      async function* (request) {
+        requests.push(request)
+        if (requests.length === 1) {
+          yield { type: EventType.TOOL_CALL_START, toolCallId: 'shell-call', toolCallName: 'shell' }
+          yield {
+            type: EventType.TOOL_CALL_ARGS,
+            toolCallId: 'shell-call',
+            delta: '{"command":"printf approved","cwd":"/workspace"}'
+          }
+          yield { type: EventType.TOOL_CALL_END, toolCallId: 'shell-call' }
+        } else yield* answer('answer')
+      },
+      [
+        {
+          name: 'shell',
+          description: 'shell',
+          parameters: { type: 'object' },
+          describeOperation: (args) => ({ kind: 'shell', command: String(args.command), paths: [String(args.cwd)] }),
+          async execute() {
+            const snapshot = await agentHost.services.generation.get('run')
+            expect(
+              snapshot?.journal.some(
+                ({ event }) =>
+                  event.type === EventType.CUSTOM &&
+                  isToolApprovalRecord(event.value) &&
+                  event.value.status === 'decided' &&
+                  event.value.decision === 'allow'
+              )
+            ).toBe(true)
+            executed++
+            return 'approved'
+          }
+        }
+      ],
+      { default: 'deny', tools: { shell: policy } }
+    )
+    try {
+      const running = Array.fromAsync(agentHost.services.run(input('thread', 'run')))
+      if (response) {
+        await expect
+          .poll(async () =>
+            (await agentHost.services.generation.get('run'))?.journal.some(
+              ({ event }) =>
+                event.type === EventType.CUSTOM &&
+                isToolApprovalRecord(event.value) &&
+                event.value.status === 'requested'
+            )
+          )
+          .toBe(true)
+        const snapshot = (await agentHost.services.generation.get('run'))!
+        const event = snapshot.journal.find(
+          ({ event }) => event.type === EventType.CUSTOM && event.name === TOOL_APPROVAL_EVENT
+        )!.event
+        if (event.type !== EventType.CUSTOM || !isToolApprovalRecord(event.value)) throw new Error('missing approval')
+        expect(event.value.operation).toEqual({ kind: 'shell', command: 'printf approved', paths: ['/workspace'] })
+        expect(executed).toBe(0)
+        expect(requests).toHaveLength(1)
+        // Reconnect and replay the same request without resolving or executing it.
+        const subscription = agentHost.services.subscribe('run')[Symbol.asyncIterator]()
+        while (true) {
+          const replayed = await subscription.next()
+          if (replayed.done) throw new Error('subscription ended before approval')
+          if (replayed.value.event.type === EventType.CUSTOM && replayed.value.event.name === TOOL_APPROVAL_EVENT) break
+        }
+        await subscription.return?.()
+        expect(executed).toBe(0)
+        expect(agentHost.services.respondToToolApproval!('other-run', event.value.requestId, response)).toBe(false)
+        expect(agentHost.services.respondToToolApproval!('run', event.value.requestId, response)).toBe(true)
+        expect(agentHost.services.respondToToolApproval!('run', event.value.requestId, response)).toBe(false)
+      }
+      await running
+      expect(executed).toBe(executions)
+      expect(requests).toHaveLength(2)
+      expect(requests[1]!.input.messages.find((message) => message.role === 'tool')?.content).toBe(
+        executions ? 'approved' : '{"error":"TOOL_PERMISSION_DENIED","tool":"shell"}'
+      )
+      const snapshot = (await agentHost.services.generation.get('run'))!
+      const decisions = snapshot.journal.flatMap(({ event }) =>
+        event.type === EventType.CUSTOM && isToolApprovalRecord(event.value) ? [event.value] : []
+      )
+      expect(decisions.map((record) => record.status)).toEqual(response ? ['requested', 'decided'] : ['decided'])
+      expect(decisions.at(-1)).toMatchObject({ decision: response ?? policy, source: response ? 'user' : 'policy' })
+      await Array.fromAsync(agentHost.services.subscribe('run'))
+      expect(executed).toBe(executions)
+    } finally {
+      await agentHost.dispose()
+    }
+  }
+)
+
+test('승인 대기 중 취소하면 도구를 실행하지 않고 늦은 승인을 거부한다', async () => {
+  let executed = 0
+  const agentHost = await host(
+    async function* () {
+      yield { type: EventType.TOOL_CALL_START, toolCallId: 'call', toolCallName: 'lookup' }
+      yield { type: EventType.TOOL_CALL_ARGS, toolCallId: 'call', delta: '{}' }
+      yield { type: EventType.TOOL_CALL_END, toolCallId: 'call' }
+    },
+    [
+      {
+        name: 'lookup',
+        description: 'lookup',
+        parameters: {},
+        execute: () => {
+          executed++
+          return 'unexpected'
+        }
+      }
+    ],
+    {}
+  )
+  try {
+    const running = Array.fromAsync(agentHost.services.run(input('thread', 'run'))).catch((error: unknown) => error)
+    await expect
+      .poll(async () =>
+        (await agentHost.services.generation.get('run'))?.journal.some(
+          ({ event }) => event.type === EventType.CUSTOM && isToolApprovalRecord(event.value)
+        )
+      )
+      .toBe(true)
+    const snapshot = (await agentHost.services.generation.get('run'))!
+    const event = snapshot.journal.find(
+      ({ event }) => event.type === EventType.CUSTOM && isToolApprovalRecord(event.value)
+    )!.event
+    if (event.type !== EventType.CUSTOM || !isToolApprovalRecord(event.value)) throw new Error('missing approval')
+    expect(agentHost.services.cancel('run')).toBe(true)
+    expect(await running).toBeInstanceOf(Error)
+    expect(agentHost.services.respondToToolApproval!('run', event.value.requestId, 'allow')).toBe(false)
+    expect((await agentHost.services.generation.get('run'))?.status).toBe('cancelled')
+    expect(executed).toBe(0)
+  } finally {
+    await agentHost.dispose()
+  }
+})
 
 test('도구 실행 중 steer한 지시를 같은 실행의 다음 모델 요청에 반영하고 도구를 다시 실행하지 않는다', async () => {
   const requests: LLMRequest[] = []

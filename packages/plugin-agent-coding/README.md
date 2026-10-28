@@ -69,6 +69,12 @@ await ctx.plugin({
 
 도구 공급자를 사용하면 실행마다 도구 목록을 다시 고를 수 있습니다. 외부 MCP 서버의 도구는 [`@keundal/mcp`](../mcp/README.md)를 참고합니다.
 
+## Git 작업공간
+
+[`@keundal/workspace`](../workspace/README.md)는 Git 상태·변경 파일·Diff 조회, 적용 전 검토, 작업별 Worktree 계약을 제공합니다. 앱은 [`@keundal/plugin-workspace-git`](../plugin-workspace-git/README.md)에 저장소와 검토 콜백을 조립하고, [`@keundal/plugin-tool-workspace`](../plugin-tool-workspace/README.md)의 `workspaceTools.tools`를 코딩 에이전트에 전달합니다.
+
+승인 콜백이 없으면 조회만 허용합니다. Worktree를 만들어도 파일·Shell 도구의 경로가 자동으로 바뀌지는 않으므로 앱이 반환한 작업 경로에서 해당 서비스를 조립합니다. Git 검토는 파일·Shell 도구를 통제하지 않으며, 일관된 통제가 필요하면 각 도구에 같은 승인 정책을 적용해야 합니다.
+
 ## 설정
 
 | 설정              | 기본값    | 설명                                                                   |

@@ -69,6 +69,7 @@ export class FileSystemToolsService extends Service {
             required: keys,
             additionalProperties: false
           },
+          describeOperation: (args) => ({ kind: name, paths: [strings(args, keys).path!] }),
           execute: async (args, context) =>
             JSON.stringify(await run(strings(args, keys), { signal: context.signal, scope: context.threadId }))
         })

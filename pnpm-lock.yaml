@@ -496,6 +496,9 @@ importers:
       '@keundal/skill':
         specifier: workspace:*
         version: link:../skill
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
@@ -566,6 +569,9 @@ importers:
       '@keundal/subagent':
         specifier: workspace:*
         version: link:../subagent
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
       '@keundal/tool-execution':
         specifier: workspace:*
         version: link:../tool-execution
@@ -688,6 +694,9 @@ importers:
       '@keundal/skill':
         specifier: workspace:*
         version: link:../skill
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
       '@keundal/tools':
         specifier: workspace:*
         version: link:../tools
@@ -749,6 +758,9 @@ importers:
       '@keundal/subagent':
         specifier: workspace:*
         version: link:../subagent
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
       '@keundal/tools':
         specifier: workspace:*
         version: link:../tools
@@ -1283,6 +1295,9 @@ importers:
       '@keundal/skill':
         specifier: workspace:*
         version: link:../skill
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
       '@keundal/tools':
         specifier: workspace:*
         version: link:../tools
@@ -1463,6 +1478,9 @@ importers:
       '@keundal/subagent':
         specifier: workspace:*
         version: link:../subagent
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
@@ -2100,6 +2118,9 @@ importers:
       '@keundal/session':
         specifier: workspace:*
         version: link:../session
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
       '@keundal/trace':
         specifier: workspace:*
         version: link:../trace
@@ -2192,6 +2213,9 @@ importers:
       '@keundal/session':
         specifier: workspace:*
         version: link:../session
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
       '@keundal/trace':
         specifier: workspace:*
         version: link:../trace
@@ -2369,6 +2393,40 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  packages/plugin-tool-workspace:
+    dependencies:
+      '@keundal/tools':
+        specifier: workspace:*
+        version: link:../tools
+      '@keundal/workspace':
+        specifier: workspace:*
+        version: link:../workspace
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/plugin-workspace-git':
+        specifier: workspace:*
+        version: link:../plugin-workspace-git
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/plugin-transcription-browser:
     dependencies:
       '@keundal/chat':
@@ -2442,6 +2500,37 @@ importers:
       ws:
         specifier: 8.22.0
         version: 8.22.0
+
+  packages/plugin-workspace-git:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/workspace':
+        specifier: workspace:*
+        version: link:../workspace
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/prompt:
     dependencies:
@@ -2588,6 +2677,9 @@ importers:
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
       '@keundal/tools':
         specifier: workspace:*
         version: link:../tools
@@ -2617,6 +2709,28 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/tool-approval:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/tools':
+        specifier: workspace:*
+        version: link:../tools
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
   packages/tool-execution:
     dependencies:
       '@keundal/core':
@@ -2625,6 +2739,9 @@ importers:
       '@keundal/llm':
         specifier: workspace:*
         version: link:../llm
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
       '@keundal/tools':
         specifier: workspace:*
         version: link:../tools
@@ -2850,6 +2967,9 @@ importers:
       '@keundal/subagent':
         specifier: workspace:*
         version: link:../subagent
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
@@ -3438,6 +3558,31 @@ importers:
       vue:
         specifier: 3.5.44
         version: 3.5.44(typescript@6.0.3)
+
+  packages/workspace:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   tools/store-conformance:
     dependencies:

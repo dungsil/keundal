@@ -86,6 +86,7 @@ test('번들 스킬과 도구의 on/off를 실제 목록에 반영하고 재연�
   try {
     expect((await platform.runtimePlugins!.list()).map(entry => entry.module)).toEqual([
       '@keundal/plugin-llm-browser', '@keundal/plugin-store-indexeddb', '@keundal/plugin-agent-chat',
+      '@keundal/prompt', '@keundal/subagent',
       '@keundal/plugin-skill', '@keundal/plugin-tool-chart', '@keundal/plugin-tool-weather', '@keundal/plugin-mcp-client'
     ])
     await expect(platform.runtimePlugins!.setEnabled('https://not-requested.invalid/plugin.mjs', true)).rejects.toThrow('Unknown bundled')
@@ -271,6 +272,26 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   const run = await connection.store.getRun?.(answer.id)
   expect(run?.status).toBe('completed')
   expect(run?.journal.map(entry => entry.event)).toContainEqual(expect.objectContaining({ type: 'CUSTOM', name: 'keundal.trace' }))
+  await platform.runtimePlugins!.setEnabled('@keundal/prompt', false)
+  await platform.runtimePlugins!.setEnabled('@keundal/subagent', false)
+  const disabledStart = requests.length
+  for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user], promptPreset, subagentRoles })) void event
+  expect(JSON.stringify(requests[disabledStart]!.input)).not.toContain('Preset focus: totals')
+  expect(requests[disabledStart]!.tools).not.toContainEqual(expect.objectContaining({ name: 'delegate_task' }))
+  await platform.runtimePlugins!.setEnabled('@keundal/prompt', true)
+  await platform.runtimePlugins!.setEnabled('@keundal/subagent', true)
+  const restoredStart = requests.length
+  for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user], promptPreset, subagentRoles })) void event
+  expect(JSON.stringify(requests[restoredStart]!.input)).toContain('Preset focus: totals')
+  expect(requests[restoredStart]!.tools).toContainEqual(expect.objectContaining({ name: 'delegate_task' }))
+  await platform.runtimePlugins!.setEnabled('@keundal/plugin-agent-chat', false)
+  const beforeBlocked = requests.length
+  await expect((async () => {
+    for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user] })) void event
+  })()).rejects.toThrow('agent is disabled')
+  expect(requests).toHaveLength(beforeBlocked)
+  expect(await connection.store.get(id)).toBeDefined()
+  await platform.runtimePlugins!.setEnabled('@keundal/plugin-agent-chat', true)
   await connection.store.delete(id)
 })
 
