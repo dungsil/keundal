@@ -2,6 +2,10 @@ import {
   loadPromptPresets,
   parsePromptPresetSettings,
   PROMPT_PRESETS_KEY,
+  exportDataBackup,
+  restoreDataBackup,
+  parseDataBackup,
+  type BackupPreferences,
   type PromptPresetSettings
 } from '@keundal/chat'
 import { listChatSummaries, type ChatStoreLike, type ChatSummary } from '@keundal/chat/chat-store'
@@ -338,6 +342,45 @@ export class ChatRuntime extends Service {
   /** Save MCP settings and restart the connection's tools. */
   async saveMcpSettings(value: unknown): Promise<void> {
     await this.platform.mcp.save(value, () => this.connection?.mcpChanged?.() ?? this.store.stop())
+  }
+
+  exportBackup(appearance: Pick<BackupPreferences, 'locale' | 'colorMode'>) {
+    if (!this.options.storage) throw unavailable('Browser storage')
+    return exportDataBackup({
+      platform: this.platform,
+      store: this.store,
+      storage: this.options.storage,
+      plugins: this.pluginManager,
+      preferences: {
+        ...appearance,
+        webSearch: this.webSearch.value,
+        reasoning: this.options.preferences.reasoning.value ?? 'medium'
+      }
+    })
+  }
+
+  async restoreBackup(value: unknown) {
+    if (!this.options.storage) throw unavailable('Browser storage')
+    const backup = parseDataBackup(value)
+    const skipped = await restoreDataBackup(
+      {
+        platform: this.platform,
+        store: this.store,
+        storage: this.options.storage,
+        plugins: this.pluginManager,
+        settingsChanged: (next) => this.connection?.settingsChanged?.(next) ?? Promise.resolve()
+      },
+      backup
+    )
+    this.settings.value = backup.settings.providers
+    this.promptPresets.value = backup.settings.promptPresets
+    this.subagentRoles.value = backup.settings.subagentRoles
+    this.defaultModel.value = backup.settings.models.default
+    this.titleModel.value = backup.settings.models.title
+    this.model.value = backup.settings.models.selected || backup.settings.models.default || FALLBACK_MODEL
+    this.options.preferences.webSearch.value = backup.settings.preferences.webSearch
+    this.options.preferences.reasoning.value = backup.settings.preferences.reasoning
+    return skipped
   }
 
   /** Stop active responses before changing plugins. Safe before a browser connection exists. */

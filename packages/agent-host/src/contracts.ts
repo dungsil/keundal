@@ -1,4 +1,5 @@
 import type { AgentExecutionOptions } from '@keundal/agent'
+import type { BackupService } from '@keundal/backup'
 import type { AGUIEvent, AgentMessage, ExecutionOptions, RunAgentInput } from '@keundal/core'
 import type { GenerationJournalEntry, GenerationService, GenerationSubscriptionOptions } from '@keundal/generation'
 import type { Reasoning } from '@keundal/llm'
@@ -57,6 +58,7 @@ export interface AgentHostServices {
   subscribe(runId: string, options?: GenerationSubscriptionOptions): AsyncIterable<GenerationJournalEntry>
   session: Pick<SessionService, 'get' | 'list' | 'commit' | 'delete'>
   generation: Pick<GenerationService, 'get' | 'list' | 'recover'>
+  backup?: Pick<BackupService, 'export' | 'import'>
   tasks?: Pick<TaskService, 'get' | 'list' | 'cancel'>
   models(): readonly AgentHostModel[]
   catalog?(options?: ExecutionOptions): Promise<{ skills: readonly SkillSummary[]; tools: readonly SkillSummary[] }>

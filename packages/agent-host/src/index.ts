@@ -1,3 +1,4 @@
+import { parseHistoryBackup, type HistoryBackup } from '@keundal/backup'
 import { SteerQueue, EventType, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import { parseReasoning, type Reasoning } from '@keundal/llm'
 import { ToolApproval } from '@keundal/tool-approval'
@@ -118,11 +119,24 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
       if (!servicesContext[name]) throw new Error(`missing host service: ${name}`)
     }
 
+    let backupOperations = 0
+    const withBackup = async <T>(work: () => Promise<T>): Promise<T> => {
+      if (closed) throw new Error('agent host disposed')
+      if (runs.size) throw new Error('cannot back up or import history while host runs are active')
+      backupOperations++
+      try {
+        return await work()
+      } finally {
+        backupOperations--
+      }
+    }
+
     const services: AgentHostServices = {
       respondToToolApproval(runId, requestId, decision) {
         return toolApproval.respond(runId, requestId, decision)
       },
       run(input, runOptions = {}) {
+        if (backupOperations) throw new Error('history backup operation is active')
         const selected = model(runOptions.model)
         const { model: _model, reasoning: rawReasoning, steer: _steer, ...execution } = runOptions
         const reasoning = parseReasoning(rawReasoning)
@@ -171,6 +185,14 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         list: (runOptions) => servicesContext.generation.list(runOptions),
         recover: (runOptions) => servicesContext.generation.recover(runOptions)
       },
+      ...(servicesContext.backup
+        ? {
+            backup: {
+              export: () => withBackup(() => servicesContext.backup.export()),
+              import: (data: HistoryBackup) => withBackup(() => servicesContext.backup.import(parseHistoryBackup(data)))
+            }
+          }
+        : {}),
       ...(servicesContext.tasks
         ? {
             tasks: {

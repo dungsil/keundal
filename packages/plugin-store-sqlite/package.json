@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@keundal/backup": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/generation": "workspace:*",
     "@keundal/llm": "workspace:*",
@@ -27,10 +28,13 @@
     "cordis": "catalog:"
   },
   "devDependencies": {
+    "@keundal/plugin-store-indexeddb": "workspace:*",
+    "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/store-conformance": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",
+    "fake-indexeddb": "6.2.6",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

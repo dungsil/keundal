@@ -10,8 +10,10 @@
     "./slots": "./app/slots.ts"
   },
   "dependencies": {
+    "@keundal/chat": "workspace:*",
     "@keundal/ui": "workspace:*",
     "@keundal/ui-layout": "workspace:*",
+    "@keundal/ui-runtime": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
     "cordis": "catalog:",
     "nuxt": "^4.6.2",

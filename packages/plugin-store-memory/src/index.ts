@@ -1,10 +1,12 @@
 import type { Context } from 'cordis'
 
+import { MemoryBackupService } from './backup.js'
 import { memoryStoreConfigSchema, type MemoryStoreConfig } from './config.js'
 import { MemoryGenerationService } from './generation.js'
 import { MemorySessionService } from './session.js'
 import { MemoryStore } from './store.js'
 
+export { MemoryBackupService } from './backup.js'
 export { memoryStoreConfigSchema, type MemoryStoreConfig } from './config.js'
 export { MemoryGenerationService } from './generation.js'
 export { MemorySessionService } from './session.js'
@@ -20,6 +22,7 @@ export const memoryStorePlugin = Object.assign(
   function memoryStorePlugin(ctx: Context, config: MemoryStoreConfig = {}) {
     const store = config.store ?? new MemoryStore()
     new MemorySessionService(ctx, store)
+    new MemoryBackupService(ctx, store)
     ctx.inject(['llm'], (injected) => {
       new MemoryGenerationService(injected, store)
     })

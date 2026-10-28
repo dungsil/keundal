@@ -19,6 +19,7 @@ const implementationIndependent = new Set([
   '@keundal/llm',
   '@keundal/session',
   '@keundal/generation',
+  '@keundal/backup',
   '@keundal/skill',
   '@keundal/compaction',
   '@keundal/trace',

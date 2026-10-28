@@ -1,15 +1,18 @@
 import type { Context } from 'cordis'
+import type { BackupPreferences } from '@keundal/chat'
 import type {} from '@keundal/ui-layout/slots'
+import type {} from '@keundal/ui-runtime'
 import { localizedText } from '@keundal/ui/app/utils/locale.ts'
 
 import { messages } from './locale'
 import type {} from './slots'
 import AppearanceSection from './views/AppearanceSection.vue'
+import DataSection from './views/DataSection.vue'
 import SettingsLink from './views/SettingsLink.vue'
 import SettingsPage from './views/SettingsPage.vue'
 
 export const name = 'ui-settings'
-export const inject = ['slots']
+export const inject = ['slots', 'chatRuntime']
 
 /** Render the settings page with its section navigation, the appearance section and the sidebar link. */
 export function apply(ctx: Context) {
@@ -23,6 +26,16 @@ export function apply(ctx: Context) {
     order: 0,
     meta: { label: localizedText(messages, 'settings.appearance'), icon: 'i-lucide-palette', group: 'general' }
   }, AppearanceSection))
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    key: 'data',
+    order: 50,
+    meta: { label: localizedText(messages, 'data.title'), icon: 'i-lucide-archive', group: 'general' },
+    inject: () => ({
+      exportBackup: (appearance: Pick<BackupPreferences, 'locale' | 'colorMode'>) => ctx.chatRuntime.exportBackup(appearance),
+      restoreBackup: (value: unknown) => ctx.chatRuntime.restoreBackup(value)
+    })
+  }, DataSection))
   ctx.slots.inject('layout.sidebar.footer', () => ctx.slots.register({
     name: 'layout.sidebar.footer',
     id: 'settings',

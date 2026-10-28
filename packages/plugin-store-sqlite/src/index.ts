@@ -1,5 +1,6 @@
 import type { Context } from 'cordis'
 
+import { SqliteBackupService } from './backup.js'
 import { sqliteStoreConfigSchema, type SqliteStoreConfig } from './config.js'
 import { SqliteGenerationService } from './generation.js'
 import { SqliteSessionService } from './session.js'
@@ -13,6 +14,7 @@ export const metadata = {
   }
 }
 
+export { SqliteBackupService } from './backup.js'
 export { sqliteStoreConfigSchema, type SqliteStoreConfig } from './config.js'
 export { SqliteGenerationService } from './generation.js'
 export { SqliteSessionService } from './session.js'
@@ -28,6 +30,7 @@ export const sqliteStorePlugin = Object.assign(
     const store = new SqliteStore(config.path)
     ctx.fiber.effect(() => () => store.release())
     new SqliteSessionService(ctx, store)
+    new SqliteBackupService(ctx, store)
     ctx.inject(['llm', 'session'], (injected) => {
       new SqliteGenerationService(injected, store)
     })

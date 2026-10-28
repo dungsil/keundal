@@ -484,6 +484,9 @@ importers:
       '@keundal/agent':
         specifier: workspace:*
         version: link:../agent
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -747,8 +750,48 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/backup:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/generation':
+        specifier: workspace:*
+        version: link:../generation
+      '@keundal/llm':
+        specifier: workspace:*
+        version: link:../llm
+      '@keundal/session':
+        specifier: workspace:*
+        version: link:../session
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/chat:
     dependencies:
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -1475,6 +1518,9 @@ importers:
       '@keundal/agent-loop':
         specifier: workspace:*
         version: link:../agent-loop
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/chat':
         specifier: workspace:*
         version: link:../chat
@@ -1527,6 +1573,9 @@ importers:
 
   packages/plugin-chat-remote:
     dependencies:
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/chat':
         specifier: workspace:*
         version: link:../chat
@@ -2130,6 +2179,9 @@ importers:
 
   packages/plugin-store-indexeddb:
     dependencies:
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -2179,6 +2231,9 @@ importers:
 
   packages/plugin-store-memory:
     dependencies:
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -2225,6 +2280,9 @@ importers:
 
   packages/plugin-store-sqlite:
     dependencies:
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -2250,6 +2308,12 @@ importers:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
     devDependencies:
+      '@keundal/plugin-store-indexeddb':
+        specifier: workspace:*
+        version: link:../plugin-store-indexeddb
+      '@keundal/plugin-store-memory':
+        specifier: workspace:*
+        version: link:../plugin-store-memory
       '@keundal/store-conformance':
         specifier: workspace:*
         version: link:../../tools/store-conformance
@@ -2262,6 +2326,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.6
+      fake-indexeddb:
+        specifier: 6.2.6
+        version: 6.2.6
       tsdown:
         specifier: 'catalog:'
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
@@ -3398,12 +3465,18 @@ importers:
 
   packages/ui-settings:
     dependencies:
+      '@keundal/chat':
+        specifier: workspace:*
+        version: link:../chat
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
       '@keundal/ui-layout':
         specifier: workspace:*
         version: link:../ui-layout
+      '@keundal/ui-runtime':
+        specifier: workspace:*
+        version: link:../ui-runtime
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots

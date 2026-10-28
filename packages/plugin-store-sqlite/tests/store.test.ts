@@ -7,9 +7,38 @@ import { DatabaseSync } from 'node:sqlite'
 import { EventType, type AGUIEvent, type AgentMessage, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
 import { type GenerationJournalEntry, type GenerationRequest } from '@keundal/generation'
 import { LLMService, type LLMEvent, type LLMModel, type LLMRequest } from '@keundal/llm'
+import indexedDBStorePlugin from '@keundal/plugin-store-indexeddb'
+import memoryStorePlugin from '@keundal/plugin-store-memory'
 import sqliteStorePlugin, { sqliteStoreConfigSchema } from '@keundal/plugin-store-sqlite'
 import { Context, type Fiber } from 'cordis'
+import { IDBFactory } from 'fake-indexeddb'
 import { expect, test, type TestContext } from 'vitest'
+
+test('SQLite 백업을 메모리와 IndexedDB를 거쳐 가져와도 메시지 스냅숏과 journal을 그대로 보존한다', async (t) => {
+  const source = await setup(t, { events: reply })
+  await collect(source.ctx.generation.run(request('portable-run')))
+  const data = await source.ctx.backup.export()
+  data.runs[0]!.messages.push({
+    id: 'not-in-journal',
+    role: 'assistant',
+    content: 'portable snapshot',
+    metadata: { custom: true }
+  })
+  const memory = new Context()
+  const memoryFiber = await memory.plugin(memoryStorePlugin)
+  t.onTestFinished(() => memoryFiber.dispose())
+  await memory.backup.import(JSON.parse(JSON.stringify(data)))
+  const indexedDB = new Context()
+  const indexedDBFiber = await indexedDB.plugin(indexedDBStorePlugin, {
+    databaseName: 'portable-backup',
+    indexedDB: new IDBFactory()
+  })
+  t.onTestFinished(() => indexedDBFiber.dispose())
+  await indexedDB.backup.import(await memory.backup.export())
+  const target = await setup(t, { events: [] })
+  await target.ctx.backup.import(await indexedDB.backup.export())
+  expect(await target.ctx.backup.export()).toEqual(data)
+})
 
 test('지정한 이벤트 공급자의 도구 결과를 저장하고 복구할 때 다시 실행하지 않는다', async (t) => {
   const { ctx, calls, path, fibers } = await setup(t, { events: [] })
@@ -159,6 +188,50 @@ const request = (runId: string, sessionRevision = 0): GenerationRequest => ({
   model: 'test-model',
   maxOutputTokens: 20,
   sessionRevision
+})
+
+test('백업을 왕복해 상태와 실행을 보존하고 충돌·실행 중·잘못된 입력은 변경 없이 거부한다', async (t) => {
+  const source = await setup(t, { events: reply })
+  await collect(source.ctx.generation.run(request('backup-run')))
+  const data = await source.ctx.backup.export()
+  data.threads[0] = {
+    ...data.threads[0]!,
+    state: { web: { title: 'saved', votes: [true], queue: [] }, custom: [1, null] }
+  }
+  data.runs[0]!.messages.push({ id: 'portable', role: 'assistant', content: 'snapshot only' })
+  const target = await setup(t, { events: [] })
+  await target.ctx.backup.import(data)
+  expect(await target.ctx.backup.export()).toEqual(data)
+  expect(await target.ctx.generation.get('backup-run')).toEqual(data.runs[0])
+  const collision = structuredClone(data)
+  collision.threads.unshift({ threadId: 'must-not-exist', revision: 0, messages: [], state: {} })
+  await expect(target.ctx.backup.import(collision)).rejects.toThrow('collision')
+  const runCollision = structuredClone(data)
+  runCollision.threads[0] = { ...runCollision.threads[0]!, threadId: 'another-thread' }
+  runCollision.runs[0]!.request.input.threadId = 'another-thread'
+  runCollision.runs[0] = { ...runCollision.runs[0]!, journal: [] }
+  await expect(target.ctx.backup.import(runCollision)).rejects.toThrow('run collision')
+  const invalid = structuredClone(data)
+  invalid.runs[0]!.journal[0] = { ...invalid.runs[0]!.journal[0]!, sequence: 2 }
+  await expect(target.ctx.backup.import(invalid)).rejects.toThrow('sequence')
+  const running = structuredClone(data)
+  running.runs[0] = { ...running.runs[0]!, status: 'running' }
+  await expect(target.ctx.backup.import(running)).rejects.toThrow('running')
+  expect(await target.ctx.backup.export()).toEqual(data)
+  const iterator = source.ctx.generation.run(request('active', 1))[Symbol.asyncIterator]()
+  try {
+    await iterator.next()
+    const before = await source.ctx.session.list()
+    await expect(source.ctx.backup.export()).rejects.toThrow('running')
+    await expect(source.ctx.backup.import({ threads: [], runs: [] })).rejects.toThrow('running')
+    expect(await source.ctx.session.list()).toEqual(before)
+  } finally {
+    await iterator.return?.()
+  }
+  const backup = target.ctx.backup
+  await target.fibers[0]!.dispose()
+  expect(await target.ctx.backup.export()).toEqual(data)
+  expect(await backup.export()).toEqual(data)
 })
 
 test('LLM 교체 중에도 기존 세션을 사용하고 교체 뒤 완료 기록과 revision을 이어간다', async (t) => {
