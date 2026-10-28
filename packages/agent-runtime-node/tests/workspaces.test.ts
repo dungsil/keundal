@@ -103,6 +103,71 @@ async function setup(t: TestContext) {
   return { root, repository, host, run, git }
 }
 
+test('ACP 매니페스트는 Worktree에서도 외부 에이전트를 선택하고 새 대화의 저장된 사용자 입력을 허용한다', async (t) => {
+  const { root, repository } = await setup(t)
+  const project = await repository('acp-project')
+  const script = `
+    let cwd;
+    require('node:readline').createInterface({input:process.stdin}).on('line', line => {
+      const request = JSON.parse(line);
+      if (request.id === undefined) return;
+      let result;
+      if (request.method === 'initialize') result = {protocolVersion:request.params.protocolVersion};
+      if (request.method === 'session/new') {cwd=request.params.cwd; result={sessionId:'acp'};}
+      if (request.method === 'session/prompt') {
+        console.log(JSON.stringify({jsonrpc:'2.0',method:'session/update',params:{sessionId:'acp',update:{
+          sessionUpdate:'agent_message_chunk',content:{type:'text',text:cwd+'|'+process.cwd()}
+        }}}));
+        result={stopReason:'end_turn'};
+      }
+      console.log(JSON.stringify({jsonrpc:'2.0',id:request.id,result}));
+    });
+  `
+  const app = await createNodeAgentHost(
+    {
+      provider: 'openai',
+      apiKey: 'unused',
+      model: 'test',
+      sqlitePath: join(root, 'acp.sqlite'),
+      workspaceRoot: join(root, 'acp-workspaces'),
+      runtimePlugins: {
+        plugins: [{ module: 'builtin:llm' }, { module: 'builtin:store' }],
+        agent: { module: 'builtin:acp', config: { command: process.execPath, args: ['-e', script], cwd: project } },
+        tools: []
+      }
+    },
+    createNodeComposition
+  )
+  try {
+    app.ctx.llm.stream = () => {
+      throw new Error('local LLM must not generate ACP responses')
+    }
+    const workspace = await app.services.workspaces!.create('acp-thread', project)
+    const message = { id: 'user', role: 'user' as const, content: 'inspect' }
+    await app.services.session.commit({ threadId: 'acp-thread', expectedRevision: 0, messages: [message], state: {} })
+    const events = await Array.fromAsync(
+      app.services.run({
+        threadId: 'acp-thread',
+        runId: 'acp-run',
+        messages: [message],
+        state: {},
+        context: [],
+        tools: []
+      })
+    )
+    expect(events.at(-1)?.type).toBe('RUN_FINISHED')
+    expect(
+      events
+        .filter((event) => event.type === 'TEXT_MESSAGE_CONTENT')
+        .map((event) => event.delta)
+        .join('')
+    ).toBe(`${workspace.path}|${workspace.path}`)
+    expect((await app.services.generation.get('acp-run'))?.status).toBe('completed')
+  } finally {
+    await app.dispose()
+  }
+})
+
 test('프로젝트와 대화별 Worktree를 격리하고 일반 대화에는 코딩 도구를 제공하지 않는다', async (t) => {
   const { repository, host, run } = await setup(t)
   const first = await repository('first')

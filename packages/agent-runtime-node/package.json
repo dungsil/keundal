@@ -23,6 +23,7 @@
     "@keundal/core": "workspace:*",
     "@keundal/mcp": "workspace:*",
     "@keundal/memory": "workspace:*",
+    "@keundal/plugin-agent-acp": "workspace:*",
     "@keundal/plugin-agent-chat": "workspace:*",
     "@keundal/plugin-agent-coding": "workspace:*",
     "@keundal/plugin-fs-local": "workspace:*",

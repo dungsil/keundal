@@ -17,6 +17,8 @@ Keundal("큰달"으로 읽음)은 개인용 오픈소스 에이전트 도구입�
 | `@keundal/agent-loop`                     | 에이전트가 공유하는 실행 루프와 설정을 제공합니다.             |
 | `@keundal/plugin-agent-chat`              | 공통 루프로 대화 에이전트를 등록합니다.                        |
 | `@keundal/plugin-agent-coding`            | 공통 루프에 코딩 지침을 적용한 에이전트를 등록합니다.          |
+| `@keundal/plugin-agent-acp`               | 외부 ACP 에이전트를 큰달에서 실행합니다.                       |
+| `@keundal/acp`                            | 큰달 에이전트를 외부 ACP 클라이언트에 제공합니다.              |
 | `@keundal/tools`                          | 에이전트와 공급자가 공유하는 도구 실행 계약을 제공합니다.      |
 | `@keundal/tool-execution`                 | 도구 호출을 실행하고 결과로 후속 모델 요청을 구성합니다.       |
 | `@keundal/deferred-tools`                 | 지연 도구의 검색·활성화와 실행 권한 재검사를 담당합니다.       |
@@ -42,6 +44,10 @@ Keundal("큰달"으로 읽음)은 개인용 오픈소스 에이전트 도구입�
 각 패키지의 설정과 사용법은 패키지 안의 README.md를 참고하고, 저장소 규칙은 [AGENTS.md](./AGENTS.md)에 정리되어 있습니다.
 
 계약과 구현의 의존 방향, 이전 가져오기 경로의 변경은 [패키지 경계 결정](docs/adr/0005-service-package-boundaries.md)에 정리되어 있습니다.
+
+## Agent Client Protocol
+
+ACP v1 stdio를 양방향으로 지원합니다. Node.js 호스트·desktop에서 외부 에이전트를 실행하려면 [`plugin-agent-acp`](packages/plugin-agent-acp/README.md)의 `builtin:acp` 설정을 사용합니다. 외부 편집기에서 큰달을 실행하려면 [`acp`](packages/acp/README.md)와 [코딩 에이전트 실행 예제](examples/acp/README.md)를 참고하세요. 세션·스트리밍·도구 승인·취소를 지원하며, 세션 복원과 원격 전송은 지원하지 않습니다.
 
 ## 파일과 Shell 도구
 
