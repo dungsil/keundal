@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsdown'
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/retrieval.ts'],
+  entry: ['src/index.ts', 'src/retrieval.ts', 'src/tools.ts'],
   format: 'esm',
   fixedExtension: false,
   platform: 'browser',

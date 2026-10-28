@@ -77,17 +77,20 @@ export class RemoteChatStore implements ChatStoreLike {
       if (!Array.isArray(entries)) throw new Error('Invalid memory response')
       return entries.map(parseMemoryEntry)
     },
-    save: async (draft, id) =>
+    save: async (draft, id, expectedRevision) =>
       parseMemoryEntry(
         await (
           await this.call(id ? `/memories/${encodeURIComponent(id)}` : '/memories', {
             method: id ? 'PUT' : 'POST',
-            body: JSON.stringify(draft)
+            body: JSON.stringify({ ...draft, ...(id ? { expectedRevision } : {}) })
           })
         ).json()
       ),
-    delete: async (id) => {
-      await this.call(`/memories/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    delete: async (id, expectedRevision) => {
+      await this.call(`/memories/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ expectedRevision })
+      })
     },
     search: async (query) => {
       const selected = query.model ? resolveModel(query.model).id : undefined

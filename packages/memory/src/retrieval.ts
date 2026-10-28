@@ -1,11 +1,11 @@
 import { EventType, type ExecutionOptions } from '@keundal/core'
 import type { LLMRequest, LLMService } from '@keundal/llm'
 
-import type { MemoryEntry, MemoryService } from './index.js'
+import type { MemoryEntry, ScopedMemoryService } from './index.js'
 
 /** Keyword recall plus model-based semantic selection, within the selected storage scopes. */
 export async function retrieveMemories(
-  memory: Pick<MemoryService, 'list' | 'search'>,
+  memory: Pick<ScopedMemoryService, 'list' | 'search'>,
   llm: Pick<LLMService, 'getModel' | 'countTokens' | 'stream'>,
   query: { text: string; projectId?: string; threadId?: string; limit?: number },
   model: string,
@@ -26,7 +26,7 @@ export async function retrieveMemories(
         (scope.type === 'project' && scope.id === query.projectId) ||
         (scope.type === 'conversation' && scope.id === query.threadId)
     )
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id))
+    .sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id))
   const candidates = [...new Map([...keywords, ...eligible].map((entry) => [entry.id, entry])).values()].slice(0, 64)
   if (!candidates.length) return []
   const limits = await llm.getModel(model, options)
@@ -56,7 +56,7 @@ export async function retrieveMemories(
   while (candidates.length) {
     data.content = JSON.stringify({
       query: query.text.slice(-4000),
-      facts: candidates.map(({ id, content }) => ({ id, content }))
+      facts: candidates.map(({ id, title, content }) => ({ id, title, content }))
     })
     if ((await llm.countTokens(request, options)) <= Math.min(8192, limits.contextWindow - output)) break
     candidates.pop()

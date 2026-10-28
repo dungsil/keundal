@@ -1,4 +1,4 @@
-import { StoredMemoryService } from '@keundal/plugin-memory'
+import { StoredMemoryService, StoredProjectMemoryService } from '@keundal/plugin-memory'
 import type { Context } from 'cordis'
 
 import { indexedDBStoreConfigSchema, type IndexedDBStoreConfig } from './config.js'
@@ -26,7 +26,8 @@ export const indexedDBStorePlugin = Object.assign(
   function indexedDBStorePlugin(ctx: Context, config: IndexedDBStoreConfig = {}) {
     const store = config.store ?? new IndexedDBStore(config)
     new IndexedDBSessionService(ctx, store)
-    new StoredMemoryService(ctx, store.memoryAdapter)
+    const scoped = new StoredMemoryService(ctx, store.memoryAdapter)
+    new StoredProjectMemoryService(ctx, scoped)
     new IndexedDBTaskStore(ctx, store)
     const generation = ctx.inject(['llm', 'session'], (injected) => {
       new IndexedDBGenerationService(injected, store)

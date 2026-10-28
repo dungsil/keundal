@@ -213,14 +213,14 @@ export class ChatRuntime extends Service {
     return this.connection.memory.list()
   }
 
-  saveMemory(draft: MemoryDraft, id?: string) {
+  saveMemory(draft: MemoryDraft, id?: string, expectedRevision?: number) {
     if (!this.connection?.memory) throw unavailable('Memory')
-    return this.connection.memory.save(draft, id)
+    return this.connection.memory.save(draft, id, expectedRevision)
   }
 
-  deleteMemory(id: string) {
+  deleteMemory(id: string, expectedRevision: number) {
     if (!this.connection?.memory) throw unavailable('Memory')
-    return this.connection.memory.delete(id)
+    return this.connection.memory.delete(id, expectedRevision)
   }
 
   searchMemories(text: string, projectId?: string, threadId?: string, semantic = false) {
@@ -235,7 +235,6 @@ export class ChatRuntime extends Service {
 
   saveMemoryProject(id: string) {
     id = id.trim()
-    if (id.length > 200) throw new Error('Project identifier must contain at most 200 characters')
     this.options.storage?.setItem('keundal:memory-project', id)
     this.memoryProject.value = id
   }

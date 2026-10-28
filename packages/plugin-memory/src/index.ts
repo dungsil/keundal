@@ -1,12 +1,19 @@
 import type { ExecutionOptions } from '@keundal/core'
 import {
   MemoryService,
+  ScopedMemoryService,
+  memoryContentSchema,
+  memoryRevisionSchema,
+  memorySearchSchema,
+  memoryTextSchema,
   parseMemoryDraft,
   parseMemoryEntry,
   parseMemoryId,
   parseMemorySearchQuery,
   type MemoryDraft,
   type MemoryEntry,
+  type MemoryContent,
+  type ProjectMemory,
   type MemorySearchQuery
 } from '@keundal/memory'
 import type { Context } from 'cordis'
@@ -14,13 +21,14 @@ import type { Context } from 'cordis'
 export interface MemoryAdapterSaveOptions extends ExecutionOptions {
   /** Updates must atomically reject missing IDs rather than recreate deleted entries. */
   readonly update: boolean
+  readonly expectedRevision?: number
 }
 
 export interface MemoryAdapter {
   list(options?: ExecutionOptions): Promise<MemoryEntry[]>
   /** Creates must reject duplicate IDs; updates must reject missing IDs. */
   save(entry: MemoryEntry, options: MemoryAdapterSaveOptions): Promise<void>
-  delete(id: string, options?: ExecutionOptions): Promise<void>
+  delete(id: string, expectedRevision: number, options?: ExecutionOptions): Promise<void>
 }
 
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
@@ -34,7 +42,7 @@ const matches = (tokens: string[], term: string): boolean =>
       (token.startsWith(term) && /^\p{Script=Hangul}+$/u.test(token.slice(term.length)))
   )
 
-export class StoredMemoryService extends MemoryService {
+export class StoredMemoryService extends ScopedMemoryService {
   private closed = false
 
   constructor(
@@ -56,25 +64,39 @@ export class StoredMemoryService extends MemoryService {
     this.check(options)
     const entries = await this.adapter.list(options)
     this.check(options)
-    return entries.map(parseMemoryEntry).sort((a, b) => compare(a.createdAt, b.createdAt) || compare(a.id, b.id))
+    return entries.map(parseMemoryEntry).sort((a, b) => a.createdAt - b.createdAt || compare(a.id, b.id))
   }
 
-  async save(draft: MemoryDraft, id?: string, options?: ExecutionOptions): Promise<MemoryEntry> {
+  async save(
+    draft: MemoryDraft,
+    id?: string,
+    expectedRevision?: number,
+    options?: ExecutionOptions
+  ): Promise<MemoryEntry> {
     this.check(options)
     const parsed = parseMemoryDraft(draft)
+    if (id !== undefined) memoryRevisionSchema.parse(expectedRevision)
+    else if (expectedRevision !== undefined) throw new Error('creation cannot specify a revision')
     const entryId = id === undefined ? globalThis.crypto.randomUUID() : parseMemoryId(id)
     const previous = id === undefined ? undefined : (await this.list(options)).find((entry) => entry.id === entryId)
     if (id !== undefined && !previous) throw new Error(`memory entry does not exist: ${entryId}`)
+    if (previous && previous.revision !== expectedRevision) throw new Error('memory revision conflict')
     this.check(options)
-    const now = new Date().toISOString()
-    const entry: MemoryEntry = { ...parsed, id: entryId, createdAt: previous?.createdAt ?? now, updatedAt: now }
-    await this.adapter.save(parseMemoryEntry(entry), { ...options, update: id !== undefined })
+    const now = Date.now()
+    const entry: MemoryEntry = {
+      ...parsed,
+      id: entryId,
+      revision: (previous?.revision ?? 0) + 1,
+      createdAt: previous?.createdAt ?? now,
+      updatedAt: now
+    }
+    await this.adapter.save(parseMemoryEntry(entry), { ...options, update: id !== undefined, expectedRevision })
     return parseMemoryEntry(entry)
   }
 
-  async delete(id: string, options?: ExecutionOptions): Promise<void> {
+  async delete(id: string, expectedRevision: number, options?: ExecutionOptions): Promise<void> {
     this.check(options)
-    await this.adapter.delete(parseMemoryId(id), options)
+    await this.adapter.delete(parseMemoryId(id), memoryRevisionSchema.parse(expectedRevision), options)
   }
 
   async search(query: MemorySearchQuery, options?: ExecutionOptions): Promise<MemoryEntry[]> {
@@ -92,7 +114,7 @@ export class StoredMemoryService extends MemoryService {
       )
       .map((entry) => {
         const content = words(entry.content)
-        const label = words(entry.source.label)
+        const label = words([entry.title, ...entry.sources.map((source) => source.label ?? '')].join(' '))
         const score = terms.reduce(
           (sum, term) => sum + (matches(content, term) ? 2 : 0) + (matches(label, term) ? 1 : 0),
           0
@@ -100,9 +122,7 @@ export class StoredMemoryService extends MemoryService {
         return { entry, score }
       })
       .filter(({ score }) => score > 0)
-      .sort(
-        (a, b) => b.score - a.score || compare(b.entry.updatedAt, a.entry.updatedAt) || compare(a.entry.id, b.entry.id)
-      )
+      .sort((a, b) => b.score - a.score || b.entry.updatedAt - a.entry.updatedAt || compare(a.entry.id, b.entry.id))
       .slice(0, parsed.limit ?? 20)
       .map(({ entry }) => entry)
   }
@@ -112,8 +132,89 @@ export interface MemoryPluginConfig {
   adapter: MemoryAdapter
 }
 
+const projectSnapshot = (entry: MemoryEntry): ProjectMemory => {
+  if (entry.scope.type !== 'project') throw new Error('not a project memory')
+  const { scope, ...record } = entry
+  return { ...record, projectId: scope.id }
+}
+
+/** Project contract over the same scoped records, with the project's literal search semantics. */
+export class StoredProjectMemoryService extends MemoryService {
+  constructor(
+    ctx: Context,
+    private readonly scoped: ScopedMemoryService
+  ) {
+    super(ctx)
+  }
+
+  async create(projectId: string, content: MemoryContent, options?: ExecutionOptions): Promise<ProjectMemory> {
+    return projectSnapshot(
+      await this.scoped.save(
+        { ...memoryContentSchema.parse(content), scope: { type: 'project', id: memoryTextSchema.parse(projectId) } },
+        undefined,
+        undefined,
+        options
+      )
+    )
+  }
+
+  async get(projectId: string, id: string, options?: ExecutionOptions): Promise<ProjectMemory | undefined> {
+    projectId = memoryTextSchema.parse(projectId)
+    id = memoryTextSchema.parse(id)
+    const entry = (await this.scoped.list(options)).find(
+      (entry) => entry.id === id && entry.scope.type === 'project' && entry.scope.id === projectId
+    )
+    return entry && projectSnapshot(entry)
+  }
+
+  async search(
+    projectId: string,
+    query: { query: string; limit?: number },
+    options?: ExecutionOptions
+  ): Promise<ProjectMemory[]> {
+    projectId = memoryTextSchema.parse(projectId)
+    const parsed = memorySearchSchema.parse(query)
+    const terms = [...new Set(parsed.query.split(/\s+/u))].map((term) => term.toLowerCase())
+    return (await this.scoped.list(options))
+      .filter(
+        (entry) =>
+          entry.scope.type === 'project' &&
+          entry.scope.id === projectId &&
+          terms.every((term) => `${entry.title}\n${entry.content}`.toLowerCase().includes(term))
+      )
+      .sort((a, b) => b.updatedAt - a.updatedAt || compare(a.id, b.id))
+      .slice(0, parsed.limit)
+      .map(projectSnapshot)
+  }
+
+  async update(
+    projectId: string,
+    id: string,
+    expectedRevision: number,
+    content: MemoryContent,
+    options?: ExecutionOptions
+  ): Promise<ProjectMemory> {
+    const previous = await this.get(projectId, id, options)
+    if (!previous) throw new Error('memory not found or revision conflict')
+    return projectSnapshot(
+      await this.scoped.save(
+        { ...memoryContentSchema.parse(content), scope: { type: 'project', id: previous.projectId } },
+        id,
+        expectedRevision,
+        options
+      )
+    )
+  }
+
+  async delete(projectId: string, id: string, expectedRevision: number, options?: ExecutionOptions): Promise<void> {
+    if (!(await this.get(projectId, id, options))) throw new Error('memory not found or revision conflict')
+    await this.scoped.delete(id, expectedRevision, options)
+  }
+}
+
 export function memoryPlugin(ctx: Context, config: MemoryPluginConfig): void {
-  new StoredMemoryService(ctx, config.adapter)
+  const scoped = new StoredMemoryService(ctx, config.adapter)
+  new StoredProjectMemoryService(ctx, scoped)
 }
 
 export default memoryPlugin

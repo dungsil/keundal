@@ -242,7 +242,7 @@ export class Agent extends AgentService {
 
       let model = await llm.getModel(modelName, options)
       signal.throwIfAborted()
-      const memory = this.ctx.get('memory')
+      const memory = this.ctx.get('scopedMemory')
       if (memory) {
         // Recall current records, never a previous turn's deleted or edited memory projection.
         preparedInput = {
@@ -252,7 +252,7 @@ export class Agent extends AgentService {
           )
         }
         const projectId = request.forwardedProps?.memoryProjectId
-        if (projectId !== undefined && (typeof projectId !== 'string' || !projectId.trim() || projectId.length > 200))
+        if (projectId !== undefined && (typeof projectId !== 'string' || !projectId.trim()))
           throw new Error('invalid memory project identifier')
         const question = request.messages.findLast(
           (message) => message.role === 'user' && typeof message.content === 'string'

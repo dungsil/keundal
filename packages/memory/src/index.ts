@@ -1,115 +1,107 @@
 import type { ExecutionOptions } from '@keundal/core'
 import { Service, type Context } from 'cordis'
+import { z } from 'zod'
 
-export type MemoryScope = { type: 'user' } | { type: 'project'; id: string } | { type: 'conversation'; id: string }
+export const memoryTextSchema = z.string().trim().min(1)
+export const memoryContentSchema = z.strictObject({
+  title: memoryTextSchema,
+  content: memoryTextSchema,
+  sources: z.array(z.strictObject({ uri: memoryTextSchema, label: memoryTextSchema.optional() })).min(1)
+})
+export const memoryRevisionSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER)
+export const memorySearchSchema = z.strictObject({
+  query: memoryTextSchema,
+  limit: z.number().int().min(1).max(50).default(10)
+})
 
-export interface MemoryDraft {
-  scope: MemoryScope
-  content: string
-  source: { label: string; threadId?: string; messageId?: string }
-}
+export type MemoryContent = z.infer<typeof memoryContentSchema>
 
-export interface MemoryEntry extends MemoryDraft {
-  id: string
-  createdAt: string
-  updatedAt: string
-}
-
-export interface MemorySearchQuery {
-  text: string
-  projectId?: string
-  threadId?: string
-  limit?: number
-}
-
-export abstract class MemoryService extends Service {
-  constructor(ctx: Context) {
-    super(ctx, 'memory')
-  }
-
-  abstract list(options?: ExecutionOptions): Promise<MemoryEntry[]>
-  abstract save(draft: MemoryDraft, id?: string, options?: ExecutionOptions): Promise<MemoryEntry>
-  abstract delete(id: string, options?: ExecutionOptions): Promise<void>
-  abstract search(query: MemorySearchQuery, options?: ExecutionOptions): Promise<MemoryEntry[]>
+export interface ProjectMemory extends MemoryContent {
+  readonly id: string
+  readonly projectId: string
+  readonly revision: number
+  readonly createdAt: number
+  readonly updatedAt: number
 }
 
 declare module 'cordis' {
   interface Context {
     readonly memory: MemoryService
+    readonly scopedMemory: ScopedMemoryService
   }
 }
 
-function object(value: unknown, keys: readonly string[]): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('expected an object')
-  const prototype = Object.getPrototypeOf(value)
-  if (prototype !== Object.prototype && prototype !== null) throw new TypeError('expected a plain object')
-  if (Object.keys(value).some((key) => !keys.includes(key))) throw new TypeError('unknown memory field')
-  return value as Record<string, unknown>
-}
-
-function string(value: unknown, max: number, field: string): string {
-  if (typeof value !== 'string' || !value.trim() || value.length > max)
-    throw new TypeError(`${field} must be a non-empty string of at most ${max} characters`)
-  return value
-}
-
-export function parseMemoryDraft(value: unknown): MemoryDraft {
-  const draft = object(value, ['scope', 'content', 'source'])
-  const scope = object(draft.scope, ['type', 'id'])
-  let parsedScope: MemoryScope
-  if (scope.type === 'user') {
-    if ('id' in scope) throw new TypeError('user scope cannot have an id')
-    parsedScope = { type: 'user' }
-  } else if (scope.type === 'project' || scope.type === 'conversation') {
-    parsedScope = { type: scope.type, id: string(scope.id, 200, 'scope.id') }
-  } else throw new TypeError('invalid memory scope')
-  const source = object(draft.source, ['label', 'threadId', 'messageId'])
-  return {
-    scope: parsedScope,
-    content: string(draft.content, 4000, 'content'),
-    source: {
-      label: string(source.label, 200, 'source.label'),
-      ...(source.threadId === undefined ? {} : { threadId: string(source.threadId, 200, 'source.threadId') }),
-      ...(source.messageId === undefined ? {} : { messageId: string(source.messageId, 200, 'source.messageId') })
-    }
+/** Project IDs are assigned by the application, not inferred from conversation text. */
+export abstract class MemoryService extends Service {
+  constructor(ctx: Context) {
+    super(ctx, 'memory')
   }
+
+  abstract create(projectId: string, content: MemoryContent, options?: ExecutionOptions): Promise<ProjectMemory>
+  abstract get(projectId: string, id: string, options?: ExecutionOptions): Promise<ProjectMemory | undefined>
+  abstract search(
+    projectId: string,
+    query: { query: string; limit?: number },
+    options?: ExecutionOptions
+  ): Promise<ProjectMemory[]>
+  /** Replaces the content and sources only if the revision still matches. */
+  abstract update(
+    projectId: string,
+    id: string,
+    expectedRevision: number,
+    content: MemoryContent,
+    options?: ExecutionOptions
+  ): Promise<ProjectMemory>
+  abstract delete(projectId: string, id: string, expectedRevision: number, options?: ExecutionOptions): Promise<void>
 }
 
-export function parseMemoryId(value: unknown): string {
-  if (
-    typeof value !== 'string' ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
-  )
-    throw new TypeError('memory id must be a UUID v4')
-  return value
-}
+const scopeSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('user') }),
+  z.strictObject({ type: z.literal('project'), id: memoryTextSchema }),
+  z.strictObject({ type: z.literal('conversation'), id: memoryTextSchema })
+])
+const draftSchema = memoryContentSchema.extend({ scope: scopeSchema })
+const entrySchema = draftSchema.extend({
+  id: memoryTextSchema,
+  revision: memoryRevisionSchema,
+  createdAt: z.number().finite().nonnegative(),
+  updatedAt: z.number().finite().nonnegative()
+})
+const searchQuerySchema = z.strictObject({
+  text: memoryTextSchema,
+  projectId: memoryTextSchema.optional(),
+  threadId: memoryTextSchema.optional(),
+  limit: z.number().int().min(1).max(20).optional()
+})
 
-export function parseMemoryEntry(value: unknown): MemoryEntry {
-  const entry = object(value, ['id', 'scope', 'content', 'source', 'createdAt', 'updatedAt'])
-  const timestamp = (value: unknown): string => {
-    if (typeof value !== 'string' || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value)
-      throw new TypeError('memory timestamps must be ISO timestamps')
-    return value
-  }
-  return {
-    ...parseMemoryDraft({ scope: entry.scope, content: entry.content, source: entry.source }),
-    id: parseMemoryId(entry.id),
-    createdAt: timestamp(entry.createdAt),
-    updatedAt: timestamp(entry.updatedAt)
-  }
+export type MemoryScope = z.infer<typeof scopeSchema>
+export interface MemoryDraft extends MemoryContent {
+  scope: MemoryScope
 }
+export interface MemoryEntry extends MemoryDraft {
+  id: string
+  revision: number
+  createdAt: number
+  updatedAt: number
+}
+export type MemorySearchQuery = z.infer<typeof searchQuerySchema>
+export const parseMemoryDraft = (value: unknown): MemoryDraft => draftSchema.parse(value)
+export const parseMemoryEntry = (value: unknown): MemoryEntry => entrySchema.parse(value)
+export const parseMemoryId = (value: unknown): string => memoryTextSchema.parse(value)
+export const parseMemorySearchQuery = (value: unknown): MemorySearchQuery => searchQuerySchema.parse(value)
 
-export function parseMemorySearchQuery(value: unknown): MemorySearchQuery {
-  const query = object(value, ['text', 'projectId', 'threadId', 'limit'])
-  if (
-    query.limit !== undefined &&
-    (!Number.isInteger(query.limit) || (query.limit as number) < 1 || (query.limit as number) > 20)
-  )
-    throw new TypeError('memory search limit must be an integer between 1 and 20')
-  return {
-    text: string(query.text, 4000, 'text'),
-    ...(query.projectId === undefined ? {} : { projectId: string(query.projectId, 200, 'projectId') }),
-    ...(query.threadId === undefined ? {} : { threadId: string(query.threadId, 200, 'threadId') }),
-    ...(query.limit === undefined ? {} : { limit: query.limit as number })
+export abstract class ScopedMemoryService extends Service {
+  constructor(ctx: Context) {
+    super(ctx, 'scopedMemory')
   }
+
+  abstract list(options?: ExecutionOptions): Promise<MemoryEntry[]>
+  abstract save(
+    draft: MemoryDraft,
+    id?: string,
+    expectedRevision?: number,
+    options?: ExecutionOptions
+  ): Promise<MemoryEntry>
+  abstract delete(id: string, expectedRevision: number, options?: ExecutionOptions): Promise<void>
+  abstract search(query: MemorySearchQuery, options?: ExecutionOptions): Promise<MemoryEntry[]>
 }

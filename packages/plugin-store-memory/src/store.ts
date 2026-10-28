@@ -50,10 +50,13 @@ export class MemoryStore {
       options.signal?.throwIfAborted()
       if (this.memories.has(entry.id) !== options.update)
         throw new Error(options.update ? 'memory entry does not exist' : 'memory entry already exists')
+      if (options.update && this.memories.get(entry.id)?.revision !== options.expectedRevision)
+        throw new Error('memory revision conflict')
       this.memories.set(entry.id, parseMemoryEntry(entry))
     },
-    delete: async (id, options) => {
+    delete: async (id, expectedRevision, options) => {
       options?.signal?.throwIfAborted()
+      if (this.memories.get(id)?.revision !== expectedRevision) throw new Error('memory not found or revision conflict')
       this.memories.delete(id)
     }
   }

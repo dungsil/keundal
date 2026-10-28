@@ -25,8 +25,8 @@ export function apply(ctx: Context) {
     meta: { label: localizedText(messages, 'memory.title'), icon: 'i-lucide-brain', group: 'general' },
     inject: () => ({
       listMemories: () => runtime.listMemories(),
-      saveMemory: (draft: MemoryDraft, id?: string) => runtime.saveMemory(draft, id),
-      deleteMemory: (id: string) => runtime.deleteMemory(id),
+      saveMemory: (draft: MemoryDraft, id?: string, revision?: number) => runtime.saveMemory(draft, id, revision),
+      deleteMemory: (id: string, revision: number) => runtime.deleteMemory(id, revision),
       searchMemories: (text: string, projectId?: string, threadId?: string, semantic?: boolean) => runtime.searchMemories(text, projectId, threadId, semantic),
       memoryProject: runtime.memoryProject,
       saveMemoryProject: (id: string) => runtime.saveMemoryProject(id),

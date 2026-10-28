@@ -14,7 +14,7 @@ import {
   type RunAgentInput
 } from '@keundal/core'
 import { StreamBudget, parseReasoning } from '@keundal/llm'
-import { parseMemoryDraft, parseMemoryId, parseMemorySearchQuery } from '@keundal/memory'
+import { memoryRevisionSchema, parseMemoryDraft, parseMemoryId, parseMemorySearchQuery } from '@keundal/memory'
 import { type SessionCommit } from '@keundal/session'
 
 import type { AgentHostModel, AgentHostRunOptions, AgentHostServices } from './contracts.js'
@@ -309,12 +309,22 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
             (request.method === 'POST' && segments.length === 1) ||
             (request.method === 'PUT' && segments.length === 2)
           ) {
-            const draft = parseMemoryDraft(JSON.parse(await readBody(request, maxRequestBodyBytes)))
+            const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as Record<string, unknown>
+            const { expectedRevision, ...content } = body
+            if (request.method === 'POST' && expectedRevision !== undefined)
+              throw new Error('new memory cannot have a revision')
+            const draft = parseMemoryDraft(content)
             const id = request.method === 'PUT' ? parseMemoryId(decodeURIComponent(segments[1]!)) : undefined
-            return sendJson(response, id ? 200 : 201, await services.memory.save(draft, id, execution))
+            const revision = id ? memoryRevisionSchema.parse(expectedRevision) : undefined
+            return sendJson(response, id ? 200 : 201, await services.memory.save(draft, id, revision, execution))
           }
           if (request.method === 'DELETE' && segments.length === 2) {
-            await services.memory.delete(parseMemoryId(decodeURIComponent(segments[1]!)), execution)
+            const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as { expectedRevision?: unknown }
+            await services.memory.delete(
+              parseMemoryId(decodeURIComponent(segments[1]!)),
+              memoryRevisionSchema.parse(body.expectedRevision),
+              execution
+            )
             return sendJson(response, 200, { deleted: true })
           }
         } finally {

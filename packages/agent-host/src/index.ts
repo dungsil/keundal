@@ -182,16 +182,23 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         list: (runOptions) => servicesContext.generation.list(runOptions),
         recover: (runOptions) => servicesContext.generation.recover(runOptions)
       },
-      ...(servicesContext.memory
+      ...(servicesContext.scopedMemory
         ? {
             memory: {
-              list: (execution) => servicesContext.memory.list(execution),
-              save: (draft, id, execution) => servicesContext.memory.save(draft, id, execution),
-              delete: (id, execution) => servicesContext.memory.delete(id, execution),
+              list: (execution) => servicesContext.scopedMemory.list(execution),
+              save: (draft, id, revision, execution) =>
+                servicesContext.scopedMemory.save(draft, id, revision, execution),
+              delete: (id, revision, execution) => servicesContext.scopedMemory.delete(id, revision, execution),
               search: ({ model: selected, ...query }, execution) =>
                 selected
-                  ? retrieveMemories(servicesContext.memory, servicesContext.llm, query, model(selected).id, execution)
-                  : servicesContext.memory.search(query, execution)
+                  ? retrieveMemories(
+                      servicesContext.scopedMemory,
+                      servicesContext.llm,
+                      query,
+                      model(selected).id,
+                      execution
+                    )
+                  : servicesContext.scopedMemory.search(query, execution)
             } satisfies NonNullable<AgentHostServices['memory']>
           }
         : {}),

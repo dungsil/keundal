@@ -128,11 +128,11 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         platform.runtimePlugins = manager
         return {
           store,
-          ...(root.memory ? { memory: {
-            list: () => root.memory.list(),
-            save: (draft, id) => root.memory.save(draft, id),
-            delete: id => root.memory.delete(id),
-            search: query => query.model ? retrieveMemories(root.memory, root.llm, query, query.model) : root.memory.search(query)
+          ...(root.scopedMemory ? { memory: {
+            list: () => root.scopedMemory.list(),
+            save: (draft, id, revision) => root.scopedMemory.save(draft, id, revision),
+            delete: (id, revision) => root.scopedMemory.delete(id, revision),
+            search: query => query.model ? retrieveMemories(root.scopedMemory, root.llm, query, query.model) : root.scopedMemory.search(query)
           } satisfies NonNullable<import('@keundal/chat/platform').ChatConnection['memory']> } : {}),
           tasks: root.tasks,
           remoteAgent: false,

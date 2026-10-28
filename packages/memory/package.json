@@ -13,6 +13,10 @@
     "./retrieval": {
       "types": "./dist/retrieval.d.ts",
       "import": "./dist/retrieval.js"
+    },
+    "./tools": {
+      "types": "./dist/tools.d.ts",
+      "import": "./dist/tools.js"
     }
   },
   "scripts": {
@@ -22,7 +26,9 @@
   "dependencies": {
     "@keundal/core": "workspace:*",
     "@keundal/llm": "workspace:*",
-    "cordis": "catalog:"
+    "@keundal/tools": "workspace:*",
+    "cordis": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",

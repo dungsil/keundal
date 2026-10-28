@@ -36,20 +36,21 @@ test('새 대화는 의미가 같은 프로젝트 기억을 출처와 함께 받
   const store = await ctx.plugin(memoryStore)
   const agent = await ctx.plugin(agentPlugin, { model: 'test', maxOutputTokens: 512 })
   try {
-    const relevant = await ctx.memory.save({
-      scope: { type: 'project', id: 'keundal' },
+    const relevant = await ctx.memory.create('keundal', {
+      title: 'Architecture decision',
       content: 'The application uses Vue and Nuxt.',
-      source: { label: 'Architecture decision', threadId: 'earlier-chat', messageId: 'decision' }
+      sources: [{ label: 'Architecture decision', uri: 'keundal://threads/earlier-chat/runs/decision' }]
     })
-    const other = await ctx.memory.save({
-      scope: { type: 'project', id: 'private-project' },
+    const other = await ctx.memory.create('private-project', {
+      title: 'private',
       content: 'Secret React application',
-      source: { label: 'private' }
+      sources: [{ uri: 'file:///private' }]
     })
-    await ctx.memory.save({
+    await ctx.scopedMemory.save({
       scope: { type: 'conversation', id: 'earlier-chat' },
+      title: 'private',
       content: 'Confidential conversation details',
-      source: { label: 'private' }
+      sources: [{ uri: 'keundal://threads/earlier-chat' }]
     })
     selection = [relevant.id, other.id, relevant.id, 'invented-id']
     const request: RunAgentInput = {
@@ -61,7 +62,7 @@ test('새 대화는 의미가 같은 프로젝트 기억을 출처와 함께 받
       forwardedProps: { memoryProjectId: 'keundal' },
       messages: [{ id: 'question', role: 'user', content: 'Which frontend framework should I use here?' }]
     }
-    expect(await ctx.memory.search({ text: 'frontend framework', projectId: 'keundal' })).toEqual([])
+    expect(await ctx.scopedMemory.search({ text: 'frontend framework', projectId: 'keundal' })).toEqual([])
     await Array.fromAsync(ctx.agent.run(request))
     expect(searched[0]).toContain(relevant.content)
     expect(searched[0]).not.toContain('Secret React')
@@ -71,7 +72,7 @@ test('새 대화는 의미가 같은 프로젝트 기억을 출처와 함께 받
     expect(context).toContain('Architecture decision')
     expect(context).toContain('earlier-chat')
     expect(context).not.toContain(other.id)
-    await ctx.memory.delete(relevant.id)
+    await ctx.memory.delete('keundal', relevant.id, relevant.revision)
     await Array.fromAsync(ctx.agent.run({ ...request, runId: 'second' }))
     expect(JSON.stringify(generated[1]?.input.messages)).not.toContain(relevant.content)
     expect(searched).toHaveLength(1)
@@ -98,14 +99,15 @@ test('의미 검색의 잘못된 JSON은 키워드 결과를 보존하고 취소
   const llm = await ctx.plugin(LLM)
   const store = await ctx.plugin(memoryStore)
   try {
-    const saved = await ctx.memory.save({
+    const saved = await ctx.scopedMemory.save({
       scope: { type: 'user' },
+      title: 'User preference',
       content: 'Prefer TypeScript',
-      source: { label: 'User preference' }
+      sources: [{ label: 'User preference', uri: 'keundal://threads/preferences' }]
     })
-    expect(await retrieveMemories(ctx.memory, ctx.llm, { text: 'TypeScript' }, 'test')).toEqual([saved])
+    expect(await retrieveMemories(ctx.scopedMemory, ctx.llm, { text: 'TypeScript' }, 'test')).toEqual([saved])
     await expect(
-      retrieveMemories(ctx.memory, ctx.llm, { text: 'TypeScript' }, 'test', { signal: AbortSignal.abort() })
+      retrieveMemories(ctx.scopedMemory, ctx.llm, { text: 'TypeScript' }, 'test', { signal: AbortSignal.abort() })
     ).rejects.toThrow()
   } finally {
     await store.dispose()

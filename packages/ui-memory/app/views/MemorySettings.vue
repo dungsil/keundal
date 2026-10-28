@@ -7,8 +7,8 @@ import { useText } from '../locale'
 
 const props = defineProps<{
   listMemories: () => Promise<MemoryEntry[]>
-  saveMemory: (draft: MemoryDraft, id?: string) => Promise<MemoryEntry>
-  deleteMemory: (id: string) => Promise<void>
+  saveMemory: (draft: MemoryDraft, id?: string, expectedRevision?: number) => Promise<MemoryEntry>
+  deleteMemory: (id: string, expectedRevision: number) => Promise<void>
   searchMemories: (text: string, projectId?: string, threadId?: string, semantic?: boolean) => Promise<MemoryEntry[]>
   memoryProject: Ref<string>
   saveMemoryProject: (id: string) => void
@@ -35,8 +35,10 @@ const original = ref<MemoryEntry | null>(null)
 const scopeType = ref<MemoryScope['type']>()
 const draftProject = ref('')
 const draftConversation = ref('')
+const title = ref('')
 const content = ref('')
 const sourceLabel = ref('')
+const sourceUri = ref('')
 const sourceConversation = ref('')
 const deleting = ref<string | null>(null)
 let request = 0
@@ -87,7 +89,6 @@ function saveProject() {
   projectError.value = ''
   projectStatus.value = ''
   const id = activeProject.value.trim()
-  if (id.length > 200) { projectError.value = t('memory.invalidId'); return }
   try {
     props.saveMemoryProject(id)
     activeProject.value = id
@@ -102,7 +103,6 @@ async function load(search: boolean) {
   if (busy.value) return
   error.value = ''
   if (search && !query.value.trim()) { error.value = t('memory.invalidQuery'); await focus('memory-query'); return }
-  if (project.value.trim().length > 200 || conversation.value.length > 200) { error.value = t('memory.invalidId'); return }
   if (search && needsContext.value) { error.value = t('memory.chooseContext'); return }
   const token = ++request
   loading.value = true
@@ -124,9 +124,15 @@ function scopeLabel(scope: MemoryScope) {
   return `${t(`memory.${scope.type}`)}${scope.type === 'user' ? '' : ` · ${scope.id}`}`
 }
 
-function sourceLink(entry: MemoryEntry) {
-  if (!entry.source.threadId) return undefined
-  return `/chat/${encodeURIComponent(entry.source.threadId)}${entry.source.messageId ? `#message-${encodeURIComponent(entry.source.messageId)}` : ''}`
+function sourceLink(uri: string) {
+  try {
+    const url = new URL(uri)
+    if (url.protocol === 'keundal:' && url.hostname === 'threads') {
+      const id = url.pathname.split('/')[1]
+      if (id) return `/chat/${encodeURIComponent(decodeURIComponent(id))}`
+    }
+  } catch { /* Non-conversation references are displayed without opening them. */ }
+  return undefined
 }
 
 function dateLabel(value: MemoryEntry['createdAt']) {
@@ -139,9 +145,11 @@ async function edit(entry?: MemoryEntry) {
   scopeType.value = entry?.scope.type
   draftProject.value = entry?.scope.type === 'project' ? entry.scope.id : project.value.trim()
   draftConversation.value = entry?.scope.type === 'conversation' ? entry.scope.id : conversation.value
+  title.value = entry?.title ?? ''
   content.value = entry?.content ?? ''
-  sourceLabel.value = entry?.source.label ?? ''
-  sourceConversation.value = entry?.source.threadId ?? ''
+  sourceLabel.value = ''
+  sourceUri.value = ''
+  sourceConversation.value = ''
   editorError.value = ''
   deleting.value = null
   editing.value = true
@@ -161,22 +169,23 @@ async function save() {
   const fail = async (key: Parameters<typeof t>[0], id: string) => { editorError.value = t(key); await focus(id) }
   if (!scopeType.value) return fail('memory.invalidScope', 'memory-draft-scope')
   const scopeId = scopeType.value === 'project' ? draftProject.value.trim() : draftConversation.value
-  if (scopeType.value !== 'user' && (!scopeId || scopeId.length > 200)) return fail('memory.invalidId', scopeType.value === 'project' ? 'memory-draft-project' : 'memory-draft-conversation')
-  if (!content.value.trim() || content.value.trim().length > 4000) return fail('memory.invalidContent', 'memory-content')
-  if (!sourceLabel.value.trim() || sourceLabel.value.trim().length > 200) return fail('memory.invalidSource', 'memory-source')
-  if (!original.value && sourceConversation.value.length > 200) return fail('memory.invalidId', 'memory-source-conversation')
+  if (scopeType.value !== 'user' && !scopeId) return fail('memory.invalidId', scopeType.value === 'project' ? 'memory-draft-project' : 'memory-draft-conversation')
+  if (!title.value.trim()) return fail('memory.invalidTitle', 'memory-entry-title')
+  if (!content.value.trim()) return fail('memory.invalidContent', 'memory-content')
+  if (!original.value && !sourceUri.value.trim() && !sourceConversation.value) return fail('memory.invalidSource', 'memory-source-uri')
   const scope: MemoryScope = scopeType.value === 'user' ? { type: 'user' } : { type: scopeType.value, id: scopeId }
   const draft: MemoryDraft = {
     scope: original.value?.scope ?? scope,
+    title: title.value.trim(),
     content: content.value.trim(),
-    source: original.value ? { ...original.value.source } : {
-      label: sourceLabel.value.trim(),
-      ...(sourceConversation.value ? { threadId: sourceConversation.value } : {})
-    }
+    sources: original.value ? original.value.sources.map(source => ({ ...source })) : [
+      ...(sourceUri.value.trim() ? [{ uri: sourceUri.value.trim(), ...(sourceLabel.value.trim() ? { label: sourceLabel.value.trim() } : {}) }] : []),
+      ...(sourceConversation.value ? [{ uri: `keundal://threads/${encodeURIComponent(sourceConversation.value)}`, label: chats.value.find(chat => chat.id === sourceConversation.value)?.title || t('memory.conversation') }] : [])
+    ]
   }
   busy.value = true
   try {
-    const saved = await props.saveMemory(draft, original.value?.id)
+    const saved = await props.saveMemory(draft, original.value?.id, original.value?.revision)
     if (stopped) return
     memories.value = [saved, ...memories.value.filter(entry => entry.id !== saved.id)]
     results.value = null
@@ -198,15 +207,15 @@ async function cancelDelete(id: string) {
   await focus(`memory-delete-${id}`)
 }
 
-async function remove(id: string) {
+async function remove(entry: MemoryEntry) {
   if (busy.value) return
   busy.value = true
   error.value = ''
   try {
-    await props.deleteMemory(id)
+    await props.deleteMemory(entry.id, entry.revision)
     if (stopped) return
-    memories.value = memories.value.filter(entry => entry.id !== id)
-    if (results.value) results.value = results.value.filter(entry => entry.id !== id)
+    memories.value = memories.value.filter(memory => memory.id !== entry.id)
+    if (results.value) results.value = results.value.filter(memory => memory.id !== entry.id)
     deleting.value = null
     await focus('memory-title')
   } catch {
@@ -224,7 +233,7 @@ async function remove(id: string) {
 
     <form class="space-y-3 rounded-lg border border-default p-4" @submit.prevent="saveProject">
       <UFormField :label="t('memory.activeProject')" name="memory-active-project" :error="projectError || undefined">
-        <UInput id="memory-active-project" v-model="activeProject" :maxlength="200" class="w-full" :disabled="busy || loading" @update:model-value="projectStatus = ''" />
+        <UInput id="memory-active-project" v-model="activeProject" class="w-full" :disabled="busy || loading" @update:model-value="projectStatus = ''" />
       </UFormField>
       <div class="flex items-center justify-end gap-3">
         <p role="status" class="text-sm text-muted">{{ projectStatus }}</p>
@@ -240,23 +249,34 @@ async function remove(id: string) {
             <USelect id="memory-draft-scope" v-model="scopeType" :placeholder="t('memory.chooseScope')" :items="(['user', 'project', 'conversation'] as const).map(value => ({ value, label: t(`memory.${value}`) }))" class="w-full" />
           </UFormField>
           <UFormField v-if="scopeType === 'project'" :label="t('memory.projectId')" name="memory-draft-project" required>
-            <UInput id="memory-draft-project" v-model="draftProject" :maxlength="200" class="w-full" />
+            <UInput id="memory-draft-project" v-model="draftProject" class="w-full" />
           </UFormField>
           <UFormField v-if="scopeType === 'conversation'" :label="t('memory.conversation')" name="memory-draft-conversation" required>
             <USelect id="memory-draft-conversation" v-model="draftConversation" :placeholder="t('memory.chooseConversation')" :items="chats.map(chat => ({ value: chat.id, label: chat.title || t('memory.untitled') }))" class="w-full" />
           </UFormField>
         </template>
         <p v-else class="break-words text-sm text-muted">{{ scopeLabel(original.scope) }}</p>
+        <UFormField :label="t('memory.entryTitle')" name="memory-entry-title" required>
+          <UInput id="memory-entry-title" v-model="title" class="w-full" />
+        </UFormField>
         <UFormField :label="t('memory.content')" name="memory-content" required>
-          <UTextarea id="memory-content" v-model="content" :maxlength="4000" :rows="5" class="w-full" />
+          <UTextarea id="memory-content" v-model="content" :rows="5" class="w-full" />
         </UFormField>
-        <UFormField :label="t('memory.source')" name="memory-source" required>
-          <UInput id="memory-source" v-model="sourceLabel" :maxlength="200" :readonly="!!original" class="w-full" />
-        </UFormField>
-        <UFormField v-if="!original" :label="t('memory.sourceConversation')" name="memory-source-conversation">
-          <USelect id="memory-source-conversation" v-model="selectedSourceConversation" :items="optionalConversations" class="w-full" />
-        </UFormField>
-        <UButton v-else-if="sourceLink(original)" :to="sourceLink(original)" :label="t('memory.openSource')" color="neutral" variant="link" />
+        <template v-if="!original">
+          <UFormField :label="t('memory.sourceUri')" name="memory-source-uri">
+            <UInput id="memory-source-uri" v-model="sourceUri" class="w-full" />
+          </UFormField>
+          <UFormField :label="t('memory.source')" name="memory-source">
+            <UInput id="memory-source" v-model="sourceLabel" class="w-full" />
+          </UFormField>
+          <UFormField :label="t('memory.sourceConversation')" name="memory-source-conversation">
+            <USelect id="memory-source-conversation" v-model="selectedSourceConversation" :items="optionalConversations" class="w-full" />
+          </UFormField>
+        </template>
+        <div v-else class="space-y-2 text-sm text-muted">
+          <p>{{ t('memory.revision') }}: {{ original.revision }}</p>
+          <p v-for="(source, index) in original.sources" :key="index" class="break-words">{{ source.label }} {{ source.uri }}</p>
+        </div>
       </fieldset>
       <p v-if="editorError" role="alert" class="text-sm text-error">{{ editorError }}</p>
       <div class="flex justify-end gap-2">
@@ -273,7 +293,7 @@ async function remove(id: string) {
           </UFormField>
           <div class="grid min-w-0 gap-4 sm:grid-cols-2">
             <UFormField :label="t('memory.searchProject')" name="memory-project">
-              <UInput v-model="project" :maxlength="200" class="w-full" />
+              <UInput v-model="project" class="w-full" />
             </UFormField>
             <UFormField :label="t('memory.searchConversation')" name="memory-conversation">
               <USelect v-model="selectedConversation" :items="optionalConversations" class="w-full" />
@@ -297,17 +317,21 @@ async function remove(id: string) {
         <p v-if="!visible.length && !error" class="rounded-lg border border-default p-4 text-sm text-muted">{{ t('memory.empty') }}</p>
         <article v-for="entry in visible" :key="entry.id" class="min-w-0 space-y-3 rounded-lg border border-default p-4">
           <p class="break-words text-sm font-medium text-highlighted">{{ scopeLabel(entry.scope) }}</p>
+          <h3 class="break-words font-medium text-highlighted">{{ entry.title }}</h3>
           <p class="whitespace-pre-wrap break-words text-sm">{{ entry.content }}</p>
           <div class="space-y-1 text-sm text-muted">
-            <p class="break-words">{{ t('memory.source') }}: {{ entry.source.label }}</p>
-            <UButton v-if="sourceLink(entry)" :to="sourceLink(entry)" :label="t('memory.openSource')" icon="i-lucide-arrow-up-right" color="neutral" variant="link" />
+            <div v-for="(source, index) in entry.sources" :key="index" class="break-words">
+              <p>{{ source.label }} {{ source.uri }}</p>
+              <UButton v-if="sourceLink(source.uri)" :to="sourceLink(source.uri)" :label="t('memory.openSource')" icon="i-lucide-arrow-up-right" color="neutral" variant="link" />
+            </div>
+            <p>{{ t('memory.revision') }}: {{ entry.revision }}</p>
             <p>{{ t('memory.created') }}: {{ dateLabel(entry.createdAt) }}</p>
             <p>{{ t('memory.updated') }}: {{ dateLabel(entry.updatedAt) }}</p>
           </div>
           <div v-if="deleting === entry.id" class="space-y-3" @keydown.esc.prevent="!busy && cancelDelete(entry.id)">
             <p :id="`memory-delete-description-${entry.id}`" class="text-sm font-medium">{{ t('memory.confirmDelete') }}</p>
             <div class="flex flex-wrap gap-2">
-              <UButton :id="`memory-confirm-${entry.id}`" :aria-describedby="`memory-delete-description-${entry.id}`" :label="t('memory.confirm')" color="error" :loading="busy" @click="remove(entry.id)" />
+              <UButton :id="`memory-confirm-${entry.id}`" :aria-describedby="`memory-delete-description-${entry.id}`" :label="t('memory.confirm')" color="error" :loading="busy" @click="remove(entry)" />
               <UButton :label="t('memory.cancel')" color="neutral" variant="outline" :disabled="busy" @click="cancelDelete(entry.id)" />
             </div>
           </div>

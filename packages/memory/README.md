@@ -1,39 +1,96 @@
-# Agent memory
+# @keundal/memory
 
-`@keundal/memory` owns the `MemoryService` contract and Cordis `ctx.memory` extension. Memory is independent of conversation compaction, sessions, and generation journals. `@keundal/plugin-memory` implements validation and scoped keyword retrieval over a storage adapter. The existing store plugins register this service alongside sessions:
+프로젝트에서 확정한 설계 결정과 반복해서 필요한 정보를 대화 기록·축약 요약과 별도로 보관합니다.
+`MemoryService`와 `ctx.memory`의 계약을 제공하며 SQLite 구현은 `@keundal/plugin-store-sqlite`에 있습니다.
+Embedding 검색과 대화에서의 자동 추출은 제공하지 않습니다.
 
-- IndexedDB: a dedicated `memories` object store, with an additive v1/v2 → v3 upgrade preserving conversations, journals, and tasks.
-- SQLite: a dedicated `memories` table in the configured database.
-- In-memory store: an independent map, intentionally lost when the process exits.
+## Node.js 호스트에서 사용
 
-## Scopes and ownership
+`createNodeAgentHost({ ...options, projectId: 'keundal' }, createNodeComposition)`을 사용하거나,
+`createAgentRuntime(env, { compose: createNodeComposition })`의 환경에 `KEUNDAL_PROJECT_ID=keundal`을 지정합니다.
+`KEUNDAL_SQLITE_PATH`는 재시작 후에도 유지할 파일 경로여야 합니다. `:memory:`는 영속 저장소가 아닙니다.
 
-A user memory applies across conversations in this storage instance. Project memories require an exact `projectId`, and conversation memories require an exact `threadId`. These are retrieval scopes, **not authorization boundaries**. The current app uses a private browser database or a single-user host protected by its bearer token. A shared multi-user host must supply independently authorized storage instances; a client-provided project identifier does not establish user identity.
+프로젝트 ID를 생략하면 메모리 도구를 제공하지 않습니다. 빈 ID는 거부합니다.
+프로젝트 ID를 지정했는데 저장소가 `memory` 서비스를 제공하지 않으면 호스트 시작을 거부합니다.
+별도 조립에서는 다음처럼 공개 도구 팩터리를 사용합니다.
 
-Each record contains content, scope, a source label, optional original conversation/message IDs, and creation/update timestamps. Source metadata is user supplied, not an independently verified citation. Editing preserves the original creation timestamp. Updating a deleted record fails rather than recreating it. Deleting a conversation does not delete independently saved memories or change their provenance.
+```ts
+import { createMemoryTools } from '@keundal/memory/tools'
+import sqliteStorePlugin from '@keundal/plugin-store-sqlite'
 
-## Retrieval
+await ctx.plugin(sqliteStorePlugin, { path: '.data/keundal.sqlite' })
+const tools = createMemoryTools(ctx.get('memory'), 'keundal')
+// 앱이 tools를 에이전트의 tools 설정에 전달합니다.
+```
 
-`memory.search()` performs normalized Unicode keyword retrieval without calling a model. `retrieveMemories()` from `@keundal/memory/retrieval` combines these results with **model-based semantic selection**, not embeddings. It uses the selected chat model to find related facts even when words differ. Only eligible scopes are sent to the model. Unknown or out-of-scope IDs returned by the model are discarded; malformed JSON falls back to keyword results. Provider failures and cancellation propagate to the caller.
+프로젝트 ID는 앱이 정한 고정 범위입니다. 도구 인자로 다른 프로젝트를 선택할 수 없습니다.
+한 호스트의 모든 대화는 이 범위를 공유하므로 서로 다른 사용자나 신뢰 범위에는 별도 호스트를 사용합니다.
+프로젝트 선택 화면이나 브라우저 로컬 저장소 구현은 이 패키지에 포함하지 않습니다.
 
-The semantic pass considers up to 64 candidates, prioritizing keyword matches and then recent updates, with at most 8,192 input tokens and 512 output tokens. Candidates are removed until they fit the model context limit. Recall defaults to eight results. This is a bounded initial implementation, not an exhaustive vector index: an older semantic-only match outside the candidate window may not be found. Every recall with eligible candidates adds a model request, latency, and provider cost. The normal agent run budget also applies to that request.
+## 명시적 메모리 도구
 
-The common agent loop recalls at the beginning of each run using the latest user text, `input.threadId`, and optional `input.forwardedProps.memoryProjectId`. It replaces previous memory projections, attaches source metadata as untrusted reference context, and runs the normal input-budget/compaction checks before generating an answer. Recalled context is recorded through the existing context journal event. The loop does not automatically infer or save memories from conversations.
+| 도구            | 입력                                                    | 결과                                 |
+| --------------- | ------------------------------------------------------- | ------------------------------------ |
+| `memory_save`   | `title`, `content`, `sources`                           | 새 메모리                            |
+| `memory_search` | `query`, `limit?`                                       | 출처와 revision을 포함한 메모리 배열 |
+| `memory_get`    | `id`                                                    | 메모리 또는 `null`                   |
+| `memory_update` | `id`, `expectedRevision`, `title`, `content`, `sources` | 수정한 메모리                        |
+| `memory_delete` | `id`, `expectedRevision`                                | `{ "deleted": true }`                |
 
-## App and HTTP
+`sources`에는 `{ uri, label? }`를 하나 이상 지정합니다. 문서 URL이나 `file:` URI 등을 사용하며,
+도구로 저장·수정한 대화의 `keundal://threads/<threadId>/runs/<runId>` 출처도 함께 기록합니다.
+출처는 참조 정보이며 원문을 복사하거나 URI를 자동으로 열지 않습니다. 원문을 삭제해도 출처 문자열은 남습니다.
+검색 결과는 참고 자료이지 실행 지침이 아닙니다.
 
-Settings → Memory supports manual creation, scope/context selection, keyword/semantic search, source inspection, content editing, and confirmed deletion. The active project setting applies to future turns, including new conversations, and can be cleared. Records can be managed without provider credentials; semantic search and automatic recall require a working selected model. Memory data is sent to that model's provider during recall. No extra embedding provider or API key is required.
+대화에서 메모리를 자동 추출하는 작업은 없습니다. 저장·수정·삭제 도구의 설명은 사용자 요청이 있을 때만 변경하도록 안내합니다.
+실제 도구 호출은 기존 도구 승인 정책을 따릅니다. 확인을 강제하려면 호스트의 `toolApproval.tools`에서
+`memory_save`, `memory_update`, `memory_delete`를 `ask`로 설정합니다.
 
-The authenticated host API provides:
+수정은 제목·본문·출처 전체를 교체합니다. 먼저 `memory_get`이나 `memory_search`로 현재 revision을 읽고
+`expectedRevision`에 전달해야 합니다. 없는 항목·다른 프로젝트·오래된 revision은 변경하지 않고 오류를 반환합니다.
+메모리는 세션 삭제·축약·호스트 재시작과 독립적으로 유지되며, 메모리 삭제 도구로 별도 삭제합니다.
+
+## SQLite 검색 규칙
+
+검색어를 공백으로 나누고 모든 검색어가 제목 또는 본문에 포함된 항목을 반환합니다.
+부분 문자열을 문자 그대로 비교하므로 한두 글자의 한국어와 `%`, `_`도 검색할 수 있습니다.
+ASCII 영문은 대소문자를 구분하지 않으며 형태소 분석·의미 검색·관련도 순위는 제공하지 않습니다.
+수정 시각 내림차순, 같은 시각이면 ID 오름차순으로 정렬합니다. 기본 10개, 최대 50개입니다.
+출처 문자열 자체는 검색하지 않습니다.
+
+프로젝트 인덱스로 범위를 좁힌 뒤 해당 프로젝트의 텍스트를 검사합니다. 메모리가 커지면 전문 검색이나
+선택적 Embedding 공급자를 검토할 수 있으며, 소비자는 SQLite 구현 대신 `MemoryService` 계약에 의존합니다.
+
+## Scoped management and recall
+
+`MemoryService` / `ctx.memory` and the project-bound tools above remain unchanged. `ScopedMemoryService` / `ctx.scopedMemory` adds management and recall across user, project, and conversation scopes. Project entries share the same IDs, content, sources, revisions, and storage as the project API: tool edits are visible in settings and UI edits are visible to tools. The scoped service is not a second copy of project data.
+
+Scoped drafts contain `{ scope, title, content, sources }`. A scope is `{ type: 'user' }`, `{ type: 'project', id }`, or `{ type: 'conversation', id }`. Entries add `id`, `revision`, and numeric `createdAt` / `updatedAt` timestamps. `save(draft, id, expectedRevision)` and `delete(id, expectedRevision)` reject stale revisions or missing entries atomically. Creation uses `save(draft)` and starts at revision 1. Editing in settings preserves every original source, including sources added by tools.
+
+The existing store plugins provide both services. SQLite keeps project entries in its existing `project_memories` table and user/conversation entries separately. IndexedDB adds scoped records without replacing sessions, journals, or tasks. The in-memory store implements the same APIs but deliberately loses data on process exit.
+
+Scopes select retrieval data, not authorization. User scope means the current private storage instance, not a multi-tenant identity. A shared host must use independently authorized storage instances; a client-selected project does not establish identity. Source URIs are user-supplied references, not independently verified citations. Deleting a conversation does not delete saved memories. Deleting memory does not erase copies already present in historical messages, summaries, or journals; an in-flight request may already contain the old value.
+
+### Retrieval
+
+`scopedMemory.search({ text, projectId?, threadId?, limit? })` provides normalized, ranked keyword retrieval across the user scope and the explicitly selected project/conversation scopes. It does not change the project API's literal all-terms search rules above. `retrieveMemories()` from `@keundal/memory/retrieval` combines scoped keyword results with model-based semantic selection, not embeddings. Unknown or out-of-scope IDs are discarded, malformed JSON falls back to keyword results, and provider failures/cancellation propagate.
+
+Semantic recall considers up to 64 candidates, prioritizing keyword matches and then recently updated entries. It uses at most 8,192 input tokens, 512 output tokens, and defaults to eight returned records. Older semantic-only matches outside this window may not be found. Eligible records are sent to the selected model provider, adding latency and cost; the normal agent run budget applies.
+
+The common agent loop recalls from the latest user text and `input.threadId`, with an optional `input.forwardedProps.memoryProjectId`. It replaces previous projections, adds sources as untrusted reference context, and applies normal input-budget/compaction checks. Recall is journaled through existing context events. There is no automatic extraction or saving of conversation memory.
+
+### Settings and HTTP
+
+Settings → Memory supports explicit creation, project selection, scope filtering, keyword/semantic search, source inspection, title/content editing, and confirmed revision-checked deletion. External source URIs are displayed without opening them; conversation references can navigate to the original conversation. The active project applies to future turns and is independent of the host's fixed project for memory tools. Set them to the same identifier to recall records written by those tools. Records can be managed without provider credentials; semantic recall requires a working selected model.
+
+The authenticated management API uses the scoped service:
 
 | Method | Path               | Body                                              |
 | ------ | ------------------ | ------------------------------------------------- |
 | GET    | `/memories`        | —                                                 |
 | POST   | `/memories`        | `MemoryDraft`                                     |
-| PUT    | `/memories/:id`    | `MemoryDraft`                                     |
-| DELETE | `/memories/:id`    | —                                                 |
+| PUT    | `/memories/:id`    | `MemoryDraft` plus `expectedRevision`             |
+| DELETE | `/memories/:id`    | `{ expectedRevision }`                            |
 | POST   | `/memories/search` | `{ text, projectId?, threadId?, limit?, model? }` |
 
-Memory entries are limited to 4,000 content characters; source labels and scope identifiers to 200. Search results are limited to 1–20 entries. Omitting `model` uses keyword-only search without provider credentials; supplying an allowed model adds semantic retrieval. Browser-local execution and remote/desktop connections use the same service contract and management UI.
-
-Deletion prevents future recall of that record; it does not erase facts already included in past messages, summaries, or durable execution journals. An in-flight request may already contain the old value. For a clean context after removal, start a new conversation.
+Scoped searches return 1–20 results. Omitting `model` uses keyword-only search; supplying an allowed model adds semantic retrieval. These management endpoints do not alter the fixed project binding of the model's memory tools. Missing/stale revisions fail instead of overwriting another edit or resurrecting deleted records.

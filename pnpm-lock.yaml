@@ -697,6 +697,9 @@ importers:
       '@keundal/mcp':
         specifier: workspace:*
         version: link:../mcp
+      '@keundal/memory':
+        specifier: workspace:*
+        version: link:../memory
       '@keundal/plugin-agent-chat':
         specifier: workspace:*
         version: link:../plugin-agent-chat
@@ -1324,9 +1327,15 @@ importers:
       '@keundal/llm':
         specifier: workspace:*
         version: link:../llm
+      '@keundal/tools':
+        specifier: workspace:*
+        version: link:../tools
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*

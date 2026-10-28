@@ -88,16 +88,22 @@ export class IndexedDBStore {
           const current = await request<unknown>(store.get(parsed.id))
           if ((current !== undefined) !== options.update)
             throw new Error(options.update ? 'memory entry does not exist' : 'memory entry already exists')
+          if (options.update && parseMemoryEntry(current).revision !== options.expectedRevision)
+            throw new Error('memory revision conflict')
           await request(store.put(parsed))
         },
         options.signal
       ),
-    delete: async (id, options) =>
+    delete: async (id, expectedRevision, options) =>
       this.transaction(
         [MEMORIES],
         'readwrite',
         async (transaction) => {
-          await request(transaction.objectStore(MEMORIES).delete(id))
+          const store = transaction.objectStore(MEMORIES)
+          const current = await request(store.get(id))
+          if (current === undefined || parseMemoryEntry(current).revision !== expectedRevision)
+            throw new Error('memory not found or revision conflict')
+          await request(store.delete(id))
         },
         options?.signal
       )

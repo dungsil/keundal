@@ -21,6 +21,11 @@ const recovered = await ctx.generation.recover()
 
 `path`에는 데이터베이스 파일 경로를 지정합니다. 파일이 없으면 새로 만들고, 등록할 때 필요한 테이블을 준비합니다. `:memory:`를 전달하면 프로세스 메모리에만 저장합니다.
 
+`ctx.memory`는 같은 파일의 `project_memories`에 프로젝트별 메모리와 출처를 저장합니다.
+기존 데이터베이스에는 테이블과 인덱스만 추가하며 대화·journal을 변경하지 않습니다.
+메모리는 세션 삭제나 축약으로 지우지 않으며, 수정·삭제는 프로젝트 ID와 revision을 검사합니다.
+LLM 없이도 메모리 서비스를 사용할 수 있습니다. 도구 조립과 검색 규칙은 [메모리 문서](../memory/README.md)를 참고하세요.
+
 - `prepare()`는 저장된 대화에 요청 메시지를 병합하며, 같은 ID가 있으면 요청 메시지로 대체합니다.
 - `commit()`은 기본적으로 메시지를 병합합니다. `mode: 'replace'`는 전체 메시지를 교체하며 `messages: []`로 모두 비울 수 있습니다. revision 검사와 종료 기록의 중복 적용 방지는 그대로 유지됩니다.
 - `delete(threadId, expectedRevision, { signal }?)`는 현재 revision(없는 스레드는 0)을 검사하고 스레드와 모든 실행·journal을 하나의 트랜잭션에서 삭제합니다. 빈 threadId와 음수·안전하지 않은 정수 revision은 거부합니다. `running` 실행이 있으면 삭제를 거부하며 자동 취소하지 않으므로 호출자가 먼저 실행을 중단하고 종료 확정을 기다려야 합니다. 없는 스레드의 revision 0 삭제는 반복할 수 있습니다.
