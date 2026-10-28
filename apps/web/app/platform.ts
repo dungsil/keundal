@@ -18,6 +18,7 @@ import type { ChatPlatform } from '@keundal/chat/platform'
 import { loadWebRuntimePlugins } from './runtime-plugins'
 import { metadata as mcpMetadata } from '@keundal/plugin-chat-browser/mcp'
 import { MemoryTaskService } from '@keundal/task-memory'
+import { retrieveMemories } from '@keundal/memory/retrieval'
 
 export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: string, agentToken?: string, pluginConfig?: string } = {}): ChatPlatform {
   const oauth: BrowserMcpOAuth = new BrowserMcpOAuth(() => mcp.configuration, () => mcp.close())
@@ -38,7 +39,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         const store = new RemoteChatStore({ endpoint: runtime.agentEndpoint, token: runtime.agentToken ?? '' })
         try {
           await store.recover()
-          return { store, workspaces: store.workspaces, tasks: store.tasks, remoteAgent: true, remoteModels: await store.models(), catalog: execution => store.catalog(execution), dispose: () => store.stop() }
+          return { store, memory: store.memory, workspaces: store.workspaces, tasks: store.tasks, remoteAgent: true, remoteModels: await store.models(), catalog: execution => store.catalog(execution), dispose: () => store.stop() }
         } catch (error) {
           await store.stop()
           throw error
@@ -131,6 +132,12 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         platform.runtimePlugins = manager
         return {
           store,
+          ...(root.scopedMemory ? { memory: {
+            list: () => root.scopedMemory.list(),
+            save: (draft, id, revision) => root.scopedMemory.save(draft, id, revision),
+            delete: (id, revision) => root.scopedMemory.delete(id, revision),
+            search: query => query.model ? retrieveMemories(root.scopedMemory, root.llm, query, query.model) : root.scopedMemory.search(query)
+          } satisfies NonNullable<import('@keundal/chat/platform').ChatConnection['memory']> } : {}),
           tasks: root.tasks,
           remoteAgent: false,
           catalog: async execution => ({

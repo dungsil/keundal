@@ -221,6 +221,7 @@ export class ChatStore implements ChatStoreLike {
       systemPrompt?: string
       promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
+      memoryProjectId?: string
       budget?: RunBudget
       reasoning?: Reasoning
       webSearch?: boolean
@@ -312,6 +313,7 @@ export class ChatStore implements ChatStoreLike {
         runId,
         messages: request.messages,
         promptPreset,
+        memoryProjectId: request.memoryProjectId,
         modelRecovery,
         ...(budget === undefined ? {} : { budget }),
         signal: combined,

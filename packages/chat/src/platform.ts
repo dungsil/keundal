@@ -1,6 +1,7 @@
 import type { ExecutionOptions } from '@keundal/core'
 import type { LLMSettings } from '@keundal/llm-settings'
 import type { McpOAuthManager, McpProbeResult, McpRequestOptions } from '@keundal/mcp'
+import type { ScopedMemoryService } from '@keundal/memory'
 import type { SkillProvider, SkillSummary } from '@keundal/skill'
 import type { TaskService } from '@keundal/task'
 import type { CodingWorkspaceClient } from '@keundal/workspace'
@@ -24,6 +25,11 @@ export type ModelLoader = (
 ) => Promise<ModelOption[]>
 export interface ChatConnection {
   store: ChatStoreLike
+  memory?: Pick<ScopedMemoryService, 'list' | 'save' | 'delete'> & {
+    search(
+      query: Parameters<ScopedMemoryService['search']>[0] & { model?: string }
+    ): ReturnType<ScopedMemoryService['search']>
+  }
   workspaces?: CodingWorkspaceClient
   tasks?: Pick<TaskService, 'list' | 'get' | 'cancel'>
   remoteAgent: boolean

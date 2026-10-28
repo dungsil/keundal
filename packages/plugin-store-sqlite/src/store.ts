@@ -3,6 +3,8 @@ import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlit
 import { parseHistoryBackup, type HistoryBackup } from '@keundal/backup'
 import { MessageAssembly, type AGUIEvent, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import { type GenerationJournalEntry, type GenerationRequest, type GenerationStatus } from '@keundal/generation'
+import { parseMemoryEntry, type MemoryEntry } from '@keundal/memory'
+import type { MemoryAdapter } from '@keundal/plugin-memory'
 
 /** 스레드 하나의 확정된 저장 상태입니다. */
 export interface StoredThread {
@@ -37,6 +39,11 @@ export interface RunOwnership {
 }
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS memories (
+  id TEXT PRIMARY KEY,
+  entry TEXT NOT NULL
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS threads (
   thread_id TEXT PRIMARY KEY,
   revision INTEGER NOT NULL,
@@ -205,6 +212,102 @@ export class SqliteStore {
 
   private readonly prepared = new Map<string, StatementSync>()
   private references = 1
+
+  readonly memoryAdapter: MemoryAdapter = {
+    list: async (options) => {
+      options?.signal?.throwIfAborted()
+      return this.transaction(() => this.readMemories())
+    },
+    save: async (entry, options) => {
+      options.signal?.throwIfAborted()
+      const parsed = parseMemoryEntry(entry)
+      this.transaction(() => {
+        const previous = this.readMemory(parsed.id)
+        if (Boolean(previous) !== options.update)
+          throw new Error(options.update ? 'memory entry does not exist' : 'memory entry already exists')
+        if (previous && previous.revision !== options.expectedRevision) throw new Error('memory revision conflict')
+        if (previous?.scope.type === 'project' && parsed.scope.type === 'project') {
+          this.database
+            .prepare(`UPDATE project_memories SET project_id = ?, title = ?, content = ?, sources = ?,
+            revision = ?, updated_at = ? WHERE id = ? AND revision = ?`)
+            .run(
+              parsed.scope.id,
+              parsed.title,
+              parsed.content,
+              JSON.stringify(parsed.sources),
+              parsed.revision,
+              parsed.updatedAt,
+              parsed.id,
+              previous.revision
+            )
+        } else {
+          if (previous) this.removeMemory(previous.id, previous.revision)
+          if (parsed.scope.type === 'project') {
+            this.database
+              .prepare(`INSERT INTO project_memories
+              (id, project_id, title, content, sources, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+              .run(
+                parsed.id,
+                parsed.scope.id,
+                parsed.title,
+                parsed.content,
+                JSON.stringify(parsed.sources),
+                parsed.revision,
+                parsed.createdAt,
+                parsed.updatedAt
+              )
+          } else {
+            this.database
+              .prepare('INSERT INTO memories (id, entry) VALUES (?, ?)')
+              .run(parsed.id, JSON.stringify(parsed))
+          }
+        }
+      })
+    },
+    delete: async (id, expectedRevision, options) => {
+      options?.signal?.throwIfAborted()
+      this.transaction(() => this.removeMemory(id, expectedRevision))
+    }
+  }
+
+  private readMemories(id?: string): MemoryEntry[] {
+    const suffix = id === undefined ? '' : ' WHERE id = ?'
+    const args = id === undefined ? [] : [id]
+    const scoped = this.database
+      .prepare(`SELECT entry FROM memories${suffix}`)
+      .all(...args)
+      .map((row) => parseMemoryEntry(JSON.parse(row.entry as string)))
+    const projects = this.database
+      .prepare(`SELECT * FROM project_memories${suffix}`)
+      .all(...args)
+      .map((row) =>
+        parseMemoryEntry({
+          id: row.id,
+          scope: { type: 'project', id: row.project_id },
+          title: row.title,
+          content: row.content,
+          sources: JSON.parse(row.sources as string),
+          revision: row.revision,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at
+        })
+      )
+    return [...scoped, ...projects]
+  }
+
+  private readMemory(id: string): MemoryEntry | undefined {
+    return this.readMemories(id)[0]
+  }
+
+  private removeMemory(id: string, expectedRevision: number): void {
+    const project = this.database
+      .prepare('DELETE FROM project_memories WHERE id = ? AND revision = ?')
+      .run(id, expectedRevision)
+    const scoped = this.database
+      .prepare("DELETE FROM memories WHERE id = ? AND json_extract(entry, '$.revision') = ?")
+      .run(id, expectedRevision)
+    if (!project.changes && !scoped.changes) throw new Error('memory not found or revision conflict')
+  }
 
   constructor(path: string) {
     try {

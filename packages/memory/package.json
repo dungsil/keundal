@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./retrieval": {
+      "types": "./dist/retrieval.d.ts",
+      "import": "./dist/retrieval.js"
+    },
     "./tools": {
       "types": "./dist/tools.d.ts",
       "import": "./dist/tools.js"
@@ -21,6 +25,7 @@
   },
   "dependencies": {
     "@keundal/core": "workspace:*",
+    "@keundal/llm": "workspace:*",
     "@keundal/tools": "workspace:*",
     "cordis": "catalog:",
     "zod": "catalog:"

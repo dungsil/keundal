@@ -20,6 +20,7 @@ export default defineNuxtConfig({
     '@keundal/ui-settings',
     '@keundal/ui-settings-llm',
     '@keundal/ui-subagents',
+    '@keundal/ui-memory',
     '@keundal/ui-skill',
     '@keundal/ui-mcp',
     '@keundal/ui-agent-plugins'

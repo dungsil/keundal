@@ -17,6 +17,7 @@ const implementationIndependent = new Set([
   '@keundal/chat',
   '@keundal/core',
   '@keundal/llm',
+  '@keundal/memory',
   '@keundal/session',
   '@keundal/generation',
   '@keundal/backup',

@@ -1,6 +1,7 @@
 import { parseHistoryBackup, type HistoryBackup } from '@keundal/backup'
 import { SteerQueue, EventType, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import { parseReasoning, type Reasoning } from '@keundal/llm'
+import { retrieveMemories } from '@keundal/memory/retrieval'
 import { ToolApproval } from '@keundal/tool-approval'
 import { Context, type Fiber } from 'cordis'
 
@@ -195,6 +196,26 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
         list: (runOptions) => servicesContext.generation.list(runOptions),
         recover: (runOptions) => servicesContext.generation.recover(runOptions)
       },
+      ...(servicesContext.scopedMemory
+        ? {
+            memory: {
+              list: (execution) => servicesContext.scopedMemory.list(execution),
+              save: (draft, id, revision, execution) =>
+                servicesContext.scopedMemory.save(draft, id, revision, execution),
+              delete: (id, revision, execution) => servicesContext.scopedMemory.delete(id, revision, execution),
+              search: ({ model: selected, ...query }, execution) =>
+                selected
+                  ? retrieveMemories(
+                      servicesContext.scopedMemory,
+                      servicesContext.llm,
+                      query,
+                      model(selected).id,
+                      execution
+                    )
+                  : servicesContext.scopedMemory.search(query, execution)
+            } satisfies NonNullable<AgentHostServices['memory']>
+          }
+        : {}),
       ...(servicesContext.backup
         ? {
             backup: {

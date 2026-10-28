@@ -33,6 +33,7 @@ import {
   providerIcon,
   type LLMSettings
 } from '@keundal/llm-settings'
+import type { MemoryDraft } from '@keundal/memory'
 import { type SkillSummary } from '@keundal/skill'
 import { parseSubagentRoles, type SubagentRole } from '@keundal/subagent'
 import type { TaskSnapshot } from '@keundal/task'
@@ -111,6 +112,7 @@ export class ChatRuntime extends Service {
     this.promptPresets.value.presets.find((preset) => preset.id === this.promptPresets.value.activePresetId)
   )
   readonly subagentRoles = ref<SubagentRole[]>([])
+  readonly memoryProject = ref('')
   readonly runBudget = ref<RunBudget>()
   readonly switching = ref(false)
   readonly workspacesAvailable = ref(false)
@@ -214,6 +216,37 @@ export class ChatRuntime extends Service {
     return this.connection.tasks.cancel(id)
   }
 
+  listMemories() {
+    if (!this.connection?.memory) throw unavailable('Memory')
+    return this.connection.memory.list()
+  }
+
+  saveMemory(draft: MemoryDraft, id?: string, expectedRevision?: number) {
+    if (!this.connection?.memory) throw unavailable('Memory')
+    return this.connection.memory.save(draft, id, expectedRevision)
+  }
+
+  deleteMemory(id: string, expectedRevision: number) {
+    if (!this.connection?.memory) throw unavailable('Memory')
+    return this.connection.memory.delete(id, expectedRevision)
+  }
+
+  searchMemories(text: string, projectId?: string, threadId?: string, semantic = false) {
+    if (!this.connection?.memory) throw unavailable('Memory')
+    return this.connection.memory.search({
+      text,
+      projectId,
+      threadId,
+      ...(semantic ? { model: this.model.value } : {})
+    })
+  }
+
+  saveMemoryProject(id: string) {
+    id = id.trim()
+    this.options.storage?.setItem('keundal:memory-project', id)
+    this.memoryProject.value = id
+  }
+
   /**
    * Load preferences and settings, then connect the platform. Call once in the browser before mounting.
    * @throws {SettingsLoadError} when saved settings cannot be read.
@@ -232,6 +265,7 @@ export class ChatRuntime extends Service {
     try {
       this.promptPresets.value = loadPromptPresets(storage)
       this.subagentRoles.value = parseSubagentRoles(JSON.parse(storage.getItem('keundal:subagent-roles') ?? '[]'))
+      this.memoryProject.value = storage.getItem('keundal:memory-project') ?? ''
       const budget = storage.getItem('keundal:run-budget')
       this.runBudget.value = budget === null ? undefined : parseRunBudget(JSON.parse(budget))
       this.settings.value = await platform.settings.load()

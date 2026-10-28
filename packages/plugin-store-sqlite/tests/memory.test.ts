@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 
 import type { MemoryContent } from '@keundal/memory'
 import { createMemoryTools } from '@keundal/memory/tools'
@@ -22,7 +23,7 @@ async function setup(t: TestContext) {
     fibers.push(fiber)
     return { ctx, fiber }
   }
-  return { open, ...(await open()) }
+  return { path, open, ...(await open()) }
 }
 
 const decision: MemoryContent = {
@@ -131,4 +132,136 @@ test('잘못된 도구 인자와 취소된 변경을 거부하고 도구 수정�
   expect(await execute('memory_get', { id: saved.id })).toEqual(updated)
   expect(await execute('memory_delete', { id: saved.id, expectedRevision: 2 })).toEqual({ deleted: true })
   expect(await execute('memory_get', { id: saved.id })).toBeNull()
+})
+
+test('공개 도구와 scopedMemory가 두 SQLite 연결에서 같은 프로젝트 행과 revision을 공유한다', async (t) => {
+  const { ctx, open, path } = await setup(t)
+  const other = (await open()).ctx
+  const context = { threadId: 'first', runId: 'save', toolCallId: 'call', signal: new AbortController().signal }
+  const saved = JSON.parse(
+    await createMemoryTools(ctx.memory, 'project')
+      .find((tool) => tool.name === 'memory_save')!
+      .execute(decision, context)
+  )
+  const scoped = (await other.scopedMemory.list())[0]
+  const { projectId, ...record } = saved
+  expect(scoped).toEqual({ ...record, scope: { type: 'project', id: projectId } })
+  expect(await other.scopedMemory.search({ text: 'SQLite', projectId: 'project' })).toEqual([scoped])
+  const updated = await other.scopedMemory.save(
+    { ...decision, content: 'Postgres로 변경', scope: scoped.scope },
+    saved.id,
+    1
+  )
+  expect(await ctx.memory.get('project', saved.id)).toMatchObject({ content: updated.content, revision: 2 })
+  await expect(ctx.memory.update('project', saved.id, 1, decision)).rejects.toThrow(/revision conflict/)
+  await expect(ctx.memory.delete('project', saved.id, 1)).rejects.toThrow(/revision conflict/)
+  const latest = await ctx.memory.update('project', saved.id, 2, decision)
+  await expect(other.scopedMemory.save({ ...decision, scope: scoped.scope }, saved.id, 2)).rejects.toThrow(
+    /revision conflict/
+  )
+  await expect(other.scopedMemory.delete(saved.id, 2)).rejects.toThrow(/revision conflict/)
+  expect((await other.scopedMemory.list())[0].revision).toBe(3)
+  // The scoped reader takes its snapshot before the other connection commits the update.
+  const competing = await Promise.allSettled([
+    other.scopedMemory.save({ ...decision, content: '오래된 변경', scope: scoped.scope }, saved.id, latest.revision),
+    ctx.memory.update('project', saved.id, latest.revision, { ...decision, content: '최신 변경' })
+  ])
+  expect(competing[0].status).toBe('rejected')
+  expect(competing[1].status).toBe('fulfilled')
+  expect(await ctx.memory.get('project', saved.id)).toMatchObject({ content: '최신 변경', revision: 4 })
+  const database = new DatabaseSync(path)
+  try {
+    expect(database.prepare('SELECT count(*) AS count FROM project_memories').get()?.count).toBe(1)
+    expect(database.prepare('SELECT count(*) AS count FROM memories').get()?.count).toBe(0)
+    expect(database.prepare('SELECT revision FROM project_memories WHERE id = ?').get(saved.id)?.revision).toBe(4)
+  } finally {
+    database.close()
+  }
+  await other.scopedMemory.delete(saved.id, 4)
+  expect(await ctx.memory.get('project', saved.id)).toBeUndefined()
+  const uiCreated = await other.scopedMemory.save({ ...decision, scope: scoped.scope })
+  expect(await ctx.memory.get('project', uiCreated.id)).toMatchObject({ title: decision.title, revision: 1 })
+  await ctx.memory.delete('project', uiCreated.id, 1)
+  expect(await other.scopedMemory.list()).toEqual([])
+})
+
+test('scopedMemory의 scope 변경과 재개방은 단일 행과 revision과 출처를 보존한다', async (t) => {
+  const { ctx, fiber, open, path } = await setup(t)
+  const entry = await ctx.scopedMemory.save({ ...decision, scope: { type: 'user' } })
+  const conversation = await ctx.scopedMemory.save(
+    { ...decision, scope: { type: 'conversation', id: 'thread' } },
+    entry.id,
+    1
+  )
+  expect(conversation.createdAt).toBe(entry.createdAt)
+  const project = await ctx.scopedMemory.save({ ...decision, scope: { type: 'project', id: 'project' } }, entry.id, 2)
+  expect(await ctx.memory.get('project', entry.id)).toMatchObject({ revision: 3 })
+  await fiber.dispose()
+  const reopened = await open()
+  expect(await reopened.ctx.scopedMemory.list()).toEqual([project])
+  const moved = await reopened.ctx.scopedMemory.save(
+    { ...decision, scope: { type: 'project', id: 'other' } },
+    entry.id,
+    3
+  )
+  expect(await reopened.ctx.memory.get('project', entry.id)).toBeUndefined()
+  expect(await reopened.ctx.memory.get('other', entry.id)).toMatchObject({ revision: 4 })
+  await reopened.ctx.scopedMemory.save({ ...decision, scope: { type: 'user' } }, entry.id, moved.revision)
+  expect(await reopened.ctx.memory.get('other', entry.id)).toBeUndefined()
+  const database = new DatabaseSync(path)
+  try {
+    expect(database.prepare('SELECT count(*) AS count FROM memories').get()?.count).toBe(1)
+    expect(database.prepare('SELECT count(*) AS count FROM project_memories').get()?.count).toBe(0)
+    expect(database.prepare('SELECT count(*) AS count FROM threads').get()?.count).toBe(0)
+  } finally {
+    database.close()
+  }
+  const options = { signal: AbortSignal.abort() }
+  await expect(reopened.ctx.scopedMemory.list(options)).rejects.toThrow()
+  await expect(
+    reopened.ctx.scopedMemory.save({ ...decision, scope: { type: 'user' } }, undefined, undefined, options)
+  ).rejects.toThrow()
+  await expect(reopened.ctx.scopedMemory.delete(entry.id, 5, options)).rejects.toThrow()
+  await reopened.ctx.scopedMemory.delete(entry.id, 5)
+  expect(await reopened.ctx.scopedMemory.list()).toEqual([])
+  await expect(reopened.ctx.scopedMemory.save({ ...decision, scope: { type: 'user' } }, entry.id, 5)).rejects.toThrow(
+    /does not exist/
+  )
+})
+
+test('기존 project_memories의 긴 제목과 본문과 출처와 프로젝트 ID 및 임의 ID를 그대로 읽는다', async (t) => {
+  const { ctx, path } = await setup(t)
+  const projectId = 'p'.repeat(500)
+  const content = {
+    title: 't'.repeat(1000),
+    content: 'c'.repeat(10000),
+    sources: [{ uri: 'custom:source', label: 's'.repeat(1000) }]
+  }
+  const database = new DatabaseSync(path)
+  try {
+    database
+      .prepare(`INSERT INTO project_memories (id, project_id, title, content, sources, revision, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run('existing-id', projectId, content.title, content.content, JSON.stringify(content.sources), 7, 123, 456)
+  } finally {
+    database.close()
+  }
+  expect(await ctx.scopedMemory.list()).toEqual([
+    {
+      ...content,
+      id: 'existing-id',
+      scope: { type: 'project', id: projectId },
+      revision: 7,
+      createdAt: 123,
+      updatedAt: 456
+    }
+  ])
+  const updated = await ctx.scopedMemory.save(
+    { ...content, scope: { type: 'project', id: projectId } },
+    'existing-id',
+    7
+  )
+  expect(updated.revision).toBe(8)
+  expect(updated.createdAt).toBe(123)
+  expect(await ctx.memory.get(projectId, 'existing-id')).toMatchObject({ revision: 8, ...content })
 })

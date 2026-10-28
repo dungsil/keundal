@@ -16,6 +16,7 @@ import {
   type RunAgentInput
 } from '@keundal/core'
 import { StreamBudget, parseReasoning } from '@keundal/llm'
+import { memoryRevisionSchema, parseMemoryDraft, parseMemoryId, parseMemorySearchQuery } from '@keundal/memory'
 import { type SessionCommit } from '@keundal/session'
 
 import type { AgentHostModel, AgentHostRunOptions, AgentHostServices } from './contracts.js'
@@ -282,6 +283,55 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
 
       if (request.method === 'GET' && segments.join('/') === 'models') {
         return sendJson(response, 200, { models: models() })
+      }
+
+      if (segments[0] === 'memories' && services.memory) {
+        const abort = new AbortController()
+        const disconnect = () => abort.abort()
+        response.once('close', disconnect)
+        const execution = { signal: abort.signal }
+        try {
+          if (request.method === 'GET' && segments.length === 1)
+            return sendJson(response, 200, await services.memory.list(execution))
+          if (request.method === 'POST' && segments.length === 2 && segments[1] === 'search') {
+            const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as Record<string, unknown>
+            const { model, ...query } = body
+            if (model !== undefined && (typeof model !== 'string' || !models().some((item) => item.id === model)))
+              throw new Error('unknown memory search model')
+            return sendJson(
+              response,
+              200,
+              await services.memory.search(
+                { ...parseMemorySearchQuery(query), ...(typeof model === 'string' ? { model } : {}) },
+                execution
+              )
+            )
+          }
+          if (
+            (request.method === 'POST' && segments.length === 1) ||
+            (request.method === 'PUT' && segments.length === 2)
+          ) {
+            const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as Record<string, unknown>
+            const { expectedRevision, ...content } = body
+            if (request.method === 'POST' && expectedRevision !== undefined)
+              throw new Error('new memory cannot have a revision')
+            const draft = parseMemoryDraft(content)
+            const id = request.method === 'PUT' ? parseMemoryId(decodeURIComponent(segments[1]!)) : undefined
+            const revision = id ? memoryRevisionSchema.parse(expectedRevision) : undefined
+            return sendJson(response, id ? 200 : 201, await services.memory.save(draft, id, revision, execution))
+          }
+          if (request.method === 'DELETE' && segments.length === 2) {
+            const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as { expectedRevision?: unknown }
+            await services.memory.delete(
+              parseMemoryId(decodeURIComponent(segments[1]!)),
+              memoryRevisionSchema.parse(body.expectedRevision),
+              execution
+            )
+            return sendJson(response, 200, { deleted: true })
+          }
+        } finally {
+          response.off('close', disconnect)
+        }
       }
 
       if (segments.join('/') === 'backup' && (request.method === 'GET' || request.method === 'POST')) {

@@ -8,10 +8,12 @@ import type { ChatStoreLike, ChatSummary, LocalChat } from '@keundal/chat/chat-s
 import { toMessages } from '@keundal/chat/messages'
 import { parseModelRecoveryPolicy, type ModelRecoveryPolicy } from '@keundal/chat/model-preferences'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
+import type { ChatConnection } from '@keundal/chat/platform'
 import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
 import { EventType, parseAGUIEvent, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
 import { type GenerationSnapshot } from '@keundal/generation'
 import { type Reasoning, STREAM_LIMITS } from '@keundal/llm'
+import { parseMemoryEntry } from '@keundal/memory'
 import { parsePromptPreset, type PromptPreset } from '@keundal/prompt'
 import { type SessionSnapshot } from '@keundal/session'
 import { type SubagentRole } from '@keundal/subagent'
@@ -113,6 +115,40 @@ export class RemoteChatStore implements ChatStoreLike {
   })
   private readonly active = this.runs.active
   private modelsCache: RemoteModel[] | undefined
+
+  readonly memory: NonNullable<ChatConnection['memory']> = {
+    list: async () => {
+      const entries: unknown = await (await this.call('/memories')).json()
+      if (!Array.isArray(entries)) throw new Error('Invalid memory response')
+      return entries.map(parseMemoryEntry)
+    },
+    save: async (draft, id, expectedRevision) =>
+      parseMemoryEntry(
+        await (
+          await this.call(id ? `/memories/${encodeURIComponent(id)}` : '/memories', {
+            method: id ? 'PUT' : 'POST',
+            body: JSON.stringify({ ...draft, ...(id ? { expectedRevision } : {}) })
+          })
+        ).json()
+      ),
+    delete: async (id, expectedRevision) => {
+      await this.call(`/memories/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ expectedRevision })
+      })
+    },
+    search: async (query) => {
+      const selected = query.model ? resolveModel(query.model).id : undefined
+      const entries: unknown = await (
+        await this.call('/memories/search', {
+          method: 'POST',
+          body: JSON.stringify({ ...query, model: selected })
+        })
+      ).json()
+      if (!Array.isArray(entries)) throw new Error('Invalid memory response')
+      return entries.map(parseMemoryEntry)
+    }
+  }
 
   readonly workspaces: CodingWorkspaceClient = {
     get: async (threadId) => {
@@ -466,6 +502,7 @@ export class RemoteChatStore implements ChatStoreLike {
       systemPrompt?: string
       promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
+      memoryProjectId?: string
       budget?: RunBudget
       reasoning?: Reasoning
       webSearch?: boolean
@@ -574,7 +611,11 @@ export class RemoteChatStore implements ChatStoreLike {
                 },
                 context: [],
                 tools: [],
-                forwardedProps: { keundalPromptPreset: promptPreset, keundalModelRecovery: recovery },
+                forwardedProps: {
+                  keundalPromptPreset: promptPreset,
+                  memoryProjectId: request.memoryProjectId,
+                  keundalModelRecovery: recovery
+                },
                 messages: [
                   {
                     id: 'keundal:web-instructions',

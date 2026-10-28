@@ -71,6 +71,7 @@
     "@keundal/llm": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
     "@keundal/mcp": "workspace:*",
+    "@keundal/memory": "workspace:*",
     "@keundal/prompt": "workspace:*",
     "@keundal/skill": "workspace:*",
     "@keundal/subagent": "workspace:*",

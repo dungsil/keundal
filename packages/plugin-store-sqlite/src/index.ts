@@ -1,3 +1,4 @@
+import { StoredMemoryService } from '@keundal/plugin-memory'
 import type { Context } from 'cordis'
 
 import { SqliteAutomationStore } from './automation.js'
@@ -36,6 +37,7 @@ export const sqliteStorePlugin = Object.assign(
     const store = new SqliteStore(config.path)
     ctx.fiber.effect(() => () => store.release())
     new SqliteSessionService(ctx, store)
+    new StoredMemoryService(ctx, store.memoryAdapter)
     new SqliteBackupService(ctx, store)
     new SqliteTaskStore(ctx, store)
     new SqliteAutomationStore(ctx, store)

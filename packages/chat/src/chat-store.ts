@@ -40,6 +40,7 @@ export interface ChatStoreLike {
       /** Ordered prompt recipe, captured for this response only. */
       promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
+      memoryProjectId?: string
       /** Replaces the agent default for this response; excluded from title generation. */
       budget?: RunBudget
       reasoning?: Reasoning

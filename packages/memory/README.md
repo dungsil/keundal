@@ -60,3 +60,37 @@ ASCII 영문은 대소문자를 구분하지 않으며 형태소 분석·의미 
 
 프로젝트 인덱스로 범위를 좁힌 뒤 해당 프로젝트의 텍스트를 검사합니다. 메모리가 커지면 전문 검색이나
 선택적 Embedding 공급자를 검토할 수 있으며, 소비자는 SQLite 구현 대신 `MemoryService` 계약에 의존합니다.
+
+## Scoped management and recall
+
+`MemoryService` / `ctx.memory` and the project-bound tools above remain unchanged. `ScopedMemoryService` / `ctx.scopedMemory` adds management and recall across user, project, and conversation scopes. Project entries share the same IDs, content, sources, revisions, and storage as the project API: tool edits are visible in settings and UI edits are visible to tools. The scoped service is not a second copy of project data.
+
+Scoped drafts contain `{ scope, title, content, sources }`. A scope is `{ type: 'user' }`, `{ type: 'project', id }`, or `{ type: 'conversation', id }`. Entries add `id`, `revision`, and numeric `createdAt` / `updatedAt` timestamps. `save(draft, id, expectedRevision)` and `delete(id, expectedRevision)` reject stale revisions or missing entries atomically. Creation uses `save(draft)` and starts at revision 1. Editing in settings preserves every original source, including sources added by tools.
+
+The existing store plugins provide both services. SQLite keeps project entries in its existing `project_memories` table and user/conversation entries separately. IndexedDB adds scoped records without replacing sessions, journals, or tasks. The in-memory store implements the same APIs but deliberately loses data on process exit.
+
+Scopes select retrieval data, not authorization. User scope means the current private storage instance, not a multi-tenant identity. A shared host must use independently authorized storage instances; a client-selected project does not establish identity. Source URIs are user-supplied references, not independently verified citations. Deleting a conversation does not delete saved memories. Deleting memory does not erase copies already present in historical messages, summaries, or journals; an in-flight request may already contain the old value.
+
+### Retrieval
+
+`scopedMemory.search({ text, projectId?, threadId?, limit? })` provides normalized, ranked keyword retrieval across the user scope and the explicitly selected project/conversation scopes. It does not change the project API's literal all-terms search rules above. `retrieveMemories()` from `@keundal/memory/retrieval` combines scoped keyword results with model-based semantic selection, not embeddings. Unknown or out-of-scope IDs are discarded, malformed JSON falls back to keyword results, and provider failures/cancellation propagate.
+
+Semantic recall considers up to 64 candidates, prioritizing keyword matches and then recently updated entries. It uses at most 8,192 input tokens, 512 output tokens, and defaults to eight returned records. Older semantic-only matches outside this window may not be found. Eligible records are sent to the selected model provider, adding latency and cost; the normal agent run budget applies.
+
+The common agent loop recalls from the latest user text and `input.threadId`, with an optional `input.forwardedProps.memoryProjectId`. It replaces previous projections, adds sources as untrusted reference context, and applies normal input-budget/compaction checks. Recall is journaled through existing context events. There is no automatic extraction or saving of conversation memory.
+
+### Settings and HTTP
+
+Settings → Memory supports explicit creation, project selection, scope filtering, keyword/semantic search, source inspection, title/content editing, and confirmed revision-checked deletion. External source URIs are displayed without opening them; conversation references can navigate to the original conversation. The active project applies to future turns and is independent of the host's fixed project for memory tools. Set them to the same identifier to recall records written by those tools. Records can be managed without provider credentials; semantic recall requires a working selected model.
+
+The authenticated management API uses the scoped service:
+
+| Method | Path               | Body                                              |
+| ------ | ------------------ | ------------------------------------------------- |
+| GET    | `/memories`        | —                                                 |
+| POST   | `/memories`        | `MemoryDraft`                                     |
+| PUT    | `/memories/:id`    | `MemoryDraft` plus `expectedRevision`             |
+| DELETE | `/memories/:id`    | `{ expectedRevision }`                            |
+| POST   | `/memories/search` | `{ text, projectId?, threadId?, limit?, model? }` |
+
+Scoped searches return 1–20 results. Omitting `model` uses keyword-only search; supplying an allowed model adds semantic retrieval. These management endpoints do not alter the fixed project binding of the model's memory tools. Missing/stale revisions fail instead of overwriting another edit or resurrecting deleted records.

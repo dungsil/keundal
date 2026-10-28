@@ -78,6 +78,7 @@ const setup = async (
       list: (options) => ctx.generation.list(options),
       recover: (options) => ctx.generation.recover(options)
     },
+    memory: ctx.scopedMemory,
     backup: {
       export: () => ctx.backup.export(),
       import: (data) => ctx.backup.import(data)
@@ -145,6 +146,46 @@ const setup = async (
     }
   }
 }
+
+test('메모리 API는 인증과 범위를 검사하고 출처를 보존하며 수정과 삭제를 반영한다', async (t) => {
+  const { base, requestJson } = await setup(t)
+  const draft = {
+    scope: { type: 'project', id: 'keundal' },
+    title: 'Architecture',
+    content: 'Use Nuxt',
+    sources: [{ label: 'Architecture', uri: 'keundal://threads/old-chat' }]
+  }
+  expect((await fetch(`${base}/memories`)).status).toBe(401)
+  const created = await requestJson('POST', '/memories', draft)
+  expect(created).toMatchObject({ status: 201, json: draft })
+  const id = (created.json as { id: string }).id
+  expect(await requestJson('POST', '/memories/search', { text: 'Nuxt', projectId: 'another-project' })).toEqual({
+    status: 200,
+    json: []
+  })
+  expect(await requestJson('POST', '/memories/search', { text: 'Nuxt', projectId: 'keundal' })).toMatchObject({
+    status: 200,
+    json: [{ id }]
+  })
+  expect((await requestJson('POST', '/memories', { ...draft, scope: { type: 'project' } })).status).toBe(400)
+  expect((await requestJson('POST', '/memories/search', { text: 'Nuxt', model: 'unknown-model' })).status).toBe(400)
+  expect((await requestJson('PUT', `/memories/${id}`, { ...draft, content: 'Use Vue' })).status).toBe(400)
+  expect(
+    await requestJson('PUT', `/memories/${id}`, { ...draft, content: 'Use Vue', expectedRevision: 1 })
+  ).toMatchObject({
+    status: 200,
+    json: { id, content: 'Use Vue', sources: draft.sources, revision: 2 }
+  })
+  expect((await requestJson('PUT', `/memories/${id}`, { ...draft, expectedRevision: 1 })).status).toBe(400)
+  expect((await requestJson('DELETE', `/memories/${id}`, { expectedRevision: 1 })).status).toBe(400)
+  expect(await requestJson('GET', '/memories')).toMatchObject({
+    status: 200,
+    json: [{ id, content: 'Use Vue', revision: 2 }]
+  })
+  expect((await requestJson('DELETE', `/memories/${id}`, { expectedRevision: 2 })).status).toBe(200)
+  expect(await requestJson('GET', '/memories')).toEqual({ status: 200, json: [] })
+  expect((await requestJson('PUT', `/memories/${id}`, { ...draft, expectedRevision: 2 })).status).toBe(400)
+})
 
 test('백업 API는 인증·입력·충돌을 검증하고 서비스가 없으면 503을 반환한다', async (t) => {
   const { requestText, requestJson, services } = await setup(t)

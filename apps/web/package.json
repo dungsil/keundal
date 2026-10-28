@@ -21,6 +21,7 @@
     "h3": "2.0.3",
     "@keundal/agent-runtime-node": "workspace:*",
     "@keundal/chat": "workspace:*",
+    "@keundal/memory": "workspace:*",
     "@keundal/plugin-runtime": "workspace:*",
     "@keundal/tools": "workspace:*",
     "@keundal/task-memory": "workspace:*",

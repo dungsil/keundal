@@ -25,6 +25,7 @@ export interface KeundalChatRequest {
   messages: ChatMessage[]
   instructions: string
   promptPreset?: PromptPreset
+  memoryProjectId?: string
   modelRecovery?: ModelRecoveryPolicy
   budget?: RunBudget
   signal?: AbortSignal
@@ -143,7 +144,11 @@ export async function createKeundalChat(
                 runId,
                 request.state
               ),
-              forwardedProps: { keundalPromptPreset: request.promptPreset, keundalModelRecovery: request.modelRecovery }
+              forwardedProps: {
+                keundalPromptPreset: request.promptPreset,
+                memoryProjectId: request.memoryProjectId,
+                keundalModelRecovery: request.modelRecovery
+              }
             },
             {
               signal: request.signal,

@@ -27,6 +27,7 @@ export interface ProjectMemory extends MemoryContent {
 declare module 'cordis' {
   interface Context {
     readonly memory: MemoryService
+    readonly scopedMemory: ScopedMemoryService
   }
 }
 
@@ -52,4 +53,55 @@ export abstract class MemoryService extends Service {
     options?: ExecutionOptions
   ): Promise<ProjectMemory>
   abstract delete(projectId: string, id: string, expectedRevision: number, options?: ExecutionOptions): Promise<void>
+}
+
+const scopeSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('user') }),
+  z.strictObject({ type: z.literal('project'), id: memoryTextSchema }),
+  z.strictObject({ type: z.literal('conversation'), id: memoryTextSchema })
+])
+const draftSchema = memoryContentSchema.extend({ scope: scopeSchema })
+const entrySchema = draftSchema.extend({
+  id: memoryTextSchema,
+  revision: memoryRevisionSchema,
+  createdAt: z.number().finite().nonnegative(),
+  updatedAt: z.number().finite().nonnegative()
+})
+const searchQuerySchema = z.strictObject({
+  text: memoryTextSchema,
+  projectId: memoryTextSchema.optional(),
+  threadId: memoryTextSchema.optional(),
+  limit: z.number().int().min(1).max(20).optional()
+})
+
+export type MemoryScope = z.infer<typeof scopeSchema>
+export interface MemoryDraft extends MemoryContent {
+  scope: MemoryScope
+}
+export interface MemoryEntry extends MemoryDraft {
+  id: string
+  revision: number
+  createdAt: number
+  updatedAt: number
+}
+export type MemorySearchQuery = z.infer<typeof searchQuerySchema>
+export const parseMemoryDraft = (value: unknown): MemoryDraft => draftSchema.parse(value)
+export const parseMemoryEntry = (value: unknown): MemoryEntry => entrySchema.parse(value)
+export const parseMemoryId = (value: unknown): string => memoryTextSchema.parse(value)
+export const parseMemorySearchQuery = (value: unknown): MemorySearchQuery => searchQuerySchema.parse(value)
+
+export abstract class ScopedMemoryService extends Service {
+  constructor(ctx: Context) {
+    super(ctx, 'scopedMemory')
+  }
+
+  abstract list(options?: ExecutionOptions): Promise<MemoryEntry[]>
+  abstract save(
+    draft: MemoryDraft,
+    id?: string,
+    expectedRevision?: number,
+    options?: ExecutionOptions
+  ): Promise<MemoryEntry>
+  abstract delete(id: string, expectedRevision: number, options?: ExecutionOptions): Promise<void>
+  abstract search(query: MemorySearchQuery, options?: ExecutionOptions): Promise<MemoryEntry[]>
 }

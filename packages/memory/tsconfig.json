@@ -1,5 +1,5 @@
 {
   "extends": "@keundal/tsconfig/node.json",
-  "compilerOptions": { "rootDir": "src", "outDir": "dist" },
+  "compilerOptions": { "rootDir": "src", "outDir": "dist", "lib": ["ESNext", "DOM", "DOM.Iterable"] },
   "include": ["src"]
 }
