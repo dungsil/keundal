@@ -29,6 +29,27 @@ export interface McpRequestOptions {
   readonly signal?: AbortSignal
 }
 
+/** Credentials stay outside serializable server settings and are scoped to one resource. */
+export interface McpAuthentication {
+  readonly serverUrl: string
+  /** Aborts existing transports when the account changes or is disconnected. */
+  readonly signal: AbortSignal
+  token(options?: McpRequestOptions): Promise<string>
+  onUnauthorized(options?: McpRequestOptions & { readonly rejectedToken?: string }): Promise<void>
+}
+
+export interface McpConnectOptions extends McpRequestOptions {
+  readonly authentication?: McpAuthentication
+}
+
+/** Implement with an OS secret store or an access-controlled server-side secret store. Never localStorage. */
+export interface McpCredentialStorage {
+  load(key: string): Promise<string | null>
+  save(key: string, credentials: string | null): Promise<void>
+}
+
+export type McpAuthenticationState = 'disconnected' | 'authorizing' | 'connected' | 'reauthentication-required'
+
 /** A tool the server reports; listing it never grants permission to run it. */
 export interface McpToolSummary {
   readonly name: string

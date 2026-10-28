@@ -100,9 +100,10 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         }
       })
       const scope = root.plugin(async (ctx: Context) => {
-        new MemoryTaskService(ctx)
         await selectSkills(manager.isEnabled('@keundal/plugin-skill'))
         await composition.setup(ctx)
+        const tasks = new MemoryTaskService(ctx, { store: ctx.get('taskStore') })
+        await tasks.list()
       })
       try {
         await scope

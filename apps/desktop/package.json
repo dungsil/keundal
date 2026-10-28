@@ -40,6 +40,7 @@
   },
   "devDependencies": {
     "@keundal/agent-host": "workspace:*",
+    "@keundal/task": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@tauri-apps/cli": "2.12.3",
     "@types/node": "catalog:",

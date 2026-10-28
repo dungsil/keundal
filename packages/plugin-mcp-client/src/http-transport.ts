@@ -1,4 +1,4 @@
-import type { McpClientConfig } from '@keundal/mcp'
+import { parseMcpHttpUrl, type McpClientConfig, type McpConnectOptions } from '@keundal/mcp'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 
 import { DEFAULT_MAX_RESULT_BYTES } from './result-budget.js'
@@ -17,15 +17,48 @@ function streamsEvents(init: globalThis.RequestInit | undefined): boolean {
   )
 }
 
-export function createHttpTransport(config: Extract<McpClientConfig, { transport: 'streamable-http' }>) {
+export function createHttpTransport(
+  config: Extract<McpClientConfig, { transport: 'streamable-http' }>,
+  options: McpConnectOptions = {}
+) {
+  const authentication = options.authentication
+  const authenticationSignal = authentication?.signal
+  authenticationSignal?.throwIfAborted()
+  if (authentication) {
+    // OAuth never inherits the plaintext HTTP opt-in or a conflicting static bearer token.
+    if (parseMcpHttpUrl(config.url).href !== new globalThis.URL(authentication.serverUrl).href)
+      throw new Error('MCP credentials belong to a different server')
+    if (new globalThis.Headers(config.headers).has('authorization'))
+      throw new Error('MCP OAuth cannot be combined with an Authorization header')
+  }
   const limit = transportByteLimit(config.maxResultBytes)
   let failure: Error | undefined
+  const lifetime = new globalThis.AbortController()
+  const rejectedTokens = new WeakMap<globalThis.Response, string>()
   const transport = new StreamableHTTPClientTransport(new globalThis.URL(config.url), {
+    ...(authentication
+      ? {
+          authProvider: {
+            token: () => authentication.token({ signal: lifetime.signal }),
+            onUnauthorized: ({ response }) =>
+              authentication.onUnauthorized({
+                signal: lifetime.signal,
+                rejectedToken: rejectedTokens.get(response)
+              })
+          }
+        }
+      : {}),
     requestInit: { headers: config.headers, redirect: 'error' },
     fetch: async (url, init) => {
       if (failure) throw failure
+      authenticationSignal?.throwIfAborted()
       const response = await globalThis.fetch(url, init)
-      if (!response.body) return response
+      const rejected =
+        response.status === 401 ? new globalThis.Headers(init?.headers).get('authorization')?.slice(7) : undefined
+      if (!response.body) {
+        if (rejected) rejectedTokens.set(response, rejected)
+        return response
+      }
       const events =
         response.ok &&
         response.status !== 202 &&
@@ -83,12 +116,25 @@ export function createHttpTransport(config: Extract<McpClientConfig, { transport
         },
         { highWaterMark: 0 }
       )
-      return new globalThis.Response(body, {
+      const bounded = new globalThis.Response(body, {
         status: response.status,
         statusText: response.statusText,
         headers: response.headers
       })
+      if (rejected) rejectedTokens.set(bounded, rejected)
+      return bounded
     }
   })
+  const close = transport.close.bind(transport)
+  transport.close = async () => {
+    lifetime.abort()
+    authenticationSignal?.removeEventListener('abort', authenticationChanged)
+    await close()
+  }
+  const authenticationChanged = () => {
+    transport.onerror?.(new Error('MCP authentication changed; reconnect after login'))
+    void transport.close().catch(() => {})
+  }
+  authenticationSignal?.addEventListener('abort', authenticationChanged, { once: true })
   return transport
 }

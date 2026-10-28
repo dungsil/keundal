@@ -2,7 +2,7 @@
 
 `@keundal/memory` owns the `MemoryService` contract and Cordis `ctx.memory` extension. Memory is independent of conversation compaction, sessions, and generation journals. `@keundal/plugin-memory` implements validation and scoped keyword retrieval over a storage adapter. The existing store plugins register this service alongside sessions:
 
-- IndexedDB: a dedicated `memories` object store, with an additive v1 → v2 upgrade.
+- IndexedDB: a dedicated `memories` object store, with an additive v1/v2 → v3 upgrade preserving conversations, journals, and tasks.
 - SQLite: a dedicated `memories` table in the configured database.
 - In-memory store: an independent map, intentionally lost when the process exits.
 

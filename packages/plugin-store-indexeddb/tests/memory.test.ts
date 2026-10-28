@@ -42,56 +42,72 @@ test('기억 전용 objectstore를 다시 열어 scope와 출처와 수정과 �
   await expect(ctx.memory.save(draft, global.id)).rejects.toThrow(/does not exist/)
 })
 
-test('v1의 세션과 실행과 journal을 보존하며 기억 objectstore만 추가한다', async (t) => {
-  const indexedDB = new IDBFactory()
-  const database = await new Promise<IDBDatabase>((resolve, reject) => {
-    const opening = indexedDB.open('upgrade', 1)
-    opening.onerror = () => reject(opening.error)
-    opening.onupgradeneeded = () => {
-      const db = opening.result
-      db.createObjectStore('threads', { keyPath: 'threadId' })
-      db.createObjectStore('runs', { keyPath: 'runId' })
-      db.createObjectStore('journal', { keyPath: ['runId', 'sequence'] }).createIndex('by-run', 'runId')
+for (const version of [1, 2])
+  test(`v${version}의 세션과 실행과 journal과 작업을 보존하며 기억 objectstore를 추가한다`, async (t) => {
+    const indexedDB = new IDBFactory()
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const opening = indexedDB.open('upgrade', version)
+      opening.onerror = () => reject(opening.error)
+      opening.onupgradeneeded = () => {
+        const db = opening.result
+        db.createObjectStore('threads', { keyPath: 'threadId' })
+        db.createObjectStore('runs', { keyPath: 'runId' })
+        db.createObjectStore('journal', { keyPath: ['runId', 'sequence'] }).createIndex('by-run', 'runId')
+        if (version === 2) db.createObjectStore('tasks', { keyPath: 'id' })
+      }
+      opening.onsuccess = () => resolve(opening.result)
+    })
+    const thread = { threadId: 'existing', revision: 3, messages: [], state: { preserved: true } }
+    const run = {
+      runId: 'run',
+      threadId: 'existing',
+      status: 'interrupted',
+      nextSequence: 1,
+      request: { marker: 'v1' }
     }
-    opening.onsuccess = () => resolve(opening.result)
+    const journal = { runId: 'run', sequence: 0, event: { type: 'RUN_STARTED', threadId: 'existing', runId: 'run' } }
+    const task = { id: 'existing-task', parentThreadId: 'existing', status: 'completed' }
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(
+        ['threads', 'runs', 'journal', ...(version === 2 ? ['tasks'] : [])],
+        'readwrite'
+      )
+      transaction.objectStore('threads').put(thread)
+      transaction.objectStore('runs').put(run)
+      transaction.objectStore('journal').put(journal)
+      if (version === 2) transaction.objectStore('tasks').put(task)
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+    })
+    database.close()
+    const ctx = new Context()
+    const fiber = await ctx.plugin(indexedDBStorePlugin, { indexedDB, databaseName: 'upgrade' })
+    t.onTestFinished(() => fiber.dispose())
+    await ctx.memory.save(draft)
+    expect(await ctx.session.get('existing')).toEqual(thread)
+    const upgraded = await new Promise<IDBDatabase>((resolve, reject) => {
+      const opening = indexedDB.open('upgrade')
+      opening.onsuccess = () => resolve(opening.result)
+      opening.onerror = () => reject(opening.error)
+    })
+    try {
+      expect(upgraded.version).toBe(3)
+      const transaction = upgraded.transaction(['runs', 'journal', 'memories', 'tasks'], 'readonly')
+      const read = <T>(request: IDBRequest<T>) =>
+        new Promise<T>((resolve, reject) => {
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+      expect(await read(transaction.objectStore('runs').get('run'))).toEqual(run)
+      expect(await read(transaction.objectStore('journal').get(['run', 0]))).toEqual(journal)
+      expect(await read(transaction.objectStore('memories').count())).toBe(1)
+      expect(await read(transaction.objectStore('tasks').get('existing-task'))).toEqual(
+        version === 2 ? task : undefined
+      )
+    } finally {
+      upgraded.close()
+    }
   })
-  const thread = { threadId: 'existing', revision: 3, messages: [], state: { preserved: true } }
-  const run = { runId: 'run', threadId: 'existing', status: 'interrupted', nextSequence: 1, request: { marker: 'v1' } }
-  const journal = { runId: 'run', sequence: 0, event: { type: 'RUN_STARTED', threadId: 'existing', runId: 'run' } }
-  await new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction(['threads', 'runs', 'journal'], 'readwrite')
-    transaction.objectStore('threads').put(thread)
-    transaction.objectStore('runs').put(run)
-    transaction.objectStore('journal').put(journal)
-    transaction.oncomplete = () => resolve()
-    transaction.onerror = () => reject(transaction.error)
-  })
-  database.close()
-  const ctx = new Context()
-  const fiber = await ctx.plugin(indexedDBStorePlugin, { indexedDB, databaseName: 'upgrade' })
-  t.onTestFinished(() => fiber.dispose())
-  await ctx.memory.save(draft)
-  expect(await ctx.session.get('existing')).toEqual(thread)
-  const upgraded = await new Promise<IDBDatabase>((resolve, reject) => {
-    const opening = indexedDB.open('upgrade')
-    opening.onsuccess = () => resolve(opening.result)
-    opening.onerror = () => reject(opening.error)
-  })
-  try {
-    expect(upgraded.version).toBe(2)
-    const transaction = upgraded.transaction(['runs', 'journal', 'memories'], 'readonly')
-    const read = <T>(request: IDBRequest<T>) =>
-      new Promise<T>((resolve, reject) => {
-        request.onsuccess = () => resolve(request.result)
-        request.onerror = () => reject(request.error)
-      })
-    expect(await read(transaction.objectStore('runs').get('run'))).toEqual(run)
-    expect(await read(transaction.objectStore('journal').get(['run', 0]))).toEqual(journal)
-    expect(await read(transaction.objectStore('memories').count())).toBe(1)
-  } finally {
-    upgraded.close()
-  }
-})
 
 test('진행 중인 IndexedDB 쓰기를 취소하면 기억 행을 확정하지 않는다', async (t) => {
   const indexedDB = new IDBFactory()

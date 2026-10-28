@@ -1,12 +1,74 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { networkInterfaces, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import type { TaskSnapshot } from '@keundal/task'
 import { expect, onTestFinished, test } from 'vitest'
 
 const token = 'test-only-sidecar-token'
+
+test.each(['SIGTERM', 'SIGKILL'] as const)('sidecar를 %s 후 다시 실행해도 작업 결과와 중단된 부분 응답을 조회한다', async (signal) => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-task-restart-'))
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
+  const calls = join(directory, 'calls.txt')
+  writeFileSync(join(directory, 'tasks.mjs'), `
+    import { appendFileSync } from 'node:fs'
+    export default ctx => { ctx.inject(['tasks'], async ctx => {
+      if ((await ctx.tasks.list()).length) return
+      for (const id of ['completed', 'running']) {
+        await ctx.tasks.enqueue({ input: { threadId: 'child-' + id, runId: id, state: {}, messages: [], tools: [], context: [] },
+          parentThreadId: 'parent', parentRunId: 'parent-run', label: id }, async function* (input, { signal }) {
+          appendFileSync(${JSON.stringify(calls)}, id + '\\n')
+          yield { type: 'TEXT_MESSAGE_CONTENT', messageId: id, delta: id === 'completed' ? 'saved result' : 'saved partial' }
+          if (id === 'running') await new Promise((resolve, reject) => {
+            if (signal.aborted) reject(signal.reason)
+            else signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+          })
+          yield { type: 'RUN_FINISHED', threadId: input.threadId, runId: input.runId, outcome: { type: 'success' } }
+        })
+      }
+    }) }
+  `)
+  const manifest = join(directory, 'keundal.plugins.json')
+  writeFileSync(manifest, JSON.stringify({ plugins: [
+    { module: 'builtin:llm' }, { module: 'builtin:store' }, { module: './tasks.mjs' }
+  ], agent: { module: 'builtin:agent' } }))
+  const start = async () => {
+    const child = spawn(process.execPath, ['dist-sidecar/main.js'], {
+      env: { PORT: '0', KEUNDAL_SIDECAR: '1', KEUNDAL_PROVIDER: 'openai', KEUNDAL_MODEL: 'test',
+        KEUNDAL_API_TOKEN: token, KEUNDAL_SQLITE_PATH: join(directory, 'tasks.sqlite'),
+        KEUNDAL_BASE_URL: 'http://127.0.0.1:1', KEUNDAL_PLUGIN_CONFIG: manifest },
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    const stop = async (reason: 'SIGTERM' | 'SIGKILL' = 'SIGTERM') => {
+      if (child.exitCode !== null || child.signalCode !== null) return
+      const exited = once(child, 'exit')
+      child.kill(reason)
+      await exited
+    }
+    onTestFinished(() => stop())
+    let output = ''
+    child.stdout.on('data', chunk => { output += String(chunk) })
+    await expect.poll(() => output, { timeout: 10000 }).toContain('keundal-sidecar')
+    const endpoint = /http:\/\/127\.0\.0\.1:\d+/.exec(output)![0]
+    const headers = { authorization: `Bearer ${token}` }
+    return { stop, list: async () => (await fetch(`${endpoint}/tasks`, { headers })).json() as Promise<TaskSnapshot[]> }
+  }
+  const first = await start()
+  await expect.poll(() => first.list()).toMatchObject([
+    { status: 'completed', content: 'saved result' }, { status: 'running', content: 'saved partial' }
+  ])
+  const before = await first.list()
+  await first.stop(signal)
+  const second = await start()
+  const after = await second.list()
+  expect(after).toEqual([before[0], { ...before[1], status: 'interrupted', updatedAt: expect.any(Number) }])
+  expect(readFileSync(calls, 'utf8')).toBe('completed\nrunning\n')
+  expect(await second.list()).toEqual(after)
+  await second.stop()
+})
 
 test('실행 파일은 토큰 누락·빈 토큰·빈 바인딩 주소에서 시작하지 않는다', () => {
   for (const config of [
