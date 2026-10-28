@@ -1,6 +1,6 @@
 export default {
   'tasks.title': 'Background tasks',
-  'tasks.memoryOnly': 'Tasks and their status are kept only while this process or browser tab is open. Restart recovery and automatic retries are not supported. Cancellation does not undo tool side effects.',
+  'tasks.storage': 'The default storage keeps task history and results across restarts. Unfinished tasks are marked interrupted and are not automatically rerun. Cancellation does not undo tool side effects.',
   'tasks.refresh': 'Refresh',
   'tasks.cancel': 'Cancel task',
   'tasks.empty': 'No background tasks.',
@@ -14,6 +14,7 @@ export default {
   'tasks.completed': 'Completed',
   'tasks.failed': 'Failed',
   'tasks.cancelled': 'Cancelled',
+  'tasks.interrupted': 'Interrupted',
   'subagents.title': 'Subagents',
   'subagents.addRole': 'Add role',
   'subagents.empty': 'No subagent roles added.',

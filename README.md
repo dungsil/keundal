@@ -118,6 +118,7 @@ pnpm --filter @keundal/desktop bundle
 - [실행 제어: Queue, Steer, 재구독](docs/run-control.md)
 - [Execution Trace와 Deferred Tools](docs/execution-trace.md)
 - [생성 스트림의 자원 한도](docs/stream-limits.md)
+- [에이전트 실행 품질 평가와 모델별 비교](tools/agent-eval/README.md)
 - [아키텍처 결정 기록](docs/adr/)
 
 ## 라이선스

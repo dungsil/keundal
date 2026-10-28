@@ -275,7 +275,10 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       signal.throwIfAborted()
       let pending = mcpClients.get(server.serverName)
       if (!pending) {
-        pending = McpClient.connect(server, { signal: mcpLifetime.signal })
+        pending = McpClient.connect(server, {
+          signal: mcpLifetime.signal,
+          authentication: options.mcpAuthentication?.[server.serverName]
+        })
         mcpClients.set(server.serverName, pending)
         void pending.catch(() => {
           if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
@@ -307,7 +310,6 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       (await runtime?.tools?.(execution))?.map(({ name, description }) => ({ name, description })) ?? [],
     async setup(ctx) {
       workspaces.setup(ctx)
-      new MemoryTaskService(ctx, { maxActive: options.maxActiveSubagents ?? 8 })
       ctx.effect(() => async () => {
         mcpLifetime.abort()
         await Promise.allSettled([...mcpClients.values()].map(async (client) => (await client).close()))
@@ -343,6 +345,12 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       })
       runtime = await runtimePromise
       await runtime.setup(ctx)
+      const tasks = new MemoryTaskService(ctx, {
+        maxActive: options.maxActiveSubagents ?? 8,
+        store: ctx.get('taskStore')
+      })
+      // Finish recovery before exposing the host, even when no task is enqueued.
+      await tasks.list()
     },
     async mountAgent(ctx, config) {
       if (!agentEnabled) throw new Error('Agent is disabled; enable the agent plugin to generate responses')

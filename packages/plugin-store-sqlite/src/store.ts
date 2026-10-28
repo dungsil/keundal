@@ -78,6 +78,22 @@ CREATE TABLE IF NOT EXISTS run_messages (
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS run_messages_order ON run_messages (run_id, position);
+
+CREATE TABLE IF NOT EXISTS tasks (
+  task_id TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  thread_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  parent_thread_id TEXT NOT NULL,
+  parent_run_id TEXT NOT NULL,
+  label TEXT,
+  content TEXT NOT NULL,
+  error TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS tasks_parent_thread ON tasks (parent_thread_id);
 `
 
 /** 데이터베이스 잠금을 기다리는 최대 시간입니다. */

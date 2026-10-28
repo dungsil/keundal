@@ -12,10 +12,13 @@ import { parsePricing, type AgentPricing } from '@keundal/trace'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 
 import { parseRunBudget } from './budget.js'
+import { parseFallbackModels, parseModelRetry, type ModelRetryConfig } from './retry.js'
 
 export interface AgentConfig {
   readonly model: string
   readonly maxOutputTokens: number
+  readonly retry?: ModelRetryConfig | false
+  readonly fallbackModels?: readonly string[]
   readonly budget?: RunBudget
   readonly webSearch?: boolean
   readonly reasoning?: Reasoning
@@ -116,9 +119,13 @@ export function parseAgentConfig(value: unknown): AgentConfig {
   if (typeof parallelTools !== 'boolean') throw new Error('parallelTools must be a boolean')
   const pricing = 'pricing' in value && value.pricing !== undefined ? parsePricing(value.pricing) : undefined
   const budget = 'budget' in value && value.budget !== undefined ? parseRunBudget(value.budget) : undefined
+  const retry = parseModelRetry('retry' in value ? value.retry : undefined)
+  const fallbackModels = parseFallbackModels('fallbackModels' in value ? value.fallbackModels : undefined)
   return {
     model: value.model,
     maxOutputTokens: value.maxOutputTokens,
+    retry,
+    ...(fallbackModels ? { fallbackModels } : {}),
     ...(budget ? { budget } : {}),
     ...('webSearch' in value ? { webSearch: value.webSearch as boolean | undefined } : {}),
     ...('reasoning' in value ? { reasoning: parseReasoning(value.reasoning) } : {}),

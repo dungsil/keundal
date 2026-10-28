@@ -21,6 +21,7 @@
     "@keundal/generation": "workspace:*",
     "@keundal/llm": "workspace:*",
     "@keundal/session": "workspace:*",
+    "@keundal/task": "workspace:*",
     "@keundal/tool-approval": "workspace:*",
     "@keundal/trace": "workspace:*",
     "@standard-schema/spec": "catalog:",
