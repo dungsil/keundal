@@ -16,6 +16,7 @@ const { t } = useText()
 
 const props = withDefaults(
   defineProps<{
+    threadId?: string
     input: string
     setInput: (value: string) => void
     status?: ChatStatus
@@ -258,7 +259,7 @@ const dictationOwner = computed(() => ({
         <PromptMenu :open="openFiles" :web-search="webSearch" :model="model" />
 
         <div class="flex min-w-0 flex-wrap items-center justify-end gap-1 ms-auto">
-          <SlotOutlet name="composer.actions" :owner="{ disabled: busy }" />
+          <SlotOutlet name="composer.actions" :owner="{ threadId, disabled: busy, running }" />
 
           <UFieldGroup v-if="running" size="sm" :aria-label="t('chat.delivery')">
             <UTooltip v-for="mode in deliveryModes" :key="mode.value" :text="mode.description">

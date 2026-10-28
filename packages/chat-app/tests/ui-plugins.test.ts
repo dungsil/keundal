@@ -31,6 +31,7 @@ vi.mock('@keundal/ui-subagents/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-tool/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-trace/plugin', () => ({ apply() {} }))
 vi.mock('@keundal/ui-weather/plugin', () => ({ apply() {} }))
+vi.mock('@keundal/ui-workspace/plugin', () => ({ apply() {} }))
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
