@@ -1,4 +1,5 @@
 import { parseRunBudget, type RunBudget } from '@keundal/agent'
+import { parseHistoryBackup, type HistoryBackup } from '@keundal/backup'
 import { ChatMessageAssembly } from '@keundal/chat/chat-message'
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
@@ -55,6 +56,49 @@ ${webSearch ? 'Use native web search when current information is needed and cite
 export class RemoteChatStore implements ChatStoreLike {
   /** 실행은 호스트가 소유하므로 연결이 끊겨도 계속되고, journal 커서로 다시 구독합니다. */
   readonly execution = 'host'
+  readonly backup = {
+    export: async (): Promise<HistoryBackup> => {
+      const headers = new Headers()
+      if (this.connection.token) headers.set('authorization', `Bearer ${this.connection.token}`)
+      const response = await this.request(this.url('/backup'), { headers, cache: 'no-store' })
+      if (!response.ok) {
+        const bounded = await boundRemoteResponse(response)
+        throw new Error((await bounded.text()) || `Keundal host request failed (HTTP ${response.status})`)
+      }
+      const limit = 64 * 1024 * 1024
+      if (Number(response.headers.get('content-length')) > limit) {
+        await response.body?.cancel()
+        throw new RemoteResponseLimitError('History backup exceeds 64 MiB')
+      }
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('History backup response is empty')
+      const decoder = new TextDecoder()
+      const chunks: string[] = []
+      let bytes = 0
+      try {
+        while (true) {
+          const next = await reader.read()
+          if (next.done) break
+          bytes += next.value.byteLength
+          if (bytes > limit) throw new RemoteResponseLimitError('History backup exceeds 64 MiB')
+          chunks.push(decoder.decode(next.value, { stream: true }))
+        }
+        chunks.push(decoder.decode())
+      } catch (error) {
+        await reader.cancel(error).catch(() => {})
+        throw error
+      } finally {
+        reader.releaseLock()
+      }
+      return parseHistoryBackup(JSON.parse(chunks.join('')))
+    },
+    import: async (data: HistoryBackup): Promise<void> => {
+      const body = JSON.stringify(parseHistoryBackup(data))
+      if (new TextEncoder().encode(body).byteLength > 64 * 1024 * 1024)
+        throw new RemoteResponseLimitError('History backup exceeds 64 MiB')
+      await this.call('/backup', { method: 'POST', body })
+    }
+  }
   private readonly runs = new ChatRuns({
     read: (id) => this.get(id),
     write: async (id, change) => {

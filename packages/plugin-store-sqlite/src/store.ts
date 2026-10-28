@@ -1,5 +1,6 @@
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite'
 
+import { parseHistoryBackup, type HistoryBackup } from '@keundal/backup'
 import { MessageAssembly, type AGUIEvent, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import { type GenerationJournalEntry, type GenerationRequest, type GenerationStatus } from '@keundal/generation'
 
@@ -355,6 +356,41 @@ export class SqliteStore {
   /** 저장된 모든 실행을 등록 순서로 읽습니다. */
   listRuns(): StoredRun[] {
     return this.rows<RunRow>(READ_RUNS).map((row) => this.toRun(row))
+  }
+
+  exportHistory(): HistoryBackup {
+    return this.transaction(() => {
+      const runs = this.listRuns().map(({ request, status, journal, messages }) => ({
+        request,
+        status,
+        journal,
+        messages
+      }))
+      return parseHistoryBackup({ threads: this.listThreads(), runs })
+    })
+  }
+
+  importHistory(data: HistoryBackup): void {
+    const parsed = parseHistoryBackup(data)
+    this.transaction(() => {
+      if (this.listOwnerships().some((run) => run.status === 'running'))
+        throw new Error('cannot import history with running generations')
+      for (const thread of parsed.threads)
+        if (this.readThread(thread.threadId)) throw new Error(`backup thread collision: ${thread.threadId}`)
+      for (const run of parsed.runs)
+        if (this.readRunHeader(run.request.input.runId))
+          throw new Error(`backup run collision: ${run.request.input.runId}`)
+      for (const thread of parsed.threads) {
+        this.writeThread(thread.threadId, thread.revision, thread.state)
+        this.writeThreadMessages(thread.threadId, thread.messages)
+      }
+      for (const run of parsed.runs) {
+        const { runId, threadId } = run.request.input
+        this.ensureRun(runId, threadId, run.request, run.status)
+        this.writeJournal(runId, run.journal)
+        this.writeRunMessages(runId, run.messages)
+      }
+    })
   }
 
   /** 모든 실행의 상태와 소유권을 등록 순서로 읽습니다. */

@@ -9,6 +9,22 @@ import { createAgentHost, type AgentHostOptions } from '../src/index.js'
 
 const input: RunAgentInput = { threadId: 'thread', runId: 'run', state: {}, context: [], tools: [], messages: [] }
 
+test('호스트는 journal 등록 전의 실행도 백업에서 차단하고 백업 중에는 새 실행을 차단한다', async () => {
+  const host = await createAgentHost(composition([]))
+  try {
+    const iterator = host.services.run(input)[Symbol.asyncIterator]()
+    await expect(host.services.backup!.export()).rejects.toThrow('active')
+    await expect(host.services.backup!.import({ threads: [], runs: [] })).rejects.toThrow('active')
+    await iterator.next()
+    await iterator.return?.()
+    const pending = host.services.backup!.export()
+    expect(() => host.services.run(input)).toThrow('backup operation')
+    expect(await pending).toEqual({ threads: [], runs: [] })
+  } finally {
+    await host.dispose()
+  }
+})
+
 function composition(disposed: string[]): AgentHostOptions {
   class LLM extends LLMService {
     constructor(ctx: Context) {

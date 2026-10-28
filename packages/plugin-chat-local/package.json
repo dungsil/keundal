@@ -22,6 +22,7 @@
   "dependencies": {
     "@keundal/agent": "workspace:*",
     "@keundal/agent-loop": "workspace:*",
+    "@keundal/backup": "workspace:*",
     "@keundal/chat": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/generation": "workspace:*",

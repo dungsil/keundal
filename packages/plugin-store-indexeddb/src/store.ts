@@ -1,3 +1,4 @@
+import { parseHistoryBackup, type HistoryBackup } from '@keundal/backup'
 import { mergeMessages, type AGUIEvent, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import {
   type GenerationJournalEntry,
@@ -45,6 +46,7 @@ interface StoredRun {
   readonly threadId: string
   readonly request: GenerationRequest
   readonly status: GenerationStatus
+  readonly messages?: AgentMessage[]
   /** journal에 확정된 다음 sequence 번호입니다. */
   readonly nextSequence: number
 }
@@ -209,6 +211,48 @@ export class IndexedDBStore {
       )
     })
     return stored.map(({ run, journal }) => snapshotRun(run, journal))
+  }
+
+  async exportHistory(): Promise<HistoryBackup> {
+    return this.transaction([THREADS, RUNS, JOURNAL], 'readonly', async (transaction) => {
+      const threads = await request<StoredThread[]>(transaction.objectStore(THREADS).getAll())
+      const stored = await request<StoredRun[]>(transaction.objectStore(RUNS).getAll())
+      const runs = await Promise.all(
+        stored.map(async (run) => snapshotRun(run, await readJournal(transaction.objectStore(JOURNAL), run.runId)))
+      )
+      return parseHistoryBackup({ threads, runs })
+    })
+  }
+
+  async importHistory(data: HistoryBackup): Promise<void> {
+    const parsed = parseHistoryBackup(data)
+    await this.transaction([THREADS, RUNS, JOURNAL], 'readwrite', async (transaction) => {
+      const threads = transaction.objectStore(THREADS)
+      const runs = transaction.objectStore(RUNS)
+      const existing = await request<StoredRun[]>(runs.getAll())
+      if (existing.some((run) => run.status === 'running'))
+        throw new Error('cannot import history with running generations')
+      for (const thread of parsed.threads)
+        if (await request(threads.getKey(thread.threadId)))
+          throw new Error(`backup thread collision: ${thread.threadId}`)
+      const runIds = new Set(existing.map((run) => run.runId))
+      for (const run of parsed.runs)
+        if (runIds.has(run.request.input.runId)) throw new Error(`backup run collision: ${run.request.input.runId}`)
+      for (const thread of parsed.threads) threads.add(thread)
+      for (const run of parsed.runs) {
+        const { runId, threadId } = run.request.input
+        runs.add({
+          runId,
+          threadId,
+          request: run.request,
+          status: run.status,
+          nextSequence: run.journal.length,
+          messages: run.messages
+        } satisfies StoredRun)
+        for (const entry of run.journal)
+          transaction.objectStore(JOURNAL).add({ runId, ...entry } satisfies StoredJournal)
+      }
+    })
   }
 
   /** session revision과 generation 종료 기록을 한 트랜잭션에서 반영합니다. */
@@ -477,6 +521,7 @@ function snapshotThread(thread: StoredThread): SessionSnapshot {
 }
 
 function snapshotRun(run: StoredRun, journal: GenerationJournalEntry[]): GenerationSnapshot {
+  if (run.messages !== undefined) return { request: run.request, status: run.status, journal, messages: run.messages }
   const recorder = recordJournal(journal)
   return { request: run.request, status: run.status, journal, messages: recorder.messages }
 }
