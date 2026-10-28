@@ -2977,6 +2977,9 @@ importers:
       '@keundal/chat':
         specifier: workspace:*
         version: link:../chat
+      '@keundal/skill':
+        specifier: workspace:*
+        version: link:../skill
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
