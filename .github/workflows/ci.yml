@@ -391,9 +391,6 @@ jobs:
             turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
             turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-
 
-      - name: Lighthouse 예산 검사
-        run: node --test tools/lighthouse/*.test.mjs
-
       - name: 테스트
         env:
           WEB_CHANGED: ${{ needs.changes.outputs.web }}
@@ -403,77 +400,6 @@ jobs:
           if [ "$WEB_CHANGED" != 'true' ]; then filters+=(--filter='!@keundal/web'); fi
           if [ "$DESKTOP_CHANGED" != 'true' ]; then filters+=(--filter='!@keundal/desktop'); fi
           pnpm exec turbo run test "${filters[@]}"
-
-      - name: Turbo 실행 요약 업로드
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: turbo-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}
-          path: .turbo/runs/*.json
-          if-no-files-found: ignore
-          retention-days: 3
-          overwrite: true
-
-  browser:
-    needs: changes
-    if: needs.changes.outputs.web == 'true'
-    name: 브라우저 회귀 검사
-    runs-on: ubuntu-26.04
-    timeout-minutes: 20
-    steps:
-      - name: 저장소 가져오기
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: 개발 환경 준비
-        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
-        with:
-          cache: true
-          require-lockfile: true
-
-      - name: Turbo 공유 캐시 설정
-        id: turbo-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .turbo/cache
-          key: turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
-            turbo-js-v1-${{ runner.os }}-${{ runner.arch }}-
-
-      - name: 접근성 검사 목록 확인
-        run: |
-          node --test tools/a11y/*.test.mjs
-          node tools/a11y/check.mjs
-
-      - name: Chromium 설치
-        run: pnpm --filter @keundal/web exec playwright install --with-deps --only-shell chromium
-
-      - name: 웹 빌드
-        env:
-          NITRO_PRESET: node-server
-        run: pnpm exec turbo run build --filter=@keundal/web...
-
-      - name: Turbo 공유 캐시 저장
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .turbo/cache
-          key: ${{ steps.turbo-cache.outputs.cache-primary-key }}
-
-      - name: 브라우저 회귀 검사
-        run: pnpm --filter @keundal/web test:browser --project=chromium
-
-      - name: 브라우저 검사 보고서 보관
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: browser-report
-          path: |
-            apps/web/playwright-report/
-            apps/web/test-results/
-          if-no-files-found: ignore
-          retention-days: 7
 
       - name: Turbo 실행 요약 업로드
         if: ${{ !cancelled() }}

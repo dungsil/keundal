@@ -5,5 +5,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["tests"]
+  "include": ["app/lib"]
 }
