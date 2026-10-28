@@ -1,0 +1,27 @@
+{
+  "name": "@keundal/example-acp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@keundal/acp": "workspace:*",
+    "@keundal/plugin-agent-coding": "workspace:*",
+    "@keundal/plugin-fs-local": "workspace:*",
+    "@keundal/plugin-fs-policy": "workspace:*",
+    "@keundal/plugin-llm-openai": "workspace:*",
+    "@keundal/plugin-store-memory": "workspace:*",
+    "@keundal/plugin-tool-fs": "workspace:*",
+    "cordis": "catalog:"
+  },
+  "devDependencies": {
+    "@keundal/tsconfig": "workspace:*",
+    "@keundal/tsdown": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  }
+}

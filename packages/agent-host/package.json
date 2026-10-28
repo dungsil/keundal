@@ -26,6 +26,8 @@
   },
   "dependencies": {
     "@keundal/agent": "workspace:*",
+    "@keundal/automation": "workspace:*",
+    "@keundal/backup": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/generation": "workspace:*",
     "@keundal/llm": "workspace:*",

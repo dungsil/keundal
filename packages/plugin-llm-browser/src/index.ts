@@ -46,7 +46,8 @@ export function browserLLMPlugin(
       models: {
         [id]: {
           contextWindow: Math.min(128_000, metadata?.contextWindow ?? 128_000),
-          maxOutputTokens: Math.min(4096, metadata?.maxOutputTokens ?? 4096, (metadata?.contextWindow ?? 128_000) - 1)
+          maxOutputTokens: Math.min(4096, metadata?.maxOutputTokens ?? 4096, (metadata?.contextWindow ?? 128_000) - 1),
+          capabilities: metadata?.capabilities
         }
       }
     })

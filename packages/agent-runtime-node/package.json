@@ -19,9 +19,11 @@
   "dependencies": {
     "@keundal/agent-host": "workspace:*",
     "@keundal/agent-plugins": "workspace:*",
+    "@keundal/automation-node": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/mcp": "workspace:*",
     "@keundal/memory": "workspace:*",
+    "@keundal/plugin-agent-acp": "workspace:*",
     "@keundal/plugin-agent-chat": "workspace:*",
     "@keundal/plugin-agent-coding": "workspace:*",
     "@keundal/plugin-fs-local": "workspace:*",

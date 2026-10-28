@@ -1,3 +1,14 @@
+import { parseModelCapabilities } from './llm.js'
+
+/** Catalog extensions are optional; unrelated provider capability formats remain unknown. */
+export function readModelCatalogCapabilities(value: unknown) {
+  try {
+    return parseModelCapabilities(value)
+  } catch {
+    return undefined
+  }
+}
+
 /** Limits apply to one complete model discovery, including discarded entries. */
 export const MODEL_CATALOG_LIMITS = {
   pageBytes: 1024 * 1024,

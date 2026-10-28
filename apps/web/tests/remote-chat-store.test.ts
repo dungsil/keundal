@@ -13,6 +13,7 @@ import { createAgentHandler } from '../server/agent/handler'
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import { RemoteChatStore } from '@keundal/plugin-chat-remote'
 import { createDesktopChatStore } from '@keundal/plugin-chat-desktop'
+import { readTraceSpans } from '@keundal/trace'
 
 const token = 'remote-test-token'
 const model = 'openai/gpt-5-nano'
@@ -29,10 +30,14 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
   const inputs: LLMRequest['input'][] = []
   const titleModels: string[] = []
   const selections: unknown[] = []
+  const requestedModels: string[] = []
+  let unavailable = false
   class ScriptedLLM extends LLMService {
-    async getModel() { return { contextWindow: 128_000, maxOutputTokens: 4096 } }
+    async getModel() { return { contextWindow: 128_000, maxOutputTokens: 4096, capabilities: { tools: true } } }
     async countTokens() { return 40 }
     async* stream(request: LLMRequest): AsyncIterable<LLMEvent> {
+      requestedModels.push(request.model)
+      if (unavailable && request.model !== 'title') throw Object.assign(new Error('Unavailable'), { status: 503 })
       inputs.push(request.input)
       const text = JSON.stringify(request.input).includes('편집한 질문') ? '편집 응답' : '원격 응답'
       const messageId = crypto.randomUUID()
@@ -168,6 +173,20 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
   expect(await chats.getRun(runId)).toBeUndefined()
   await chats.delete('branch')
   await chats.create('chat', user, model)
+
+  unavailable = true
+  requestedModels.length = 0
+  const recovered = await collect(chats.respond('chat', {
+    model, messages: [user], modelRecovery: { retry: { maxRetries: 1, initialDelayMs: 0, maxDelayMs: 0 }, fallbackModels: ['anthropic/title'] }
+  }))
+  expect(recovered.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(requestedModels).toEqual(['test', 'test', 'title'])
+  expect(readTraceSpans(recovered).filter(span => span.kind === 'model').map(span => [span.model, span.status]))
+    .toEqual([['test', 'failed'], ['test', 'failed'], ['title', 'completed']])
+  requestedModels.length = 0
+  const failed = await collect(chats.respond('chat', { model, messages: [user], modelRecovery: { retry: false, fallbackModels: [] } }))
+  expect(failed.at(-1)?.type).toBe(EventType.RUN_ERROR)
+  expect(requestedModels).toEqual(['test'])
 
   await chats.delete('chat')
   expect(await chats.get('chat')).toBeUndefined()

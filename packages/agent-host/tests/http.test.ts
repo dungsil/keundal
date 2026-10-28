@@ -79,6 +79,10 @@ const setup = async (
       recover: (options) => ctx.generation.recover(options)
     },
     memory: ctx.scopedMemory,
+    backup: {
+      export: () => ctx.backup.export(),
+      import: (data) => ctx.backup.import(data)
+    },
     models: () => [{ id: 'test', provider: 'openai', contextWindow: 2000, maxOutputTokens: 200 }],
     title: async () => 'test title'
   }
@@ -181,6 +185,35 @@ test('메모리 API는 인증과 범위를 검사하고 출처를 보존하며 �
   expect((await requestJson('DELETE', `/memories/${id}`, { expectedRevision: 2 })).status).toBe(200)
   expect(await requestJson('GET', '/memories')).toEqual({ status: 200, json: [] })
   expect((await requestJson('PUT', `/memories/${id}`, { ...draft, expectedRevision: 2 })).status).toBe(400)
+})
+
+test('백업 API는 인증·입력·충돌을 검증하고 서비스가 없으면 503을 반환한다', async (t) => {
+  const { requestText, requestJson, services } = await setup(t)
+  const data = { threads: [{ threadId: 'imported', revision: 4, messages: [], state: { saved: true } }], runs: [] }
+  expect((await requestJson('GET', '/backup', undefined, { authorization: 'Bearer wrong' })).status).toBe(401)
+  expect((await requestText('POST', '/backup', data)).status).toBe(204)
+  expect((await requestJson('GET', '/backup')).json).toEqual(data)
+  expect((await requestText('POST', '/backup', data)).status).toBe(400)
+  expect(
+    (await requestText('POST', '/backup', { threads: [{ ...data.threads[0], revision: -1 }], runs: [] })).status
+  ).toBe(400)
+  expect((await requestJson('GET', '/backup')).json).toEqual(data)
+  services.backup = undefined
+  expect((await requestJson('GET', '/backup')).status).toBe(503)
+  expect((await requestText('POST', '/backup', data)).status).toBe(503)
+})
+
+test('백업 가져오기는 기본 8 MiB보다 큰 본문을 허용하되 명시한 관리자 한도를 지킨다', async (t) => {
+  const normal = await setup(t)
+  const data = {
+    threads: [{ threadId: 'large', revision: 0, messages: [], state: { value: 'x'.repeat(9 * 1024 * 1024) } }],
+    runs: []
+  }
+  expect((await normal.requestText('POST', '/backup', data)).status).toBe(204)
+  expect((await normal.services.session.get('large'))?.state).toEqual(data.threads[0]!.state)
+  const capped = await setup(t, { maxRequestBodyBytes: 64 })
+  expect((await capped.requestText('POST', '/backup', data)).status).toBe(413)
+  expect(await capped.services.session.list()).toEqual([])
 })
 
 test('승인 API는 인증과 결정을 검증하고 첫 응답만 받아들인다', async (t) => {

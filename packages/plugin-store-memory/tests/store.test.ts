@@ -85,6 +85,50 @@ const request = (runId: string, sessionRevision = 0): GenerationRequest => ({
   sessionRevision
 })
 
+test('백업을 왕복해 상태와 실행을 보존하고 충돌·실행 중·잘못된 입력은 변경 없이 거부한다', async (t) => {
+  const source = await setup(t, { events: reply })
+  await collect(source.ctx.generation.run(request('backup-run')))
+  const data = await source.ctx.backup.export()
+  data.threads[0] = {
+    ...data.threads[0]!,
+    state: { web: { title: 'saved', votes: [true], queue: [] }, custom: [1, null] }
+  }
+  data.runs[0]!.messages.push({ id: 'portable', role: 'assistant', content: 'snapshot only' })
+  const target = await setup(t, { events: [] })
+  await target.ctx.backup.import(data)
+  expect(await target.ctx.backup.export()).toEqual(data)
+  expect(await target.ctx.generation.get('backup-run')).toEqual(data.runs[0])
+  const collision = structuredClone(data)
+  collision.threads.unshift({ threadId: 'must-not-exist', revision: 0, messages: [], state: {} })
+  await expect(target.ctx.backup.import(collision)).rejects.toThrow('collision')
+  const runCollision = structuredClone(data)
+  runCollision.threads[0] = { ...runCollision.threads[0]!, threadId: 'another-thread' }
+  runCollision.runs[0]!.request.input.threadId = 'another-thread'
+  runCollision.runs[0] = { ...runCollision.runs[0]!, journal: [] }
+  await expect(target.ctx.backup.import(runCollision)).rejects.toThrow('run collision')
+  const invalid = structuredClone(data)
+  invalid.runs[0]!.journal[0] = { ...invalid.runs[0]!.journal[0]!, sequence: 2 }
+  await expect(target.ctx.backup.import(invalid)).rejects.toThrow('sequence')
+  const running = structuredClone(data)
+  running.runs[0] = { ...running.runs[0]!, status: 'running' }
+  await expect(target.ctx.backup.import(running)).rejects.toThrow('running')
+  expect(await target.ctx.backup.export()).toEqual(data)
+  const iterator = source.ctx.generation.run(request('active', 1))[Symbol.asyncIterator]()
+  try {
+    await iterator.next()
+    const before = await source.ctx.session.list()
+    await expect(source.ctx.backup.export()).rejects.toThrow('running')
+    await expect(source.ctx.backup.import({ threads: [], runs: [] })).rejects.toThrow('running')
+    expect(await source.ctx.session.list()).toEqual(before)
+  } finally {
+    await iterator.return?.()
+  }
+  const backup = target.ctx.backup
+  await target.fibers[0]!.dispose()
+  expect(await target.ctx.backup.export()).toEqual(data)
+  expect(await backup.export()).toEqual(data)
+})
+
 test('성공한 실행은 커밋 이후에 RUN_FINISHED를 전달하고 실행을 completed로 확정한다', async (t) => {
   const { ctx } = await setup(t, { events: reply })
   const delivered: AGUIEvent[] = []

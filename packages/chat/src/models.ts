@@ -1,3 +1,4 @@
+import { parseModelCapabilities } from '@keundal/llm'
 import { providerType } from '@keundal/llm-settings'
 import { z } from 'zod'
 export const modelSchema = z.object({
@@ -5,7 +6,8 @@ export const modelSchema = z.object({
   label: z.string().min(1),
   icon: z.string(),
   contextWindow: z.number().int().positive().optional(),
-  maxOutputTokens: z.number().int().positive().optional()
+  maxOutputTokens: z.number().int().positive().optional(),
+  capabilities: z.unknown().transform(parseModelCapabilities).optional()
 })
 export type ModelOption = z.infer<typeof modelSchema>
 

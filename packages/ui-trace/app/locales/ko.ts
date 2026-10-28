@@ -25,6 +25,7 @@ export default {
   'trace.duration': '소요 시간',
   'trace.usageSource': '사용량 출처',
   'trace.model': '모델',
+  'trace.modelSwitch': '모델 전환',
   'trace.name': '이름',
   'trace.started': '시작 시각',
   'trace.statusLabel': '상태',

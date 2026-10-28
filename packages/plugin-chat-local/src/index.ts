@@ -1,14 +1,16 @@
 import { parseRunBudget, type RunBudget } from '@keundal/agent'
+import type { HistoryBackup } from '@keundal/backup'
 import type { ChatMessage, ChatMessageAssembly } from '@keundal/chat/chat-message'
 import { branchChat, chatSummary, validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, ChatSummary, LocalChat } from '@keundal/chat/chat-store'
+import { parseModelRecoveryPolicy, type ModelRecoveryPolicy } from '@keundal/chat/model-preferences'
 import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
 import { SteerQueue, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
 import { type Reasoning } from '@keundal/llm'
 import { parsePromptPreset, type PromptPreset } from '@keundal/prompt'
 import { type SessionSnapshot } from '@keundal/session'
 import type {} from '@keundal/skill'
-import { type SubagentRole } from '@keundal/subagent'
+import { parseSubagentRoles, type SubagentRole } from '@keundal/subagent'
 import { ToolApproval } from '@keundal/tool-approval'
 import type { Context } from 'cordis'
 
@@ -22,6 +24,19 @@ type LocalRun = ActiveChatRun & { steer: SteerQueue; model: string }
 export class ChatStore implements ChatStoreLike {
   /** 실행은 브라우저 탭 안에서 진행되므로 탭을 닫으면 실행과 메모리의 대기열이 함께 끝납니다. */
   readonly execution = 'browser'
+  get backup(): ChatStoreLike['backup'] {
+    if (!this.ctx.backup) return undefined
+    return {
+      export: async () => {
+        if (this.active.size) throw new Error('cannot export history while a chat is running')
+        return this.ctx.backup.export()
+      },
+      import: async (data: HistoryBackup) => {
+        if (this.active.size) throw new Error('cannot import history while a chat is running')
+        await this.ctx.backup.import(data)
+      }
+    }
+  }
   private readonly runtimes = new Map<string, { key: string; runtime: KeundalChatRuntime }>()
   private readonly runs = new ChatRuns<LocalRun>({
     read: (id) => this.get(id),
@@ -202,6 +217,7 @@ export class ChatStore implements ChatStoreLike {
       messages: ChatMessage[]
       model: string
       titleModel?: string
+      modelRecovery?: ModelRecoveryPolicy
       systemPrompt?: string
       promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
@@ -216,6 +232,9 @@ export class ChatStore implements ChatStoreLike {
   ): AsyncGenerator<AGUIEvent> {
     if (this.active.has(id)) throw new Error('A response is already running')
     const promptPreset = request.promptPreset === undefined ? undefined : parsePromptPreset(request.promptPreset)
+    const modelRecovery =
+      request.modelRecovery === undefined ? undefined : parseModelRecoveryPolicy(request.modelRecovery)
+    const subagentRoles = request.subagentRoles === undefined ? undefined : parseSubagentRoles(request.subagentRoles)
     const budget = request.budget === undefined ? undefined : parseRunBudget(request.budget)
     const abort = new AbortController()
     const combined = signal ? AbortSignal.any([signal, abort.signal]) : abort.signal
@@ -295,9 +314,10 @@ export class ChatStore implements ChatStoreLike {
         messages: request.messages,
         promptPreset,
         memoryProjectId: request.memoryProjectId,
+        modelRecovery,
         ...(budget === undefined ? {} : { budget }),
         signal: combined,
-        state: { web: chat, ...(request.subagentRoles === undefined ? {} : { subagentRoles: request.subagentRoles }) },
+        state: { web: chat, ...(subagentRoles === undefined ? {} : { subagentRoles }) },
         onMessage: request.onMessage,
         instructions: `You are a knowledgeable and helpful AI assistant. Be clear, accurate and concise.
 Do not use markdown headings. Use bold text for section labels instead.

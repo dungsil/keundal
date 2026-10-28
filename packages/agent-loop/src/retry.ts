@@ -1,3 +1,4 @@
+import { parseModelRetry, type ModelRetryConfig } from '@keundal/agent'
 import { SummaryCompactionController } from '@keundal/compaction-summary/controller'
 import { EventType } from '@keundal/core'
 import { isTransientLLMError, llmRetryAfterMs, type LLMEvent, type LLMRequest, type LLMService } from '@keundal/llm'
@@ -5,52 +6,6 @@ import { LLM_USAGE_EVENT, TRACE_EVENT } from '@keundal/trace'
 import type { TraceRecorder } from '@keundal/trace/recording'
 
 import type { AgentConfig } from './config.js'
-
-export interface ModelRetryConfig {
-  readonly maxRetries?: number
-  readonly initialDelayMs?: number
-  readonly maxDelayMs?: number
-}
-
-export function parseModelRetry(value: unknown): ModelRetryConfig | false {
-  if (value === false) return false
-  if (value === undefined) return { maxRetries: 2, initialDelayMs: 250, maxDelayMs: 4000 }
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    throw new Error('retry must be an object or false')
-  const source = value as Record<string, unknown>
-  if (Object.keys(source).some((key) => !['maxRetries', 'initialDelayMs', 'maxDelayMs'].includes(key)))
-    throw new Error('unknown retry option')
-  const result = {
-    maxRetries: source.maxRetries === undefined ? 2 : source.maxRetries,
-    initialDelayMs: source.initialDelayMs === undefined ? 250 : source.initialDelayMs,
-    maxDelayMs: source.maxDelayMs === undefined ? 4000 : source.maxDelayMs
-  }
-  for (const [key, limit] of [
-    ['maxRetries', 5],
-    ['initialDelayMs', 60_000],
-    ['maxDelayMs', 60_000]
-  ] as const) {
-    const count = result[key]
-    if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0 || count > limit)
-      throw new Error(`retry.${key} must be an integer between 0 and ${limit}`)
-  }
-  if ((result.initialDelayMs as number) > (result.maxDelayMs as number))
-    throw new Error('retry.initialDelayMs exceeds maxDelayMs')
-  return result as Required<ModelRetryConfig>
-}
-
-export function parseFallbackModels(value: unknown): readonly string[] | undefined {
-  if (value === undefined) return undefined
-  if (
-    !Array.isArray(value) ||
-    value.length > 8 ||
-    Array.from(value).some((item) => typeof item !== 'string' || !item.trim())
-  )
-    throw new Error('fallbackModels must contain at most 8 non-empty model IDs')
-  const models = value.map((item: string) => item.trim())
-  if (new Set(models).size !== models.length) throw new Error('fallbackModels must not contain duplicates')
-  return models
-}
 
 function retryDelay(error: unknown, attempt: number, policy: Required<ModelRetryConfig>): number {
   return (

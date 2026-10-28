@@ -249,6 +249,9 @@ importers:
       '@keundal/llm-settings':
         specifier: workspace:*
         version: link:../../packages/llm-settings
+      '@keundal/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@keundal/plugin-chat-browser':
         specifier: workspace:*
         version: link:../../packages/plugin-chat-browser
@@ -258,6 +261,9 @@ importers:
       '@keundal/plugin-llm-browser':
         specifier: workspace:*
         version: link:../../packages/plugin-llm-browser
+      '@keundal/plugin-mcp-client':
+        specifier: workspace:*
+        version: link:../../packages/plugin-mcp-client
       '@keundal/plugin-runtime':
         specifier: workspace:*
         version: link:../../packages/plugin-runtime
@@ -423,6 +429,49 @@ importers:
         specifier: 4.151.1
         version: 4.151.1(@types/node@24.19.2)
 
+  examples/acp:
+    dependencies:
+      '@keundal/acp':
+        specifier: workspace:*
+        version: link:../../packages/acp
+      '@keundal/plugin-agent-coding':
+        specifier: workspace:*
+        version: link:../../packages/plugin-agent-coding
+      '@keundal/plugin-fs-local':
+        specifier: workspace:*
+        version: link:../../packages/plugin-fs-local
+      '@keundal/plugin-fs-policy':
+        specifier: workspace:*
+        version: link:../../packages/plugin-fs-policy
+      '@keundal/plugin-llm-openai':
+        specifier: workspace:*
+        version: link:../../packages/plugin-llm-openai
+      '@keundal/plugin-store-memory':
+        specifier: workspace:*
+        version: link:../../packages/plugin-store-memory
+      '@keundal/plugin-tool-fs':
+        specifier: workspace:*
+        version: link:../../packages/plugin-tool-fs
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
   examples/basic:
     dependencies:
       '@keundal/core':
@@ -457,6 +506,43 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  packages/acp:
+    dependencies:
+      '@agentclientprotocol/sdk':
+        specifier: 2.1.0
+        version: 2.1.0(zod@4.6.7)
+      '@keundal/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/agent:
     dependencies:
       '@keundal/core':
@@ -490,6 +576,12 @@ importers:
       '@keundal/agent':
         specifier: workspace:*
         version: link:../agent
+      '@keundal/automation':
+        specifier: workspace:*
+        version: link:../automation
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -691,6 +783,9 @@ importers:
       '@keundal/agent-plugins':
         specifier: workspace:*
         version: link:../agent-plugins
+      '@keundal/automation-node':
+        specifier: workspace:*
+        version: link:../automation-node
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -700,6 +795,9 @@ importers:
       '@keundal/memory':
         specifier: workspace:*
         version: link:../memory
+      '@keundal/plugin-agent-acp':
+        specifier: workspace:*
+        version: link:../plugin-agent-acp
       '@keundal/plugin-agent-chat':
         specifier: workspace:*
         version: link:../plugin-agent-chat
@@ -789,11 +887,122 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/automation:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/automation-node:
+    dependencies:
+      '@keundal/automation':
+        specifier: workspace:*
+        version: link:../automation
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+      cron-parser:
+        specifier: 5.10.2
+        version: 5.10.2
+    devDependencies:
+      '@keundal/plugin-store-sqlite':
+        specifier: workspace:*
+        version: link:../plugin-store-sqlite
+      '@keundal/task-memory':
+        specifier: workspace:*
+        version: link:../task-memory
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/backup:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/generation':
+        specifier: workspace:*
+        version: link:../generation
+      '@keundal/llm':
+        specifier: workspace:*
+        version: link:../llm
+      '@keundal/session':
+        specifier: workspace:*
+        version: link:../session
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/chat:
     dependencies:
       '@keundal/agent':
         specifier: workspace:*
         version: link:../agent
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -1353,6 +1562,58 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  packages/plugin-agent-acp:
+    dependencies:
+      '@agentclientprotocol/sdk':
+        specifier: 2.1.0
+        version: 2.1.0(zod@4.6.7)
+      '@keundal/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/generation':
+        specifier: workspace:*
+        version: link:../generation
+      '@keundal/llm':
+        specifier: workspace:*
+        version: link:../llm
+      '@keundal/session':
+        specifier: workspace:*
+        version: link:../session
+      '@keundal/tool-approval':
+        specifier: workspace:*
+        version: link:../tool-approval
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
+    devDependencies:
+      '@keundal/plugin-store-memory':
+        specifier: workspace:*
+        version: link:../plugin-store-memory
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/plugin-agent-chat:
     dependencies:
       '@keundal/agent-loop':
@@ -1569,6 +1830,9 @@ importers:
       '@keundal/agent-loop':
         specifier: workspace:*
         version: link:../agent-loop
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/chat':
         specifier: workspace:*
         version: link:../chat
@@ -1624,6 +1888,9 @@ importers:
       '@keundal/agent':
         specifier: workspace:*
         version: link:../agent
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/chat':
         specifier: workspace:*
         version: link:../chat
@@ -2264,6 +2531,9 @@ importers:
 
   packages/plugin-store-indexeddb:
     dependencies:
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -2322,6 +2592,9 @@ importers:
 
   packages/plugin-store-memory:
     dependencies:
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -2374,6 +2647,12 @@ importers:
 
   packages/plugin-store-sqlite:
     dependencies:
+      '@keundal/automation':
+        specifier: workspace:*
+        version: link:../automation
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
@@ -2408,6 +2687,12 @@ importers:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
     devDependencies:
+      '@keundal/plugin-store-indexeddb':
+        specifier: workspace:*
+        version: link:../plugin-store-indexeddb
+      '@keundal/plugin-store-memory':
+        specifier: workspace:*
+        version: link:../plugin-store-memory
       '@keundal/store-conformance':
         specifier: workspace:*
         version: link:../../tools/store-conformance
@@ -2420,6 +2705,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.6
+      fake-indexeddb:
+        specifier: 6.2.6
+        version: 6.2.6
       tsdown:
         specifier: 'catalog:'
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
@@ -3598,6 +3886,9 @@ importers:
       '@keundal/agent':
         specifier: workspace:*
         version: link:../agent
+      '@keundal/chat':
+        specifier: workspace:*
+        version: link:../chat
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
@@ -4010,6 +4301,15 @@ packages:
       zod: ^3.25.18 || ^4.0.0
     peerDependenciesMeta:
       zod:
+        optional: true
+
+  '@agentclientprotocol/sdk@2.1.0':
+    resolution: {integrity: sha512-IuKjJmHLPzbmbg26eK9Jopd8AVxgLuu8fX114YzYAU6tLYclCo2DUzLL4vbCpYGr9mzvs2T0kigE3ZCueL06tg==}
+    peerDependencies:
+      '@modelcontextprotocol/server': ^2.4.0
+      zod: ^3.25.76 || ^4.0.0
+    peerDependenciesMeta:
+      '@modelcontextprotocol/server':
         optional: true
 
   '@alloc/quick-lru@5.3.0':
@@ -7378,6 +7678,10 @@ packages:
     resolution: {integrity: sha512-piICUB6ei4IlTv1+653yq5+KoqfBYmj9bw6LqXoOneTMDXk5nM1qt12mFW1caG3LlJXEKW1Bp0WggEmIfQB34g==}
     engines: {node: '>= 14'}
 
+  cron-parser@5.10.2:
+    resolution: {integrity: sha512-JfAYMY0LZaWQTuict8PhtF/ksSnq8xefSDmQUnnoqvkPYkU/y3UP0DTWzJKFBz0P1IXsDG8q0vY3zHkoFZOhvw==}
+    engines: {node: '>=18'}
+
   croner@10.0.1:
     resolution: {integrity: sha512-ixNtAJndqh173VQ4KodSdJEI6nuioBWI0V1ITNKhZZsO0pEMoDxz539T4FTTbSZ/xIOSuDnzxLVRqBVSvPNE2g==}
     engines: {node: '>=18.0'}
@@ -8679,6 +8983,10 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
+
+  luxon@3.7.2:
+    resolution: {integrity: sha512-vtEhXh/gNjI9Yg1u4jX/0YVPMvxzHuGgCm6tC5kZyb08yjGWGnqAjGJvcXbqQR2P3MyMEFnRbpcdFS6PBcLqew==}
+    engines: {node: '>=12'}
 
   magic-regexp@0.10.0:
     resolution: {integrity: sha512-Uly1Bu4lO1hwHUW0CQeSWuRtzCMNO00CmXtS8N6fyvB3B979GOEEeAkiTUDsmbYLAbvpUS/Kt5c4ibosAzVyVg==}
@@ -10872,6 +11180,10 @@ snapshots:
 
   '@ag-ui/core@1.0.2(zod@4.6.7)':
     optionalDependencies:
+      zod: 4.6.7
+
+  '@agentclientprotocol/sdk@2.1.0(zod@4.6.7)':
+    dependencies:
       zod: 4.6.7
 
   '@alloc/quick-lru@5.3.0': {}
@@ -15080,6 +15392,10 @@ snapshots:
       crc-32: 1.2.2
       readable-stream: 4.8.0
 
+  cron-parser@5.10.2:
+    dependencies:
+      luxon: 3.7.2
+
   croner@10.0.1: {}
 
   cross-spawn@7.0.6:
@@ -16364,6 +16680,8 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  luxon@3.7.2: {}
 
   magic-regexp@0.10.0:
     dependencies:

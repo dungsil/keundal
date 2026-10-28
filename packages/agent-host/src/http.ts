@@ -5,6 +5,8 @@ import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http
 import { URL } from 'node:url'
 
 import { parseRunBudget } from '@keundal/agent'
+import type { AutomationDefinition, AutomationEvent } from '@keundal/automation'
+import { parseHistoryBackup } from '@keundal/backup'
 import {
   EventType,
   parseAGUIEvent,
@@ -27,7 +29,7 @@ export interface AgentAppServices extends Omit<AgentHostServices, 'run'> {
 export interface AgentAppOptions {
   /** 모든 HTTP 요청에 필요한 Bearer 토큰입니다. */
   token: string
-  /** POST /runs 본문의 최대 바이트 수. 기본값은 8 MiB입니다. */
+  /** Maximum request bytes. Defaults to 8 MiB, or 64 MiB for history import. */
   maxRequestBodyBytes?: number
   /** 브라우저에서 직접 호출할 때 허용할 origin 목록입니다. 비어 있으면 CORS 헤더를 보내지 않습니다. */
   allowedOrigins?: readonly string[]
@@ -329,6 +331,50 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
           }
         } finally {
           response.off('close', disconnect)
+        }
+      }
+
+      if (segments.join('/') === 'backup' && (request.method === 'GET' || request.method === 'POST')) {
+        if (!services.backup) return sendJson(response, 503, { error: 'history backup is unavailable' })
+        if (request.method === 'GET') return sendJson(response, 200, await services.backup.export())
+        const data = parseHistoryBackup(
+          JSON.parse(await readBody(request, options.maxRequestBodyBytes ?? 64 * 1024 * 1024))
+        )
+        await services.backup.import(data)
+        response.writeHead(204)
+        response.end()
+        return
+      }
+
+      if (services.automation) {
+        const automation = services.automation
+        if (segments[0] === 'automations') {
+          const id = segments[1] === undefined ? undefined : decodeURIComponent(segments[1])
+          if (request.method === 'GET' && segments.length === 1) return sendJson(response, 200, await automation.list())
+          if (request.method === 'PUT' && segments.length === 2 && id) {
+            const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as AutomationDefinition
+            return sendJson(response, 200, await automation.put(id, body))
+          }
+          if (request.method === 'DELETE' && segments.length === 2 && id) {
+            await automation.delete(id)
+            response.writeHead(204).end()
+            return
+          }
+          if (request.method === 'GET' && segments.length === 3 && id && segments[2] === 'history')
+            return sendJson(response, 200, await automation.history(id))
+          if (request.method === 'POST' && segments.length === 3 && id && segments[2] === 'webhook') {
+            const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as AutomationEvent
+            const attempts = await automation.webhook(id, body)
+            return attempts.length
+              ? sendJson(response, 202, attempts)
+              : sendJson(response, 404, { error: 'enabled webhook not found' })
+          }
+        }
+        if (request.method === 'POST' && segments.join('/') === 'automation-events') {
+          const body = JSON.parse(await readBody(request, maxRequestBodyBytes)) as AutomationEvent & { name: string }
+          if (!body || typeof body.name !== 'string' || !body.name.trim() || body.name.length > 256)
+            throw new Error('invalid event name')
+          return sendJson(response, 202, await automation.emit(body.name, body))
         }
       }
 

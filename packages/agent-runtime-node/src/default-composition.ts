@@ -9,6 +9,7 @@ import { loadAgentPlugin, type LoadedAgentPlugin } from '@keundal/agent-plugins'
 import type { ExecutionOptions } from '@keundal/core'
 import { parseMcpServers } from '@keundal/mcp'
 import { createMemoryTools } from '@keundal/memory/tools'
+import acpAgentPlugin from '@keundal/plugin-agent-acp'
 import agentPlugin, { metadata as agentMetadata } from '@keundal/plugin-agent-chat'
 import codingAgentPlugin from '@keundal/plugin-agent-coding'
 import { LocalFileSystemService } from '@keundal/plugin-fs-local'
@@ -134,6 +135,7 @@ export function getConfiguredNodePluginModules(options: NodeHostOptions): string
   const builtinNames: Record<string, string> = {
     'builtin:llm': `@keundal/plugin-llm-${provider}`,
     'builtin:store': '@keundal/plugin-store-sqlite',
+    'builtin:acp': '@keundal/plugin-agent-acp',
     'builtin:agent': '@keundal/plugin-agent-chat'
   }
   return [
@@ -246,6 +248,7 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       config: { providers: skillProviders },
       exports: { default: skillPlugin }
     },
+    'builtin:acp': { exports: { default: acpAgentPlugin } },
     'builtin:agent': {
       config: {
         maxToolRounds: options.maxToolRounds ?? 4,
@@ -363,6 +366,13 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
     async mountAgent(ctx, config) {
       if (!agentEnabled) throw new Error('Agent is disabled; enable the agent plugin to generate responses')
       if (!runtime) throw new Error('runtime plugins are not initialized')
+      if (manifest.agent.module === 'builtin:acp' || manifest.agent.module === '@keundal/plugin-agent-acp') {
+        return runtime.mountAgent(ctx, {
+          ...config,
+          toolApproval: options.toolApproval === undefined ? undefined : config.toolApproval,
+          ...(config.workspacePath ? { cwd: config.workspacePath } : {})
+        })
+      }
       if (config.codingThreadId && config.workspacePath) {
         const backendContext = ctx.isolate('fs')
         let backend!: LocalFileSystemService

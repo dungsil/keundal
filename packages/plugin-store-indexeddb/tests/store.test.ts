@@ -7,6 +7,58 @@ import { Context, type Fiber } from 'cordis'
 import { IDBFactory, IDBVersionChangeEvent } from 'fake-indexeddb'
 import { expect, test, type TestContext } from 'vitest'
 
+test('백업을 왕복해 상태와 실행을 보존하고 충돌·실행 중·잘못된 입력은 변경 없이 거부한다', async (t) => {
+  const source = await setup(t, [
+    { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' },
+    { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'reply', delta: 'hello' },
+    { type: EventType.TEXT_MESSAGE_END, messageId: 'reply' }
+  ])
+  for await (const _event of source.ctx.generation.run(request())) {
+    /* consume */
+  }
+  const data = await source.ctx.backup.export()
+  data.threads[0] = {
+    ...data.threads[0]!,
+    state: { web: { title: 'saved', votes: [true], queue: [] }, custom: [1, null] }
+  }
+  data.runs[0]!.messages.push({ id: 'portable', role: 'assistant', content: 'snapshot only' })
+  const target = await setup(t)
+  await target.ctx.backup.import(data)
+  expect(await target.ctx.backup.export()).toEqual(data)
+  expect(await target.ctx.generation.get('run')).toEqual(data.runs[0])
+  const collision = structuredClone(data)
+  collision.threads.unshift({ threadId: 'must-not-exist', revision: 0, messages: [], state: {} })
+  await expect(target.ctx.backup.import(collision)).rejects.toThrow('collision')
+  const runCollision = structuredClone(data)
+  runCollision.threads[0] = { ...runCollision.threads[0]!, threadId: 'another-thread' }
+  runCollision.runs[0]!.request.input.threadId = 'another-thread'
+  runCollision.runs[0] = { ...runCollision.runs[0]!, journal: [] }
+  await expect(target.ctx.backup.import(runCollision)).rejects.toThrow('run collision')
+  const invalid = structuredClone(data)
+  invalid.runs[0]!.journal[0] = { ...invalid.runs[0]!.journal[0]!, sequence: 2 }
+  await expect(target.ctx.backup.import(invalid)).rejects.toThrow('sequence')
+  const running = structuredClone(data)
+  running.runs[0] = { ...running.runs[0]!, status: 'running' }
+  await expect(target.ctx.backup.import(running)).rejects.toThrow('running')
+  expect(await target.ctx.backup.export()).toEqual(data)
+  const active = request()
+  active.input.runId = 'active'
+  const iterator = source.ctx.generation.run({ ...active, sessionRevision: 1 })[Symbol.asyncIterator]()
+  try {
+    await iterator.next()
+    const before = await source.ctx.session.list()
+    await expect(source.ctx.backup.export()).rejects.toThrow('running')
+    await expect(source.ctx.backup.import({ threads: [], runs: [] })).rejects.toThrow('running')
+    expect(await source.ctx.session.list()).toEqual(before)
+  } finally {
+    await iterator.return?.()
+  }
+  const backup = target.ctx.backup
+  await target.fibers[0]!.dispose()
+  expect(await target.ctx.backup.export()).toEqual(data)
+  expect(await backup.export()).toEqual(data)
+})
+
 test('이전 IndexedDB를 업그레이드하고 다시 열어도 작업 결과와 세션을 보존한다', async (t) => {
   const factory = new IDBFactory()
   const databaseName = crypto.randomUUID()

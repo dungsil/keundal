@@ -229,19 +229,18 @@ test('저장하지 않은 설정으로 연결을 확인하면 도구 목록을 �
   expect([...local.values.entries()]).toEqual(saved)
 })
 
-test('주입한 MCP 계정으로 연결과 확인을 인증하고 서버 설정에 토큰을 저장하지 않는다', async (t) => {
+test.for(['고정 계정', '설정별 계정'] as const)('%s으로 연결과 확인을 인증하고 서버 설정에 토큰을 저장하지 않는다', async (mode, t) => {
   const { url } = await jsonRpcServer(t, 'account-token')
   const local = storage()
-  const manager = new McpManager(createBrowserMcpSettingsStorage(local), {
-    authentication: {
-      docs: {
-        serverUrl: url,
-        signal: new AbortController().signal,
-        token: async () => 'account-token',
-        onUnauthorized: async () => { throw new Error('Login required') }
-      }
-    }
-  })
+  const authentication = {
+    serverUrl: url,
+    signal: new AbortController().signal,
+    token: async () => 'account-token',
+    onUnauthorized: async () => { throw new Error('Login required') }
+  }
+  const manager = new McpManager(createBrowserMcpSettingsStorage(local), mode === '고정 계정'
+    ? { authentication: { docs: authentication } }
+    : { getAuthentication: async (server) => server.serverName === 'docs' ? authentication : undefined })
   t.onTestFinished(() => manager.close())
   await manager.save([{ ...remote, url }], async () => {})
   expect((await manager.probe({ ...remote, url })).tools.map(tool => tool.name)).toEqual(['search', 'delete_all'])

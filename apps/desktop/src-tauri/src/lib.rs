@@ -2,6 +2,7 @@ mod settings;
 mod sidecar;
 mod skills;
 mod runtime_plugins;
+mod mcp_oauth;
 
 pub fn run() {
     let app = tauri::Builder::default()
@@ -14,7 +15,8 @@ pub fn run() {
             skills::list_skill_files,
             skills::read_skill_file,
             runtime_plugins::runtime_plugins,
-            sidecar::sidecar_info
+            sidecar::sidecar_info,
+            sidecar::sidecar_current_info
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Keundal desktop application");

@@ -1,10 +1,12 @@
 import { parseRunBudget, type RunBudget } from '@keundal/agent'
+import { parseHistoryBackup, type HistoryBackup } from '@keundal/backup'
 import { ChatMessageAssembly } from '@keundal/chat/chat-message'
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
 import { branchChat, chatSummary, validateChatTitle } from '@keundal/chat/chat-store'
 import type { ChatStoreLike, ChatSummary, LocalChat } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
+import { parseModelRecoveryPolicy, type ModelRecoveryPolicy } from '@keundal/chat/model-preferences'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
 import type { ChatConnection } from '@keundal/chat/platform'
 import { ChatRuns, createActiveChatRun, settleChatRun, type ActiveChatRun } from '@keundal/chat/run-queue'
@@ -57,6 +59,49 @@ ${webSearch ? 'Use native web search when current information is needed and cite
 export class RemoteChatStore implements ChatStoreLike {
   /** 실행은 호스트가 소유하므로 연결이 끊겨도 계속되고, journal 커서로 다시 구독합니다. */
   readonly execution = 'host'
+  readonly backup = {
+    export: async (): Promise<HistoryBackup> => {
+      const headers = new Headers()
+      if (this.connection.token) headers.set('authorization', `Bearer ${this.connection.token}`)
+      const response = await this.request(this.url('/backup'), { headers, cache: 'no-store' })
+      if (!response.ok) {
+        const bounded = await boundRemoteResponse(response)
+        throw new Error((await bounded.text()) || `Keundal host request failed (HTTP ${response.status})`)
+      }
+      const limit = 64 * 1024 * 1024
+      if (Number(response.headers.get('content-length')) > limit) {
+        await response.body?.cancel()
+        throw new RemoteResponseLimitError('History backup exceeds 64 MiB')
+      }
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('History backup response is empty')
+      const decoder = new TextDecoder()
+      const chunks: string[] = []
+      let bytes = 0
+      try {
+        while (true) {
+          const next = await reader.read()
+          if (next.done) break
+          bytes += next.value.byteLength
+          if (bytes > limit) throw new RemoteResponseLimitError('History backup exceeds 64 MiB')
+          chunks.push(decoder.decode(next.value, { stream: true }))
+        }
+        chunks.push(decoder.decode())
+      } catch (error) {
+        await reader.cancel(error).catch(() => {})
+        throw error
+      } finally {
+        reader.releaseLock()
+      }
+      return parseHistoryBackup(JSON.parse(chunks.join('')))
+    },
+    import: async (data: HistoryBackup): Promise<void> => {
+      const body = JSON.stringify(parseHistoryBackup(data))
+      if (new TextEncoder().encode(body).byteLength > 64 * 1024 * 1024)
+        throw new RemoteResponseLimitError('History backup exceeds 64 MiB')
+      await this.call('/backup', { method: 'POST', body })
+    }
+  }
   private readonly runs = new ChatRuns({
     read: (id) => this.get(id),
     write: async (id, change) => {
@@ -453,6 +498,7 @@ export class RemoteChatStore implements ChatStoreLike {
       messages: ChatMessage[]
       model: string
       titleModel?: string
+      modelRecovery?: ModelRecoveryPolicy
       systemPrompt?: string
       promptPreset?: PromptPreset
       subagentRoles?: readonly SubagentRole[]
@@ -467,6 +513,8 @@ export class RemoteChatStore implements ChatStoreLike {
   ): AsyncGenerator<AGUIEvent> {
     if (this.active.has(id)) throw new Error('A response is already running')
     const promptPreset = request.promptPreset === undefined ? undefined : parsePromptPreset(request.promptPreset)
+    const modelRecovery =
+      request.modelRecovery === undefined ? undefined : parseModelRecoveryPolicy(request.modelRecovery)
     const runBudget = request.budget === undefined ? undefined : parseRunBudget(request.budget)
     const abort = new AbortController()
     const combined = signal ? AbortSignal.any([signal, abort.signal]) : abort.signal
@@ -512,6 +560,15 @@ export class RemoteChatStore implements ChatStoreLike {
       }
       combined.throwIfAborted()
       const selected = await this.model(chat.model)
+      const recovery =
+        !resuming && modelRecovery
+          ? {
+              ...modelRecovery,
+              fallbackModels: await Promise.all(
+                (modelRecovery.fallbackModels ?? []).map(async (value) => (await this.model(value)).id)
+              )
+            }
+          : undefined
       const projection = new ChatMessageAssembly(runId)
       const publisher = new ChatMessagePublisher(request.onMessage)
       let finished: Extract<AGUIEvent, { type: 'RUN_FINISHED' }> | undefined
@@ -554,7 +611,11 @@ export class RemoteChatStore implements ChatStoreLike {
                 },
                 context: [],
                 tools: [],
-                forwardedProps: { keundalPromptPreset: promptPreset, memoryProjectId: request.memoryProjectId },
+                forwardedProps: {
+                  keundalPromptPreset: promptPreset,
+                  memoryProjectId: request.memoryProjectId,
+                  keundalModelRecovery: recovery
+                },
                 messages: [
                   {
                     id: 'keundal:web-instructions',

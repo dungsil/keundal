@@ -1,4 +1,5 @@
 import type { RunBudget } from '@keundal/agent'
+import type { HistoryBackup } from '@keundal/backup'
 import type { ExecutionOptions, AGUIEvent } from '@keundal/core'
 import type { GenerationSnapshot } from '@keundal/generation'
 import type { Reasoning } from '@keundal/llm'
@@ -6,7 +7,12 @@ import type { PromptPreset } from '@keundal/prompt'
 import type { SubagentRole } from '@keundal/subagent'
 
 import type { ChatMessage } from './chat-message'
+import type { ModelRecoveryPolicy } from './model-preferences'
 export interface ChatStoreLike {
+  readonly backup?: {
+    export(): Promise<HistoryBackup>
+    import(data: HistoryBackup): Promise<void>
+  }
   respondToToolApproval?(runId: string, requestId: string, decision: 'allow' | 'deny'): Promise<boolean>
   list(): Promise<LocalChat[]>
   listSummaries?(): Promise<ChatSummary[]>
@@ -28,6 +34,7 @@ export interface ChatStoreLike {
       messages: ChatMessage[]
       model: string
       titleModel?: string
+      modelRecovery?: ModelRecoveryPolicy
       /** Optional user-provided instructions for model responses; excluded from title generation. */
       systemPrompt?: string
       /** Ordered prompt recipe, captured for this response only. */

@@ -4,6 +4,7 @@ import { ChatMessageAssembly, type ChatMessage } from '@keundal/chat/chat-messag
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
 import { validateChatTitle } from '@keundal/chat/chat-store'
 import { toMessages } from '@keundal/chat/messages'
+import type { ModelRecoveryPolicy } from '@keundal/chat/model-preferences'
 import { EventType, type AGUIEvent, type AgentMessage, type SteerQueue } from '@keundal/core'
 import type {} from '@keundal/generation'
 import { type Reasoning } from '@keundal/llm'
@@ -25,6 +26,7 @@ export interface KeundalChatRequest {
   instructions: string
   promptPreset?: PromptPreset
   memoryProjectId?: string
+  modelRecovery?: ModelRecoveryPolicy
   budget?: RunBudget
   signal?: AbortSignal
   runId?: string
@@ -142,7 +144,11 @@ export async function createKeundalChat(
                 runId,
                 request.state
               ),
-              forwardedProps: { keundalPromptPreset: request.promptPreset, memoryProjectId: request.memoryProjectId }
+              forwardedProps: {
+                keundalPromptPreset: request.promptPreset,
+                memoryProjectId: request.memoryProjectId,
+                keundalModelRecovery: request.modelRecovery
+              }
             },
             {
               signal: request.signal,

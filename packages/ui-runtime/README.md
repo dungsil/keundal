@@ -5,6 +5,7 @@
 - 연결: `start()`, `store`, `platform`, `remoteAgent`
 - 설정: `settings`, `saveSettings()`, `ensureConfigured()`, `saveMcpSettings()`
 - 모델: `model`, `models`, `selectedModel`, `defaultModel`, `titleModel`, `switching`, `refreshModels()`
+- 모델 복구 정책: `modelRecovery`, `saveModelRecovery()` — 브라우저에 저장하고 다음 응답 실행에 전달합니다.
 - 입력 옵션: `promptPresets`, `promptPreset`, `savePromptPresets()`, `webSearch`, `reasoning`, `reasoningLevels`, `promptCatalog()`
 - 실행 정책: `subagentRoles`, `saveSubagentRoles()`, `runBudget`, `saveRunBudget()`
 - 대화 목록: `chats`, `refreshChats()`, `renameChat()`, `deleteChat()`

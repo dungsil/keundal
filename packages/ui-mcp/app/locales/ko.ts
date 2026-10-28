@@ -1,6 +1,20 @@
 import type en from './en'
 
 export default {
+  'mcp.useOAuth': 'OAuth로 로그인',
+  'mcp.clientId': '클라이언트 ID(동적 등록 시 생략 가능)',
+  'mcp.oauthScope': '권한 범위(선택 사항)',
+  'mcp.connectAccount': '계정 연결',
+  'mcp.reauthenticate': '재인증',
+  'mcp.disconnectAccount': '연결 해제',
+  'mcp.oauth.disconnected': '연결 안 됨',
+  'mcp.oauth.authorizing': '로그인 중…',
+  'mcp.oauth.connected': '계정 연결됨',
+  'mcp.oauth.reauthentication-required': '재인증 필요',
+  'mcp.oauth.unavailable': '인증 상태 확인 불가',
+  'mcp.oauthWeb': '서버를 저장한 뒤 계정을 연결하세요. 팝업과 이 앱 origin의 CORS 요청을 허용해야 합니다. OAuth 인증 정보는 메모리에만 보관하므로 새로고침하거나 앱을 닫으면 다시 로그인해야 합니다.',
+  'mcp.oauthDesktop': '서버를 저장한 뒤 시스템 브라우저에서 로그인하세요. OAuth 인증 정보는 OS 보안 저장소에 보관합니다.',
+  'mcp.oauthFailed': '계정을 연결하지 못했습니다. 팝업 허용, 서버와 보안 저장소를 확인한 뒤 다시 시도하세요. 로그인 창을 닫거나 거부하면 연결을 취소합니다.',
   'mcp.name': '서버 이름',
   'mcp.transport': '연결 방식',
   'mcp.command': '실행 명령',
@@ -21,7 +35,7 @@ export default {
   'mcp.check': '연결 확인',
   'mcp.checkCancel': '확인 취소',
   'mcp.checkDesktopLimit':
-    '데스크톱에서는 Streamable HTTP 서버만 확인할 수 있습니다. 확인은 앱 창에서 요청하므로 서버가 이 앱의 origin을 CORS로 허용해야 합니다. 대화에 응답하는 로컬 호스트는 거치지 않습니다. 확인은 stdio 명령을 실행하지 않습니다.',
+    '데스크톱에서는 로컬 호스트가 연결된 계정으로 Streamable HTTP 서버를 확인합니다. 확인은 stdio 명령을 실행하지 않습니다.',
   'mcp.checkStdioUnsupported': 'stdio 서버는 여기서 확인할 수 없습니다. 그대로 저장할 수 있습니다.',
   'mcp.checkFailed':
     '서버에 연결하지 못했습니다. 주소와 서버 실행 여부, 서버가 이 앱의 CORS 요청과 MCP 헤더를 허용하는지 확인하세요. 그대로 저장할 수 있습니다.',

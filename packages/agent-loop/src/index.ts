@@ -1,4 +1,4 @@
-import { AgentService, parseRunBudget, type AgentExecutionOptions } from '@keundal/agent'
+import { AgentService, parseModelRecoveryPolicy, parseRunBudget, type AgentExecutionOptions } from '@keundal/agent'
 import { SummaryCompactionController } from '@keundal/compaction-summary/controller'
 import { contextMessage } from '@keundal/context'
 import {
@@ -32,7 +32,7 @@ import { SYSTEM_PROMPT_ID, withSystemPrompt } from './prompt.js'
 import { streamWithModelRecovery } from './retry.js'
 
 export type { AgentConfig } from './config.js'
-export type { ModelRetryConfig } from './retry.js'
+export type { ModelRetryConfig } from '@keundal/agent'
 export type { ToolProvider, ExecutableTool, ToolExecutionContext } from '@keundal/tools'
 export { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 
@@ -162,6 +162,9 @@ export class Agent extends AgentService {
     try {
       signal.throwIfAborted()
       const request = parseRunAgentInput(input)
+      const recoveryValue = request.forwardedProps?.keundalModelRecovery
+      const recoveryConfig =
+        recoveryValue === undefined ? this.config : { ...this.config, ...parseModelRecoveryPolicy(recoveryValue) }
       const presetValue: unknown =
         this.config.promptPresets === false ? undefined : request.forwardedProps?.keundalPromptPreset
       const promptPreset = presetValue === undefined ? undefined : parsePromptPreset(presetValue)
@@ -318,7 +321,7 @@ export class Agent extends AgentService {
         streamWithModelRecovery(
           llm,
           { ...request, model: modelName },
-          this.config,
+          recoveryConfig,
           compaction,
           maxInputTokens,
           execution?.signal ?? signal,
