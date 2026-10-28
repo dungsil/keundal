@@ -487,6 +487,9 @@ importers:
       '@keundal/agent':
         specifier: workspace:*
         version: link:../agent
+      '@keundal/automation':
+        specifier: workspace:*
+        version: link:../automation
       '@keundal/backup':
         specifier: workspace:*
         version: link:../backup
@@ -685,12 +688,18 @@ importers:
       '@keundal/agent-plugins':
         specifier: workspace:*
         version: link:../agent-plugins
+      '@keundal/automation-node':
+        specifier: workspace:*
+        version: link:../automation-node
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
       '@keundal/mcp':
         specifier: workspace:*
         version: link:../mcp
+      '@keundal/memory':
+        specifier: workspace:*
+        version: link:../memory
       '@keundal/plugin-agent-chat':
         specifier: workspace:*
         version: link:../plugin-agent-chat
@@ -761,6 +770,77 @@ importers:
       '@keundal/trace':
         specifier: workspace:*
         version: link:../trace
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/automation:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/automation-node:
+    dependencies:
+      '@keundal/automation':
+        specifier: workspace:*
+        version: link:../automation
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+      cron-parser:
+        specifier: 5.10.2
+        version: 5.10.2
+    devDependencies:
+      '@keundal/plugin-store-sqlite':
+        specifier: workspace:*
+        version: link:../plugin-store-sqlite
+      '@keundal/task-memory':
+        specifier: workspace:*
+        version: link:../task-memory
       '@keundal/tsconfig':
         specifier: workspace:*
         version: link:../../tools/tsconfig
@@ -1327,6 +1407,37 @@ importers:
         version: 6.0.3
 
   packages/mcp:
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/memory:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/tools':
+        specifier: workspace:*
+        version: link:../tools
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -2328,6 +2439,9 @@ importers:
 
   packages/plugin-store-sqlite:
     dependencies:
+      '@keundal/automation':
+        specifier: workspace:*
+        version: link:../automation
       '@keundal/backup':
         specifier: workspace:*
         version: link:../backup
@@ -2340,6 +2454,9 @@ importers:
       '@keundal/llm':
         specifier: workspace:*
         version: link:../llm
+      '@keundal/memory':
+        specifier: workspace:*
+        version: link:../memory
       '@keundal/session':
         specifier: workspace:*
         version: link:../session
@@ -7311,6 +7428,10 @@ packages:
     resolution: {integrity: sha512-piICUB6ei4IlTv1+653yq5+KoqfBYmj9bw6LqXoOneTMDXk5nM1qt12mFW1caG3LlJXEKW1Bp0WggEmIfQB34g==}
     engines: {node: '>= 14'}
 
+  cron-parser@5.10.2:
+    resolution: {integrity: sha512-JfAYMY0LZaWQTuict8PhtF/ksSnq8xefSDmQUnnoqvkPYkU/y3UP0DTWzJKFBz0P1IXsDG8q0vY3zHkoFZOhvw==}
+    engines: {node: '>=18'}
+
   croner@10.0.1:
     resolution: {integrity: sha512-ixNtAJndqh173VQ4KodSdJEI6nuioBWI0V1ITNKhZZsO0pEMoDxz539T4FTTbSZ/xIOSuDnzxLVRqBVSvPNE2g==}
     engines: {node: '>=18.0'}
@@ -8612,6 +8733,10 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
+
+  luxon@3.7.2:
+    resolution: {integrity: sha512-vtEhXh/gNjI9Yg1u4jX/0YVPMvxzHuGgCm6tC5kZyb08yjGWGnqAjGJvcXbqQR2P3MyMEFnRbpcdFS6PBcLqew==}
+    engines: {node: '>=12'}
 
   magic-regexp@0.10.0:
     resolution: {integrity: sha512-Uly1Bu4lO1hwHUW0CQeSWuRtzCMNO00CmXtS8N6fyvB3B979GOEEeAkiTUDsmbYLAbvpUS/Kt5c4ibosAzVyVg==}
@@ -15013,6 +15138,10 @@ snapshots:
       crc-32: 1.2.2
       readable-stream: 4.8.0
 
+  cron-parser@5.10.2:
+    dependencies:
+      luxon: 3.7.2
+
   croner@10.0.1: {}
 
   cross-spawn@7.0.6:
@@ -16297,6 +16426,8 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  luxon@3.7.2: {}
 
   magic-regexp@0.10.0:
     dependencies:

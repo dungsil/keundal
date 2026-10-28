@@ -17,10 +17,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@keundal/automation": "workspace:*",
     "@keundal/backup": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/generation": "workspace:*",
     "@keundal/llm": "workspace:*",
+    "@keundal/memory": "workspace:*",
     "@keundal/session": "workspace:*",
     "@keundal/task": "workspace:*",
     "@keundal/tool-approval": "workspace:*",

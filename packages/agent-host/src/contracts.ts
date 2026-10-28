@@ -1,4 +1,5 @@
 import type { AgentExecutionOptions } from '@keundal/agent'
+import type { AutomationService } from '@keundal/automation'
 import type { BackupService } from '@keundal/backup'
 import type { AGUIEvent, AgentMessage, ExecutionOptions, RunAgentInput } from '@keundal/core'
 import type { GenerationJournalEntry, GenerationService, GenerationSubscriptionOptions } from '@keundal/generation'
@@ -65,6 +66,7 @@ export interface AgentHostServices {
   generation: Pick<GenerationService, 'get' | 'list' | 'recover'>
   backup?: Pick<BackupService, 'export' | 'import'>
   tasks?: Pick<TaskService, 'get' | 'list' | 'cancel'>
+  automation?: Pick<AutomationService, 'list' | 'put' | 'delete' | 'webhook' | 'emit' | 'history'>
   models(): readonly AgentHostModel[]
   catalog?(options?: ExecutionOptions): Promise<{ skills: readonly SkillSummary[]; tools: readonly SkillSummary[] }>
   title(request: AgentHostTitleRequest, options?: ExecutionOptions): Promise<string>

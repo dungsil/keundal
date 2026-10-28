@@ -25,6 +25,89 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
+test('프로젝트 메모리를 에이전트 도구로 저장하고 호스트 재시작 후 새 대화에서 출처와 함께 검색한다', async () => {
+  const path = sqlitePath()
+  const decision = {
+    title: '프로젝트 저장소 결정',
+    content: 'SQLite WAL로 영속성을 제공한다',
+    sources: [{ uri: 'https://example.com/decisions/42', label: '설계 결정' }]
+  }
+  const open = async (projectId: string) => {
+    const host = await createAgentRuntime(
+      {
+        KEUNDAL_PROVIDER: 'openai',
+        KEUNDAL_MODEL: 'test',
+        KEUNDAL_SQLITE_PATH: path,
+        KEUNDAL_API_TOKEN: 'memory-test-token',
+        KEUNDAL_PROJECT_ID: projectId
+      },
+      { compose: createNodeComposition, subagents: false }
+    )
+    hosts.push(host)
+    host.ctx.llm.countTokens = async () => 20
+    host.ctx.llm.stream = async function* (request): AsyncIterable<LLMEvent> {
+      const result = request.input.messages.find((message) => message.role === 'tool')
+      if (result) {
+        yield { type: EventType.TEXT_MESSAGE_START, messageId: 'answer', role: 'assistant' }
+        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'answer', delta: String(result.content) }
+        yield { type: EventType.TEXT_MESSAGE_END, messageId: 'answer' }
+        return
+      }
+      const save = request.input.messages.some((message) => message.role === 'user' && message.content === 'save')
+      const name = save ? 'memory_save' : 'memory_search'
+      expect(request.input.tools.some((tool) => tool.name === name)).toBe(true)
+      yield { type: EventType.TOOL_CALL_START, toolCallId: 'memory-call', toolCallName: name }
+      yield {
+        type: EventType.TOOL_CALL_ARGS,
+        toolCallId: 'memory-call',
+        delta: JSON.stringify(save ? decision : { query: '결정 sqlite' })
+      }
+      yield { type: EventType.TOOL_CALL_END, toolCallId: 'memory-call' }
+    }
+    return host
+  }
+  const run = async (host: Awaited<ReturnType<typeof open>>, threadId: string, command: string) => {
+    const events = []
+    for await (const event of host.services.run({
+      threadId,
+      runId: `${threadId}-run`,
+      state: {},
+      tools: [],
+      context: [],
+      messages: [{ id: 'user', role: 'user', content: command }]
+    }))
+      events.push(event)
+    expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+    const session = await host.services.session.get(threadId)
+    const result = session?.messages.find((message) => message.role === 'tool')
+    return JSON.parse(String(result?.content))
+  }
+  const first = await open('keundal')
+  expect((await first.services.catalog?.())?.tools.map((tool) => tool.name)).toEqual([
+    'memory_search',
+    'memory_get',
+    'memory_save',
+    'memory_update',
+    'memory_delete'
+  ])
+  const saved = await run(first, 'first-conversation', 'save')
+  expect(saved).toMatchObject({
+    ...decision,
+    sources: [
+      ...decision.sources,
+      { uri: 'keundal://threads/first-conversation/runs/first-conversation-run', label: 'Conversation' }
+    ]
+  })
+  const original = await first.services.session.get('first-conversation')
+  await first.services.session.delete('first-conversation', original!.revision)
+  await first.dispose()
+  const second = await open('keundal')
+  expect(await run(second, 'new-conversation', 'search')).toEqual([saved])
+  await second.dispose()
+  const unrelated = await open('unrelated-project')
+  expect(await run(unrelated, 'other-project-conversation', 'search')).toEqual([])
+})
+
 test('외부 매니페스트가 파일과 import 전용 패키지를 불러오고 사용자 공급자를 유지한다', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'keundal-runtime-plugins-'))
   directories.push(directory)
@@ -727,6 +810,85 @@ test('같은 모델의 추론 수준을 바꾸면 캐시된 에이전트에도 �
     expect(events.at(-1)?.type).toBe('RUN_FINISHED')
   }
   expect(received).toEqual(['low', 'high', 'medium', 'low'].map((effort) => ({ effort, summary: 'auto' })))
+})
+
+test('자동화 HTTP API는 인증 뒤 Webhook과 이름 기반 이벤트로 작업을 만들고 결과를 저장한다', async (t) => {
+  const { createServer } = await import('node:http')
+  const runtime = await createAgentRuntime(
+    {
+      KEUNDAL_PROVIDER: 'openai',
+      OPENAI_API_KEY: 'test',
+      KEUNDAL_MODEL: 'small',
+      KEUNDAL_API_TOKEN: 'automation-test-token',
+      KEUNDAL_SQLITE_PATH: sqlitePath()
+    },
+    { compose: createNodeComposition }
+  )
+  hosts.push(runtime)
+  runtime.ctx.llm.countTokens = async () => 10
+  runtime.ctx.llm.stream = async function* (): AsyncIterable<LLMEvent> {
+    yield { type: EventType.TEXT_MESSAGE_START, messageId: 'answer', role: 'assistant' }
+    yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'answer', delta: 'automatic response' }
+    yield { type: EventType.TEXT_MESSAGE_END, messageId: 'answer' }
+  }
+  const server = createServer(runtime.app)
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.onTestFinished(
+    () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+  )
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('server did not bind a port')
+  const base = `http://127.0.0.1:${address.port}`
+  const request = (method: string, path: string, body?: unknown, token = 'automation-test-token') =>
+    fetch(base + path, {
+      method,
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    })
+  const definition = {
+    label: 'Automation',
+    enabled: true,
+    trigger: { type: 'webhook' },
+    input: { state: {}, context: [], tools: [], messages: [{ id: 'q', role: 'user', content: 'Respond' }] }
+  }
+  expect((await request('PUT', '/automations/hook', definition, 'wrong-token')).status).toBe(401)
+  expect(
+    (
+      await request('PUT', '/automations/hook', {
+        ...definition,
+        trigger: { type: 'cron', expression: 'invalid', timezone: 'UTC' }
+      })
+    ).status
+  ).toBe(400)
+  expect((await request('PUT', '/automations/hook', definition)).status).toBe(200)
+  expect((await request('POST', '/automations/hook/webhook', {})).status).toBe(400)
+  expect((await request('POST', '/automations/hook/webhook', { id: 'one' }, 'wrong-token')).status).toBe(401)
+  expect((await request('POST', '/automations/hook/webhook', { id: 'one', payload: { source: 'ci' } })).status).toBe(
+    202
+  )
+  expect((await request('POST', '/automations/hook/webhook', { id: 'one' })).status).toBe(202)
+  await expect.poll(async () => (await runtime.services.automation!.history('hook'))[0]?.task?.status).toBe('completed')
+  const history = await (await request('GET', '/automations/hook/history')).json()
+  expect(history).toMatchObject([{ status: 'submitted', task: { status: 'completed', content: 'automatic response' } }])
+  expect(await runtime.services.tasks!.list()).toHaveLength(1)
+  const [attempt] = await runtime.services.automation!.history('hook')
+  expect((await runtime.services.session.get(attempt!.task!.threadId))?.messages).toContainEqual(
+    expect.objectContaining({ role: 'assistant', content: 'automatic response' })
+  )
+  expect(
+    (await request('PUT', '/automations/named', { ...definition, trigger: { type: 'event', name: 'ci.failed' } }))
+      .status
+  ).toBe(200)
+  expect((await request('POST', '/automation-events', { name: 'ci.passed', id: 'build-1' })).status).toBe(202)
+  expect(await runtime.services.tasks!.list()).toHaveLength(1)
+  expect((await request('POST', '/automation-events', { name: 'ci.failed', id: 'build-1' })).status).toBe(202)
+  await expect
+    .poll(async () => (await runtime.services.automation!.history('named'))[0]?.task?.status)
+    .toBe('completed')
+  expect(await runtime.services.tasks!.list()).toHaveLength(2)
+  expect((await request('DELETE', '/automations/hook')).status).toBe(204)
+  expect((await request('POST', '/automations/hook/webhook', { id: 'two' })).status).toBe(404)
+  expect(await (await request('GET', '/automations')).json()).toMatchObject([{ id: 'named' }])
 })
 
 test.each([['x'.repeat(101)], ['x'.repeat(60), 'x'.repeat(41)], [' '.repeat(1025)], ['x'.repeat(100_000)]])(

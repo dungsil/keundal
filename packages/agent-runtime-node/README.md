@@ -12,6 +12,15 @@ const runtime = await createAgentRuntime(process.env, { compose: createNodeCompo
 
 `KEUNDAL_MODEL`, 공급자 API 키, `KEUNDAL_API_TOKEN`과 기존 환경 변수 형식은 유지합니다. API 키 없이 연결할 때는 `KEUNDAL_PROVIDER`를 명시합니다. 자세한 설정은 [웹 앱 문서](../../apps/web/README.md)를 참고합니다.
 
+## 프로젝트 메모리
+
+`KEUNDAL_PROJECT_ID` 또는 `createNodeAgentHost()`의 `projectId`를 지정하면 프로젝트 범위의
+`memory_save`, `memory_search`, `memory_get`, `memory_update`, `memory_delete` 도구를 제공합니다.
+같은 SQLite 파일과 프로젝트 ID를 사용하는 대화는 저장한 정보와 출처를 공유합니다.
+생략하면 도구를 제공하지 않으며, 빈 ID나 `memory` 서비스가 없는 저장소 구성은 거부합니다.
+프로젝트 선택은 모델이나 HTTP 요청이 아니라 호스트를 조립하는 앱이 담당합니다.
+검색 규칙과 승인 설정은 [메모리 문서](../memory/README.md)를 참고하세요.
+
 ## 런타임 플러그인
 
 기본 구성은 `KEUNDAL_PLUGIN_CONFIG`가 가리키는 JSON 파일을 시작할 때 읽습니다. 경로는 절대 경로 또는 현재 작업 디렉터리 기준 상대 경로입니다. 변수를 설정하지 않으면 현재 작업 디렉터리의 `keundal.plugins.json`을 찾습니다. 파일이 없으면 기본 구성을 사용합니다.
@@ -64,6 +73,10 @@ OAuth를 쓰는 호스트는 `mcpAuthentication: { documents: account }`로 서�
 `maxActiveSubagents`의 기본값은 8이며 부모 실행별 동시 자식 수를 제한합니다.
 `createAgentRuntime(env, { compose: createNodeComposition, subagents: false })`에도 같은 설정을 전달할 수 있습니다.
 자세한 결과 형식과 취소 동작은 [에이전트 문서](../agent-loop/README.md#서브에이전트)를 참고하세요.
+
+## 예약 실행과 이벤트 기반 작업
+
+기본 Node 조립은 SQLite에 등록한 Cron·Webhook·이름 기반 이벤트를 `TaskService`의 백그라운드 작업으로 제출합니다. 예약 실행은 호스트가 켜져 있을 때만 동작합니다. `automation: false` 옵션으로 끌 수 있습니다. 등록 API, 중복 실행 방지와 복구 정책은 [자동화 문서](../automation/README.md)를 참고하세요.
 
 ## 코딩 작업공간
 

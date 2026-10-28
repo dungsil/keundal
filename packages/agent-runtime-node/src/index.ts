@@ -3,6 +3,7 @@ import process from 'node:process'
 import { createAgentHost, type AgentHostModel, type AgentHostOptions, type AgentHost } from '@keundal/agent-host'
 import { createAgentApp, type AgentAppOptions } from '@keundal/agent-host/http'
 import type { AgentPluginOptions, LoadedAgentPlugin } from '@keundal/agent-plugins'
+import { NodeAutomationService } from '@keundal/automation-node'
 import type { McpAuthentication, McpClientConfig } from '@keundal/mcp'
 import type { RuntimePluginManifest } from '@keundal/plugin-runtime'
 import { ToolApproval, type ToolApprovalPolicy } from '@keundal/tool-approval'
@@ -31,6 +32,8 @@ export type BundledPluginSelection = Readonly<Partial<Record<BundledPluginModule
 
 export interface NodeHostOptions {
   readonly toolApproval?: ToolApprovalPolicy
+  /** Defaults to enabled when the composition supplies tasks and automationStore. */
+  readonly automation?: boolean
   readonly plugins?: readonly AgentPluginOptions[]
   /** Bundled optional features default to enabled; deployment manifests remain operator-owned. */
   readonly bundledPlugins?: BundledPluginSelection
@@ -44,6 +47,8 @@ export interface NodeHostOptions {
   /** 사용할 수 있는 모델과 한도입니다. */
   readonly models?: Readonly<Record<string, Omit<AgentHostModel, 'id' | 'provider'>>>
   readonly sqlitePath: string
+  /** Stable project scope for opt-in persistent memory tools. Omit to leave them disabled. */
+  readonly projectId?: string
   /** Durable workspace state outside selected repositories. */
   readonly workspaceRoot?: string
   readonly maxOutputTokens?: number
@@ -75,7 +80,30 @@ export async function createNodeAgentHost(options: NodeHostOptions, compose: Hos
     maxOutputTokens: options.maxOutputTokens,
     ...composition
   })
-  return { ...host, plugins: composition.plugins ?? [] }
+  let automation: NodeAutomationService | undefined
+  try {
+    if (options.automation !== false && host.ctx.tasks && host.ctx.automationStore) {
+      automation = new NodeAutomationService(host.ctx, {
+        store: host.ctx.automationStore,
+        tasks: host.ctx.tasks,
+        run: (input, execution) => host.services.run(input, execution)
+      })
+      await automation.start()
+    }
+    return {
+      ...host,
+      services: { ...host.services, ...(automation ? { automation } : {}) },
+      plugins: composition.plugins ?? [],
+      async dispose() {
+        await automation?.dispose()
+        await host.dispose()
+      }
+    }
+  } catch (error) {
+    await automation?.dispose()
+    await host.dispose()
+    throw error
+  }
 }
 
 export interface AgentRuntime extends AgentHost {
@@ -89,6 +117,7 @@ export async function createAgentRuntime(
   options: Pick<
     NodeHostOptions,
     | 'tools'
+    | 'automation'
     | 'defaultTools'
     | 'plugins'
     | 'subagents'
@@ -130,6 +159,7 @@ export async function createAgentRuntime(
     {
       toolApproval:
         options.toolApproval ?? (env.KEUNDAL_TOOL_APPROVAL ? JSON.parse(env.KEUNDAL_TOOL_APPROVAL) : undefined),
+      automation: options.automation,
       tools: options.tools,
       defaultTools: options.defaultTools,
       subagents: options.subagents,
@@ -147,6 +177,7 @@ export async function createAgentRuntime(
       model,
       models: { [model]: { contextWindow, maxOutputTokens } },
       sqlitePath,
+      projectId: env.KEUNDAL_PROJECT_ID,
       workspaceRoot: env.KEUNDAL_WORKSPACE_ROOT,
       maxOutputTokens,
       baseURL: env.KEUNDAL_BASE_URL || undefined,
