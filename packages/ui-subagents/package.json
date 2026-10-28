@@ -9,6 +9,7 @@
     "./plugin": "./app/plugin.ts"
   },
   "dependencies": {
+    "@keundal/chat": "workspace:*",
     "@keundal/subagent": "workspace:*",
     "@keundal/task": "workspace:*",
     "@keundal/ui": "workspace:*",
