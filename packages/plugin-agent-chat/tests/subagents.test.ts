@@ -1,3 +1,5 @@
+import { setTimeout as delay } from 'node:timers/promises'
+
 import { AgentConfigSchema, type AgentConfig } from '@keundal/agent-loop'
 import { EventType, parseAGUIEvent, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
 import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
@@ -440,4 +442,56 @@ test.for(['', ' '.repeat(2), 'x'.repeat(81), 1])('잘못된 작업 이름 %j는 
   )
   await expect(collect(ctx.agent.run(input))).rejects.toThrow('delegate_task label')
   expect(requests).toHaveLength(1)
+})
+
+test.for([
+  { kind: 'tokens', limit: 219, calls: 1 },
+  { kind: 'tokens', limit: 329, calls: 2 },
+  { kind: 'tokens', limit: 330, calls: 3 },
+  { kind: 'cost', limit: 219, calls: 1 },
+  { kind: 'cost', limit: 329, calls: 2 },
+  { kind: 'cost', limit: 330, calls: 3 }
+])('서브에이전트와 후속 부모 호출은 $kind 예산 $limit을 공유한다', async ({ kind, limit, calls }, t) => {
+  const { ctx, requests } = await setup(t, [call('delegate', '{"task":"inspect"}', 'delegate_task'), answer, answer], {
+    subagents: true,
+    pricing: { currency: 'USD', models: { test: { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 } } },
+    budget: kind === 'tokens' ? { maxTokens: limit } : { maxCost: { currency: 'USD', amount: limit } }
+  })
+  const completion = collect(ctx.agent.run(input))
+  if (limit < 330) await expect(completion).rejects.toThrow(`run budget exceeded: ${kind}`)
+  else await completion
+  expect(requests).toHaveLength(calls)
+  expect((await ctx.generation.get(input.runId))?.status === 'completed').toBe(limit === 330)
+})
+
+test.for([329, 440])('병렬 서브에이전트는 토큰 예산 %s의 잔여분을 중복 예약하지 않는다', async (maxTokens, t) => {
+  let childCalls = 0
+  let cancelled = false
+  const { ctx } = await setup(
+    t,
+    [],
+    { subagents: true, parallelTools: true, budget: { maxTokens } },
+    {
+      stream: async function* (request, options) {
+        if (request.input.state.subagent) {
+          childCalls++
+          try {
+            await delay(20, undefined, { signal: options?.signal })
+            yield* answer
+          } finally {
+            cancelled ||= options?.signal?.aborted ?? false
+          }
+        } else if (request.input.messages.some((message) => message.role === 'tool')) yield* answer
+        else {
+          yield* call('first', '{"task":"first"}', 'delegate_task')
+          yield* call('second', '{"task":"second"}', 'delegate_task')
+        }
+      }
+    }
+  )
+  const completion = collect(ctx.agent.run(input))
+  if (maxTokens === 329) await expect(completion).rejects.toThrow('run budget exceeded: tokens')
+  else await completion
+  expect(childCalls).toBe(maxTokens === 329 ? 1 : 2)
+  expect(cancelled).toBe(maxTokens === 329)
 })

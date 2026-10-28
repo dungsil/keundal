@@ -57,7 +57,7 @@ interface PendingCall {
 }
 
 export async function* streamWithTools(
-  llm: LLMService,
+  llm: Pick<LLMService, 'stream'>,
   request: LLMRequest,
   tools: readonly ExecutableTool[],
   maxToolRounds: number,

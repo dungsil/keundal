@@ -1,4 +1,4 @@
-import type {} from '@keundal/agent'
+import type { AgentExecutionOptions } from '@keundal/agent'
 import type { AGUIEvent, AgentMessage, ExecutionOptions, RunAgentInput } from '@keundal/core'
 import type { GenerationJournalEntry, GenerationService, GenerationSubscriptionOptions } from '@keundal/generation'
 import type { Reasoning } from '@keundal/llm'
@@ -31,7 +31,7 @@ export interface AgentHostOptions {
   readonly toolCatalog?: (options: ExecutionOptions) => Promise<readonly SkillSummary[]>
 }
 
-export interface AgentHostRunOptions extends ExecutionOptions {
+export interface AgentHostRunOptions extends AgentExecutionOptions {
   readonly reasoning?: Reasoning
   readonly model?: string
 }
