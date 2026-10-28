@@ -855,3 +855,11 @@ test('인증된 작업 API는 부모별 조회와 개별 취소를 제공하고 
     await tasks.dispose()
   }
 })
+
+test('Workspace 기능이 없는 호스트는 작업 경로에 404를 반환한다', async (t) => {
+  const { requestJson } = await setup(t)
+  expect(await requestJson('GET', '/workspaces/thread')).toEqual({
+    status: 404,
+    json: { error: 'coding workspaces are not supported' }
+  })
+})

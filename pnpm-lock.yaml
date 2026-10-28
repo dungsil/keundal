@@ -514,6 +514,9 @@ importers:
       '@keundal/tool-approval':
         specifier: workspace:*
         version: link:../tool-approval
+      '@keundal/workspace':
+        specifier: workspace:*
+        version: link:../workspace
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
@@ -691,6 +694,15 @@ importers:
       '@keundal/plugin-agent-chat':
         specifier: workspace:*
         version: link:../plugin-agent-chat
+      '@keundal/plugin-agent-coding':
+        specifier: workspace:*
+        version: link:../plugin-agent-coding
+      '@keundal/plugin-fs-local':
+        specifier: workspace:*
+        version: link:../plugin-fs-local
+      '@keundal/plugin-fs-policy':
+        specifier: workspace:*
+        version: link:../plugin-fs-policy
       '@keundal/plugin-llm-anthropic':
         specifier: workspace:*
         version: link:../plugin-llm-anthropic
@@ -715,6 +727,12 @@ importers:
       '@keundal/plugin-store-sqlite':
         specifier: workspace:*
         version: link:../plugin-store-sqlite
+      '@keundal/plugin-tool-fs':
+        specifier: workspace:*
+        version: link:../plugin-tool-fs
+      '@keundal/plugin-workspace-git':
+        specifier: workspace:*
+        version: link:../plugin-workspace-git
       '@keundal/skill':
         specifier: workspace:*
         version: link:../skill
@@ -727,6 +745,9 @@ importers:
       '@keundal/tools':
         specifier: workspace:*
         version: link:../tools
+      '@keundal/workspace':
+        specifier: workspace:*
+        version: link:../workspace
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
@@ -797,6 +818,9 @@ importers:
       '@keundal/tools':
         specifier: workspace:*
         version: link:../tools
+      '@keundal/workspace':
+        specifier: workspace:*
+        version: link:../workspace
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -906,6 +930,9 @@ importers:
       '@keundal/ui-weather':
         specifier: workspace:*
         version: link:../ui-weather
+      '@keundal/ui-workspace':
+        specifier: workspace:*
+        version: link:../ui-workspace
       '@nuxt/ui':
         specifier: ^4.11.3
         version: 4.11.3(4705b2a0419a8033a0a4c92ab2e65166)
@@ -1606,6 +1633,9 @@ importers:
       '@keundal/task':
         specifier: workspace:*
         version: link:../task
+      '@keundal/workspace':
+        specifier: workspace:*
+        version: link:../workspace
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -3504,6 +3534,9 @@ importers:
       '@keundal/task':
         specifier: workspace:*
         version: link:../task
+      '@keundal/workspace':
+        specifier: workspace:*
+        version: link:../workspace
       '@vueuse/core':
         specifier: ^14.4.0
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
@@ -3775,6 +3808,33 @@ importers:
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+      nuxt:
+        specifier: ^4.6.2
+        version: 4.6.2(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.154.0)(@types/node@24.19.2)(@vercel/blob@2.8.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.89.0(oxlint-tsgolint@7.0.2004))(rolldown@1.2.14)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.14)(rollup@4.64.7))(rollup@4.64.7)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
+      vue:
+        specifier: 3.5.44
+        version: 3.5.44(typescript@6.0.3)
+
+  packages/ui-workspace:
+    dependencies:
+      '@keundal/ui':
+        specifier: workspace:*
+        version: link:../ui
+      '@keundal/ui-composer':
+        specifier: workspace:*
+        version: link:../ui-composer
+      '@keundal/ui-runtime':
+        specifier: workspace:*
+        version: link:../ui-runtime
+      '@keundal/ui-slots':
+        specifier: workspace:*
+        version: link:../ui-slots
+      '@keundal/workspace':
+        specifier: workspace:*
+        version: link:../workspace
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11

@@ -29,6 +29,7 @@ import type { MemoryDraft } from '@keundal/memory'
 import { type SkillSummary } from '@keundal/skill'
 import { parseSubagentRoles, type SubagentRole } from '@keundal/subagent'
 import type { TaskSnapshot } from '@keundal/task'
+import type { CodingWorkspaceClient } from '@keundal/workspace'
 import { useStorage } from '@vueuse/core'
 import { Service, type Context } from 'cordis'
 import { computed, effectScope, reactive, ref, shallowRef, watch, type Ref } from 'vue'
@@ -104,6 +105,7 @@ export class ChatRuntime extends Service {
   readonly subagentRoles = ref<SubagentRole[]>([])
   readonly memoryProject = ref('')
   readonly switching = ref(false)
+  readonly workspacesAvailable = ref(false)
   readonly webSearch = computed<boolean>({
     get: () => this.options.preferences.webSearch.value ?? true,
     set: (value) => {
@@ -189,6 +191,11 @@ export class ChatRuntime extends Service {
     return this.connection?.remoteAgent ?? false
   }
 
+  get workspaces(): CodingWorkspaceClient {
+    if (!this.connection?.workspaces) throw unavailable('Coding workspaces')
+    return this.connection.workspaces
+  }
+
   async listBackgroundTasks(): Promise<TaskSnapshot[]> {
     if (!this.connection?.tasks) throw unavailable('Background tasks')
     return this.connection.tasks.list()
@@ -265,6 +272,7 @@ export class ChatRuntime extends Service {
       skills: platform.skills.providers
     })
     this.connection = connection
+    this.workspacesAvailable.value = !!connection.workspaces
     if (connection.selectedModel) this.model.value = connection.selectedModel
     if (connection.remoteModels) {
       this.remoteModels.value = connection.remoteModels
