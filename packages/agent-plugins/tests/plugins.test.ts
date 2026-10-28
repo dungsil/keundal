@@ -144,6 +144,72 @@ test('MCP 설정 오류가 있어도 스킬은 로드한다', async (t) => {
   expect((await p.skillProvider.prepare()).skills).toHaveLength(1)
 })
 
+test('스킬 보조 파일은 목록만 제공하고 요청한 텍스트만 읽으며 스크립트는 실행하지 않는다', async (t) => {
+  const f = await fixture(t)
+  await f.skill('hello', 'Read references/nested/guide.md and assets/template.svg.')
+  await f.file('skills/hello/references/nested/guide.md', 'Reference content')
+  await f.file('skills/hello/assets/template.svg', '<svg/>')
+  await f.file('skills/hello/scripts/run.sh', `touch '${join(f.base, 'executed')}'`)
+  await f.file('skills/hello/assets/binary.bin', '\0binary')
+  await f.file('skills/hello/assets/large.txt', 'x'.repeat(1024 * 1024 + 1))
+  const plugin = await f.load()
+  const catalog = await plugin.skillProvider.prepare()
+  expect(JSON.stringify(catalog.skills)).not.toContain('guide.md')
+  const loaded = await catalog.load('hello')
+  expect(loaded?.resources).toEqual([
+    'assets/binary.bin',
+    'assets/large.txt',
+    'assets/template.svg',
+    'references/nested/guide.md',
+    'scripts/run.sh'
+  ])
+  expect(loaded?.content).not.toContain('Reference content')
+  expect(await catalog.readResource!('hello', 'references/nested/guide.md')).toBe('Reference content')
+  expect(await catalog.readResource!('hello', 'assets/template.svg')).toBe('<svg/>')
+  expect(await catalog.readResource!('hello', 'scripts/run.sh')).toContain('touch')
+  await expect(readFile(join(f.base, 'executed'))).rejects.toThrow('ENOENT')
+  await expect(catalog.readResource!('hello', 'assets/binary.bin')).rejects.toThrow('UTF-8')
+  await expect(catalog.readResource!('hello', 'assets/large.txt')).rejects.toThrow('1 MiB')
+  await expect(
+    catalog.readResource!('hello', 'assets/template.svg', {
+      signal: AbortSignal.abort(new Error('cancel resource'))
+    })
+  ).rejects.toThrow('cancel resource')
+  await plugin.close()
+  await expect(catalog.readResource!('hello', 'assets/template.svg')).rejects.toThrow('closed')
+})
+
+test('보조 파일의 경로 탐색과 다른 스킬·플러그인 밖 링크를 거부하고 읽기 직전 다시 검사한다', async (t) => {
+  const f = await fixture(t)
+  await f.skill()
+  await f.file('skills/hello/references/safe.md', 'safe')
+  await f.file('skills/other/references/secret.md', 'other skill')
+  await writeFile(join(f.base, 'outside.md'), 'outside')
+  await symlink('safe.md', join(f.root, 'skills/hello/references/internal.md'))
+  await symlink('../../other/references/secret.md', join(f.root, 'skills/hello/references/sibling.md'))
+  await symlink(join(f.base, 'outside.md'), join(f.root, 'skills/hello/references/outside.md'))
+  const catalog = await (await f.load()).skillProvider.prepare()
+  expect((await catalog.load('hello'))?.resources).toEqual(['references/internal.md', 'references/safe.md'])
+  expect(await catalog.readResource!('hello', 'references/internal.md')).toBe('safe')
+  for (const path of ['references/sibling.md', 'references/outside.md']) {
+    await expect(catalog.readResource!('hello', path)).rejects.toThrow('boundary')
+  }
+  for (const path of [
+    '../plugin.json',
+    '/etc/passwd',
+    'references/../../other/SKILL.md',
+    'references\\safe.md',
+    'references//safe.md',
+    'references/./safe.md',
+    'SKILL.md'
+  ]) {
+    await expect(catalog.readResource!('hello', path)).rejects.toThrow('path')
+  }
+  await rm(join(f.root, 'skills/hello/references/safe.md'))
+  await symlink(join(f.base, 'outside.md'), join(f.root, 'skills/hello/references/safe.md'))
+  await expect(catalog.readResource!('hello', 'references/internal.md')).rejects.toThrow('boundary')
+})
+
 test('서버별 검증과 연결 실패를 분리하고 stdio 환경과 인자를 한 번만 치환한다', async (t) => {
   const f = await fixture(t)
   await f.mcp({

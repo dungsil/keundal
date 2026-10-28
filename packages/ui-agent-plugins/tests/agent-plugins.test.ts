@@ -8,12 +8,15 @@ const markdown = '---\nname: review\ndescription: Review reports\n---\nCheck the
 const files = {
   'plugin.json': JSON.stringify({ $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json', name: 'reports' }),
   'skills/review/SKILL.md': markdown,
+  'skills/review/references/guide.md': 'Review reference',
+  'skills/review/assets/template.svg': '<svg/>',
+  'skills/review/scripts/run.sh': 'echo must-not-execute',
   'mcp.json': JSON.stringify({ $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json', mcpServers: {
     remote: { type: 'streamable-http', url: 'https://example.com/mcp' }
   } })
 }
 
-test('폴더에서 플러그인 구성요소만 가져오고 보조 파일은 읽지 않는다', async () => {
+test('폴더에서 스킬 보조 파일을 함께 가져오고 스킬 밖 파일은 제외한다', async () => {
   const selected = Object.entries({ ...files, 'scripts/run.sh': 'not imported' }).map(([path, content]) => ({
     webkitRelativePath: `reports/${path}`, size: content.length,
     text: async () => {
@@ -42,16 +45,24 @@ test('가져온 플러그인은 기본 비활성이며 활성화·새로고침·
   const restored = new BrowserAgentPluginManager(storage)
   const catalog = await restored.provider.prepare()
   expect(catalog.skills).toEqual([{ name: 'review', description: 'Review reports' }])
-  expect(await catalog.load('review')).toEqual({ name: 'review', description: 'Review reports', content: markdown })
+  expect(await catalog.load('review')).toEqual({ name: 'review', description: 'Review reports', content: markdown,
+    resources: ['assets/template.svg', 'references/guide.md', 'scripts/run.sh'] })
+  expect(await catalog.readResource!('review', 'references/guide.md')).toBe('Review reference')
+  expect(await catalog.readResource!('review', 'scripts/run.sh')).toBe('echo must-not-execute')
+  await expect(catalog.readResource!('review', 'references/../../plugin.json')).rejects.toThrow('path')
+  expect(await catalog.readResource!('review', 'assets/missing.svg')).toBeUndefined()
   // An enabled plugin without MCP permissions must not even connect to its server.
   await expect(restored.tools()).resolves.toEqual([])
-  await restored.import({ ...files, 'plugin.json': files['plugin.json'].replace('reports', 'other'), 'skills/review/SKILL.md': markdown + '\nOther instructions.' }, stop)
+  await restored.import({ ...files, 'plugin.json': files['plugin.json'].replace('reports', 'other'), 'skills/review/SKILL.md': markdown + '\nOther instructions.', 'skills/review/references/guide.md': 'Other reference' }, stop)
   await restored.configure('other', { enabled: true, permissions: {} }, stop)
   const combined = await restored.provider.prepare()
   expect(combined.skills).toHaveLength(1)
   expect((await combined.load('review'))?.content).toBe(markdown)
+  expect(await combined.readResource!('review', 'references/guide.md')).toBe('Review reference')
   await restored.configure('reports', { enabled: false, permissions: {} }, stop)
-  expect((await (await restored.provider.prepare()).load('review'))?.content).toContain('Other instructions.')
+  const fallback = await restored.provider.prepare()
+  expect((await fallback.load('review'))?.content).toContain('Other instructions.')
+  expect(await fallback.readResource!('review', 'references/guide.md')).toBe('Other reference')
   await restored.remove('other', stop)
   expect((await restored.provider.prepare()).skills).toEqual([])
   await restored.remove('reports', stop)
