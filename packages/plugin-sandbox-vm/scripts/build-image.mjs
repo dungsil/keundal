@@ -125,24 +125,32 @@ try {
   await copy(join(image, 'prepare-state.mjs'), '/prepare-state.mjs')
   await copy(guest, '/guest.mjs')
   const archive = join(root, '..', `${root.split('/').at(-1)}.cpio.gz`)
+  const uncompressed = archive.slice(0, -3)
   try {
     await fs.chmod(root, 0o755) // The archived / must be traversable by uid 1000.
-    // Fixed cwd and no caller strings in shell source. cpio forces root ownership.
-    run(
-      '/bin/bash',
-      [
-        '-o',
-        'pipefail',
-        '-c',
-        'find . -print0 | sort -z | cpio --null -o --format=newc --owner=0:0 --quiet | gzip -n -9 > "$1"',
-        'build-image',
-        archive
-      ],
-      { cwd: root }
-    )
+    // Keep paths out of shell commands; cpio forces root ownership in the archive.
+    const names = run('/usr/bin/find', ['.', '-print0'], { cwd: root })
+    const sorted = run('/usr/bin/sort', ['-z'], { input: names })
+    const raw = await fs.open(uncompressed, 'wx', 0o600)
+    try {
+      run('/usr/bin/cpio', ['--null', '-o', '--format=newc', '--owner=0:0', '--quiet'], {
+        cwd: root,
+        input: sorted,
+        stdio: ['pipe', raw.fd, 'pipe']
+      })
+    } finally {
+      await raw.close()
+    }
+    const compressed = await fs.open(archive, 'wx', 0o600)
+    try {
+      run('/usr/bin/gzip', ['-n', '-9', '-c', uncompressed], { stdio: ['ignore', compressed.fd, 'pipe'] })
+    } finally {
+      await compressed.close()
+    }
     await fs.copyFile(kernel, join(output, 'kernel'), 1)
     await fs.copyFile(archive, join(output, 'initramfs.cpio.gz'), 1)
   } finally {
+    await fs.rm(uncompressed, { force: true })
     await fs.rm(archive, { force: true })
   }
   const sha256 = async (path) =>
