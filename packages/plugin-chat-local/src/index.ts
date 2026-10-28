@@ -8,6 +8,7 @@ import { parsePromptPreset, type PromptPreset } from '@keundal/prompt'
 import { type SessionSnapshot } from '@keundal/session'
 import type {} from '@keundal/skill'
 import { type SubagentRole } from '@keundal/subagent'
+import { ToolApproval } from '@keundal/tool-approval'
 import type { Context } from 'cordis'
 
 import { createKeundalChat, toMessages, type KeundalChatRuntime, type MountAgent } from './keundal'
@@ -36,8 +37,13 @@ export class ChatStore implements ChatStoreLike {
 
   constructor(
     private readonly ctx: Context,
-    private readonly mountAgent: MountAgent
+    private readonly mountAgent: MountAgent,
+    private readonly toolApproval: ToolApproval = new ToolApproval({ default: 'allow' })
   ) {}
+
+  async respondToToolApproval(runId: string, requestId: string, decision: 'allow' | 'deny') {
+    return this.toolApproval.respond(runId, requestId, decision)
+  }
 
   private async trimRuntimes(limit: number) {
     while (this.runtimes.size > limit) {
@@ -253,7 +259,12 @@ export class ChatStore implements ChatStoreLike {
         await this.trimRuntimes(7)
         cached = {
           key,
-          runtime: await createKeundalChat(this.ctx, request.model, { ...request, maxOutputTokens }, this.mountAgent)
+          runtime: await createKeundalChat(
+            this.ctx,
+            request.model,
+            { ...request, maxOutputTokens, toolApproval: this.toolApproval },
+            this.mountAgent
+          )
         }
         this.runtimes.set(id, cached)
       }

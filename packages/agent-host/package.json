@@ -31,6 +31,7 @@
     "@keundal/llm": "workspace:*",
     "@keundal/session": "workspace:*",
     "@keundal/skill": "workspace:*",
+    "@keundal/tool-approval": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {

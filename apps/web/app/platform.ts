@@ -110,6 +110,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
           if (!manager.isEnabled('@keundal/plugin-agent-chat')) throw new Error('Chat agent is disabled. Enable it in plugin settings to generate responses.')
           return composition.mountAgent(ctx, {
             model: config.model,
+            toolApproval: config.toolApproval,
             maxOutputTokens: config.maxOutputTokens,
             reasoning: config.reasoning,
             webSearch: config.webSearch,

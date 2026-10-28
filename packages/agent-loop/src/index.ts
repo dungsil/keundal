@@ -276,6 +276,7 @@ export class Agent extends AgentService {
           return traceEvent(ended)
         }
       }
+      const approval = this.config.toolApproval
       const generation = this.ctx.generation.run(
         {
           input: fitted.input,
@@ -306,6 +307,7 @@ export class Agent extends AgentService {
                     (next) => prepareNext(next, generationSignal),
                     generationSignal,
                     {
+                      approval,
                       parallel,
                       stream,
                       maxToolCalls,

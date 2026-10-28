@@ -72,6 +72,7 @@
     "@keundal/prompt": "workspace:*",
     "@keundal/skill": "workspace:*",
     "@keundal/subagent": "workspace:*",
+    "@keundal/tool-approval": "workspace:*",
     "@keundal/tools": "workspace:*",
     "zod": "catalog:"
   },

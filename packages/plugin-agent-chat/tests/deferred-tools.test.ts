@@ -4,6 +4,7 @@ import { createDeferredToolSession, parseDeferredToolsConfig } from '@keundal/de
 import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
+import { ToolApproval } from '@keundal/tool-approval'
 import { type ExecutableTool } from '@keundal/tools'
 import { readTraceSpans } from '@keundal/trace'
 import { Context } from 'cordis'
@@ -78,6 +79,37 @@ async function runAgent(
     }
   }
 }
+
+test('search_tool을 허용해도 검색한 도구의 deny 정책은 실행을 막고 모델에 거부 결과를 전달한다', async () => {
+  let executed = 0
+  const setup = await runAgent(
+    [call('search', 'search_tool', '{"query":"restricted"}'), call('restricted', 'restricted', '{}'), answer('done')],
+    {
+      deferredTools: {},
+      deferredToolProvider: () => [
+        mcpTool('restricted', 'restricted', {}, () => {
+          executed++
+          return 'unexpected'
+        })
+      ],
+      toolApproval: new ToolApproval({ default: 'deny', tools: { search_tool: 'allow' } })
+    }
+  )
+  try {
+    const events = await Array.fromAsync(setup.ctx.agent.run(input))
+    expect(executed).toBe(0)
+    expect(setup.requests).toHaveLength(3)
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: EventType.TOOL_CALL_RESULT,
+        toolCallId: 'restricted',
+        content: '{"error":"TOOL_PERMISSION_DENIED","tool":"restricted"}'
+      })
+    )
+  } finally {
+    await setup.close()
+  }
+})
 
 test('MCP형 120개 도구에서 지연 검색이 전체 요청 토큰 추정치를 줄인다', async () => {
   let executed = 0

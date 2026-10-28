@@ -52,6 +52,7 @@ export async function createKeundalChat(
   context: Context,
   name: string,
   options: {
+    toolApproval?: AgentConfig['toolApproval']
     maxActiveSubagents?: number
     subagents?: boolean
     webSearch?: boolean
@@ -66,6 +67,7 @@ export async function createKeundalChat(
   const agent = ctx.plugin(async (child: Context) => {
     await mountAgent(child, {
       model: config.value,
+      toolApproval: options.toolApproval,
       maxOutputTokens,
       webSearch: !!options.webSearch && config.provider !== 'google' && config.provider !== 'openai-chat',
       reasoning:

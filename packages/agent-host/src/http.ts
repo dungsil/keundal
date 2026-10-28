@@ -367,6 +367,21 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
         return sendJson(response, 200, { cancelled: services.cancel(segments[1]) })
       }
 
+      if (request.method === 'POST' && segments.length === 4 && segments[0] === 'runs' && segments[2] === 'approvals') {
+        const body: unknown = JSON.parse(await readBody(request, maxRequestBodyBytes))
+        if (
+          !body ||
+          typeof body !== 'object' ||
+          !('decision' in body) ||
+          (body.decision !== 'allow' && body.decision !== 'deny') ||
+          Object.keys(body).length !== 1
+        ) {
+          return sendJson(response, 400, { error: 'invalid approval decision' })
+        }
+        const accepted = services.respondToToolApproval?.(segments[1]!, segments[3]!, body.decision) ?? false
+        return sendJson(response, accepted ? 202 : 409, { accepted })
+      }
+
       if (request.method === 'POST' && segments[0] === 'runs' && segments[2] === 'steer' && segments[1]) {
         const messages = steerBody(JSON.parse(await readBody(request, maxRequestBodyBytes)))
         const queued = services.steer(segments[1], messages)

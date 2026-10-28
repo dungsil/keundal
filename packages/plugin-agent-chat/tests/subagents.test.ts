@@ -5,6 +5,7 @@ import { EventType, parseAGUIEvent, type AGUIEvent, type ExecutionOptions, type 
 import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
+import { ToolApproval, isToolApprovalRecord } from '@keundal/tool-approval'
 import type { ExecutableTool } from '@keundal/tools'
 import { Context } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
@@ -81,6 +82,39 @@ async function setup(
   })
   return { ctx, requests, counted, agent }
 }
+
+test('서브에이전트의 승인 요청을 부모에게 전달하고 자식 runId로 승인한 뒤에만 실행한다', async (t) => {
+  let executed = 0
+  const approval = new ToolApproval({ default: 'ask', tools: { delegate_task: 'allow' } })
+  const { ctx, requests } = await setup(
+    t,
+    [call('delegate', '{"task":"inspect"}', 'delegate_task'), call('child-lookup'), answer, answer],
+    {
+      subagents: true,
+      toolApproval: approval,
+      tools: [
+        tool(() => {
+          executed++
+          return 'result'
+        })
+      ]
+    }
+  )
+  let answered = false
+  for await (const event of ctx.agent.run(input)) {
+    if (event.type !== EventType.CUSTOM || event.name !== 'keundal.tool.progress') continue
+    const record = event.value?.value?.approval
+    if (!isToolApprovalRecord(record) || record.status !== 'requested') continue
+    expect(executed).toBe(0)
+    expect(record.runId).not.toBe(input.runId)
+    expect(approval.respond(input.runId, record.requestId, 'allow')).toBe(false)
+    expect(approval.respond(record.runId, record.requestId, 'allow')).toBe(true)
+    answered = true
+  }
+  expect(answered).toBe(true)
+  expect(executed).toBe(1)
+  expect(requests).toHaveLength(4)
+})
 
 test('서브에이전트는 독립된 대화에서 도구를 실행하고 최종 답변만 부모에게 돌려준다', async (t) => {
   const { ctx, requests } = await setup(
