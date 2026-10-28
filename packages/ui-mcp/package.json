@@ -12,7 +12,6 @@
     "@keundal/mcp": "workspace:*",
     "@keundal/ui": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
-    "@keundal/ui-settings": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
     "@vueuse/core": "^14.4.0",
     "cordis": "catalog:",

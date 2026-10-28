@@ -1,4 +1,4 @@
-import { StoredMemoryService, StoredProjectMemoryService } from '@keundal/plugin-memory'
+import { StoredMemoryService, StoredProjectMemoryService } from '@keundal/memory-store'
 import type { Context } from 'cordis'
 
 import { MemoryBackupService } from './backup.js'

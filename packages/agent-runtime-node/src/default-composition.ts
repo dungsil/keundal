@@ -5,30 +5,24 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
-import { loadAgentPlugin, type LoadedAgentPlugin } from '@keundal/agent-plugins'
-import type { ExecutionOptions } from '@keundal/core'
-import { parseMcpServers } from '@keundal/mcp'
 import { createMemoryTools } from '@keundal/memory/tools'
 import acpAgentPlugin from '@keundal/plugin-agent-acp'
 import agentPlugin, { metadata as agentMetadata } from '@keundal/plugin-agent-chat'
-import codingAgentPlugin from '@keundal/plugin-agent-coding'
-import { LocalFileSystemService } from '@keundal/plugin-fs-local'
-import { PolicyFileSystemService } from '@keundal/plugin-fs-policy'
 import anthropic, { metadata as anthropicMetadata } from '@keundal/plugin-llm-anthropic'
 import gemini, { metadata as geminiMetadata } from '@keundal/plugin-llm-gemini'
 import openai, { metadata as openaiMetadata } from '@keundal/plugin-llm-openai'
 import openaiChat, { metadata as openaiChatMetadata } from '@keundal/plugin-llm-openai-chat'
-import { McpClient, metadata as mcpMetadata } from '@keundal/plugin-mcp-client'
+import { metadata as mcpMetadata } from '@keundal/plugin-mcp-client'
 import { loadRuntimePlugins, parseRuntimePluginManifest, type RuntimePluginManifest } from '@keundal/plugin-runtime'
 import skillPlugin, { metadata as skillMetadata } from '@keundal/plugin-skill'
 import sqlite, { metadata as storeMetadata } from '@keundal/plugin-store-sqlite'
-import { FileSystemToolsService } from '@keundal/plugin-tool-fs'
-import type { SkillProvider } from '@keundal/skill'
 import { MemoryTaskService } from '@keundal/task-memory'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 import type { Context, Fiber } from 'cordis'
 import { resolve as resolveModule } from 'import-meta-resolve'
 
+import { createNodeAgentIntegrations } from './agent-integrations.js'
+import { mountCodingAgent } from './coding-agent.js'
 import type { HostCompositionFactory, NodeHostOptions } from './index.js'
 import { NodeCodingWorkspaces } from './workspaces.js'
 
@@ -160,18 +154,15 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       join(homedir(), '.keundal', 'workspaces', createHash('sha256').update(resolve(options.sqlitePath)).digest('hex'))
   )
   const workspaces = new NodeCodingWorkspaces(workspaceRoot)
-  const plugins: LoadedAgentPlugin[] = []
-  const skillProviders: SkillProvider[] = []
   const promptPresetsEnabled = options.bundledPlugins?.['@keundal/prompt'] !== false
   const subagentsEnabled = options.bundledPlugins?.['@keundal/subagent'] !== false
   const skillsEnabled = options.bundledPlugins?.['@keundal/plugin-skill'] !== false
   const mcpEnabled = options.bundledPlugins?.['@keundal/plugin-mcp-client'] !== false
+  const integrations = createNodeAgentIntegrations(options, mcpEnabled)
+  const { plugins, skillProviders } = integrations
   const legacyToolsEnabled = options.bundledPlugins?.['@keundal/plugin-tool-chat'] ?? true
   const chartEnabled = options.bundledPlugins?.['@keundal/plugin-tool-chart'] ?? legacyToolsEnabled
   const weatherEnabled = options.bundledPlugins?.['@keundal/plugin-tool-weather'] ?? legacyToolsEnabled
-  const mcpServers = mcpEnabled ? parseMcpServers(options.mcpServers ?? []) : []
-  const mcpClients = new Map<string, Promise<McpClient>>()
-  const mcpLifetime = new globalThis.AbortController()
   const selection = readManifest(options, skillsEnabled && Boolean(options.plugins?.length))
   const agentEnabled =
     options.bundledPlugins?.['@keundal/plugin-agent-chat'] !== false &&
@@ -272,40 +263,6 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
           ...memoryTools
         ]
       : undefined
-  const deferredToolProvider: ToolProvider = async (execution: ExecutionOptions) => {
-    const signal = execution.signal
-      ? globalThis.AbortSignal.any([execution.signal, mcpLifetime.signal])
-      : mcpLifetime.signal
-    const result: ExecutableTool[] = []
-    for (const server of mcpServers) {
-      signal.throwIfAborted()
-      let pending = mcpClients.get(server.serverName)
-      if (!pending) {
-        pending = McpClient.connect(server, {
-          signal: mcpLifetime.signal,
-          authentication: options.mcpAuthentication?.[server.serverName]
-        })
-        mcpClients.set(server.serverName, pending)
-        void pending.catch(() => {
-          if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
-        })
-      }
-      try {
-        const client = await pending
-        signal.throwIfAborted()
-        result.push(...(await client.tools({ signal })))
-      } catch (error) {
-        if (signal.aborted) throw error
-        if (mcpClients.get(server.serverName) === pending) mcpClients.delete(server.serverName)
-        await pending.then((client) => client.close()).catch(() => {})
-        throw error
-      }
-    }
-    if (mcpEnabled) {
-      for (const plugin of plugins) result.push(...(await plugin.tools({ signal })))
-    }
-    return result
-  }
   let runtime: LoadedNodePlugins | undefined
   let runtimePromise: Promise<LoadedNodePlugins> | undefined
 
@@ -316,19 +273,7 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       (await runtime?.tools?.(execution))?.map(({ name, description }) => ({ name, description })) ?? [],
     async setup(ctx) {
       workspaces.setup(ctx)
-      ctx.effect(() => async () => {
-        mcpLifetime.abort()
-        await Promise.allSettled([...mcpClients.values()].map(async (client) => (await client).close()))
-        mcpClients.clear()
-        const results = await Promise.allSettled(plugins.map((plugin) => plugin.close()))
-        const errors = results.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []))
-        if (errors.length) throw new AggregateError(errors, 'failed to dispose agent plugins')
-      })
-      for (const config of options.plugins ?? []) {
-        const plugin = await loadAgentPlugin(mcpEnabled ? config : { ...config, mcp: undefined })
-        plugins.push(plugin)
-        skillProviders.push(plugin.skillProvider)
-      }
+      await integrations.setup(ctx)
       if (skillsEnabled && plugins.length && !manifest.plugins.some((spec) => spec.module === 'builtin:skills')) {
         throw new Error('runtime plugin manifest must include builtin:skills when Agent Plugins are configured')
       }
@@ -347,7 +292,7 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
         importModule: createNodeImporter(basePath),
         builtins: builtinRegistry,
         tools: suppliedTools,
-        deferredToolProvider
+        deferredToolProvider: integrations.tools
       })
       runtime = await runtimePromise
       await runtime.setup(ctx)
@@ -374,48 +319,7 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
         })
       }
       if (config.codingThreadId && config.workspacePath) {
-        const backendContext = ctx.isolate('fs')
-        let backend!: LocalFileSystemService
-        await backendContext.plugin((child: Context) => {
-          backend = new LocalFileSystemService(child, { cwd: config.workspacePath })
-        })
-        const files = ctx.isolate('fs')
-        await files.plugin((child: Context) => {
-          new PolicyFileSystemService(child, {
-            backend,
-            roots: [config.workspacePath!],
-            writableRoots: [config.workspacePath!]
-          })
-        })
-        let tools!: readonly ExecutableTool[]
-        await files.plugin(
-          Object.assign(
-            (child: Context) => {
-              tools = new FileSystemToolsService(child).tools.map((tool) => ({
-                ...tool,
-                async execute(args, execution) {
-                  const path = args.path
-                  if (typeof path !== 'string' || path.split(/[\\/]/).some((part) => part.toLowerCase() === '.git'))
-                    throw new Error('Git metadata is not accessible to file tools')
-                  const canonical = await child.fs.resolve(path, { signal: execution.signal })
-                  if (canonical.split(/[\\/]/).some((part) => part.toLowerCase() === '.git'))
-                    throw new Error('Git metadata is not accessible to file tools')
-                  return tool.execute(args, execution)
-                }
-              }))
-            },
-            { inject: ['fs'] }
-          )
-        )
-        const { codingThreadId: _thread, workspacePath: _path, ...agentConfig } = config
-        return files.plugin(codingAgentPlugin, {
-          ...agentConfig,
-          maxToolRounds: options.maxToolRounds ?? 8,
-          skills: false,
-          promptPresets: false,
-          subagents: false,
-          tools
-        })
+        return mountCodingAgent(ctx, config, options)
       }
       return runtime.mountAgent(ctx, {
         ...config,

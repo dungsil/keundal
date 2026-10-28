@@ -4,7 +4,8 @@ import { listGeminiModels } from '@keundal/plugin-llm-gemini'
 import { listOpenAIModels } from '@keundal/plugin-llm-openai'
 import { listOpenAIChatModels } from '@keundal/plugin-llm-openai-chat'
 import { expect, test, onTestFinished, vi } from 'vitest'
-import { loadModels, MODEL_CACHE_TTL, MODEL_CACHE_MAX_AGE } from '@keundal/plugin-llm-browser/models'
+import { MODEL_CACHE_TTL, MODEL_CACHE_MAX_AGE } from '@keundal/plugin-llm-browser/models'
+import { loadModels } from '@keundal/browser-composition/llm'
 import { defaultLLMSettings } from '@keundal/llm-settings'
 
 async function fixture(handler: (req: IncomingMessage, res: ServerResponse) => void) {

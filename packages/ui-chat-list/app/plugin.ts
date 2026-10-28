@@ -1,7 +1,7 @@
 import type { Context } from 'cordis'
-import type {} from '@keundal/ui-layout/slots'
+import type {} from '@keundal/ui/app/contracts/layout.ts'
 import type {} from '@keundal/ui-runtime'
-import type {} from '@keundal/ui-settings/slots'
+import type {} from '@keundal/ui/app/contracts/settings.ts'
 import { lazyView } from '@keundal/ui-slots'
 import { computed, reactive } from 'vue'
 

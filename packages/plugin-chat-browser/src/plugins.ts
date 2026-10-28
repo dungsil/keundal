@@ -1,7 +1,7 @@
 import { inspectAgentPlugin } from '@keundal/agent-plugins/browser'
 import type { AgentPluginInfo, AgentPluginManager, AgentPluginSettings } from '@keundal/chat/platform'
 import type { ExecutionOptions } from '@keundal/core'
-import { parseMcpServers } from '@keundal/mcp'
+import { parseMcpServers, type McpConnector } from '@keundal/mcp'
 import type { SkillProvider } from '@keundal/skill'
 
 import { McpManager } from './mcp.js'
@@ -14,10 +14,13 @@ export class BrowserAgentPluginManager implements AgentPluginManager {
   private records: InstalledPlugin[]
   readonly provider: SkillProvider
 
-  constructor(private readonly storage: Pick<Storage, 'getItem' | 'setItem'>) {
+  constructor(
+    private readonly storage: Pick<Storage, 'getItem' | 'setItem'>,
+    connector?: McpConnector
+  ) {
     this.records = JSON.parse(storage.getItem(key) ?? '[]') as InstalledPlugin[]
     if (!Array.isArray(this.records)) throw new Error('Invalid agent plugin settings')
-    this.mcp = new McpManager()
+    this.mcp = new McpManager(undefined, { connector })
     this.provider = {
       name: 'agent-plugins',
       prepare: async (options) => {

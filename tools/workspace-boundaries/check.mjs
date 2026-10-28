@@ -15,9 +15,10 @@ const groups = ['apps', 'packages', 'tools', 'examples']
 const implementationIndependent = new Set([
   '@keundal/chat-app',
   '@keundal/chat',
+  '@keundal/chat-http',
+  '@keundal/agent-plugins',
   '@keundal/core',
   '@keundal/llm',
-  '@keundal/memory',
   '@keundal/session',
   '@keundal/generation',
   '@keundal/backup',
@@ -34,6 +35,7 @@ const implementationIndependent = new Set([
   '@keundal/context',
   '@keundal/mcp',
   '@keundal/memory',
+  '@keundal/memory-store',
   '@keundal/llm-settings',
   '@keundal/agent-host',
   '@keundal/fs',
@@ -47,10 +49,21 @@ const isImplementationIndependent = (name) =>
 const isImplementation = (name) =>
   name.startsWith('@keundal/plugin-') ||
   name === '@keundal/agent-loop' ||
+  name === '@keundal/memory-store' ||
   name === '@keundal/agent-runtime-node' ||
+  name === '@keundal/browser-composition' ||
   name === '@keundal/task-memory' ||
   name === '@keundal/automation-node' ||
   name.startsWith('@tauri-apps/')
+
+const isUIImplementation = (name) =>
+  name.startsWith('@keundal/ui-') && !['@keundal/ui-slots', '@keundal/ui-runtime'].includes(name)
+const isPeerImplementation = (source, target) =>
+  source !== target &&
+  ((source.startsWith('@keundal/plugin-') &&
+    (target.startsWith('@keundal/plugin-') ||
+      ['@keundal/browser-composition', '@keundal/agent-runtime-node'].includes(target))) ||
+    ((source === '@keundal/ui' || source.startsWith('@keundal/ui-')) && isUIImplementation(target)))
 
 const ignored = new Set(['node_modules', 'dist', 'target', 'coverage'])
 
@@ -63,7 +76,7 @@ async function* sources(directory) {
   }
 }
 
-function strings(source, file) {
+function strings(source, file, importsOnly = false) {
   if (extname(file) === '.json') {
     const values = []
     function visit(value) {
@@ -89,7 +102,19 @@ function strings(source, file) {
   const values = []
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   function visit(node) {
-    if (ts.isStringLiteralLike(node)) values.push(node.text)
+    if (ts.isStringLiteralLike(node)) {
+      const parent = node.parent
+      if (
+        !importsOnly ||
+        ((ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent)) && parent.moduleSpecifier === node) ||
+        (ts.isLiteralTypeNode(parent) && ts.isImportTypeNode(parent.parent)) ||
+        (ts.isCallExpression(parent) &&
+          parent.arguments[0] === node &&
+          (parent.expression.kind === ts.SyntaxKind.ImportKeyword ||
+            (ts.isIdentifier(parent.expression) && parent.expression.text === 'require')))
+      )
+        values.push(node.text)
+    }
     ts.forEachChild(node, visit)
   }
   visit(ast)
@@ -118,6 +143,20 @@ export async function checkWorkspaceBoundaries(root) {
   for (const workspace of workspaces) {
     for await (const file of sources(workspace.directory)) {
       const source = await readFile(file, 'utf8')
+      const localPath = relative(workspace.directory, file)
+      if (/^(src|app|shared)[/\\]/.test(localPath) || /^(nuxt\.config\.ts|tsconfig.*\.json)$/.test(localPath)) {
+        for (const value of strings(source, file, /^(src|app|shared)[/\\]/.test(localPath))) {
+          const target = value.startsWith('.') || isAbsolute(value) ? resolve(dirname(file), value) : null
+          const peer = workspaces.find(
+            (candidate) =>
+              isPeerImplementation(workspace.manifest.name, candidate.manifest.name) &&
+              (value === candidate.manifest.name ||
+                value.startsWith(`${candidate.manifest.name}/`) ||
+                (target && isWithin(target, candidate.directory)))
+          )
+          if (peer) errors.push(`${relative(root, file)}: ${value} couples plugins through an implementation`)
+        }
+      }
       for (const value of strings(source, file)) {
         const local = relative(workspace.directory, file)
         if (workspace.manifest.name === '@keundal/core' && /^src[/\\]/.test(local)) {
@@ -172,6 +211,22 @@ export async function checkWorkspaceBoundaries(root) {
       if (file === resolve(workspace.directory, 'package.json')) {
         for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
           for (const name of Object.keys(workspace.manifest[field] ?? {})) {
+            if (field !== 'devDependencies') {
+              const value = workspace.manifest[field][name]
+              const specifier = value.replace(/^(?:file:|link:|workspace:)/, '')
+              const target =
+                specifier.startsWith('.') || isAbsolute(specifier) ? resolve(workspace.directory, specifier) : null
+              const peer = workspaces.find(
+                (candidate) =>
+                  isPeerImplementation(workspace.manifest.name, candidate.manifest.name) &&
+                  (name === candidate.manifest.name ||
+                    value.startsWith(`workspace:${candidate.manifest.name}@`) ||
+                    value.startsWith(`npm:${candidate.manifest.name}@`) ||
+                    (target && isWithin(target, candidate.directory)))
+              )
+              if (peer)
+                errors.push(`${relative(root, file)}: ${field}.${name} couples plugins through an implementation`)
+            }
             if (
               field !== 'devDependencies' &&
               workspace.manifest.name === '@keundal/core' &&

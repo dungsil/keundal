@@ -1,7 +1,7 @@
 import type { Context } from 'cordis'
 import type {} from '@keundal/ui-runtime'
 import type {} from '@keundal/ui-slots'
-import type {} from './slots'
+import type {} from '@keundal/ui/app/contracts/composer.ts'
 import Composer from './views/Composer.vue'
 
 export const name = 'ui-composer'

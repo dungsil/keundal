@@ -1,4 +1,5 @@
 import { modelSchema, type ModelOption } from '@keundal/chat/models'
+import type { LLMModelInfo } from '@keundal/llm'
 export { resolveModel, type ModelOption } from '@keundal/chat/models'
 const cacheSchema = z.object({ scope: z.string(), fetchedAt: z.number(), models: z.array(modelSchema) })
 import {
@@ -7,6 +8,7 @@ import {
   providerError,
   providerIcon,
   providerType,
+  type LLMProvider,
   type LLMSettings
 } from '@keundal/llm-settings'
 import { z } from 'zod'
@@ -15,12 +17,15 @@ export const MODEL_CACHE_TTL = 60 * 60 * 1000
 export const MODEL_CACHE_MAX_AGE = 24 * MODEL_CACHE_TTL
 // Only write ordering is shared, scoped to a storage instance; no credentials or results.
 const latestRequests = new WeakMap<object, Map<string, symbol>>()
-const modelLoaders = {
-  openai: () => import('@keundal/plugin-llm-openai').then((module) => module.listOpenAIModels),
-  'openai-chat': () => import('@keundal/plugin-llm-openai-chat').then((module) => module.listOpenAIChatModels),
-  anthropic: () => import('@keundal/plugin-llm-anthropic').then((module) => module.listAnthropicModels),
-  google: () => import('@keundal/plugin-llm-gemini').then((module) => module.listGeminiModels)
-}
+export type ModelLoaders = Record<
+  LLMProvider,
+  () => Promise<
+    (
+      credentials: ReturnType<typeof providerCredentials> & { dangerouslyAllowBrowser: boolean },
+      options: { signal: AbortSignal }
+    ) => Promise<LLMModelInfo[]>
+  >
+>
 
 /** Credential-scoped cache identity without persisting another copy of the API key. */
 async function cacheScope(provider: string, settings: LLMSettings) {
@@ -48,6 +53,7 @@ async function cacheScope(provider: string, settings: LLMSettings) {
 
 /** Lists provider metadata only. A listed model may not support this app's tools/streaming API. */
 export async function loadModels(
+  modelLoaders: ModelLoaders,
   provider: string,
   settings: LLMSettings,
   storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>,

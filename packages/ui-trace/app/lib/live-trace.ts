@@ -3,7 +3,7 @@ import { TRACE_EVENT, readTraceSpans } from '@keundal/trace'
 import type { AGUIEvent } from '@keundal/core'
 import type { TraceSpan } from '@keundal/trace'
 import { shallowReactive } from 'vue'
-import type { ChatIndicatorOwner } from '@keundal/ui-chat/slots'
+import type { ChatIndicatorOwner } from '@keundal/ui/app/contracts/chat.ts'
 
 type Messages = ChatIndicatorOwner['messages']
 

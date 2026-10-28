@@ -1,5 +1,6 @@
 import { STREAM_LIMITS, StreamBudget } from '@keundal/llm'
 
+/** Shared HTTP transport limit, including desktop sidecar connections. */
 export class RemoteResponseLimitError extends Error {}
 
 /** Retained across reconnects and the final cancellation journal drain. */

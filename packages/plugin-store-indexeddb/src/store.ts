@@ -6,8 +6,7 @@ import {
   type GenerationSnapshot,
   type GenerationStatus
 } from '@keundal/generation'
-import { parseMemoryEntry } from '@keundal/memory'
-import type { MemoryAdapter } from '@keundal/plugin-memory'
+import { parseMemoryEntry, type MemoryAdapter } from '@keundal/memory'
 import { assertGenerationMessageIds, type SessionCommit, type SessionSnapshot } from '@keundal/session'
 import type { TaskSnapshot } from '@keundal/task'
 

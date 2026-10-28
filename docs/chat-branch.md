@@ -4,7 +4,7 @@
 
 ## 계약
 
-`ChatStoreLike.branch(sourceId, messageId, newId)`는 새 `LocalChat`을 돌려줍니다. `@keundal/plugin-chat-local`의 `ChatStore`와 `@keundal/plugin-chat-remote`의 `RemoteChatStore`(데스크톱은 이를 상속)가 구현하며, 복사 규칙은 `@keundal/chat`의 `branchChat()` 하나에 둡니다.
+`ChatStoreLike.branch(sourceId, messageId, newId)`는 새 `LocalChat`을 돌려줍니다. `@keundal/plugin-chat-local`의 `ChatStore`와 `@keundal/chat-http`의 `RemoteChatStore`(데스크톱은 이를 상속)가 구현하며, 복사 규칙은 `@keundal/chat`의 `branchChat()` 하나에 둡니다.
 
 - 원래 대화를 읽고 새 `threadId`에 한 번만 저장합니다. 저장은 `SessionService`의 `get()`과 `commit()`, 원격에서는 기존 `GET`·`PUT /threads/:id`만 씁니다. 새 라우트와 저장소 스키마 변경은 없습니다.
 - `newId`가 이미 있으면 `create()`처럼 `Chat already exists`로 거부합니다. 원래 대화가 없으면 `Chat not found`, 선택한 메시지가 없거나 사용자·어시스턴트 메시지가 아니면 `Invalid message`로 거부하며 새 대화를 남기지 않습니다.

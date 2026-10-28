@@ -32,11 +32,12 @@
     "@keundal/plugin-store-indexeddb": "workspace:*",
     "@keundal/plugin-skill": "workspace:*",
     "@keundal/plugin-chat-local": "workspace:*",
-    "@keundal/plugin-chat-remote": "workspace:*",
+    "@keundal/chat-http": "workspace:*",
     "@keundal/plugin-chat-browser": "workspace:*",
     "@keundal/plugin-llm-browser": "workspace:*",
+    "@keundal/plugin-mcp-client": "workspace:*",
     "cordis": "catalog:",
-    "@keundal/plugin-transcription-browser": "workspace:*"
+    "@keundal/browser-composition": "workspace:*"
   },
   "devDependencies": {
     "@modelcontextprotocol/server": "2.3.1",

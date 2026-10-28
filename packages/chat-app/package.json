@@ -48,13 +48,14 @@
     "@keundal/llm": "workspace:*"
   },
   "devDependencies": {
+    "@keundal/browser-composition": "workspace:*",
     "@keundal/agent-loop": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
     "@keundal/plugin-agent-chat": "workspace:*",
     "@keundal/plugin-chat-browser": "workspace:*",
     "@keundal/plugin-chat-desktop": "workspace:*",
     "@keundal/plugin-chat-local": "workspace:*",
-    "@keundal/plugin-chat-remote": "workspace:*",
+    "@keundal/chat-http": "workspace:*",
     "@keundal/plugin-llm-anthropic": "workspace:*",
     "@keundal/plugin-llm-browser": "workspace:*",
     "@keundal/plugin-llm-gemini": "workspace:*",

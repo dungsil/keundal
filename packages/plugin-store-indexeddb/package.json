@@ -22,7 +22,7 @@
     "@keundal/generation": "workspace:*",
     "@keundal/llm": "workspace:*",
     "@keundal/memory": "workspace:*",
-    "@keundal/plugin-memory": "workspace:*",
+    "@keundal/memory-store": "workspace:*",
     "@keundal/session": "workspace:*",
     "@keundal/task": "workspace:*",
     "@keundal/tool-approval": "workspace:*",

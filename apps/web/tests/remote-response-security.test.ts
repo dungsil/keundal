@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { RemoteChatStore } from '@keundal/plugin-chat-remote'
+import { RemoteChatStore } from '@keundal/chat-http'
 import { EventType, type AGUIEvent } from '@keundal/core'
 import { STREAM_LIMITS } from '@keundal/llm'
 import type { LocalChat } from '@keundal/chat/chat-store'

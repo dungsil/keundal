@@ -17,7 +17,6 @@
     "@keundal/generation": "workspace:*",
     "@keundal/trace": "workspace:*",
     "@keundal/ui": "workspace:*",
-    "@keundal/ui-chat": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
     "cordis": "catalog:",

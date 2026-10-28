@@ -1,7 +1,8 @@
-import type {} from '@keundal/ui-slots'
 import type { ChatMessage, ChatStatus, ToolPart } from '@keundal/chat/chat-message'
 import type { AGUIEvent } from '@keundal/core'
+import type {} from '@keundal/ui-slots'
 
+/** Shared slot contracts; implementations own their runtime declarations. */
 /** Values a tool view receives. The entry `key` is the tool name, `part.type` without the `tool-` prefix. */
 export interface ChatToolOwner {
   part: ToolPart

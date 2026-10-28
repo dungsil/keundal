@@ -1,5 +1,5 @@
 import type { ExecutionOptions } from '@keundal/core'
-import type {} from '@keundal/ui-chat/slots'
+import type {} from '@keundal/ui/app/contracts/chat.ts'
 import type {} from '@keundal/ui-runtime'
 import type { Context } from 'cordis'
 import { lazyView } from '@keundal/ui-slots'

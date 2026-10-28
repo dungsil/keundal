@@ -1,7 +1,7 @@
 import type { Context } from 'cordis'
 import type { AgentPluginSettings, RuntimePluginSource } from '@keundal/chat/platform'
 import type {} from '@keundal/ui-runtime'
-import type {} from '@keundal/ui-settings/slots'
+import type {} from '@keundal/ui/app/contracts/settings.ts'
 import { localizedText, sharedText } from '@keundal/ui/app/utils/locale.ts'
 
 import { messages } from './locale'

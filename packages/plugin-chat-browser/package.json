@@ -33,7 +33,6 @@
     "@keundal/core": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
     "@keundal/mcp": "workspace:*",
-    "@keundal/plugin-mcp-client": "workspace:*",
     "@keundal/skill": "workspace:*",
     "@keundal/skill-markdown": "workspace:*"
   },

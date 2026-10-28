@@ -1,7 +1,7 @@
 import type { Context } from 'cordis'
 import type { LLMSettings } from '@keundal/llm-settings'
 import type {} from '@keundal/ui-runtime'
-import type {} from '@keundal/ui-settings/slots'
+import type {} from '@keundal/ui/app/contracts/settings.ts'
 import LLMSettingsSection from './views/LLMSettings.vue'
 
 export const name = 'ui-settings-llm'

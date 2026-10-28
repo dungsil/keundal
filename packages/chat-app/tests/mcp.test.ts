@@ -9,8 +9,15 @@ import { createChartTools } from '@keundal/plugin-tool-chart'
 import { createWeatherTools } from '@keundal/plugin-tool-weather'
 import type { invoke } from '@tauri-apps/api/core'
 import { expect, test, vi, type TestContext } from 'vitest'
-import { McpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-chat-browser/mcp'
+import { McpManager as BrowserMcpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-chat-browser/mcp'
+import { browserMcpConnector } from '@keundal/browser-composition/mcp'
 import { createNativeMcpSettingsStorage } from '@keundal/plugin-chat-desktop/mcp'
+
+class McpManager extends BrowserMcpManager {
+  constructor(...[storage, options]: ConstructorParameters<typeof BrowserMcpManager>) {
+    super(storage, { connector: browserMcpConnector, ...options })
+  }
+}
 
 function storage() {
   const values = new Map<string, string>()

@@ -1,11 +1,11 @@
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import type { ChatStoreLike } from '@keundal/chat/chat-store'
 import type { Context } from 'cordis'
-import type {} from '@keundal/ui-layout/slots'
+import type {} from '@keundal/ui/app/contracts/layout.ts'
 import type {} from '@keundal/ui-runtime'
 import { lazyView } from '@keundal/ui-slots'
 
-import type {} from './slots'
+import type {} from '@keundal/ui/app/contracts/chat.ts'
 
 export const name = 'ui-chat'
 export const inject = ['slots', 'chatRuntime']

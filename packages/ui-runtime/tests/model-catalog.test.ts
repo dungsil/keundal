@@ -2,7 +2,8 @@ import { createServer } from 'node:http'
 import { effectScope, ref } from 'vue'
 import { expect, onTestFinished, test, vi } from 'vitest'
 import { defaultLLMSettings } from '@keundal/llm-settings'
-import * as modelRequests from '@keundal/plugin-llm-browser/models'
+import * as modelRequests from '@keundal/browser-composition/llm'
+import type { ModelOption } from '@keundal/chat/models'
 import { useModelCatalog } from '../src/model-catalog'
 
 test('API 키 없이 주소만 저장한 공급자의 모델을 조회하고 설정 삭제 시 목록과 캐시를 비운다', async () => {
@@ -89,8 +90,8 @@ test('공급자별 응답을 즉시 표시하고 동시 새로고침은 같은 �
   const settings = ref(defaultLLMSettings())
   settings.value.openai.apiKey = 'key'
   settings.value.google.apiKey = 'key'
-  const openai = Promise.withResolvers<modelRequests.ModelOption[]>()
-  const google = Promise.withResolvers<modelRequests.ModelOption[]>()
+  const openai = Promise.withResolvers<ModelOption[]>()
+  const google = Promise.withResolvers<ModelOption[]>()
   const loader = vi.fn((provider: string) => provider === 'openai' ? openai.promise : google.promise)
   const catalog = scope.run(() => useModelCatalog(settings, loader))!
   const first = catalog.refresh()
@@ -111,8 +112,8 @@ test('설정 변경 전 늦은 응답과 범위 해제 후 응답은 새 목록�
   onTestFinished(() => { scope.stop(); vi.unstubAllGlobals() })
   const settings = ref(defaultLLMSettings())
   settings.value.openai.apiKey = 'old'
-  const old = Promise.withResolvers<modelRequests.ModelOption[]>()
-  const next = Promise.withResolvers<modelRequests.ModelOption[]>()
+  const old = Promise.withResolvers<ModelOption[]>()
+  const next = Promise.withResolvers<ModelOption[]>()
   const loader = vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(next.promise)
   const catalog = scope.run(() => useModelCatalog(settings, loader))!
   settings.value.openai.apiKey = 'new'
@@ -123,7 +124,7 @@ test('설정 변경 전 늦은 응답과 범위 해제 후 응답은 새 목록�
   old.resolve([{ value: 'openai/old', label: 'Old', icon: '' }])
   await old.promise
   expect(catalog.models.value[0]!.value).toBe('openai/new')
-  const disposed = Promise.withResolvers<modelRequests.ModelOption[]>()
+  const disposed = Promise.withResolvers<ModelOption[]>()
   loader.mockReturnValueOnce(disposed.promise)
   const pending = catalog.refresh(true)
   scope.stop()
@@ -140,8 +141,8 @@ test('강제 갱신은 진행 중인 일반 조회를 취소하고 강제 요청
   const settings = ref(defaultLLMSettings())
   settings.value.openai.apiKey = 'key'
   settings.value.google.apiKey = 'key'
-  const slow = Promise.withResolvers<modelRequests.ModelOption[]>()
-  const fresh = Promise.withResolvers<modelRequests.ModelOption[]>()
+  const slow = Promise.withResolvers<ModelOption[]>()
+  const fresh = Promise.withResolvers<ModelOption[]>()
   const loader = vi.fn((provider: string, _settings: unknown, _storage: unknown, options?: { force?: boolean }) => {
     if (options?.force) return fresh.promise
     return provider === 'openai' ? Promise.resolve([{ value: 'openai/cached', label: 'Cached', icon: '' }]) : slow.promise

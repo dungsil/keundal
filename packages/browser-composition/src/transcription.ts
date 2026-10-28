@@ -3,6 +3,7 @@ import { providerCredentials, providerError } from '@keundal/llm-settings'
 import { encodeRealtimeAudio, streamTranscription } from '@keundal/plugin-transcription-openai/client'
 import { Context } from 'cordis'
 
+/** The application's default provider selection, separate from the transcription implementation. */
 export const openaiTranscription: ChatPlatform['transcription'] = {
   sampleRate: 24000,
   async start(settings, audio, signal) {

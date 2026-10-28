@@ -17,7 +17,7 @@ import * as chat from '@keundal/ui-chat/plugin'
 
 ## 선언하는 슬롯
 
-`page.chat`의 `children`으로 선언하며 소유자 타입은 `@keundal/ui-chat/slots`에 있습니다.
+`page.chat`의 `children`으로 선언하며 소유자 타입은 `@keundal/ui/app/contracts/chat.ts`에 있습니다.
 
 - `chat.message.tool`(keyed): 도구 호출 카드입니다. 키는 `part.type`에서 `tool-`을 뺀 도구 이름이고 소유자는 `{ part, message }`입니다. 항목이 없는 도구는 이 패키지의 기본 카드(`plugin.tool*` 문구, 입력과 출력을 JSON으로 표시)로 그립니다.
 - `chat.message.footer`(list): 각 메시지 내용 아래에 렌더링합니다. 소유자는 `{ chatId, message, messages, status }`입니다.

@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@keundal/ui": "workspace:*",
-    "@keundal/ui-composer": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
     "@keundal/workspace": "workspace:*",

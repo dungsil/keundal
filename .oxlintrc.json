@@ -116,11 +116,12 @@
     {
       "files": [
         "packages/chat/src/**",
+        "packages/chat-http/src/**",
+        "packages/browser-composition/src/**",
         "packages/ui-runtime/src/**",
         "packages/ui-slots/src/**",
         "packages/plugin-chat-*/src/**",
-        "packages/plugin-llm-browser/src/**",
-        "packages/plugin-transcription-browser/src/**"
+        "packages/plugin-llm-browser/src/**"
       ],
       "env": {
         "browser": true

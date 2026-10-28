@@ -15,6 +15,9 @@
     "build": "tsdown",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
+  "dependencies": {
+    "@keundal/tools": "workspace:*"
+  },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",

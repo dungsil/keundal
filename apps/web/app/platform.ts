@@ -6,27 +6,29 @@ import agentPlugin, { metadata as agentMetadata } from '@keundal/plugin-agent-ch
 import indexedDBStorePlugin, { metadata as storeMetadata } from '@keundal/plugin-store-indexeddb'
 import skillPlugin, { metadata as skillMetadata } from '@keundal/plugin-skill'
 import { ChatStore } from '@keundal/plugin-chat-local'
-import { RemoteChatStore } from '@keundal/plugin-chat-remote'
-import { browserLLMPlugin, metadata as llmMetadata } from '@keundal/plugin-llm-browser'
-import { loadModels } from '@keundal/plugin-llm-browser/models'
-import { openaiTranscription } from '@keundal/plugin-transcription-browser'
+import { RemoteChatStore } from '@keundal/chat-http'
+import { metadata as llmMetadata } from '@keundal/plugin-llm-browser'
+import { browserLLMPlugin, loadModels } from '@keundal/browser-composition/llm'
+import { browserMcpConnector, createBrowserMcpAccount } from '@keundal/browser-composition/mcp'
+import { openaiTranscription } from '@keundal/browser-composition/transcription'
 import { BrowserRuntimePluginManager, createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
 import { mountRuntimePlugin, type RuntimeModuleRegistry } from '@keundal/plugin-runtime'
 import { createChartTools, metadata as chartMetadata } from '@keundal/plugin-tool-chart'
 import { createWeatherTools, metadata as weatherMetadata } from '@keundal/plugin-tool-weather'
 import type { ChatPlatform } from '@keundal/chat/platform'
 import { loadWebRuntimePlugins } from './runtime-plugins'
-import { metadata as mcpMetadata } from '@keundal/plugin-chat-browser/mcp'
+import { metadata as mcpMetadata } from '@keundal/plugin-mcp-client/browser'
 import { MemoryTaskService } from '@keundal/task-memory'
 import { retrieveMemories } from '@keundal/memory/retrieval'
 
 export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: string, agentToken?: string, pluginConfig?: string } = {}): ChatPlatform {
-  const oauth: BrowserMcpOAuth = new BrowserMcpOAuth(() => mcp.configuration, () => mcp.close())
+  const oauth: BrowserMcpOAuth = new BrowserMcpOAuth(() => mcp.configuration, () => mcp.close(), createBrowserMcpAccount)
   const mcp: McpManager = new McpManager(createBrowserMcpSettingsStorage(storage), {
+    connector: browserMcpConnector,
     oauth,
     getAuthentication: server => oauth.authentication(server)
   })
-  const plugins = runtime.agentEndpoint ? undefined : new BrowserAgentPluginManager(storage)
+  const plugins = runtime.agentEndpoint ? undefined : new BrowserAgentPluginManager(storage, browserMcpConnector)
   const platform: ChatPlatform = {
     mcp,
     plugins,

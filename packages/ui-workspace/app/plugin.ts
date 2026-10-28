@@ -1,5 +1,5 @@
 import type { Context } from 'cordis'
-import type {} from '@keundal/ui-composer/slots'
+import type {} from '@keundal/ui/app/contracts/composer.ts'
 import type {} from '@keundal/ui-runtime'
 import type { CodingWorkspaceSnapshot } from '@keundal/workspace'
 import Workspace from './views/Workspace.vue'

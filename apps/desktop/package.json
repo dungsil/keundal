@@ -33,7 +33,7 @@
     "@keundal/plugin-runtime": "workspace:*",
     "@keundal/plugin-tool-chart": "workspace:*",
     "@keundal/plugin-tool-weather": "workspace:*",
-    "@keundal/plugin-transcription-browser": "workspace:*",
+    "@keundal/browser-composition": "workspace:*",
     "@tauri-apps/api": "2.12.4",
     "desktop-npm": "npm:npm@11.12.0",
     "fflate": "0.8.3",

@@ -1,4 +1,4 @@
-import { StoredMemoryService } from '@keundal/plugin-memory'
+import { StoredMemoryService } from '@keundal/memory-store'
 import type { Context } from 'cordis'
 
 import { SqliteAutomationStore } from './automation.js'

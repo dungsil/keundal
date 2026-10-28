@@ -11,7 +11,7 @@ import { onTestFinished, test, expect } from 'vitest'
 
 import { createAgentHandler } from '../server/agent/handler'
 import type { ChatMessage } from '@keundal/chat/chat-message'
-import { RemoteChatStore } from '@keundal/plugin-chat-remote'
+import { RemoteChatStore } from '@keundal/chat-http'
 import { createDesktopChatStore } from '@keundal/plugin-chat-desktop'
 import { readTraceSpans } from '@keundal/trace'
 

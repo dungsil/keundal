@@ -1,7 +1,8 @@
-import type {} from '@keundal/ui-slots'
 import type { ChatStatus } from '@keundal/chat/chat-message'
 import type { FileWithStatus } from '@keundal/chat/file'
+import type {} from '@keundal/ui-slots'
 
+/** Shared slot contracts; implementations own their runtime declarations. */
 /** How a message sent during a run is delivered: after the run, or into the run at its next safe boundary. */
 export type DeliveryMode = 'queue' | 'steer'
 

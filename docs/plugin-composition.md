@@ -2,20 +2,20 @@
 
 web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도구를 런타임 JSON 설정으로 선택합니다. 앱의 `app/platform.ts`는 실행 환경과 기본 플러그인 목록을 제공합니다. 공통 채팅 레이어는 `@keundal/ui-runtime`을 거쳐 `ChatPlatform` 계약으로 설정·대화·모델 목록·받아쓰기를 사용합니다. 화면 구성은 [UI 플러그인 문서](ui-plugins.md)를 따릅니다.
 
-| 경계                                        | 담당 패키지 또는 경로                   |
-| ------------------------------------------- | --------------------------------------- |
-| 채팅 데이터와 플랫폼 계약                   | `@keundal/chat`                         |
-| 화면 셸과 UI 플러그인 조립                  | `@keundal/chat-app`                     |
-| 화면 기능과 공유 화면 상태                  | `@keundal/ui-*`, `@keundal/ui-runtime`  |
-| Cordis 서비스로 대화 실행                   | `@keundal/plugin-chat-local`            |
-| HTTP 호스트 연결                            | `@keundal/plugin-chat-remote`           |
-| sidecar·OS 보안 저장소·로컬 스킬 IPC        | `@keundal/plugin-chat-desktop`          |
-| 브라우저 설정 저장과 MCP 연결 관리          | `@keundal/plugin-chat-browser`          |
-| 브라우저 LLM과 모델 목록의 기본 공급자 구성 | `@keundal/plugin-llm-browser`           |
-| 브라우저 받아쓰기의 기본 공급자 구성        | `@keundal/plugin-transcription-browser` |
-| 공급자와 무관한 호스트와 HTTP 연결          | `@keundal/agent-host`                   |
-| Node.js 환경 설정과 기본 플러그인 구성      | `@keundal/agent-runtime-node`           |
-| 런타임 플러그인 설정과 Cordis 모듈 로딩     | `@keundal/plugin-runtime`               |
+| 경계                                         | 담당 패키지 또는 경로                  |
+| -------------------------------------------- | -------------------------------------- |
+| 채팅 데이터와 플랫폼 계약                    | `@keundal/chat`                        |
+| 화면 셸과 UI 플러그인 조립                   | `@keundal/chat-app`                    |
+| 화면 기능과 공유 화면 상태                   | `@keundal/ui-*`, `@keundal/ui-runtime` |
+| Cordis 서비스로 대화 실행                    | `@keundal/plugin-chat-local`           |
+| HTTP 호스트 연결                             | `@keundal/chat-http`                   |
+| sidecar·OS 보안 저장소·로컬 스킬 IPC         | `@keundal/plugin-chat-desktop`         |
+| 브라우저 설정 저장과 MCP 연결 관리           | `@keundal/plugin-chat-browser`         |
+| 브라우저 LLM 설정과 모델 목록 캐시           | `@keundal/plugin-llm-browser`          |
+| 브라우저 LLM·MCP·받아쓰기의 기본 공급자 조립 | `@keundal/browser-composition`         |
+| 공급자와 무관한 호스트와 HTTP 연결           | `@keundal/agent-host`                  |
+| Node.js 환경 설정과 기본 플러그인 구성       | `@keundal/agent-runtime-node`          |
+| 런타임 플러그인 설정과 Cordis 모듈 로딩      | `@keundal/plugin-runtime`              |
 
 `@keundal/llm`, `@keundal/session`, `@keundal/generation`, `@keundal/skill`은 각 서비스 계약과 Cordis Context 확장을 소유합니다. `@keundal/agent`, `@keundal/tools`, `@keundal/context`, `@keundal/mcp`, `@keundal/shell`, `@keundal/transcription`, `@keundal/fs`, `@keundal/workspace`도 구현 플러그인에 의존하지 않습니다. `@keundal/core`는 AG-UI 프로토콜과 공통 실행·메시지만 제공하며 기능별 계약을 다시 내보내지 않습니다.
 
@@ -24,6 +24,21 @@ Git 작업공간은 `@keundal/workspace` 계약, `@keundal/plugin-workspace-git`
 기본 실행 루프는 `@keundal/agent-loop`가 소유하고, 요약 축약은 `@keundal/compaction-summary`, 도구 반복은 `@keundal/tool-execution`, 지연 도구는 `@keundal/deferred-tools`, 실행 추적은 `@keundal/trace`를 조합합니다. 독립적인 에이전트는 `AgentService`를 구현하고, 기본 루프를 재사용할 때는 `agent-loop`의 `Agent`를 상속합니다. 계약과 구현의 전체 경계와 가져오기 경로 변경은 [ADR-0005](adr/0005-service-package-boundaries.md)를 참고합니다.
 
 `@keundal/plugin-agent-chat`과 `@keundal/plugin-agent-coding`은 같은 루프를 재사용하는 별도 구현입니다. 코딩 구현은 채팅 구현에 의존하지 않습니다. `@keundal/plugin-context`는 환경에 독립적인 컨텍스트 공급자를, `@keundal/plugin-context-node`는 로컬 파일·에이전트 지침·tmux 공급자를 제공합니다. 스킬의 Markdown 형식 해석은 `@keundal/skill-markdown`이 담당합니다.
+
+플러그인은 다른 플러그인의 구현을 가져오지 않습니다. 서비스 계약이나 공통 알고리즘을 사용하고, 구체적인 공급자는 앱·`browser-composition`·`agent-runtime-node`에서 선택해 주입합니다. `agent-loop`처럼 여러 구현이 재사용하는 실행 알고리즘은 유지합니다. UI 슬롯의 타입은 `@keundal/ui/app/contracts/*`에서 공유하고, 실제 슬롯의 선언과 해제는 화면을 소유한 플러그인이 담당합니다.
+
+메모리 저장 어댑터의 계약은 `@keundal/memory`, 공통 검색·revision 처리는 `@keundal/memory-store`가 소유합니다. 메모리·IndexedDB·SQLite 저장소 플러그인과 `plugin-memory`는 이 공통 처리를 재사용하며 서로의 구현을 가져오지 않습니다. `plugin-memory`는 어댑터를 받아 서비스를 등록하는 진입점만 제공합니다.
+
+기능 추가는 해당 플러그인과 조립 목록에서 처리합니다. `chat-app/app/ui-plugins.ts`는 목록만 소유하며 등록·해제 로직은 `ui-plugin-manager.ts`에 둡니다. Node.js의 MCP·Agent Plugins 수명은 `agent-integrations.ts`, 코딩 파일시스템 구성은 `coding-agent.ts`에서 관리합니다. 저장소 형식과 기존 플러그인 선택 식별자는 바꾸지 않습니다.
+
+### 가져오기와 주입 변경
+
+- `@keundal/plugin-chat-remote`는 `@keundal/chat-http`로 바꿉니다. `RemoteChatStore`의 계약과 HTTP 동작은 같습니다.
+- 기본 `browserLLMPlugin`과 `loadModels`는 `@keundal/browser-composition/llm`에서 가져옵니다. `plugin-llm-browser`를 직접 사용할 때는 `providers`와 `ModelLoaders`를 주입합니다.
+- `@keundal/plugin-transcription-browser`의 `openaiTranscription`은 `@keundal/browser-composition/transcription`으로 옮겼습니다.
+- `McpManager`에는 `McpConnector`를, `BrowserMcpOAuth`의 세 번째 인자에는 계정 팩터리를 전달합니다. 웹 기본값은 `@keundal/browser-composition/mcp`의 `browserMcpConnector`와 `createBrowserMcpAccount`입니다. `BrowserAgentPluginManager`의 두 번째 인자도 같은 연결자를 받습니다.
+- `loadAgentPlugin(config, options)`에서 MCP를 사용하면 `options.connectMcp`를 전달합니다. Node.js 기본 조립은 `McpClient.connect`를 주입합니다.
+- `@keundal/ui-{chat,composer,layout,settings}/slots`는 각각 `@keundal/ui/app/contracts/{chat,composer,layout,settings}.ts`로 바꿉니다. 타입만 사용하는 플러그인은 슬롯 소유자 패키지에 의존하지 않습니다.
 
 ## 구현 교체
 
@@ -154,4 +169,4 @@ Git 작업공간은 `@keundal/workspace` 계약, `@keundal/plugin-workspace-git`
 
 ## 경계 검증
 
-`pnpm check:boundaries`는 앱 간 의존성과 함께 공통 UI·계약 패키지의 구현 의존성을 검사합니다. 통합 테스트의 개발 의존성은 허용하지만, 실행 의존성과 `src`, `app`, `shared`의 구현 직접 참조는 거부합니다.
+`pnpm check:boundaries`는 앱 간 의존성과 함께 공통 UI·계약 패키지의 구현 의존성을 검사합니다. 통합 테스트의 개발 의존성은 허용하지만, 실행 의존성과 `src`, `app`, `shared`의 구현 직접 참조는 거부합니다. 플러그인끼리의 구현 참조와 UI 기능끼리의 참조도 거부합니다. 타입 가져오기, 동적 가져오기, 재노출, 상대 경로, 의존성 별칭과 Nuxt·TypeScript 설정도 검사합니다. 선택에 쓰는 모듈 이름 문자열은 구현 참조로 보지 않습니다.
