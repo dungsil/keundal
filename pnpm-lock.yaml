@@ -688,6 +688,9 @@ importers:
       '@keundal/mcp':
         specifier: workspace:*
         version: link:../mcp
+      '@keundal/memory':
+        specifier: workspace:*
+        version: link:../memory
       '@keundal/plugin-agent-chat':
         specifier: workspace:*
         version: link:../plugin-agent-chat
@@ -1284,6 +1287,37 @@ importers:
         version: 6.0.3
 
   packages/mcp:
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/memory:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/tools':
+        specifier: workspace:*
+        version: link:../tools
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -2282,6 +2316,9 @@ importers:
       '@keundal/llm':
         specifier: workspace:*
         version: link:../llm
+      '@keundal/memory':
+        specifier: workspace:*
+        version: link:../memory
       '@keundal/session':
         specifier: workspace:*
         version: link:../session

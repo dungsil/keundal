@@ -2,6 +2,7 @@ import type { Context } from 'cordis'
 
 import { sqliteStoreConfigSchema, type SqliteStoreConfig } from './config.js'
 import { SqliteGenerationService } from './generation.js'
+import { SqliteMemoryService } from './memory.js'
 import { SqliteSessionService } from './session.js'
 import { SqliteStore } from './store.js'
 import { SqliteTaskStore } from './tasks.js'
@@ -16,6 +17,7 @@ export const metadata = {
 
 export { sqliteStoreConfigSchema, type SqliteStoreConfig } from './config.js'
 export { SqliteGenerationService } from './generation.js'
+export { SqliteMemoryService } from './memory.js'
 export { SqliteSessionService } from './session.js'
 export { SqliteStore, type RunOwnership, type StoredRun, type StoredThread } from './store.js'
 export { SqliteTaskStore } from './tasks.js'
@@ -31,6 +33,7 @@ export const sqliteStorePlugin = Object.assign(
     ctx.fiber.effect(() => () => store.release())
     new SqliteSessionService(ctx, store)
     new SqliteTaskStore(ctx, store)
+    new SqliteMemoryService(ctx, store)
     ctx.inject(['llm', 'session'], (injected) => {
       new SqliteGenerationService(injected, store)
     })

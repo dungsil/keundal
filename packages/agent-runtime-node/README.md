@@ -12,6 +12,15 @@ const runtime = await createAgentRuntime(process.env, { compose: createNodeCompo
 
 `KEUNDAL_MODEL`, 공급자 API 키, `KEUNDAL_API_TOKEN`과 기존 환경 변수 형식은 유지합니다. API 키 없이 연결할 때는 `KEUNDAL_PROVIDER`를 명시합니다. 자세한 설정은 [웹 앱 문서](../../apps/web/README.md)를 참고합니다.
 
+## 프로젝트 메모리
+
+`KEUNDAL_PROJECT_ID` 또는 `createNodeAgentHost()`의 `projectId`를 지정하면 프로젝트 범위의
+`memory_save`, `memory_search`, `memory_get`, `memory_update`, `memory_delete` 도구를 제공합니다.
+같은 SQLite 파일과 프로젝트 ID를 사용하는 대화는 저장한 정보와 출처를 공유합니다.
+생략하면 도구를 제공하지 않으며, 빈 ID나 `memory` 서비스가 없는 저장소 구성은 거부합니다.
+프로젝트 선택은 모델이나 HTTP 요청이 아니라 호스트를 조립하는 앱이 담당합니다.
+검색 규칙과 승인 설정은 [메모리 문서](../memory/README.md)를 참고하세요.
+
 ## 런타임 플러그인
 
 기본 구성은 `KEUNDAL_PLUGIN_CONFIG`가 가리키는 JSON 파일을 시작할 때 읽습니다. 경로는 절대 경로 또는 현재 작업 디렉터리 기준 상대 경로입니다. 변수를 설정하지 않으면 현재 작업 디렉터리의 `keundal.plugins.json`을 찾습니다. 파일이 없으면 기본 구성을 사용합니다.

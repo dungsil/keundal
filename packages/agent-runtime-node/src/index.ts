@@ -44,6 +44,8 @@ export interface NodeHostOptions {
   /** 사용할 수 있는 모델과 한도입니다. */
   readonly models?: Readonly<Record<string, Omit<AgentHostModel, 'id' | 'provider'>>>
   readonly sqlitePath: string
+  /** Stable project scope for opt-in persistent memory tools. Omit to leave them disabled. */
+  readonly projectId?: string
   /** Durable workspace state outside selected repositories. */
   readonly workspaceRoot?: string
   readonly maxOutputTokens?: number
@@ -147,6 +149,7 @@ export async function createAgentRuntime(
       model,
       models: { [model]: { contextWindow, maxOutputTokens } },
       sqlitePath,
+      projectId: env.KEUNDAL_PROJECT_ID,
       workspaceRoot: env.KEUNDAL_WORKSPACE_ROOT,
       maxOutputTokens,
       baseURL: env.KEUNDAL_BASE_URL || undefined,

@@ -94,6 +94,19 @@ CREATE TABLE IF NOT EXISTS tasks (
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS tasks_parent_thread ON tasks (parent_thread_id);
+
+CREATE TABLE IF NOT EXISTS project_memories (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  sources TEXT NOT NULL,
+  revision INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS project_memories_project ON project_memories (project_id, updated_at DESC);
 `
 
 /** 데이터베이스 잠금을 기다리는 최대 시간입니다. */
