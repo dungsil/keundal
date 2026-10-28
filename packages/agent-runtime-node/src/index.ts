@@ -8,17 +8,26 @@ import type { RuntimePluginManifest } from '@keundal/plugin-runtime'
 import { ToolApproval, type ToolApprovalPolicy } from '@keundal/tool-approval'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
 
-export { createNodeComposition, getRequiredNodePluginModules, nodePluginMetadata } from './default-composition.js'
+export {
+  createNodeComposition,
+  getRequiredNodePluginModules,
+  getConfiguredNodePluginModules,
+  nodePluginMetadata
+} from './default-composition.js'
 
 export type AgentHostProvider = 'openai' | 'gemini' | 'anthropic' | (string & {})
 export type BundledPluginModule =
+  | '@keundal/prompt'
+  | '@keundal/subagent'
+  | '@keundal/plugin-agent-chat'
   | '@keundal/plugin-skill'
   | '@keundal/plugin-mcp-client'
   | '@keundal/plugin-tool-chart'
   | '@keundal/plugin-tool-weather'
   /** Legacy preference used only as a fallback for the split tool selections. */
   | '@keundal/plugin-tool-chat'
-export type BundledPluginSelection = Readonly<Partial<Record<BundledPluginModule, boolean>>>
+export type BundledPluginSelection = Readonly<Partial<Record<BundledPluginModule, boolean>>> &
+  Readonly<Record<string, boolean | undefined>>
 
 export interface NodeHostOptions {
   readonly toolApproval?: ToolApprovalPolicy

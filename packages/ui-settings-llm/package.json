@@ -6,7 +6,8 @@
   "main": "./nuxt.config.ts",
   "exports": {
     ".": "./nuxt.config.ts",
-    "./plugin": "./app/plugin.ts"
+    "./plugin": "./app/plugin.ts",
+    "./prompt-plugin": "./app/prompt-plugin.ts"
   },
   "dependencies": {
     "@keundal/chat": "workspace:*",

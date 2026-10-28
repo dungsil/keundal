@@ -1,7 +1,11 @@
 export default {
   'runtime.title': 'Keundal plugins',
   'runtime.unavailable': 'Plugin selection is unavailable for this connection.',
-  'runtime.bundled': 'Choose from the functional plugins bundled with this app. Related views follow each feature automatically, without separate UI switches. External downloads are not supported. Required plugins stay enabled.',
+  'runtime.bundled': 'Manage execution and UI plugins. Dependencies and dependent plugins are linked below each entry. Turning off a dependency suspends related views without erasing their selections or saved data. Only essential services and the management shell stay enabled. External downloads are not supported in the browser.',
+  'runtime.requires': 'Requires',
+  'runtime.usedBy': 'Used by',
+  'runtime.blocked': 'Dependency disabled',
+  'runtime.blockedDescription': 'Waiting for: {names}. Your enabled selection is preserved.',
   'runtime.required': 'Required',
   'runtime.requiredDescription': 'Required plugin. Always enabled and cannot be turned off.',
   'runtime.enabled': 'Enabled',
