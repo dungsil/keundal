@@ -25,6 +25,40 @@ const request: LLMRequest = {
   }
 }
 const limits = { contextWindow: 128, maxOutputTokens: 64 }
+
+test('공개 설정 스키마와 서비스가 모델 기능 메타데이터를 보존한다', async (t) => {
+  const capabilities = {
+    tools: true,
+    reasoning: [false, true, 'low', 'medium', 'high', 'xhigh', 'max'],
+    webSearch: false
+  } as const
+  const model = { ...limits, capabilities }
+  const config = { apiKey: 'test-api-key', models: { 'test-model': model, legacy: limits } }
+  expect(await GeminiLLMConfigSchema['~standard'].validate(config)).toHaveProperty('value.models.test-model', model)
+  const ctx = new Context()
+  const fiber = await ctx.plugin(geminiLLMPlugin, config)
+  t.onTestFinished(() => fiber.dispose())
+  expect(await ctx.llm.getModel('test-model')).toStrictEqual(model)
+  expect(await ctx.llm.getModel('legacy')).toStrictEqual(limits)
+})
+
+test('공개 설정 스키마가 잘못된 모델 기능 메타데이터를 거부한다', async () => {
+  for (const capabilities of [
+    null,
+    [],
+    { tools: 1 },
+    { webSearch: 'true' },
+    { reasoning: true },
+    { reasoning: [undefined] },
+    { reasoning: ['invalid'] },
+    { unknown: true }
+  ]) {
+    expect(
+      await GeminiLLMConfigSchema['~standard'].validate({ models: { model: { ...limits, capabilities } } })
+    ).toHaveProperty('issues')
+  }
+})
+
 type Chunk = Record<string, unknown>
 type Received = {
   path: string | undefined

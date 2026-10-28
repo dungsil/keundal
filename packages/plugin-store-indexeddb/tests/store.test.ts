@@ -2,6 +2,7 @@ import { EventType, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
 import { type GenerationRequest } from '@keundal/generation'
 import { LLMService, type LLMEvent, type LLMModel, type LLMRequest } from '@keundal/llm'
 import indexedDBStorePlugin, { IndexedDBStore, type WebLockManager } from '@keundal/plugin-store-indexeddb'
+import type { TaskSnapshot, TaskStatus } from '@keundal/task'
 import { Context, type Fiber } from 'cordis'
 import { IDBFactory, IDBVersionChangeEvent } from 'fake-indexeddb'
 import { expect, test, type TestContext } from 'vitest'
@@ -56,6 +57,109 @@ test('백업을 왕복해 상태와 실행을 보존하고 충돌·실행 중·�
   await target.fibers[0]!.dispose()
   expect(await target.ctx.backup.export()).toEqual(data)
   expect(await backup.export()).toEqual(data)
+})
+
+test('이전 IndexedDB를 업그레이드하고 다시 열어도 작업 결과와 세션을 보존한다', async (t) => {
+  const factory = new IDBFactory()
+  const databaseName = crypto.randomUUID()
+  await new Promise<void>((resolve, reject) => {
+    const opening = factory.open(databaseName, 1)
+    opening.onupgradeneeded = () => {
+      const db = opening.result
+      const threads = db.createObjectStore('threads', { keyPath: 'threadId' })
+      threads.put({ threadId: 'old', revision: 3, messages: [], state: { retained: true } })
+      db.createObjectStore('runs', { keyPath: 'runId' })
+      db.createObjectStore('journal', { keyPath: ['runId', 'sequence'] }).createIndex('by-run', 'runId')
+    }
+    opening.onsuccess = () => {
+      opening.result.close()
+      resolve()
+    }
+    opening.onerror = () => reject(opening.error)
+  })
+  const locks = new Locks()
+  const first = await setup(t, [], new IndexedDBStore({ databaseName, indexedDB: factory, locks }))
+  const taskStatuses: TaskStatus[] = ['queued', 'running', 'completed', 'failed', 'cancelled', 'interrupted']
+  const snapshots: TaskSnapshot[] = taskStatuses.map((status, i) => ({
+    id: `task-${i}`,
+    status,
+    threadId: `child-${i}`,
+    runId: `run-${i}`,
+    parentThreadId: i % 2 ? 'other' : 'parent',
+    parentRunId: 'parent-run',
+    label: `label-${i}`,
+    content: `output-${i}`,
+    ...(status === 'failed' ? { error: 'provider failed' } : {}),
+    createdAt: 100 + i,
+    updatedAt: 200 + i
+  }))
+  for (const snapshot of snapshots) await first.ctx.taskStore.save(snapshot)
+  await first.fibers[1]!.dispose()
+  first.store.close()
+
+  const second = await setup(t, [], new IndexedDBStore({ databaseName, indexedDB: factory, locks }))
+  expect(await second.ctx.taskStore.list()).toEqual(snapshots)
+  await second.ctx.taskStore.recover()
+  const recovered = await second.ctx.taskStore.list()
+  for (const [i, snapshot] of snapshots.entries()) {
+    if (snapshot.status === 'queued' || snapshot.status === 'running') {
+      expect(recovered[i]).toEqual({ ...snapshot, status: 'interrupted', updatedAt: expect.any(Number) })
+      expect(recovered[i]!.updatedAt).toBeGreaterThan(snapshot.updatedAt)
+    } else expect(recovered[i]).toEqual(snapshot)
+  }
+  await second.ctx.taskStore.recover()
+  expect(await second.ctx.taskStore.list()).toEqual(recovered)
+  expect(await second.ctx.taskStore.list({ parentThreadId: 'parent' })).toEqual([
+    recovered[0],
+    recovered[2],
+    recovered[4]
+  ])
+  const copy = (await second.ctx.taskStore.get('task-0'))!
+  copy.content = 'changed'
+  expect(await second.ctx.taskStore.get('task-0')).toEqual(recovered[0])
+  expect(await second.ctx.taskStore.get('missing')).toBeUndefined()
+  expect(await second.ctx.session.get('old')).toEqual({
+    threadId: 'old',
+    revision: 3,
+    messages: [],
+    state: { retained: true }
+  })
+  expect(second.methodCalls).toEqual([])
+})
+
+test('다른 탭이 소유한 대기·실행 작업은 복구하지 않고 잠금 해제 후에만 interrupted로 바꾼다', async (t) => {
+  const factory = new IDBFactory()
+  const databaseName = crypto.randomUUID()
+  const locks = new Locks()
+  const first = await setup(t, [], new IndexedDBStore({ databaseName, indexedDB: factory, locks }))
+  const second = await setup(t, [], new IndexedDBStore({ databaseName, indexedDB: factory, locks }))
+  for (const status of ['queued', 'running'] as const) {
+    const release = await first.ctx.taskStore.acquire(status)
+    const task: TaskSnapshot = {
+      id: status,
+      status,
+      threadId: 'child',
+      runId: status,
+      parentThreadId: 'parent',
+      parentRunId: 'parent-run',
+      content: 'partial',
+      createdAt: 1,
+      updatedAt: 2
+    }
+    try {
+      await first.ctx.taskStore.save(task)
+      await second.ctx.taskStore.recover()
+      expect(await second.ctx.taskStore.get(status)).toEqual(task)
+    } finally {
+      await release()
+    }
+    await second.ctx.taskStore.recover()
+    expect(await second.ctx.taskStore.get(status)).toEqual({
+      ...task,
+      status: 'interrupted',
+      updatedAt: expect.any(Number)
+    })
+  }
 })
 
 test('승인 이벤트를 전달하기 전에 IndexedDB 배치를 확정한다', async (t) => {

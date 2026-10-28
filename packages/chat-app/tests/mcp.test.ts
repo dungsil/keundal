@@ -169,9 +169,13 @@ test('데스크톱 서버별 HTTP 허용을 저장하고 다시 불러와도 다
   expect(local.values.size).toBe(0)
 })
 
-async function jsonRpcServer(t: TestContext) {
+async function jsonRpcServer(t: TestContext, bearer?: string) {
   const calls: string[] = []
   const http = createServer(async (req, res) => {
+    if (bearer && req.headers.authorization !== `Bearer ${bearer}`) {
+      res.writeHead(401).end()
+      return
+    }
     const chunks: Buffer[] = []
     for await (const chunk of req) chunks.push(Buffer.from(chunk))
     if (req.method === 'GET') {
@@ -223,6 +227,26 @@ test('저장하지 않은 설정으로 연결을 확인하면 도구 목록을 �
   expect(calls.at(-1)).toBe('DELETE')
   expect(manager.configuration).toEqual([remote])
   expect([...local.values.entries()]).toEqual(saved)
+})
+
+test('주입한 MCP 계정으로 연결과 확인을 인증하고 서버 설정에 토큰을 저장하지 않는다', async (t) => {
+  const { url } = await jsonRpcServer(t, 'account-token')
+  const local = storage()
+  const manager = new McpManager(createBrowserMcpSettingsStorage(local), {
+    authentication: {
+      docs: {
+        serverUrl: url,
+        signal: new AbortController().signal,
+        token: async () => 'account-token',
+        onUnauthorized: async () => { throw new Error('Login required') }
+      }
+    }
+  })
+  t.onTestFinished(() => manager.close())
+  await manager.save([{ ...remote, url }], async () => {})
+  expect((await manager.probe({ ...remote, url })).tools.map(tool => tool.name)).toEqual(['search', 'delete_all'])
+  expect((await manager.tools()).map(tool => tool.name)).toEqual(['mcp__docs__tool__search'])
+  expect([...local.values.values()].join(' ')).not.toContain('account-token')
 })
 
 test('도달할 수 없는 서버는 확인에 실패하고 저장된 설정을 유지한다', async () => {

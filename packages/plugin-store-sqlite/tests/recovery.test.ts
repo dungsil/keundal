@@ -7,7 +7,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { EventType, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
 import { type GenerationRequest } from '@keundal/generation'
 import { LLMService, type LLMEvent, type LLMModel, type LLMRequest } from '@keundal/llm'
-import sqliteStorePlugin, { SqliteStore } from '@keundal/plugin-store-sqlite'
+import sqliteStorePlugin, { SqliteStore, SqliteTaskStore } from '@keundal/plugin-store-sqlite'
+import type { TaskSnapshot, TaskStatus } from '@keundal/task'
 import { Context, type Fiber } from 'cordis'
 import { expect, test, vi, type TestContext } from 'vitest'
 
@@ -94,6 +95,112 @@ const request = (runId = 'run'): GenerationRequest => ({
   model: 'test-model',
   maxOutputTokens: 10,
   sessionRevision: 0
+})
+
+test('작업을 다시 열고 두 번 복구해도 종료 상태와 출력 및 세션을 보존한다', async (t) => {
+  const path = databasePath(t)
+  const first = await setup(t, { events: [] }, path)
+  expect(first.ctx.taskStore).toBeInstanceOf(SqliteTaskStore)
+  expect(await first.ctx.taskStore.get('missing')).toBeUndefined()
+  expect(await first.ctx.taskStore.list()).toEqual([])
+  const session = await first.ctx.session.commit({
+    threadId: 'parent',
+    expectedRevision: 0,
+    messages: [{ id: 'message', role: 'user', content: 'existing session' }],
+    state: { retained: true }
+  })
+  const taskStatuses: TaskStatus[] = ['queued', 'running', 'completed', 'failed', 'cancelled', 'interrupted']
+  const tasks: TaskSnapshot[] = taskStatuses.map((status, index) => ({
+    id: `task-${status}`,
+    status,
+    threadId: `child-${index}`,
+    runId: `run-${index}`,
+    parentThreadId: index % 2 === 0 ? 'parent' : 'other-parent',
+    parentRunId: `parent-run-${index}`,
+    ...(index % 2 === 0 ? { label: `label-${index}` } : {}),
+    content: `partial or final output ${index}`,
+    ...(index % 2 === 1 ? { error: `error-${index}` } : {}),
+    createdAt: 100 + index,
+    updatedAt: 200 + index
+  }))
+  for (const task of tasks) {
+    const value = { ...task, content: 'initial content', label: 'initial label', error: 'initial error' }
+    await first.ctx.taskStore.save(value)
+    value.content = 'mutated after saving'
+    expect((await first.ctx.taskStore.get(task.id))?.content).toBe('initial content')
+    await first.ctx.taskStore.save(task)
+  }
+  expect(await first.ctx.taskStore.list()).toEqual(tasks)
+  await first.fibers[1]?.dispose()
+
+  const second = await setup(t, { events: [] }, path)
+  expect(await second.ctx.taskStore.list()).toEqual(tasks)
+  const beforeRecovery = Date.now()
+  await second.ctx.taskStore.recover()
+  const afterRecovery = Date.now()
+  const recovered = await second.ctx.taskStore.list()
+  for (const [index, task] of tasks.entries()) {
+    const result = recovered[index]!
+    if (task.status === 'queued' || task.status === 'running') {
+      expect(result).toEqual({ ...task, status: 'interrupted', updatedAt: result.updatedAt })
+      expect(result.updatedAt).toBeGreaterThanOrEqual(beforeRecovery)
+      expect(result.updatedAt).toBeLessThanOrEqual(afterRecovery)
+    } else {
+      expect(result).toEqual(task)
+    }
+    expect(await second.ctx.taskStore.get(task.id)).toEqual(result)
+  }
+  await second.ctx.taskStore.recover()
+  expect(await second.ctx.taskStore.list()).toEqual(recovered)
+  const filtered = recovered.filter((task) => task.parentThreadId === 'parent')
+  expect(await second.ctx.taskStore.list({ parentThreadId: 'parent' })).toEqual(filtered)
+  expect(await second.ctx.taskStore.list({ parentThreadId: 'missing' })).toEqual([])
+  expect(await second.ctx.taskStore.list({ parentThreadId: '' })).toEqual([])
+
+  const single = (await second.ctx.taskStore.get(tasks[0]!.id))!
+  single.content = 'mutated get result'
+  single.error = 'mutated error'
+  const listed = await second.ctx.taskStore.list({ parentThreadId: 'parent' })
+  listed[0]!.content = 'mutated list result'
+  listed.pop()
+  expect(await second.ctx.taskStore.list()).toEqual(recovered)
+  expect(await second.ctx.session.get('parent')).toEqual(session)
+  expect(second.calls).toEqual([])
+
+  const disposed = second.ctx.taskStore
+  await second.fibers[1]?.dispose()
+  await expect(disposed.get('missing')).rejects.toThrow('disposed')
+  await expect(disposed.list()).rejects.toThrow('disposed')
+  await expect(disposed.save(tasks[0]!)).rejects.toThrow('disposed')
+  await expect(disposed.recover()).rejects.toThrow('disposed')
+})
+
+test('작업 복구가 실패하면 모든 작업의 상태와 시각을 되돌린다', async (t) => {
+  const path = databasePath(t)
+  const { ctx } = await setup(t, { events: [] }, path)
+  const taskStatuses: TaskStatus[] = ['queued', 'running']
+  const tasks: TaskSnapshot[] = taskStatuses.map((status, index) => ({
+    id: `task-${index}`,
+    status,
+    threadId: `child-${index}`,
+    runId: `run-${index}`,
+    parentThreadId: 'parent',
+    parentRunId: 'parent-run',
+    content: `partial-${index}`,
+    createdAt: 100,
+    updatedAt: 200
+  }))
+  for (const task of tasks) await ctx.taskStore.save(task)
+  const writer = new DatabaseSync(path)
+  try {
+    writer.exec(`CREATE TRIGGER fail_task_recovery BEFORE UPDATE ON tasks
+      WHEN OLD.task_id = 'task-1' BEGIN SELECT RAISE(ABORT, 'recovery failed'); END`)
+    await expect(ctx.taskStore.recover()).rejects.toThrow('recovery failed')
+    expect(await ctx.taskStore.list()).toEqual(tasks)
+  } finally {
+    writer.exec('DROP TRIGGER fail_task_recovery')
+    writer.close()
+  }
 })
 
 test('승인 이벤트를 전달하기 전에 배치를 디스크에 확정한다', async (t) => {

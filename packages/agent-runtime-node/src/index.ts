@@ -3,7 +3,7 @@ import process from 'node:process'
 import { createAgentHost, type AgentHostModel, type AgentHostOptions, type AgentHost } from '@keundal/agent-host'
 import { createAgentApp, type AgentAppOptions } from '@keundal/agent-host/http'
 import type { AgentPluginOptions, LoadedAgentPlugin } from '@keundal/agent-plugins'
-import type { McpClientConfig } from '@keundal/mcp'
+import type { McpAuthentication, McpClientConfig } from '@keundal/mcp'
 import type { RuntimePluginManifest } from '@keundal/plugin-runtime'
 import { ToolApproval, type ToolApprovalPolicy } from '@keundal/tool-approval'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
@@ -35,6 +35,8 @@ export interface NodeHostOptions {
   /** Bundled optional features default to enabled; deployment manifests remain operator-owned. */
   readonly bundledPlugins?: BundledPluginSelection
   readonly mcpServers?: readonly McpClientConfig[]
+  /** Live per-user account controllers; never serialized into environment/server settings. */
+  readonly mcpAuthentication?: Readonly<Record<string, McpAuthentication>>
   readonly provider: AgentHostProvider
   readonly apiKey: string
   /** 기본 모델 ID입니다. `models`에 포함되어야 합니다. */
@@ -93,6 +95,7 @@ export async function createAgentRuntime(
     | 'runtimePluginBasePath'
     | 'bundledPlugins'
     | 'toolApproval'
+    | 'mcpAuthentication'
   > & {
     compose: HostCompositionFactory
   }
@@ -136,6 +139,7 @@ export async function createAgentRuntime(
       pluginConfigPath: env.KEUNDAL_PLUGIN_CONFIG,
       requireProviderApiKey: !env.KEUNDAL_PROVIDER,
       mcpServers: env.KEUNDAL_MCP_SERVERS ? JSON.parse(env.KEUNDAL_MCP_SERVERS) : [],
+      mcpAuthentication: options.mcpAuthentication,
       provider,
       apiKey: apiKey ?? '',
       model,

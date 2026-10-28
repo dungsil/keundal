@@ -28,8 +28,10 @@ import type { Context } from 'cordis'
 import { BudgetLedger, parseRunBudget } from './budget.js'
 import type { AgentConfig } from './config.js'
 import { SYSTEM_PROMPT_ID, withSystemPrompt } from './prompt.js'
+import { streamWithModelRecovery } from './retry.js'
 
 export type { AgentConfig } from './config.js'
+export type { ModelRetryConfig } from './retry.js'
 export type { ToolProvider, ExecutableTool, ToolExecutionContext } from '@keundal/tools'
 export { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 
@@ -147,8 +149,9 @@ export class Agent extends AgentService {
     let failedTrace: TraceRecorder | undefined
     let rootFinalized = false
     const llm = budget ? budget.wrap(this.ctx.llm) : this.ctx.llm
-    const modelName = role?.model ?? this.config.model
-    const compaction =
+    let modelName = role?.model ?? this.config.model
+    let preparedModel = modelName
+    let compaction =
       budget || role?.model
         ? new SummaryCompactionController(llm, { ...this.config, model: modelName })
         : this.compaction
@@ -236,7 +239,7 @@ export class Agent extends AgentService {
         throw new Error('session revision must be a non-negative integer')
       }
 
-      const model = await llm.getModel(modelName, options)
+      let model = await llm.getModel(modelName, options)
       signal.throwIfAborted()
       const maxOutputTokens = this.config.maxOutputTokens
       if (
@@ -247,7 +250,7 @@ export class Agent extends AgentService {
       ) {
         throw new Error('requested output budget exceeds the model limits')
       }
-      const maxInputTokens = model.contextWindow - maxOutputTokens - (compaction.policy.reserveTokens ?? 0)
+      let maxInputTokens = model.contextWindow - maxOutputTokens - (compaction.policy.reserveTokens ?? 0)
       if (!Number.isSafeInteger(maxInputTokens) || maxInputTokens <= 0)
         throw new Error('compaction reserveTokens exceeds the model input budget')
       let step = 1
@@ -267,11 +270,31 @@ export class Agent extends AgentService {
           )
         : []
       const stream = (request: LLMRequest, execution?: ExecutionOptions) =>
-        compaction.streamWithRetry(request, maxInputTokens, execution?.signal ?? signal, trace!)
+        streamWithModelRecovery(
+          llm,
+          { ...request, model: modelName },
+          this.config,
+          compaction,
+          maxInputTokens,
+          execution?.signal ?? signal,
+          trace,
+          (selected) => {
+            modelName = selected
+          }
+        )
       const maxToolRounds = role?.maxToolRounds ?? this.config.maxToolRounds ?? 8
       const maxToolCalls = this.config.maxToolCalls ?? 32
       const parallel = this.config.parallelTools ?? false
       const prepareNext = async (next: RunAgentInput, generationSignal: AbortSignal) => {
+        if (preparedModel !== modelName) {
+          model = await llm.getModel(modelName, { signal: generationSignal })
+          generationSignal.throwIfAborted()
+          if (compaction !== this.compaction) compaction.dispose()
+          else compaction.detach(signal)
+          compaction = new SummaryCompactionController(llm, { ...this.config, model: modelName })
+          maxInputTokens = model.contextWindow - maxOutputTokens - (compaction.policy.reserveTokens ?? 0)
+          preparedModel = modelName
+        }
         const contextual = this.config.context
           ? await this.ctx.requestContext.prepare(next, {
               signal: generationSignal,

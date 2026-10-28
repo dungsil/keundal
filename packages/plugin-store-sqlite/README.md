@@ -1,5 +1,11 @@
 # `@keundal/plugin-store-sqlite`
 
+`ctx.taskStore`는 백그라운드 작업의 상태·부분 응답·결과·오류를 같은 파일의 `tasks`에
+저장합니다. 기존 대화와 journal은 유지합니다. 기본 Node·desktop 조립은 이 저장소를 작업
+실행 서비스에 주입하며, 재시작하면 미완료 작업을 `interrupted`로 복구합니다. 데이터베이스당
+작업 실행 서비스 하나만 사용해야 합니다. 콜백·실행 입력·인증 정보는 저장하지 않으며 작업을
+자동으로 다시 실행하지 않습니다. 자세한 복구 범위는 [ADR-0006](../../docs/adr/0006-background-tasks.md)을 참고하세요.
+
 `ctx.session`과 `ctx.generation`을 하나의 SQLite 파일에 저장합니다. Node.js 내장 `node:sqlite`를 사용하므로 별도 의존성이 필요 없습니다. `llm` 서비스를 등록한 뒤 사용합니다.
 
 ```ts

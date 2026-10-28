@@ -26,7 +26,7 @@ export function subagentTool(
     description:
       'Delegate a self-contained task to a subagent and wait for its final answer. It inherits the parent model and tools unless its configured role overrides them, but receives no parent conversation. Include all necessary context in the task. It cannot delegate further. Independent calls can run in parallel. Check the returned status: failed or rejected tasks are not complete. At capacity, retry in a later round after current tasks finish.' +
       (tasks
-        ? ' Set background=true to enqueue a separately owned task and return its task ID immediately. It survives parent completion or cancellation, but not process restart. Use get_background_task to check progress and cancel_background_task to cancel. Never treat queued or running as completed.'
+        ? ' Set background=true to enqueue a separately owned task and return its task ID immediately. It survives parent completion or cancellation. With persistent storage, restart preserves history and marks unfinished tasks interrupted; it never resumes them automatically. Use get_background_task to check progress and cancel_background_task to cancel. Never treat queued, running or interrupted as completed.'
         : '') +
       (roles.length
         ? ` Available roles (name and description): ${JSON.stringify(roles.map(({ name, description }) => ({ name, description })))}`

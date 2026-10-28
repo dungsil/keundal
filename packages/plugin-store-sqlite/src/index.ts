@@ -5,6 +5,7 @@ import { sqliteStoreConfigSchema, type SqliteStoreConfig } from './config.js'
 import { SqliteGenerationService } from './generation.js'
 import { SqliteSessionService } from './session.js'
 import { SqliteStore } from './store.js'
+import { SqliteTaskStore } from './tasks.js'
 
 export const metadata = {
   name: { en: 'SQLite storage', ko: 'SQLite 저장소' },
@@ -19,6 +20,7 @@ export { sqliteStoreConfigSchema, type SqliteStoreConfig } from './config.js'
 export { SqliteGenerationService } from './generation.js'
 export { SqliteSessionService } from './session.js'
 export { SqliteStore, type RunOwnership, type StoredRun, type StoredThread } from './store.js'
+export { SqliteTaskStore } from './tasks.js'
 
 /**
  * session과 generation 서비스를 하나의 SQLite 데이터베이스 파일로 함께 제공합니다. 두 서비스가 같은
@@ -31,6 +33,7 @@ export const sqliteStorePlugin = Object.assign(
     ctx.fiber.effect(() => () => store.release())
     new SqliteSessionService(ctx, store)
     new SqliteBackupService(ctx, store)
+    new SqliteTaskStore(ctx, store)
     ctx.inject(['llm', 'session'], (injected) => {
       new SqliteGenerationService(injected, store)
     })

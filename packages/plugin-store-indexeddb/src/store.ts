@@ -7,13 +7,15 @@ import {
   type GenerationStatus
 } from '@keundal/generation'
 import { assertGenerationMessageIds, type SessionCommit, type SessionSnapshot } from '@keundal/session'
+import type { TaskSnapshot } from '@keundal/task'
 
 import { recordJournal } from './messages.js'
 
-const DATABASE_VERSION = 1
+const DATABASE_VERSION = 2
 const THREADS = 'threads'
 const RUNS = 'runs'
 const JOURNAL = 'journal'
+const TASKS = 'tasks'
 
 export interface WebLockManager {
   request<T>(
@@ -71,6 +73,43 @@ export class IndexedDBStore {
     if (!indexedDB) throw new Error('IndexedDB is unavailable in this environment')
     this.idb = indexedDB
     this.lockManager = options.locks
+  }
+
+  async getTask(id: string): Promise<TaskSnapshot | undefined> {
+    return this.transaction([TASKS], 'readonly', async (transaction) =>
+      request<TaskSnapshot | undefined>(transaction.objectStore(TASKS).get(id))
+    )
+  }
+
+  async listTasks(options: { parentThreadId?: string } = {}): Promise<TaskSnapshot[]> {
+    return this.transaction([TASKS], 'readonly', async (transaction) => {
+      const tasks = await request<TaskSnapshot[]>(transaction.objectStore(TASKS).getAll())
+      return tasks
+        .filter((task) => options.parentThreadId === undefined || task.parentThreadId === options.parentThreadId)
+        .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+    })
+  }
+
+  async saveTask(snapshot: TaskSnapshot): Promise<void> {
+    const copy = { ...snapshot }
+    await this.transaction([TASKS], 'readwrite', async (transaction) => {
+      await request(transaction.objectStore(TASKS).put(copy))
+    })
+  }
+
+  async recoverTasks(): Promise<void> {
+    for (const candidate of await this.listTasks()) {
+      if (candidate.status !== 'queued' && candidate.status !== 'running') continue
+      await this.recoverIfUnlocked(`task:${candidate.id}`, new globalThis.AbortController().signal, async () => {
+        await this.transaction([TASKS], 'readwrite', async (transaction) => {
+          const tasks = transaction.objectStore(TASKS)
+          const snapshot = await request<TaskSnapshot | undefined>(tasks.get(candidate.id))
+          if (snapshot && (snapshot.status === 'queued' || snapshot.status === 'running')) {
+            tasks.put({ ...snapshot, status: 'interrupted', updatedAt: Date.now() } satisfies TaskSnapshot)
+          }
+        })
+      })
+    }
   }
 
   async getThread(threadId: string, signal?: AbortSignal): Promise<SessionSnapshot | undefined> {
@@ -447,6 +486,7 @@ export class IndexedDBStore {
         const database = request.result
         if (!database.objectStoreNames.contains(THREADS)) database.createObjectStore(THREADS, { keyPath: 'threadId' })
         if (!database.objectStoreNames.contains(RUNS)) database.createObjectStore(RUNS, { keyPath: 'runId' })
+        if (!database.objectStoreNames.contains(TASKS)) database.createObjectStore(TASKS, { keyPath: 'id' })
         if (!database.objectStoreNames.contains(JOURNAL)) {
           const journal = database.createObjectStore(JOURNAL, { keyPath: ['runId', 'sequence'] })
           journal.createIndex('by-run', 'runId')

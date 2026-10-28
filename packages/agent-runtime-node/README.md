@@ -49,6 +49,8 @@ const runtime = await createAgentRuntime(process.env, { compose: createNodeCompo
 
 설정 형식과 서버 이름 중복은 호스트 생성 시 검증합니다. 실제 연결은 응답을 시작할 때 수행하며, 모델별 에이전트는 호스트의 연결을 공유합니다. 실행마다 도구 목록을 갱신하고, 연결·조회 실패 시 생성을 시작하지 않습니다. 다음 실행에서는 실패한 연결을 새로 만듭니다. `dispose()`는 연결 중인 작업을 취소하고 MCP 세션과 stdio 프로세스를 정리합니다. HTTP 요청으로 서버 설정이나 실행 명령을 받지 않습니다.
 
+OAuth를 쓰는 호스트는 `mcpAuthentication: { documents: account }`로 서버 이름에 대응하는 `McpOAuth`를 주입합니다. `createNodeAgentHost()`와 `createAgentRuntime()`의 옵션에서 지원하며, JSON 환경 변수에는 계정 컨트롤러나 토큰을 넣지 않습니다. 로그인·콜백 라우트, 사용자 세션 검사와 비밀 저장소는 호스트를 조립하는 앱의 책임입니다. 기본 HTTP API에 공개 OAuth 콜백 경로를 추가하지 않습니다. 호스트가 MCP 연결을 공유하므로 서로 다른 사용자의 계정은 호스트와 저장소도 분리해야 합니다. 재인증으로 기존 전송이 닫히면 해당 실행은 실패하고 다음 실행에서 새 연결을 만듭니다. 자세한 인증 계약은 [MCP 클라이언트 문서](../plugin-mcp-client/README.md#oauth-계정-연결)를 참고합니다.
+
 매니페스트에 `"agent": { "module": "builtin:agent", "config": { "deferredTools": {} } }`를 지정하면 MCP Schema를 검색한 뒤 노출합니다. 기본 도구와 명시한 `options.tools`는 계속 직접 노출합니다. 설정을 생략하면 기존 직접 호출을 유지합니다. 검색 한도와 Trace 계약은 [실행 관측 문서](../../docs/execution-trace.md)를 참고합니다.
 
 ## Agent Plugins
