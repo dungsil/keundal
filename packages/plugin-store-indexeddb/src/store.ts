@@ -189,6 +189,7 @@ export class IndexedDBStore {
   }
 
   async startRun(run: GenerationRequest): Promise<void> {
+    run = cloneForStorage(run, 'generation request')
     await this.transaction([THREADS, RUNS], 'readwrite', async (transaction) => {
       const runs = transaction.objectStore(RUNS)
       if (await request<StoredRun | undefined>(runs.get(run.input.runId)))
@@ -215,6 +216,7 @@ export class IndexedDBStore {
   /** 배치로 쌓은 journal 항목을 한 트랜잭션에 append-only로 확정합니다. */
   async appendEvents(runId: string, entries: readonly GenerationJournalEntry[]): Promise<void> {
     if (!entries.length) return
+    entries = cloneForStorage(entries, 'journal batch')
     await this.transaction(
       [RUNS, JOURNAL],
       'readwrite',
@@ -301,6 +303,7 @@ export class IndexedDBStore {
 
   /** session revision과 generation 종료 기록을 한 트랜잭션에서 반영합니다. */
   async commit(change: SessionCommit, signal?: AbortSignal): Promise<SessionSnapshot> {
+    change = cloneForStorage(change, 'session commit')
     return this.transaction(
       [THREADS, RUNS, JOURNAL],
       'readwrite',
@@ -563,6 +566,14 @@ export class IndexedDBStore {
 
 function snapshotThread(thread: StoredThread): SessionSnapshot {
   return { threadId: thread.threadId, revision: thread.revision, messages: thread.messages, state: thread.state }
+}
+
+function cloneForStorage<T>(value: T, boundary: string): T {
+  try {
+    return globalThis.structuredClone(value)
+  } catch (cause) {
+    throw new TypeError(`IndexedDB ${boundary} is not structured-cloneable`, { cause })
+  }
 }
 
 function snapshotRun(run: StoredRun, journal: GenerationJournalEntry[]): GenerationSnapshot {
