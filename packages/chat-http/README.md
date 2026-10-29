@@ -6,6 +6,8 @@
 
 `ChatStoreLike.respond()`는 선택적 `systemPrompt`를 받습니다. 공백이 아닌 값은 기본 응답 지침 뒤에 추가하고, 공백만 있는 값은 무시합니다. 제목 생성에는 적용하지 않습니다.
 
+앱 기본 지침과 사용자 `systemPrompt`는 `forwardedProps.keundalChatInstructions`에 구분해 보냅니다. 호스트가 선택한 에이전트의 `inputCapabilities.systemMessages`에 맞춰 실행 입력을 조립합니다. ACP에는 기본 지침을 붙이지 않으며, 공백이 아닌 사용자 지침은 지원 불가 오류로 알립니다. 이 입력 형식을 처리하는 호스트와 함께 업데이트해야 합니다.
+
 선택적 `promptPreset`은 실행을 시작할 때 검증·복사해 `forwardedProps.keundalPromptPreset`으로 HTTP 호스트에 전달합니다. 호스트의 공통 실행 루프가 저장된 대화를 준비한 뒤 프리셋을 조립합니다. 실행 중 프리셋 변경이나 재구독은 이미 시작한 응답의 입력을 바꾸지 않으며, 제목 생성에는 전달하지 않습니다.
 
 원격 호스트와 desktop sidecar의 응답은 JSON 파싱 전에 32 MiB로 제한합니다.

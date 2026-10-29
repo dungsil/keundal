@@ -40,6 +40,7 @@
     "@keundal/browser-composition": "workspace:*"
   },
   "devDependencies": {
+    "@keundal/agent": "workspace:*",
     "@modelcontextprotocol/server": "2.3.1",
     "@types/node": "^24.19.2",
     "htmlparser2": "12.0.0",

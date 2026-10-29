@@ -62,6 +62,7 @@ function userPrompt(message: AgentMessage): { id: string; text: string } {
 }
 
 export class AcpAgent extends AgentService {
+  override readonly inputCapabilities = { systemMessages: false }
   private readonly sessions = new Map<string, RemoteSession>()
   private readonly busy = new Set<string>()
   private readonly lifetime = new globalThis.AbortController()
@@ -117,6 +118,13 @@ export class AcpAgent extends AgentService {
     signal.throwIfAborted()
     if (options.budget) throw new Error('ACP agents do not support local run budgets')
     const input = parseRunAgentInput(raw)
+    if (
+      input.forwardedProps?.keundalPromptPreset !== undefined ||
+      input.forwardedProps?.memoryProjectId !== undefined ||
+      input.forwardedProps?.keundalModelRecovery !== undefined
+    ) {
+      throw new Error('ACP prompt presets, local memory and model recovery are not supported')
+    }
     if (this.busy.has(input.threadId)) throw new Error('ACP thread already has an active run')
     this.busy.add(input.threadId)
     let settled = false

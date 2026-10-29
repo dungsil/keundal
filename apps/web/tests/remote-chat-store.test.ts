@@ -1,5 +1,6 @@
 import { createServer } from 'node:http'
 
+import { prepareChatInput } from '@keundal/agent'
 import { EventType, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
 import { LLMService, type LLMRequest, type LLMEvent } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
@@ -50,7 +51,7 @@ test.each([false, true])('원격 저장소는 HTTP 호스트에서 대화·제�
   const store = await ctx.plugin(memoryStorePlugin)
   const agent = await ctx.plugin(agentPlugin, { model: 'test', maxOutputTokens: 100, subagents: true })
   const services: AgentAppServices = {
-    run: (input, options?: ExecutionOptions) => ctx.agent.run(input, options),
+    run: (input, options?: ExecutionOptions) => ctx.agent.run(prepareChatInput(input, ctx.agent.inputCapabilities), options),
     steer: () => 0,
     cancel: () => false,
     subscribe: (runId, options) => ctx.generation.subscribe(runId, options),

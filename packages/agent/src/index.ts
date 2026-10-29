@@ -19,12 +19,48 @@ export interface AgentExecutionOptions extends ExecutionOptions {
   readonly budget?: RunBudget
 }
 
+export interface AgentInputCapabilities {
+  readonly systemMessages: boolean
+}
+
+/** Resolve optional app defaults separately from instructions explicitly requested by the caller. */
+export function prepareChatInput(input: RunAgentInput, capabilities: AgentInputCapabilities): RunAgentInput {
+  const { keundalChatInstructions, ...forwardedProps } = input.forwardedProps ?? {}
+  if (keundalChatInstructions === undefined) return input
+  if (
+    !keundalChatInstructions ||
+    typeof keundalChatInstructions !== 'object' ||
+    typeof keundalChatInstructions.defaults !== 'string' ||
+    (keundalChatInstructions.custom !== undefined && typeof keundalChatInstructions.custom !== 'string')
+  ) {
+    throw new Error('Invalid chat instructions')
+  }
+  const custom = keundalChatInstructions.custom?.trim()
+  if (!capabilities.systemMessages && custom) throw new Error('This agent does not support custom system instructions')
+  return {
+    ...input,
+    forwardedProps,
+    messages: capabilities.systemMessages
+      ? [
+          {
+            id: 'keundal:web-instructions',
+            role: 'system',
+            content: custom ? `${keundalChatInstructions.defaults}\n\n${custom}` : keundalChatInstructions.defaults
+          },
+          ...input.messages
+        ]
+      : input.messages
+  }
+}
+
 declare module 'cordis' {
   interface Context {
     readonly agent: AgentService
   }
 }
 export abstract class AgentService extends Service {
+  readonly inputCapabilities: AgentInputCapabilities = { systemMessages: true }
+
   constructor(ctx: Context) {
     super(ctx, 'agent')
   }
