@@ -39,6 +39,18 @@ export default {
   'plugin.none': 'None',
   'plugin.permissions': 'MCP permissions',
   'plugin.deleteHelp': 'Remove this plugin and its saved permissions?',
+  'plugin.update': 'Update from folder',
+  'plugin.reviewUpdate': 'Review update',
+  'plugin.applyUpdate': 'Apply update',
+  'plugin.updated': '{name} updated. Your settings have been preserved.',
+  'plugin.updateHelp': 'Review the files before replacing this version. Applying stops active responses. Activation and permissions for unchanged servers are preserved.',
+  'plugin.changedFiles': 'Changed files',
+  'plugin.noChanges': 'The selected files match the installed version.',
+  'plugin.before': 'Installed',
+  'plugin.after': 'Update',
+  'plugin.permissionRequests': 'New permission requests',
+  'plugin.newPermissionsHelp': 'New or changed MCP connections require fresh approval. Leave blank to deny access, enter one tool name or resource URI per line, or * to allow all. Other permissions are preserved.',
+  'plugin.permissionsPreserved': 'No new MCP connections. Existing permissions are preserved.',
   'plugin.persistence':
-    'Plugin text and credentials are stored in this browser, not uploaded to the host. Changes stop active responses and apply to the next response. To update, remove the plugin and import its folder again.'
+    'Plugin text and credentials are stored in this browser, not uploaded to the host. Changes stop active responses and apply to the next response. Failed updates keep the installed version and settings.'
 }

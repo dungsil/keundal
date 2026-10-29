@@ -1,5 +1,10 @@
 import { inspectAgentPlugin } from '@keundal/agent-plugins/browser'
-import type { AgentPluginInfo, AgentPluginManager, AgentPluginSettings } from '@keundal/chat/platform'
+import type {
+  AgentPluginInfo,
+  AgentPluginManager,
+  AgentPluginSettings,
+  AgentPluginUpdate
+} from '@keundal/chat/platform'
 import type { ExecutionOptions } from '@keundal/core'
 import { parseMcpServers, type McpConnector } from '@keundal/mcp'
 import type { SkillProvider } from '@keundal/skill'
@@ -12,6 +17,13 @@ type InstalledPlugin = AgentPluginSettings & { files: Record<string, string> }
 export class BrowserAgentPluginManager implements AgentPluginManager {
   private readonly mcp: McpManager
   private records: InstalledPlugin[]
+  private saving = false
+  private pendingUpdate?: {
+    review: AgentPluginUpdate
+    records: InstalledPlugin[]
+    index: number
+    files: Record<string, string>
+  }
   readonly provider: SkillProvider
 
   constructor(
@@ -74,13 +86,76 @@ export class BrowserAgentPluginManager implements AgentPluginManager {
   }
 
   async import(files: Record<string, string>, restart: () => Promise<void>) {
+    const records = this.records
+    files = JSON.parse(JSON.stringify(files)) as Record<string, string>
     const plugin = await inspectAgentPlugin(files)
     if ((await this.list()).some((item) => item.name === plugin.manifest.name))
       throw new Error(`Plugin already installed: ${plugin.manifest.name}`)
-    await this.save([...this.records, { files, enabled: false, permissions: {} }], restart)
+    await this.save([...records, { files, enabled: false, permissions: {} }], restart, records)
+  }
+
+  async previewUpdate(name: string, files: Record<string, string>): Promise<AgentPluginUpdate> {
+    const records = this.records
+    files = JSON.parse(JSON.stringify(files)) as Record<string, string>
+    const plugins = await this.inspect()
+    const index = plugins.findIndex((plugin) => plugin.manifest.name === name)
+    if (index < 0) throw new Error('Plugin not found')
+    const plugin = await inspectAgentPlugin(files)
+    if (plugin.manifest.name !== name) throw new Error('Plugin name must match the installed plugin')
+    const previous = plugins[index]!
+    const before = records[index]!.files
+    const review: AgentPluginUpdate = {
+      id: crypto.randomUUID(),
+      name,
+      previousVersion: previous.manifest.version,
+      version: plugin.manifest.version,
+      changes: [...new Set([...Object.keys(before), ...Object.keys(files)])]
+        .sort()
+        .filter((path) => before[path] !== files[path])
+        .map((path) => ({ path, before: before[path], after: files[path] })),
+      permissionRequests: plugin.servers
+        .filter(
+          (server) =>
+            JSON.stringify(previous.servers.find((old) => old.serverName === server.serverName)) !==
+            JSON.stringify(server)
+        )
+        .map((server) => {
+          const old = previous.servers.find((old) => old.serverName === server.serverName)
+          return {
+            name: server.serverName,
+            url: server.transport === 'streamable-http' ? server.url : '',
+            previousUrl: old?.transport === 'streamable-http' ? old.url : undefined
+          }
+        }),
+      diagnostics: plugin.diagnostics
+    }
+    this.pendingUpdate = { review, records, index, files }
+    return structuredClone(review)
+  }
+
+  async update(id: string, permissions: AgentPluginSettings['permissions'], restart: () => Promise<void>) {
+    const pending = this.pendingUpdate
+    if (!pending || pending.review.id !== id) throw new Error('Review this update again before applying it')
+    const { review, records, index, files } = pending
+    if (records !== this.records) throw new Error('Plugin settings changed; review the update again')
+    if (review.diagnostics.some((diagnostic) => diagnostic.component !== 'manifest'))
+      throw new Error('Resolve plugin diagnostics before updating')
+    permissions = JSON.parse(JSON.stringify(permissions)) as AgentPluginSettings['permissions']
+    const next = [...records]
+    const approved = { ...records[index]!.permissions }
+    for (const request of review.permissionRequests) approved[request.name] = permissions[request.name] ?? {}
+    const plugin = await inspectAgentPlugin(files)
+    parseMcpServers(
+      plugin.servers.map((server) => ({ ...server, permissions: approved[server.serverName] })),
+      false
+    )
+    next[index] = { ...records[index]!, files, permissions: approved }
+    await this.save(next, restart, records)
+    if (this.pendingUpdate === pending) this.pendingUpdate = undefined
   }
 
   async configure(name: string, settings: AgentPluginSettings, restart: () => Promise<void>) {
+    const records = this.records
     settings = JSON.parse(JSON.stringify(settings)) as AgentPluginSettings
     const plugins = await this.inspect()
     const index = plugins.findIndex((plugin) => plugin.manifest.name === name)
@@ -89,25 +164,37 @@ export class BrowserAgentPluginManager implements AgentPluginManager {
       plugins[index]!.servers.map((server) => ({ ...server, permissions: settings.permissions[server.serverName] })),
       false
     )
-    const next = [...this.records]
+    const next = [...records]
     next[index] = { files: next[index]!.files, enabled: settings.enabled, permissions: settings.permissions }
-    await this.save(next, restart)
+    await this.save(next, restart, records)
   }
 
   async remove(name: string, restart: () => Promise<void>) {
+    const records = this.records
     const plugins = await this.inspect()
     await this.save(
-      this.records.filter((_, i) => plugins[i]!.manifest.name !== name),
-      restart
+      records.filter((_, i) => plugins[i]!.manifest.name !== name),
+      restart,
+      records
     )
   }
 
-  private async save(next: InstalledPlugin[], restart: () => Promise<void>) {
-    await restart()
-    this.storage.setItem(key, JSON.stringify(next))
-    await this.mcp.close()
-    this.records = structuredClone(next)
-    this.initializing = undefined
+  private async save(next: InstalledPlugin[], restart: () => Promise<void>, previous: InstalledPlugin[]) {
+    if (this.saving || previous !== this.records) throw new Error('Plugin settings changed; try again')
+    const serialized = JSON.stringify(next)
+    this.saving = true
+    try {
+      await restart()
+      // Drain initialization before closing so it cannot reinstall old servers after the swap.
+      await this.initializing?.catch(() => {})
+      await this.mcp.close()
+      this.initializing = undefined
+      // localStorage.setItem is atomic: on failure both the saved and in-memory version stay unchanged.
+      this.storage.setItem(key, serialized)
+      this.records = next
+    } finally {
+      this.saving = false
+    }
   }
 
   private async syncMcp() {
@@ -151,11 +238,13 @@ export class BrowserAgentPluginManager implements AgentPluginManager {
   private initializing?: Promise<void>
   async tools(options: ExecutionOptions = {}) {
     options.signal?.throwIfAborted()
+    if (this.saving) throw new Error('Plugin settings are being updated')
     await (this.initializing ??= this.syncMcp().catch((error) => {
       this.initializing = undefined
       throw error
     }))
     options.signal?.throwIfAborted()
+    if (this.saving) throw new Error('Plugin settings are being updated')
     return this.mcp.tools(options)
   }
 
