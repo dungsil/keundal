@@ -82,6 +82,34 @@ async function setup(
   return { ctx, requests, counted, agent }
 }
 
+test('도구 후속 요청에 갱신한 공유 상태만 전달하고 Activity는 모델 입력에서 제외한다', async (t) => {
+  let executed = 0
+  const { ctx, requests } = await setup(
+    t,
+    [
+      [
+        { type: EventType.STATE_DELTA, delta: [{ op: 'add', path: '/progress', value: 1 }] },
+        { type: EventType.ACTIVITY_SNAPSHOT, messageId: 'plan', activityType: 'PLAN', content: { done: false } },
+        ...call()
+      ],
+      answer
+    ],
+    {
+      tools: [
+        tool(() => {
+          executed++
+          return 'result'
+        })
+      ]
+    }
+  )
+  await collect(ctx.agent.run(input))
+  expect(executed).toBe(1)
+  expect(requests[1]!.input.state).toEqual({ selected: true, progress: 1 })
+  expect(requests[1]!.input.messages.some((message) => message.role === 'activity')).toBe(false)
+  expect((await ctx.session.get('thread'))?.state).toEqual({ selected: true, progress: 1 })
+})
+
 test.for([true, false])(
   '검색·추론 %s 설정과 네이티브 문맥을 토큰 계산·도구 후속 생성·세션에 보존한다',
   async (enabled, t) => {

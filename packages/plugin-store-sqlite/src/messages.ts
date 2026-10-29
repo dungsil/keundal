@@ -15,7 +15,7 @@ const JOURNAL_BATCH_INTERVAL_MS = 50
  * 기록을 이어서 볼 수 있습니다.
  */
 export class RunRecorder {
-  private readonly assembly = new MessageAssembly()
+  private readonly assembly: MessageAssembly
   private pending: GenerationJournalEntry[] = []
   private written: number
   private deadline?: number
@@ -25,8 +25,10 @@ export class RunRecorder {
     private readonly store: SqliteStore,
     private readonly runId: string,
     private readonly ownerId: string,
-    private readonly publish: (entry: GenerationJournalEntry) => void
+    private readonly publish: (entry: GenerationJournalEntry) => void,
+    initialState: unknown = {}
   ) {
+    this.assembly = new MessageAssembly(initialState)
     this.written = store.journalLength(runId)
   }
 

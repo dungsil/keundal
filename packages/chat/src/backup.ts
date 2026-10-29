@@ -67,6 +67,14 @@ const chatMessage = z.looseObject({
         type: z.literal('data-keundal'),
         data: z.looseObject({ model: model, messages: z.array(z.unknown()) })
       }),
+      z.looseObject({ type: z.literal('data-state'), data: z.unknown() }),
+      z.looseObject({ type: z.literal('data-state-warning'), message: z.string() }),
+      z.looseObject({
+        type: z.literal('activity'),
+        messageId: z.string().min(1),
+        activityType: z.string(),
+        content: z.record(z.string(), z.unknown())
+      }),
       z.looseObject({
         type: z.string().regex(/^tool-.+/),
         toolCallId: z.string().min(1),
@@ -134,8 +142,9 @@ export function parseDataBackup(value: unknown) {
     throw new Error('Duplicate backup plugin selection')
   const history = parseHistoryBackup(parsed.history)
   for (const thread of history.threads) {
-    if (!thread.state || typeof thread.state !== 'object' || !('web' in thread.state)) continue
-    const web = chat.parse(thread.state.web)
+    const source = thread.metadata?.web !== undefined ? thread.metadata : thread.state
+    if (!source || typeof source !== 'object' || !('web' in source)) continue
+    const web = chat.parse(source.web)
     if (
       web.id !== thread.threadId ||
       !web.model ||
@@ -149,7 +158,7 @@ export function parseDataBackup(value: unknown) {
     toMessages(web.messages as Parameters<typeof toMessages>[0], web.model)
     // A restored unsent or interrupted chat must never auto-start a new model request.
     delete web.pendingRunId
-    thread.state.web = { ...web, started: true }
+    source.web = { ...web, started: true }
   }
   return {
     ...parsed,

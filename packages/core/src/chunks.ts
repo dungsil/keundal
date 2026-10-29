@@ -50,6 +50,8 @@ export class EventNormalizer {
       case EventType.MESSAGES_SNAPSHOT:
         return [...this.finish(), event]
       case EventType.RAW:
+      case EventType.STATE_SNAPSHOT:
+      case EventType.STATE_DELTA:
       case EventType.ACTIVITY_SNAPSHOT:
       case EventType.ACTIVITY_DELTA:
       case EventType.REASONING_ENCRYPTED_VALUE:

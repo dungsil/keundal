@@ -145,7 +145,7 @@ test('같은 종류와 모델의 공급자 전환에도 설정 식별자를 전�
 test('제목 생성 중 모델을 바꾸면 제목 요청을 취소하고 교착 없이 새 모델로 전환한다', async () => {
   const fixture = createFixture()
   const message = { id: 'user', role: 'user' as const, parts: [{ type: 'text' as const, text: '질문' }] }
-  let snapshot = { revision: 1, state: { web: { id: 'chat', title: null, messages: [message], model: 'openai/first' } } }
+  let snapshot: { revision: number; state: unknown; metadata?: unknown } = { revision: 1, state: { web: { id: 'chat', title: null, messages: [message], model: 'openai/first' } } }
   let started!: () => void
   const titleStarted = new Promise<void>((resolve) => {
     started = resolve
@@ -154,7 +154,7 @@ test('제목 생성 중 모델을 바꾸면 제목 요청을 취소하고 교착
     if (String(url).endsWith('/threads/chat')) {
       if (init?.method === 'PUT') {
         const body = JSON.parse(String(init.body))
-        snapshot = { revision: snapshot.revision + 1, state: body.state }
+        snapshot = { revision: snapshot.revision + 1, state: body.state, metadata: body.metadata }
       }
       return Response.json(snapshot)
     }
@@ -185,7 +185,7 @@ test('제목 생성 중 모델을 바꾸면 제목 요청을 취소하고 교착
 test('같은 종류의 다른 공급자로 제목을 생성하다 취소하면 원래 공급자를 거쳐 새 공급자로 전환한다', async () => {
   const fixture = createFixture()
   const message = { id: 'user', role: 'user' as const, parts: [{ type: 'text' as const, text: '질문' }] }
-  let snapshot = { revision: 1, state: { web: { id: 'chat', title: null, messages: [message], model: 'openai@chat/first' } } }
+  let snapshot: { revision: number; state: unknown; metadata?: unknown } = { revision: 1, state: { web: { id: 'chat', title: null, messages: [message], model: 'openai@chat/first' } } }
   let started!: () => void
   const titleStarted = new Promise<void>((resolve) => {
     started = resolve
@@ -194,7 +194,7 @@ test('같은 종류의 다른 공급자로 제목을 생성하다 취소하면 �
     if (String(url).endsWith('/threads/chat')) {
       if (init?.method === 'PUT') {
         const body = JSON.parse(String(init.body))
-        snapshot = { revision: snapshot.revision + 1, state: body.state }
+        snapshot = { revision: snapshot.revision + 1, state: body.state, metadata: body.metadata }
       }
       return Response.json(snapshot)
     }

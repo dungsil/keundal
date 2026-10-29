@@ -219,9 +219,9 @@ export class Agent extends AgentService {
               subagentTool(
                 (child, execution, role) => this.runInternal(child, execution, false, budget, role),
                 this.config.maxActiveSubagents ?? 8,
-                request.state?.subagentRoles === undefined
+                (request.forwardedProps?.keundalSubagentRoles ?? request.state?.subagentRoles) === undefined
                   ? this.config.subagentRoles
-                  : parseSubagentRoles(request.state.subagentRoles),
+                  : parseSubagentRoles(request.forwardedProps?.keundalSubagentRoles ?? request.state?.subagentRoles),
                 tasks,
                 tasks ? (child, execution, role) => this.runBackground(child, execution, role) : undefined
               )
@@ -234,6 +234,10 @@ export class Agent extends AgentService {
         withSystemPrompt(withSkillCatalog(parseRunAgentInput(prepared.input), catalog), this.systemPrompt()),
         tools
       )
+      preparedInput = {
+        ...preparedInput,
+        messages: preparedInput.messages.filter((message) => message.role !== 'activity')
+      }
       if (promptPreset)
         preparedInput = { ...preparedInput, messages: assemblePrompt(preparedInput.messages, promptPreset) }
       if (preparedInput.threadId !== request.threadId || preparedInput.runId !== request.runId) {

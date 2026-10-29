@@ -826,6 +826,18 @@ test('스레드 요약은 선택한 상태의 원시 값만 반환하고 전체 
   ])
   expect((await requestJson('GET', '/threads?view=summary&stateFields=constructor.prototype')).status).toBe(400)
   expect((await requestJson('GET', '/threads?view=unknown')).status).toBe(400)
+  const metadata = { web: state.web }
+  expect(
+    (await requestJson('PUT', '/threads/thread', { expectedRevision: 1, messages: [], state: null, metadata })).status
+  ).toBe(200)
+  expect((await requestJson('GET', '/threads/thread')).json).toMatchObject({ state: null, metadata })
+  expect((await requestJson('GET', '/threads?view=summary&metadataFields=web.id,web.messages,web')).json).toEqual([
+    { threadId: 'thread', revision: 2, state: {}, metadata: { web: { id: 'thread' } } }
+  ])
+  expect((await requestJson('GET', '/threads?view=summary&metadataFields=constructor.prototype')).status).toBe(400)
+  expect(
+    (await requestJson('PUT', '/threads/thread', { expectedRevision: 2, messages: [], metadata: [] })).status
+  ).toBe(400)
 })
 
 test('호스트는 JSON과 스트림과 인증 오류의 캐시 저장을 금지한다', async (t) => {

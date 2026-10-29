@@ -40,10 +40,20 @@ export type ToolPart = ToolInvocation & {
   subagent?: SubagentProgress
   approvals?: ToolApprovalRecord[]
 }
+export type StatePart = { type: 'data-state'; data: unknown }
+export type ActivityPart = {
+  type: 'activity'
+  messageId: string
+  activityType: string
+  content: Record<string, unknown>
+}
 export type ChatPart =
   | TextPart
   | FilePart
   | ToolPart
+  | StatePart
+  | ActivityPart
+  | { type: 'data-state-warning'; message: string }
   | { type: 'source-url'; sourceId: string; url: string; title?: string }
   | { type: 'data-keundal'; data: { model: string; messages: AgentMessage[] } }
 
@@ -64,14 +74,17 @@ export class ChatMessageAssembly {
   readonly message: ChatMessage
   /** 이 실행이 journal에 반영한 지시입니다. 반영한 순서를 유지합니다. */
   readonly steered: Extract<AgentMessage, { role: 'user' }>[] = []
-  private readonly assembly = new MessageAssembly()
+  private readonly assembly: MessageAssembly
   private readonly normalizer = new EventNormalizer()
   private readonly texts = new Map<string, TextPart>()
   private readonly calls = new Map<string, { args: string; part: ToolPart }>()
   private readonly sources = new Set<string>()
   private search?: ToolPart & { state: 'output-available'; output: LLMSource[] }
+  private statePart?: StatePart
+  private readonly activities = new Map<string, ActivityPart>()
 
-  constructor(id: string) {
+  constructor(id: string, initialState: unknown = {}) {
+    this.assembly = new MessageAssembly(initialState)
     this.message = { id, role: 'assistant', parts: [] }
   }
 
@@ -80,12 +93,40 @@ export class ChatMessageAssembly {
   }
 
   private applyEvent(event: AGUIEvent) {
-    this.assembly.apply(event)
+    const warningCount = this.assembly.warnings.length
+    const changed = this.assembly.apply(event)
+    for (const message of this.assembly.warnings.slice(warningCount))
+      this.message.parts.push({ type: 'data-state-warning', message })
     if (event.type === EventType.CUSTOM && event.name === STEER_MESSAGE_EVENT && isSteerMessage(event.value)) {
       this.steered.push(event.value)
       return
     }
     switch (event.type) {
+      case EventType.STATE_SNAPSHOT:
+      case EventType.STATE_DELTA:
+        if (this.assembly.warnings.length !== warningCount) break
+        if (!this.statePart) {
+          this.statePart = { type: 'data-state', data: this.assembly.state }
+          this.message.parts.push(this.statePart)
+        } else this.statePart.data = this.assembly.state
+        break
+      case EventType.ACTIVITY_SNAPSHOT:
+      case EventType.ACTIVITY_DELTA: {
+        if (changed?.role !== 'activity') break
+        const part = this.activities.get(changed.id)
+        if (part) Object.assign(part, { activityType: changed.activityType, content: changed.content })
+        else {
+          const created: ActivityPart = {
+            type: 'activity',
+            messageId: changed.id,
+            activityType: changed.activityType,
+            content: changed.content
+          }
+          this.activities.set(changed.id, created)
+          this.message.parts.push(created)
+        }
+        break
+      }
       case EventType.TEXT_MESSAGE_START:
       case EventType.REASONING_MESSAGE_START: {
         const part: TextPart = {

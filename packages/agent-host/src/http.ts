@@ -133,6 +133,11 @@ const commitBody = (threadId: string, value: unknown): SessionCommit => {
   if (body.mode !== undefined && body.mode !== 'merge' && body.mode !== 'replace') {
     throw new Error('invalid mode')
   }
+  if (
+    body.metadata !== undefined &&
+    (!body.metadata || typeof body.metadata !== 'object' || Array.isArray(body.metadata))
+  )
+    throw new Error('invalid metadata')
   const parsed = parseRunAgentInput({
     threadId,
     runId: 'commit',
@@ -146,7 +151,8 @@ const commitBody = (threadId: string, value: unknown): SessionCommit => {
     expectedRevision: body.expectedRevision as number,
     ...(body.mode === 'merge' || body.mode === 'replace' ? { mode: body.mode } : {}),
     messages: parsed.messages,
-    state: parsed.state
+    state: parsed.state,
+    ...(body.metadata === undefined ? {} : { metadata: body.metadata as Record<string, unknown> })
   }
 }
 
@@ -589,10 +595,12 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
           const view = url.searchParams.get('view')
           if (view !== null && view !== 'summary') return sendJson(response, 400, { error: 'invalid view' })
           const fields = (url.searchParams.get('stateFields') ?? '').split(',').filter(Boolean)
+          const metadataFields = (url.searchParams.get('metadataFields') ?? '').split(',').filter(Boolean)
           if (
             view === 'summary' &&
             (fields.length > 16 ||
-              fields.some(
+              metadataFields.length > 16 ||
+              [...fields, ...metadataFields].some(
                 (field) =>
                   field.length > 160 ||
                   !field
@@ -613,7 +621,8 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
             snapshots.map((snapshot) => ({
               threadId: snapshot.threadId,
               revision: snapshot.revision,
-              state: projectScalarState(snapshot.state, fields)
+              state: projectScalarState(snapshot.state, fields),
+              ...(metadataFields.length ? { metadata: projectScalarState(snapshot.metadata, metadataFields) } : {})
             }))
           )
         }

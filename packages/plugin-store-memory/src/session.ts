@@ -11,7 +11,13 @@ import type { Context } from 'cordis'
 import type { MemoryStore, StoredThread } from './store.js'
 
 function snapshot(threadId: string, thread: StoredThread): SessionSnapshot {
-  return { threadId, revision: thread.revision, messages: [...thread.messages], state: thread.state }
+  return {
+    threadId,
+    revision: thread.revision,
+    messages: [...thread.messages],
+    state: thread.state,
+    ...(thread.metadata === undefined ? {} : { metadata: thread.metadata })
+  }
 }
 
 /**
@@ -53,7 +59,7 @@ export class MemorySessionService extends SessionService {
       input: {
         ...request,
         messages: mergeMessages(thread?.messages ?? [], request.messages),
-        state: request.state ?? thread?.state
+        state: input.state === undefined ? thread?.state : input.state
       },
       revision: thread?.revision ?? 0
     }
@@ -108,10 +114,12 @@ export class MemorySessionService extends SessionService {
 
     assertGenerationMessageIds(current.messages, change)
 
+    const metadata = change.metadata ?? current.metadata
     const next: StoredThread = {
       revision: current.revision + 1,
       messages: change.mode === 'replace' ? [...change.messages] : mergeMessages(current.messages, change.messages),
-      state: change.state ?? current.state
+      state: change.state === undefined ? current.state : change.state,
+      ...(metadata === undefined ? {} : { metadata })
     }
     this.store.threads.set(change.threadId, next)
     if (generation && runId) {

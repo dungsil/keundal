@@ -234,7 +234,7 @@ test('새 클라이언트가 pendingRunId의 journal을 구독하면 모델과 �
   const snapshot = (await host.services.session.get('chat'))!
   const saved = await host.services.session.commit({
     threadId: 'chat', expectedRevision: snapshot.revision, mode: 'replace', messages: snapshot.messages,
-    state: { web: { ...chat, started: true, pendingRunId: 'existing-run' } }
+    state: snapshot.state, metadata: { web: { ...chat, started: true, pendingRunId: 'existing-run' } }
   })
   const running = (async () => {
     for await (const _event of host.services.run({

@@ -17,12 +17,17 @@ import type { Context } from 'cordis'
 
 import { GenerationRecorder } from './messages.js'
 import type { MemoryStore, StoredRun } from './store.js'
-const snapshot = (r: StoredRun): GenerationSnapshot => ({
-  request: r.request,
-  status: r.status,
-  journal: reconcileTerminalTraceJournal(r.journal, r.status),
-  messages: [...r.messages]
-})
+const snapshot = (r: StoredRun): GenerationSnapshot => {
+  const recorder = new GenerationRecorder(r.request.input.state)
+  for (const entry of r.journal) recorder.record(entry.event)
+  return {
+    request: r.request,
+    status: r.status,
+    journal: reconcileTerminalTraceJournal(r.journal, r.status),
+    messages: [...r.messages],
+    state: recorder.state
+  }
+}
 export class MemoryGenerationService extends GenerationService {
   private readonly controllers = new Set<globalThis.AbortController>()
   private readonly active = new Map<string, AbortSignal>()
@@ -182,7 +187,7 @@ export class MemoryGenerationService extends GenerationService {
     stream?: GenerationOptions['stream']
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     const { threadId, runId } = request.input
-    const recorder = new GenerationRecorder()
+    const recorder = new GenerationRecorder(request.input.state)
     let record: StoredRun | undefined
     let settled = false
     let registered = false
@@ -199,13 +204,14 @@ export class MemoryGenerationService extends GenerationService {
         request,
         status,
         journal: [...recorder.journal],
-        messages: [...recorder.messages]
+        messages: [...recorder.messages],
+        state: recorder.state
       }
       await this.ctx.session.commit({
         threadId,
         expectedRevision: request.sessionRevision,
         messages: status === 'completed' ? terminal.messages : [],
-        state: status === 'completed' ? request.input.state : undefined,
+        state: status === 'completed' ? recorder.state : undefined,
         generation: terminal
       })
       if (this.store.runs.get(runId) === activeRecord) {
@@ -254,12 +260,18 @@ export class MemoryGenerationService extends GenerationService {
       if (!current()) return
       const finished: AGUIEvent = { type: EventType.RUN_FINISHED, threadId, runId, outcome: { type: 'success' } }
       const journal = [...recorder.journal, { sequence: recorder.journal.length, event: finished }]
-      const terminal: TerminalGeneration = { request, status: 'completed', journal, messages: [...recorder.messages] }
+      const terminal: TerminalGeneration = {
+        request,
+        status: 'completed',
+        journal,
+        messages: [...recorder.messages],
+        state: recorder.state
+      }
       await this.ctx.session.commit({
         threadId,
         expectedRevision: request.sessionRevision,
         messages: terminal.messages,
-        state: request.input.state,
+        state: recorder.state,
         generation: terminal
       })
       // 종료 커밋은 저장소의 실행 기록을 새 객체로 바꾸므로, 확정된 journal에서 마지막 항목을 전달합니다.

@@ -34,7 +34,10 @@ export type RunFinishedEvent = UpstreamRunFinishedEvent
 export type RunErrorEvent = UpstreamRunErrorEvent
 
 export function parseRunAgentInput(value: unknown): RunAgentInput {
-  return UpstreamRunAgentInputSchema.parse(value) as RunAgentInput
+  const input = UpstreamRunAgentInputSchema.parse(value) as RunAgentInput
+  // State is any JSON value; upstream optional-null normalization must not erase a null baseline.
+  if (typeof value === 'object' && value !== null && 'state' in value && value.state === null) input.state = null
+  return input
 }
 
 export function parseAGUIEvent(value: unknown): AGUIEvent {

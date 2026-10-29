@@ -492,3 +492,115 @@ test.each([
   )
   expect(assembly.messages).toEqual([])
 })
+
+test('공유 상태를 교체하고 RFC 6902의 여섯 연산과 이스케이프 경로를 순서대로 적용한다', () => {
+  const initial = { obsolete: true }
+  const assembly = new MessageAssembly(initial)
+  assembly.apply({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'text', delta: 'before' })
+  assembly.apply({ type: EventType.STATE_SNAPSHOT, snapshot: { items: ['A', 'B', 'C'], 'a/b': { '~key': 1 } } })
+  const delta: AGUIEvent = {
+    type: EventType.STATE_DELTA,
+    delta: [
+      { op: 'test', path: '/items/1', value: 'B' },
+      { op: 'move', from: '/items/0', path: '/items/2' },
+      { op: 'copy', from: '/a~1b/~0key', path: '/copied' },
+      { op: 'add', path: '/items/-', value: 'D' },
+      { op: 'remove', path: '/items/1' },
+      { op: 'replace', path: '/a~1b/~0key', value: 7 },
+      { op: 'add', path: '/nested', value: { status: 'pending' } }
+    ]
+  }
+  const original = structuredClone(delta)
+  assembly.apply(delta)
+  assembly.apply({ type: EventType.STATE_DELTA, delta: [{ op: 'replace', path: '/nested/status', value: 'done' }] })
+  expect(assembly.state).toEqual({
+    items: ['B', 'A', 'D'],
+    'a/b': { '~key': 7 },
+    copied: 1,
+    nested: { status: 'done' }
+  })
+  expect(initial).toEqual({ obsolete: true })
+  expect(delta).toEqual(original)
+  assembly.apply({ type: EventType.TEXT_MESSAGE_CHUNK, delta: 'after' })
+  expect(assembly.messages[0]).toMatchObject({ content: 'beforeafter' })
+  assembly.apply({ type: EventType.STATE_SNAPSHOT, snapshot: null })
+  expect(assembly.state).toBeNull()
+  assembly.apply({ type: EventType.STATE_DELTA, delta: [{ op: 'add', path: '', value: [1, 2] }] })
+  expect(assembly.state).toEqual([1, 2])
+})
+
+test('실패한 Patch의 앞선 연산도 취소하며 프로토타입 경로를 거부하고 다음 Snapshot으로 복구한다', () => {
+  const assembly = new MessageAssembly({ count: 2 })
+  for (const last of [
+    { op: 'test' as const, path: '/count', value: 2 },
+    { op: 'remove' as const, path: '/missing' },
+    { op: 'add' as const, path: '/__proto__/polluted', value: true }
+  ]) {
+    assembly.apply({ type: EventType.STATE_DELTA, delta: [{ op: 'replace', path: '/count', value: 9 }, last] })
+    expect(assembly.state).toEqual({ count: 2 })
+  }
+  expect(assembly.warnings).toHaveLength(3)
+  expect(Object.prototype).not.toHaveProperty('polluted')
+  assembly.apply({ type: EventType.STATE_SNAPSHOT, snapshot: { synced: true } })
+  expect(assembly.state).toEqual({ synced: true })
+})
+
+test('Activity를 ID별로 갱신하고 누락·잘못된 Patch·소유자 변경을 건너뛰며 모델 대화에서는 제외한다', () => {
+  const assembly = new MessageAssembly()
+  for (const messageId of ['one', 'two'])
+    assembly.apply({
+      type: EventType.ACTIVITY_SNAPSHOT,
+      messageId,
+      activityType: 'PLAN',
+      content: { done: 0 },
+      metadata: { source: messageId }
+    })
+  assembly.apply({
+    type: EventType.ACTIVITY_SNAPSHOT,
+    messageId: 'one',
+    activityType: 'IGNORED',
+    content: {},
+    replace: false
+  })
+  assembly.apply({
+    type: EventType.ACTIVITY_DELTA,
+    messageId: 'one',
+    activityType: 'PROGRESS',
+    patch: [{ op: 'replace', path: '/done', value: 1 }],
+    metadata: { progress: true }
+  })
+  for (const event of [
+    { type: EventType.ACTIVITY_DELTA, messageId: 'missing', activityType: 'PLAN', patch: [] },
+    { type: EventType.ACTIVITY_DELTA, messageId: 'one', activityType: 'PLAN', subagentRunId: 'child', patch: [] },
+    {
+      type: EventType.ACTIVITY_DELTA,
+      messageId: 'two',
+      activityType: 'PLAN',
+      patch: [{ op: 'replace', path: '', value: [] }]
+    }
+  ] as AGUIEvent[])
+    assembly.apply(event)
+  expect(assembly.messages).toEqual([
+    {
+      id: 'one',
+      role: 'activity',
+      activityType: 'PROGRESS',
+      content: { done: 1 },
+      metadata: { source: 'one', progress: true }
+    },
+    { id: 'two', role: 'activity', activityType: 'PLAN', content: { done: 0 }, metadata: { source: 'two' } }
+  ])
+  expect(assembly.warnings).toHaveLength(3)
+  expect(prepareReplayMessages(assembly.messages, 'model', 'model')).toEqual([])
+  assembly.apply({
+    type: EventType.ACTIVITY_SNAPSHOT,
+    messageId: 'one',
+    activityType: 'RESET',
+    content: { reset: true }
+  })
+  expect(assembly.messages[0]).toMatchObject({
+    activityType: 'RESET',
+    content: { reset: true },
+    metadata: { source: 'one', progress: true }
+  })
+})

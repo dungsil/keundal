@@ -62,7 +62,7 @@ test('백업은 비밀 설정을 제외하고 대화·프리셋·로컬 스킬·
   const original = (await source.store.get('portable-chat'))!
   const messages = [...original.messages, { id: 'reply', role: 'assistant' as const, parts: [{ type: 'text' as const, text: 'Saved answer' }] }]
   await source.ctx.session.commit({ threadId: 'portable-chat', expectedRevision: snapshot.revision,
-    messages: toMessages(messages.slice(-1), original.model), state: { web: { ...original, messages } },
+    messages: toMessages(messages.slice(-1), original.model), state: {}, metadata: { web: { ...original, messages } },
     generation: {
       request: { input: { threadId: 'portable-chat', runId: 'reply', state: {}, context: [], tools: [], messages: snapshot.messages },
         sessionRevision: snapshot.revision, model: 'custom', maxOutputTokens: 120 },
@@ -115,7 +115,7 @@ test('미지원 버전·손상된 대화·인증 정보가 있는 파일은 거�
   expect(() => parseDataBackup({ ...backup, version: 2 })).toThrow()
   expect(() => readDataBackup('{broken')).toThrow()
   const damaged = structuredClone(backup)
-  ;(damaged.history.threads[0]!.state as { web: { id: string } }).web.id = 'another-chat'
+  ;(damaged.history.threads[0]!.metadata!.web as { id: string }).id = 'another-chat'
   expect(() => parseDataBackup(damaged)).toThrow('Invalid backup conversation')
   const credentials = structuredClone(backup)
   credentials.settings.providers.openai.apiKey = 'unexpected-secret'

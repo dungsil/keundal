@@ -127,7 +127,10 @@ export async function* streamWithTools(
    * 지시와 도구 결과가 같은 경로로 입력 예산과 축약 정책을 거치게 합니다.
    */
   const advance = async function* (messages: AgentMessage[]): AsyncGenerator<LLMEvent, RunAgentInput> {
-    let next = { ...current.input, messages: [...current.input.messages, ...messages] }
+    let next: RunAgentInput = {
+      ...current.input,
+      messages: [...current.input.messages, ...messages].filter((message) => message.role !== 'activity')
+    }
     if (options.resolveTools) {
       next = await refreshResolvedTools(next)
       resolvedToolsPrepared = true
@@ -165,7 +168,7 @@ export async function* streamWithTools(
       current = { ...current, input: await refreshResolvedTools(current.input) }
     }
     resolvedToolsPrepared = false
-    const assembly = new MessageAssembly()
+    const assembly = new MessageAssembly(current.input.state)
     const calls = new Map<string, PendingCall>()
     for await (const event of normalizeEvents(
       options.stream ? options.stream(current, { signal }) : llm.stream(current, { signal })
@@ -199,6 +202,7 @@ export async function* streamWithTools(
       const steered = yield* takeSteer(assembly.messages)
       if (!steered.length) return
       rounds++
+      current = { ...current, input: { ...current.input, state: assembly.state } }
       current = { ...current, input: yield* advance([...assembly.messages, ...steered]) }
       continue
     }
@@ -242,6 +246,7 @@ export async function* streamWithTools(
     signal.throwIfAborted()
     // 지시는 진행 중인 요청이나 도구를 중단하지 않고, 완료된 도구 결과 뒤의 경계에서만 반영합니다.
     const steered = yield* takeSteer(assembly.messages)
+    current = { ...current, input: { ...current.input, state: assembly.state } }
     current = { ...current, input: yield* advance([...assembly.messages, ...steered]) }
   }
 }

@@ -174,7 +174,6 @@ export class IndexedDBGenerationService extends GenerationService {
     const { threadId, runId } = request.input
     let active: ActiveRun | undefined
     let registered = false
-    const recorder = new GenerationRecorder()
     try {
       signal.throwIfAborted()
       this.validate(request)
@@ -189,6 +188,7 @@ export class IndexedDBGenerationService extends GenerationService {
       this.active.set(runId, active)
       registered = true
       signal.throwIfAborted()
+      const recorder = new GenerationRecorder(request.input.state)
 
       // startRun이 nextSequence 0으로 등록하므로 0부터 부여합니다.
       let nextSequence = 0
@@ -308,14 +308,20 @@ export class IndexedDBGenerationService extends GenerationService {
       const journal = finished
         ? [...snapshot.journal, { sequence: snapshot.journal.length, event: finished }]
         : snapshot.journal
-      const terminal: TerminalGeneration = { request: active.request, status, journal, messages: snapshot.messages }
+      const terminal: TerminalGeneration = {
+        request: active.request,
+        status,
+        journal,
+        messages: snapshot.messages,
+        state: snapshot.state
+      }
       try {
         await this.track(
           this.ctx.session.commit({
             threadId: active.request.input.threadId,
             expectedRevision: active.request.sessionRevision,
             messages: status === 'completed' ? terminal.messages : [],
-            state: status === 'completed' ? active.request.input.state : undefined,
+            state: status === 'completed' ? snapshot.state : undefined,
             generation: terminal
           })
         )

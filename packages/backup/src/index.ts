@@ -99,16 +99,20 @@ export function parseHistoryBackup(value: unknown): HistoryBackup {
   portable(value)
   const data = object(value, ['threads', 'runs'])
   const threads = array(data.threads).map((value) => {
-    const thread = object(value, ['threadId', 'revision', 'messages', 'state'])
+    const thread = object(value, ['threadId', 'revision', 'messages', 'state', 'metadata'])
     id(thread.threadId)
     integer(thread.revision)
     messages(thread.messages)
+    if (thread.metadata !== undefined) {
+      if (!thread.metadata || typeof thread.metadata !== 'object' || Array.isArray(thread.metadata))
+        throw new Error('invalid backup metadata')
+    }
     return thread as unknown as SessionSnapshot
   })
   unique(threads.map((thread) => thread.threadId))
   const threadRevisions = new Map(threads.map((thread) => [thread.threadId, thread.revision]))
   const runs = array(data.runs).map((value) => {
-    const run = object(value, ['request', 'status', 'journal', 'messages'])
+    const run = object(value, ['request', 'status', 'journal', 'messages', 'state'])
     if (!['completed', 'failed', 'cancelled', 'interrupted'].includes(run.status as string))
       throw new Error('backup cannot contain running or unknown generation status')
     const request = object(run.request, [
@@ -144,7 +148,7 @@ export function parseHistoryBackup(value: unknown): HistoryBackup {
       unique(ids)
     }
     messages(run.messages)
-    const assembly = new MessageAssembly()
+    const assembly = new MessageAssembly((request.input as typeof input).state)
     array(run.journal).forEach((value, sequence) => {
       const entry = object(value, ['sequence', 'event'])
       if (entry.sequence !== sequence) throw new Error('backup journal sequences must be contiguous from zero')
@@ -158,7 +162,7 @@ export function parseHistoryBackup(value: unknown): HistoryBackup {
       assembly.apply(event)
     })
     messages(assembly.messages)
-    return run as unknown as GenerationSnapshot
+    return { ...run, state: assembly.state } as unknown as GenerationSnapshot
   })
   unique(runs.map((run) => run.request.input.runId))
   return globalThis.structuredClone({ threads, runs })
