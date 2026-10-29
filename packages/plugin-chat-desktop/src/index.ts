@@ -1,7 +1,7 @@
+import { RemoteChatStore, type RemoteAgentInfo } from '@keundal/chat-http'
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
 import type { NativeInvoke } from '@keundal/chat/platform'
-import { RemoteChatStore, type RemoteAgentInfo } from '@keundal/plugin-chat-remote'
 
 export { createNativeRuntimePluginManager } from './runtime-plugins.js'
 

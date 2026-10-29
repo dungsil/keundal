@@ -20,7 +20,7 @@ import { type SubagentRole } from '@keundal/subagent'
 import type { TaskService, TaskSnapshot } from '@keundal/task'
 import type { CodingWorkspaceClient, CodingWorkspaceSnapshot } from '@keundal/workspace'
 
-import { boundRemoteResponse, RemoteResponseLimitError, RemoteStreamBudget } from './response-budget'
+import { boundRemoteResponse, RemoteResponseLimitError, RemoteStreamBudget } from './response-budget.js'
 
 type ChatState = { web: LocalChat }
 

@@ -3,6 +3,7 @@ import {
   type McpAuthentication,
   type McpAuthenticationState,
   type McpCredentialStorage,
+  type McpOAuthOptions,
   type McpRequestOptions
 } from '@keundal/mcp'
 import {
@@ -17,15 +18,7 @@ import {
   type StoredOAuthTokens
 } from '@modelcontextprotocol/client'
 
-export interface McpOAuthOptions {
-  readonly serverUrl: string
-  readonly redirectUrl: string
-  /** Omit to use dynamic client registration when the authorization server supports it. */
-  readonly clientId?: string
-  readonly scope?: string
-  /** Must be isolated by application user/account on a shared server. */
-  readonly storage: McpCredentialStorage
-}
+export type { McpOAuthOptions } from '@keundal/mcp'
 
 interface Credentials {
   client?: StoredOAuthClientInformation

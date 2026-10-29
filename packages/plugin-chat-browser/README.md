@@ -6,6 +6,8 @@
 
 `McpManager.probe(config, { signal })`는 저장하지 않은 설정을 검증한 뒤 임시 연결로 도구 목록을 조회합니다. 저장된 설정, 저장소, 진행 중인 응답의 연결에는 영향을 주지 않습니다. Streamable HTTP만 확인하며 stdio 설정은 연결하기 전에 거부합니다.
 
+연결 구현은 `new McpManager(storage, { connector })`로 주입합니다. `connector`는 `@keundal/mcp`의 `McpConnector` 계약을 구현합니다. 웹의 기본 연결자는 `@keundal/browser-composition/mcp`의 `browserMcpConnector`입니다. 연결자를 생략하면 설정 관리만 사용할 수 있습니다. `BrowserAgentPluginManager(storage, connector)`도 같은 연결자를 받습니다. `BrowserMcpOAuth(storage, changed, createAccount)`에는 같은 모듈의 `createBrowserMcpAccount`를 전달합니다.
+
 `new McpManager(settingsStorage, { authentication: { issues: account } })`로 서버 이름에 대응하는 `McpAuthentication`을 주입합니다. 연결과 `probe()`가 같은 계정 컨트롤러를 사용하며 자격 증명은 서버 설정에 직렬화하지 않습니다. OAuth 로그인·콜백과 보안 저장소는 앱에서 조립합니다. 설정을 localStorage에 저장하더라도 OAuth 저장소로 재사용하지 않습니다. 계정 연결을 해제하거나 재인증한 뒤에는 `manager.close()`로 캐시를 비우고 다음 조회에서 새 연결을 만듭니다. 자세한 계정 수명과 저장소 경계는 [MCP 클라이언트 문서](../plugin-mcp-client/README.md#oauth-계정-연결)를 참고합니다.
 
 `BrowserMcpOAuth`는 기본 웹 앱의 계정 연결을 담당합니다. `McpManager`의 `oauth`와 `getAuthentication`에 같은 관리자를 연결합니다. 로그인 팝업은 사용자 클릭에서 열며 `/mcp/oauth-callback.html`로 돌아온 전체 URL을 검증합니다. 팝업을 닫거나 설정 화면을 떠나면 미완료 로그인을 취소합니다. 계정 변경은 기존 MCP 연결을 닫습니다. 자격 증명은 현재 앱 인스턴스의 메모리에만 보관하며 새로고침이나 앱 종료 후에는 다시 로그인합니다. MCP 서버와 인증 서버가 앱 origin의 CORS 요청을 허용해야 합니다.

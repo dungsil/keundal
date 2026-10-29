@@ -2,7 +2,9 @@ import { Context } from 'cordis'
 import { SlotService } from '@keundal/ui-slots'
 import type { RuntimePluginInfo, RuntimePluginManager } from '@keundal/chat/platform'
 import { afterEach, expect, test, vi } from 'vitest'
-import { UIPluginManager, type UIPluginEntry } from '../app/ui-plugins'
+import { UIPluginManager, type UIPluginEntry } from '../app/ui-plugin-manager'
+import type {} from '@keundal/ui/app/contracts/chat.ts'
+import type {} from '@keundal/ui/app/contracts/layout.ts'
 
 declare module '@keundal/ui-slots' {
   interface SlotMap {
@@ -11,27 +13,6 @@ declare module '@keundal/ui-slots' {
     'page.tool': { kind: 'single'; owner: Record<string, never> }
   }
 }
-
-// Node has no Nuxt SFC compiler. The fixtures below still use real Cordis fibers and slots.
-vi.mock('@keundal/ui-agent-plugins/plugin', () => ({ apply() {}, agentPluginSettings: { apply() {} } }))
-vi.mock('@keundal/ui-chat/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-chat-list/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-chart/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-composer/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-dictation/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-home/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-layout/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-mcp/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-model-selection/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-settings/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-settings-llm/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-settings-llm/prompt-plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-skill/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-subagents/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-tool/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-trace/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-weather/plugin', () => ({ apply() {} }))
-vi.mock('@keundal/ui-workspace/plugin', () => ({ apply() {} }))
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {

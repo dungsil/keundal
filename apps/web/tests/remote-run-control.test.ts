@@ -6,7 +6,7 @@ import type { ChatMessage } from '@keundal/chat/chat-message'
 import { EventType, parseAGUIEvent } from '@keundal/core'
 import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
-import { RemoteChatStore } from '@keundal/plugin-chat-remote'
+import { RemoteChatStore } from '@keundal/chat-http'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { expect, onTestFinished, test } from 'vitest'
 

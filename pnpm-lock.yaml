@@ -240,6 +240,9 @@ importers:
       '@keundal/agent-runtime-node':
         specifier: workspace:*
         version: link:../../packages/agent-runtime-node
+      '@keundal/browser-composition':
+        specifier: workspace:*
+        version: link:../../packages/browser-composition
       '@keundal/chat':
         specifier: workspace:*
         version: link:../../packages/chat
@@ -273,9 +276,6 @@ importers:
       '@keundal/plugin-tool-weather':
         specifier: workspace:*
         version: link:../../packages/plugin-tool-weather
-      '@keundal/plugin-transcription-browser':
-        specifier: workspace:*
-        version: link:../../packages/plugin-transcription-browser
       '@tauri-apps/api':
         specifier: 2.12.4
         version: 2.12.4
@@ -328,12 +328,18 @@ importers:
       '@keundal/agent-runtime-node':
         specifier: workspace:*
         version: link:../../packages/agent-runtime-node
+      '@keundal/browser-composition':
+        specifier: workspace:*
+        version: link:../../packages/browser-composition
       '@keundal/chat':
         specifier: workspace:*
         version: link:../../packages/chat
       '@keundal/chat-app':
         specifier: workspace:*
         version: link:../../packages/chat-app
+      '@keundal/chat-http':
+        specifier: workspace:*
+        version: link:../../packages/chat-http
       '@keundal/llm-settings':
         specifier: workspace:*
         version: link:../../packages/llm-settings
@@ -349,12 +355,12 @@ importers:
       '@keundal/plugin-chat-local':
         specifier: workspace:*
         version: link:../../packages/plugin-chat-local
-      '@keundal/plugin-chat-remote':
-        specifier: workspace:*
-        version: link:../../packages/plugin-chat-remote
       '@keundal/plugin-llm-browser':
         specifier: workspace:*
         version: link:../../packages/plugin-llm-browser
+      '@keundal/plugin-mcp-client':
+        specifier: workspace:*
+        version: link:../../packages/plugin-mcp-client
       '@keundal/plugin-runtime':
         specifier: workspace:*
         version: link:../../packages/plugin-runtime
@@ -370,9 +376,6 @@ importers:
       '@keundal/plugin-tool-weather':
         specifier: workspace:*
         version: link:../../packages/plugin-tool-weather
-      '@keundal/plugin-transcription-browser':
-        specifier: workspace:*
-        version: link:../../packages/plugin-transcription-browser
       '@keundal/task-memory':
         specifier: workspace:*
         version: link:../../packages/task-memory
@@ -613,15 +616,15 @@ importers:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
     devDependencies:
+      '@keundal/chat-http':
+        specifier: workspace:*
+        version: link:../chat-http
       '@keundal/plugin-agent-chat':
         specifier: workspace:*
         version: link:../plugin-agent-chat
       '@keundal/plugin-chat-local':
         specifier: workspace:*
         version: link:../plugin-chat-local
-      '@keundal/plugin-chat-remote':
-        specifier: workspace:*
-        version: link:../plugin-chat-remote
       '@keundal/plugin-store-memory':
         specifier: workspace:*
         version: link:../plugin-store-memory
@@ -737,9 +740,6 @@ importers:
       '@keundal/mcp':
         specifier: workspace:*
         version: link:../mcp
-      '@keundal/plugin-mcp-client':
-        specifier: workspace:*
-        version: link:../plugin-mcp-client
       '@keundal/skill':
         specifier: workspace:*
         version: link:../skill
@@ -750,6 +750,9 @@ importers:
         specifier: 2.9.1
         version: 2.9.1
     devDependencies:
+      '@keundal/plugin-mcp-client':
+        specifier: workspace:*
+        version: link:../plugin-mcp-client
       '@keundal/plugin-skill':
         specifier: workspace:*
         version: link:../plugin-skill
@@ -995,6 +998,55 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/browser-composition:
+    dependencies:
+      '@keundal/chat':
+        specifier: workspace:*
+        version: link:../chat
+      '@keundal/llm-settings':
+        specifier: workspace:*
+        version: link:../llm-settings
+      '@keundal/mcp':
+        specifier: workspace:*
+        version: link:../mcp
+      '@keundal/plugin-llm-anthropic':
+        specifier: workspace:*
+        version: link:../plugin-llm-anthropic
+      '@keundal/plugin-llm-browser':
+        specifier: workspace:*
+        version: link:../plugin-llm-browser
+      '@keundal/plugin-llm-gemini':
+        specifier: workspace:*
+        version: link:../plugin-llm-gemini
+      '@keundal/plugin-llm-openai':
+        specifier: workspace:*
+        version: link:../plugin-llm-openai
+      '@keundal/plugin-llm-openai-chat':
+        specifier: workspace:*
+        version: link:../plugin-llm-openai-chat
+      '@keundal/plugin-mcp-client':
+        specifier: workspace:*
+        version: link:../plugin-mcp-client
+      '@keundal/plugin-transcription-openai':
+        specifier: workspace:*
+        version: link:../plugin-transcription-openai
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
   packages/chat:
     dependencies:
       '@keundal/agent':
@@ -1182,6 +1234,12 @@ importers:
       '@keundal/agent-loop':
         specifier: workspace:*
         version: link:../agent-loop
+      '@keundal/browser-composition':
+        specifier: workspace:*
+        version: link:../browser-composition
+      '@keundal/chat-http':
+        specifier: workspace:*
+        version: link:../chat-http
       '@keundal/llm-settings':
         specifier: workspace:*
         version: link:../llm-settings
@@ -1197,9 +1255,6 @@ importers:
       '@keundal/plugin-chat-local':
         specifier: workspace:*
         version: link:../plugin-chat-local
-      '@keundal/plugin-chat-remote':
-        specifier: workspace:*
-        version: link:../plugin-chat-remote
       '@keundal/plugin-llm-anthropic':
         specifier: workspace:*
         version: link:../plugin-llm-anthropic
@@ -1263,6 +1318,67 @@ importers:
       vue-tsc:
         specifier: ^3.3.13
         version: 3.3.13(typescript@6.0.3)
+
+  packages/chat-http:
+    dependencies:
+      '@keundal/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@keundal/backup':
+        specifier: workspace:*
+        version: link:../backup
+      '@keundal/chat':
+        specifier: workspace:*
+        version: link:../chat
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/generation':
+        specifier: workspace:*
+        version: link:../generation
+      '@keundal/llm':
+        specifier: workspace:*
+        version: link:../llm
+      '@keundal/memory':
+        specifier: workspace:*
+        version: link:../memory
+      '@keundal/prompt':
+        specifier: workspace:*
+        version: link:../prompt
+      '@keundal/session':
+        specifier: workspace:*
+        version: link:../session
+      '@keundal/skill':
+        specifier: workspace:*
+        version: link:../skill
+      '@keundal/subagent':
+        specifier: workspace:*
+        version: link:../subagent
+      '@keundal/task':
+        specifier: workspace:*
+        version: link:../task
+      '@keundal/workspace':
+        specifier: workspace:*
+        version: link:../workspace
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/compaction:
     dependencies:
@@ -1511,6 +1627,10 @@ importers:
         version: 6.0.3
 
   packages/mcp:
+    dependencies:
+      '@keundal/tools':
+        specifier: workspace:*
+        version: link:../tools
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -1555,6 +1675,28 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/memory-store:
+    dependencies:
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
+      '@keundal/memory':
+        specifier: workspace:*
+        version: link:../memory
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
       tsdown:
         specifier: 'catalog:'
         version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
@@ -1759,9 +1901,6 @@ importers:
       '@keundal/mcp':
         specifier: workspace:*
         version: link:../mcp
-      '@keundal/plugin-mcp-client':
-        specifier: workspace:*
-        version: link:../plugin-mcp-client
       '@keundal/skill':
         specifier: workspace:*
         version: link:../skill
@@ -1793,15 +1932,15 @@ importers:
       '@keundal/chat':
         specifier: workspace:*
         version: link:../chat
+      '@keundal/chat-http':
+        specifier: workspace:*
+        version: link:../chat-http
       '@keundal/llm-settings':
         specifier: workspace:*
         version: link:../llm-settings
       '@keundal/mcp':
         specifier: workspace:*
         version: link:../mcp
-      '@keundal/plugin-chat-remote':
-        specifier: workspace:*
-        version: link:../plugin-chat-remote
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -1863,67 +2002,6 @@ importers:
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
-    devDependencies:
-      '@keundal/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@keundal/tsdown':
-        specifier: workspace:*
-        version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.13.6
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-
-  packages/plugin-chat-remote:
-    dependencies:
-      '@keundal/agent':
-        specifier: workspace:*
-        version: link:../agent
-      '@keundal/backup':
-        specifier: workspace:*
-        version: link:../backup
-      '@keundal/chat':
-        specifier: workspace:*
-        version: link:../chat
-      '@keundal/core':
-        specifier: workspace:*
-        version: link:../core
-      '@keundal/generation':
-        specifier: workspace:*
-        version: link:../generation
-      '@keundal/llm':
-        specifier: workspace:*
-        version: link:../llm
-      '@keundal/memory':
-        specifier: workspace:*
-        version: link:../memory
-      '@keundal/prompt':
-        specifier: workspace:*
-        version: link:../prompt
-      '@keundal/session':
-        specifier: workspace:*
-        version: link:../session
-      '@keundal/skill':
-        specifier: workspace:*
-        version: link:../skill
-      '@keundal/subagent':
-        specifier: workspace:*
-        version: link:../subagent
-      '@keundal/task':
-        specifier: workspace:*
-        version: link:../task
-      '@keundal/workspace':
-        specifier: workspace:*
-        version: link:../workspace
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -2140,18 +2218,6 @@ importers:
       '@keundal/llm-settings':
         specifier: workspace:*
         version: link:../llm-settings
-      '@keundal/plugin-llm-anthropic':
-        specifier: workspace:*
-        version: link:../plugin-llm-anthropic
-      '@keundal/plugin-llm-gemini':
-        specifier: workspace:*
-        version: link:../plugin-llm-gemini
-      '@keundal/plugin-llm-openai':
-        specifier: workspace:*
-        version: link:../plugin-llm-openai
-      '@keundal/plugin-llm-openai-chat':
-        specifier: workspace:*
-        version: link:../plugin-llm-openai-chat
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
@@ -2382,6 +2448,9 @@ importers:
       '@keundal/memory':
         specifier: workspace:*
         version: link:../memory
+      '@keundal/memory-store':
+        specifier: workspace:*
+        version: link:../memory-store
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
@@ -2546,9 +2615,9 @@ importers:
       '@keundal/memory':
         specifier: workspace:*
         version: link:../memory
-      '@keundal/plugin-memory':
+      '@keundal/memory-store':
         specifier: workspace:*
-        version: link:../plugin-memory
+        version: link:../memory-store
       '@keundal/session':
         specifier: workspace:*
         version: link:../session
@@ -2607,9 +2676,9 @@ importers:
       '@keundal/memory':
         specifier: workspace:*
         version: link:../memory
-      '@keundal/plugin-memory':
+      '@keundal/memory-store':
         specifier: workspace:*
-        version: link:../plugin-memory
+        version: link:../memory-store
       '@keundal/session':
         specifier: workspace:*
         version: link:../session
@@ -2665,9 +2734,9 @@ importers:
       '@keundal/memory':
         specifier: workspace:*
         version: link:../memory
-      '@keundal/plugin-memory':
+      '@keundal/memory-store':
         specifier: workspace:*
-        version: link:../plugin-memory
+        version: link:../memory-store
       '@keundal/session':
         specifier: workspace:*
         version: link:../session
@@ -2878,40 +2947,6 @@ importers:
       '@keundal/plugin-workspace-git':
         specifier: workspace:*
         version: link:../plugin-workspace-git
-      '@keundal/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@keundal/tsdown':
-        specifier: workspace:*
-        version: link:../../tools/tsdown
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.13.6
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-
-  packages/plugin-transcription-browser:
-    dependencies:
-      '@keundal/chat':
-        specifier: workspace:*
-        version: link:../chat
-      '@keundal/llm-settings':
-        specifier: workspace:*
-        version: link:../llm-settings
-      '@keundal/plugin-transcription-openai':
-        specifier: workspace:*
-        version: link:../plugin-transcription-openai
-      cordis:
-        specifier: 'catalog:'
-        version: 4.0.0-rc.11
-    devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
         version: link:../../tools/tsconfig
@@ -3380,6 +3415,9 @@ importers:
       '@keundal/chat':
         specifier: workspace:*
         version: link:../chat
+      '@keundal/core':
+        specifier: workspace:*
+        version: link:../core
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -3423,9 +3461,6 @@ importers:
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
-      '@keundal/ui-settings':
-        specifier: workspace:*
-        version: link:../ui-settings
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -3463,9 +3498,6 @@ importers:
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
-      '@keundal/ui-chat':
-        specifier: workspace:*
-        version: link:../ui-chat
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -3505,12 +3537,6 @@ importers:
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
-      '@keundal/ui-composer':
-        specifier: workspace:*
-        version: link:../ui-composer
-      '@keundal/ui-layout':
-        specifier: workspace:*
-        version: link:../ui-layout
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
@@ -3551,15 +3577,9 @@ importers:
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
-      '@keundal/ui-layout':
-        specifier: workspace:*
-        version: link:../ui-layout
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
-      '@keundal/ui-settings':
-        specifier: workspace:*
-        version: link:../ui-settings
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -3617,9 +3637,6 @@ importers:
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
-      '@keundal/ui-composer':
-        specifier: workspace:*
-        version: link:../ui-composer
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
@@ -3644,12 +3661,6 @@ importers:
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
-      '@keundal/ui-composer':
-        specifier: workspace:*
-        version: link:../ui-composer
-      '@keundal/ui-layout':
-        specifier: workspace:*
-        version: link:../ui-layout
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
@@ -3735,9 +3746,6 @@ importers:
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
-      '@keundal/ui-settings':
-        specifier: workspace:*
-        version: link:../ui-settings
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -3765,9 +3773,6 @@ importers:
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
-      '@keundal/ui-settings':
-        specifier: workspace:*
-        version: link:../ui-settings
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -3792,15 +3797,9 @@ importers:
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
-      '@keundal/ui-composer':
-        specifier: workspace:*
-        version: link:../ui-composer
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
-      '@keundal/ui-settings':
-        specifier: workspace:*
-        version: link:../ui-settings
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -3859,9 +3858,9 @@ importers:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
     devDependencies:
-      '@keundal/plugin-llm-browser':
+      '@keundal/browser-composition':
         specifier: workspace:*
-        version: link:../plugin-llm-browser
+        version: link:../browser-composition
       '@keundal/tsconfig':
         specifier: workspace:*
         version: link:../../tools/tsconfig
@@ -3892,9 +3891,6 @@ importers:
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
-      '@keundal/ui-layout':
-        specifier: workspace:*
-        version: link:../ui-layout
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
@@ -3928,9 +3924,6 @@ importers:
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
-      '@keundal/ui-settings':
-        specifier: workspace:*
-        version: link:../ui-settings
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -3961,9 +3954,6 @@ importers:
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
-      '@keundal/ui-settings':
-        specifier: workspace:*
-        version: link:../ui-settings
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -4032,9 +4022,6 @@ importers:
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
-      '@keundal/ui-settings':
-        specifier: workspace:*
-        version: link:../ui-settings
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -4059,9 +4046,6 @@ importers:
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
-      '@keundal/ui-chat':
-        specifier: workspace:*
-        version: link:../ui-chat
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
@@ -4092,9 +4076,6 @@ importers:
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
-      '@keundal/ui-chat':
-        specifier: workspace:*
-        version: link:../ui-chat
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime
@@ -4132,9 +4113,6 @@ importers:
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
-      '@keundal/ui-chat':
-        specifier: workspace:*
-        version: link:../ui-chat
       '@keundal/ui-slots':
         specifier: workspace:*
         version: link:../ui-slots
@@ -4153,9 +4131,6 @@ importers:
       '@keundal/ui':
         specifier: workspace:*
         version: link:../ui
-      '@keundal/ui-composer':
-        specifier: workspace:*
-        version: link:../ui-composer
       '@keundal/ui-runtime':
         specifier: workspace:*
         version: link:../ui-runtime

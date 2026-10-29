@@ -1,8 +1,8 @@
 import { resolveModel, type ModelOption } from '@keundal/chat/models'
 import { type ExecutionOptions } from '@keundal/core'
 import { LLMService, type LLMRequest, type LLMEvent } from '@keundal/llm'
-import { providerCredentials, providerError, type LLMSettings } from '@keundal/llm-settings'
-import { Context, type Fiber } from 'cordis'
+import { providerCredentials, providerError, type LLMProvider, type LLMSettings } from '@keundal/llm-settings'
+import { Context, type Fiber, type Plugin } from 'cordis'
 
 export const metadata = {
   name: { en: 'Browser model connection', ko: '브라우저 모델 연결' },
@@ -12,17 +12,14 @@ export const metadata = {
   }
 }
 
-const plugins = {
-  openai: () => import('@keundal/plugin-llm-openai').then((module) => module.default),
-  'openai-chat': () => import('@keundal/plugin-llm-openai-chat').then((module) => module.default),
-  anthropic: () => import('@keundal/plugin-llm-anthropic').then((module) => module.default),
-  google: () => import('@keundal/plugin-llm-gemini').then((module) => module.default)
-}
-
 /** Resolves browser-owned settings at call time; credentials never enter generation requests. */
 export function browserLLMPlugin(
   ctx: Context,
-  config: { getSettings: () => LLMSettings; getModels?: () => ModelOption[] }
+  config: {
+    getSettings: () => LLMSettings
+    getModels?: () => ModelOption[]
+    providers: Record<LLMProvider, () => Promise<Plugin>>
+  }
 ) {
   const active = new Set<Fiber>()
   let disposed = false
@@ -35,7 +32,7 @@ export function browserLLMPlugin(
     const { provider, configuration, id, value } = resolveModel(model)
     const credentials = providerCredentials(config.getSettings(), configuration)
     const metadata = config.getModels?.().find((item) => item.value === value)
-    const plugin = await plugins[provider]()
+    const plugin = await config.providers[provider]()
     options?.signal?.throwIfAborted()
     if (disposed) throw new Error('Browser LLM service is disposed')
     const context = new Context()

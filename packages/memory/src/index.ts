@@ -84,6 +84,20 @@ export interface MemoryEntry extends MemoryDraft {
   createdAt: number
   updatedAt: number
 }
+
+export interface MemoryAdapterSaveOptions extends ExecutionOptions {
+  /** Updates must atomically reject missing IDs rather than recreate deleted entries. */
+  readonly update: boolean
+  readonly expectedRevision?: number
+}
+
+export interface MemoryAdapter {
+  list(options?: ExecutionOptions): Promise<MemoryEntry[]>
+  /** Creates must reject duplicate IDs; updates must reject missing IDs. */
+  save(entry: MemoryEntry, options: MemoryAdapterSaveOptions): Promise<void>
+  delete(id: string, expectedRevision: number, options?: ExecutionOptions): Promise<void>
+}
+
 export type MemorySearchQuery = z.infer<typeof searchQuerySchema>
 export const parseMemoryDraft = (value: unknown): MemoryDraft => draftSchema.parse(value)
 export const parseMemoryEntry = (value: unknown): MemoryEntry => entrySchema.parse(value)

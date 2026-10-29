@@ -12,7 +12,6 @@
     "@keundal/memory": "workspace:*",
     "@keundal/ui": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
-    "@keundal/ui-settings": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
     "cordis": "catalog:",
     "nuxt": "^4.6.2",

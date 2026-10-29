@@ -3,7 +3,7 @@ import type { AGUIEvent } from '@keundal/core'
 import { shallowRef } from 'vue'
 
 import type { ChatMessage, ChatStatus, FilePart } from '@keundal/chat/chat-message'
-import type { DeliveryMode } from '@keundal/ui-composer/slots'
+import type { DeliveryMode } from '@keundal/ui/app/contracts/composer.ts'
 
 export function useKeundalChat(options: {
   respond: (

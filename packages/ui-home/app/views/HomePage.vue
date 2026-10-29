@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@keundal/chat/chat-message'
-import type { ComposerOwner } from '@keundal/ui-composer/slots'
+import type { ComposerOwner } from '@keundal/ui/app/contracts/composer.ts'
 import { SlotFactory } from '@keundal/ui-slots'
 import type { Ref } from 'vue'
 

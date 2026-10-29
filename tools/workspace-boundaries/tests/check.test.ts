@@ -194,3 +194,69 @@ test('코어는 기능 계약을 다시 내보내거나 실행 의존성으로 �
   assert.equal(errors.length, 3)
   assert.ok(errors.every((error) => error.endsWith('couples core to a feature package')))
 })
+
+test('플러그인은 타입·동적 import·상대 경로·설정으로 다른 구현을 참조할 수 없다', async (t) => {
+  for (const [source, target] of [
+    ['@keundal/plugin-chat-browser', '@keundal/plugin-mcp-client'],
+    ['@keundal/plugin-llm-browser', '@keundal/browser-composition'],
+    ['@keundal/ui-tool', '@keundal/ui-chat']
+  ]) {
+    const root = await fixture(t, {
+      'packages/shared/package.json': { name: source },
+      'packages/provider/package.json': { name: target },
+      'packages/shared/src/index.ts': `import type { X } from '${target}'; export * from '${target}/types';
+        const load = () => import('${target}'); type Y = import('${target}').Y;
+        const legacy = require('${target}'); import '../../provider/src/index'`,
+      'packages/shared/app/View.vue': `<script setup>import type { X } from '${target}'</script>`,
+      'packages/shared/nuxt.config.ts': `export default { extends: ['${target}'] }`,
+      'packages/shared/tsconfig.json': { compilerOptions: { paths: { '#peer': ['../provider/src/*'] } } }
+    })
+    const errors = await checkWorkspaceBoundaries(root)
+    assert.equal(errors.length, 9, source)
+    assert.ok(errors.every((error) => error.endsWith('couples plugins through an implementation')))
+  }
+})
+
+test('플러그인의 실행 의존성은 패키지 별칭과 로컬 경로로 구현 경계를 우회할 수 없다', async (t) => {
+  for (const field of ['dependencies', 'peerDependencies', 'optionalDependencies']) {
+    for (const dependency of [
+      { '@keundal/plugin-mcp-client': 'workspace:*' },
+      { alias: 'workspace:@keundal/plugin-mcp-client@*' },
+      { alias: 'npm:@keundal/plugin-mcp-client@1.0.0' },
+      { alias: 'file:../provider' },
+      { alias: 'link:../provider' },
+      { alias: 'workspace:../provider' }
+    ]) {
+      const root = await fixture(t, {
+        'packages/shared/package.json': { name: '@keundal/plugin-chat-browser', [field]: dependency },
+        'packages/provider/package.json': { name: '@keundal/plugin-mcp-client' }
+      })
+      assert.equal((await checkWorkspaceBoundaries(root)).length, 1)
+    }
+  }
+})
+
+test('플러그인은 계약·자기 모듈·선택 식별자를 사용하고 조립과 통합 테스트는 구현을 선택할 수 있다', async (t) => {
+  const root = await fixture(t, {
+    'packages/shared/package.json': {
+      name: '@keundal/plugin-chat-browser',
+      dependencies: { '@keundal/mcp': 'workspace:*' },
+      devDependencies: { '@keundal/plugin-mcp-client': 'workspace:*' }
+    },
+    'packages/shared/src/index.ts': `import type { McpConnector } from '@keundal/mcp';
+      import '@keundal/plugin-chat-browser/mcp'; const module = '@keundal/plugin-mcp-client'`,
+    'packages/shared/tests/integration.test.ts': "import '@keundal/plugin-mcp-client'",
+    'packages/provider/package.json': { name: '@keundal/plugin-mcp-client' },
+    'packages/mcp/package.json': { name: '@keundal/mcp' },
+    'packages/ui-tool/package.json': { name: '@keundal/ui-tool', dependencies: { '@keundal/ui': 'workspace:*' } },
+    'packages/ui-tool/app/plugin.ts': "import type { ChatToolOwner } from '@keundal/ui/app/contracts/chat.ts'",
+    'packages/ui/package.json': { name: '@keundal/ui' },
+    'packages/browser-composition/package.json': {
+      name: '@keundal/browser-composition',
+      dependencies: { '@keundal/plugin-mcp-client': 'workspace:*' }
+    },
+    'packages/browser-composition/src/mcp.ts': "export * from '@keundal/plugin-mcp-client'",
+    'apps/alpha/app/platform.ts': "import '@keundal/browser-composition/mcp'"
+  })
+  assert.deepEqual(await checkWorkspaceBoundaries(root), [])
+})

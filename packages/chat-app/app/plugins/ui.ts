@@ -4,7 +4,8 @@ import { ChatRuntime, SettingsLoadError } from '@keundal/ui-runtime'
 import { SlotService } from '@keundal/ui-slots'
 import { Context } from 'cordis'
 
-import { UIPluginManager } from '../ui-plugins'
+import { UIPluginManager } from '../ui-plugin-manager'
+import { uiPluginCatalog } from '../ui-plugins'
 
 declare module '#app' {
   interface NuxtApp {
@@ -58,7 +59,7 @@ export default defineNuxtPlugin({
       stop: () => ctx.chatRuntime.stopResponses(),
       platform: import.meta.client ? nuxtApp.$chatPlatform?.runtimePlugins : undefined,
       storage: import.meta.client ? localStorage : undefined
-    })
+    }, uiPluginCatalog)
     ctx.chatRuntime.pluginManager = pluginManager
     if (import.meta.client) nuxtApp.hook('app:mounted', () => pluginManager.sync())
 

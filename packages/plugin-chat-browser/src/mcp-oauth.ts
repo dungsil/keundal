@@ -3,23 +3,25 @@ import {
   type McpAuthentication,
   type McpAuthenticationState,
   type McpClientConfig,
+  type McpOAuthAccount,
   type McpOAuthManager,
+  type McpOAuthOptions,
   type McpRequestOptions
 } from '@keundal/mcp'
-import type { McpOAuth } from '@keundal/plugin-mcp-client/browser'
 
 /** Browser grants live only in this app instance, never in Web Storage or IndexedDB. */
 export class BrowserMcpOAuth implements McpOAuthManager {
   private readonly credentials = new Map<string, string>()
-  private readonly accounts = new Map<string, Promise<McpOAuth>>()
+  private readonly accounts = new Map<string, Promise<McpOAuthAccount>>()
   private readonly pending = new Map<string, AbortController>()
 
   constructor(
     private readonly configuration: () => McpClientConfig[],
-    private readonly changed: () => Promise<void>
+    private readonly changed: () => Promise<void>,
+    private readonly createAccount: (options: McpOAuthOptions) => Promise<McpOAuthAccount>
   ) {}
 
-  private account(server: McpClientConfig): Promise<McpOAuth> {
+  private account(server: McpClientConfig): Promise<McpOAuthAccount> {
     if (server.transport !== 'streamable-http' || !server.oauth) throw new Error('OAuth is not configured')
     const redirectUrl = new URL('/mcp/oauth-callback.html', window.location.origin).href
     const key = JSON.stringify([
@@ -30,22 +32,18 @@ export class BrowserMcpOAuth implements McpOAuthManager {
     ])
     let account = this.accounts.get(key)
     if (!account) {
-      // Keep the SDK out of the initial browser bundle, as for MCP connections.
-      account = import('@keundal/plugin-mcp-client/browser').then(
-        ({ McpOAuth }) =>
-          new McpOAuth({
-            serverUrl: server.url,
-            redirectUrl,
-            ...server.oauth,
-            storage: {
-              load: async (key) => this.credentials.get(key) ?? null,
-              save: async (key, value) => {
-                if (value === null) this.credentials.delete(key)
-                else this.credentials.set(key, value)
-              }
-            }
-          })
-      )
+      account = this.createAccount({
+        serverUrl: server.url,
+        redirectUrl,
+        ...server.oauth,
+        storage: {
+          load: async (key) => this.credentials.get(key) ?? null,
+          save: async (key, value) => {
+            if (value === null) this.credentials.delete(key)
+            else this.credentials.set(key, value)
+          }
+        }
+      })
       this.accounts.set(key, account)
     }
     return account
@@ -83,7 +81,7 @@ export class BrowserMcpOAuth implements McpOAuthManager {
       AbortSignal.timeout(10 * 60_000),
       ...(options.signal ? [options.signal] : [])
     ])
-    let account: McpOAuth | undefined
+    let account: McpOAuthAccount | undefined
     try {
       account = await this.account(server)
       await this.changed()

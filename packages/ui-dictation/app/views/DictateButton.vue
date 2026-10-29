@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { TranscriptionStream } from '@keundal/chat/platform'
-import type { DictationState } from '@keundal/ui-composer/slots'
+import type { DictationState } from '@keundal/ui/app/contracts/composer.ts'
 
 import { useDictation } from '../lib/use-dictation'
 import { useText } from '../locale'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ExecutionOptions } from '@keundal/core'
 import type { GenerationSnapshot } from '@keundal/generation'
-import type { ChatIndicatorOwner } from '@keundal/ui-chat/slots'
+import type { ChatIndicatorOwner } from '@keundal/ui/app/contracts/chat.ts'
 
 import { showRootTrace, type LiveTrace } from '../lib/live-trace'
 import TraceViewer from './TraceViewer.vue'

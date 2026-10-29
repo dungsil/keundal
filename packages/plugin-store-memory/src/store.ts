@@ -1,7 +1,6 @@
 import type { AgentMessage, RunAgentInput } from '@keundal/core'
 import type { GenerationJournalEntry, GenerationRequest, GenerationStatus } from '@keundal/generation'
-import { parseMemoryEntry, type MemoryEntry } from '@keundal/memory'
-import type { MemoryAdapter } from '@keundal/plugin-memory'
+import { parseMemoryEntry, type MemoryEntry, type MemoryAdapter } from '@keundal/memory'
 
 /** 스레드 하나의 저장 상태입니다. */
 export interface StoredThread {

@@ -1,5 +1,5 @@
 {
-  "name": "@keundal/plugin-transcription-browser",
+  "name": "@keundal/memory-store",
   "private": true,
   "files": [
     "dist"
@@ -16,17 +16,13 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@keundal/chat": "workspace:*",
-    "@keundal/llm-settings": "workspace:*",
-    "@keundal/plugin-transcription-openai": "workspace:*",
+    "@keundal/core": "workspace:*",
+    "@keundal/memory": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",
-    "@keundal/tsdown": "workspace:*",
-    "@types/node": "catalog:",
     "tsdown": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }

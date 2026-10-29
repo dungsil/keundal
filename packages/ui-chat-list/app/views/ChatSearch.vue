@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { SlotEntryInfo } from '@keundal/ui-slots'
 import type { ChatSummary } from '@keundal/ui-runtime'
-import type {} from '@keundal/ui-settings/slots'
+import type {} from '@keundal/ui/app/contracts/settings.ts'
 import type { Ref } from 'vue'
 
 import { useLocalizedChats } from '../lib/useLocalizedChats'

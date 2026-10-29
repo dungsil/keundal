@@ -6,8 +6,7 @@
   "main": "./nuxt.config.ts",
   "exports": {
     ".": "./nuxt.config.ts",
-    "./plugin": "./app/plugin.ts",
-    "./slots": "./app/slots.ts"
+    "./plugin": "./app/plugin.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -21,8 +20,6 @@
     "@keundal/subagent": "workspace:*",
     "@keundal/tool-approval": "workspace:*",
     "@keundal/ui": "workspace:*",
-    "@keundal/ui-composer": "workspace:*",
-    "@keundal/ui-layout": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
     "@nuxt/ui": "^4.11.3",

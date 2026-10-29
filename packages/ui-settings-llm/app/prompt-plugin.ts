@@ -1,7 +1,7 @@
 import type { Context } from 'cordis'
 import type { PromptPresetSettings } from '@keundal/chat'
 import type {} from '@keundal/ui-runtime'
-import type {} from '@keundal/ui-settings/slots'
+import type {} from '@keundal/ui/app/contracts/settings.ts'
 import { localizedText } from '@keundal/ui/app/utils/locale.ts'
 import { messages } from './locale'
 import SystemPromptSettings from './views/SystemPromptSettings.vue'

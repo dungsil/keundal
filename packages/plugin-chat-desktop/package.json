@@ -29,9 +29,9 @@
   },
   "dependencies": {
     "@keundal/chat": "workspace:*",
+    "@keundal/chat-http": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
-    "@keundal/mcp": "workspace:*",
-    "@keundal/plugin-chat-remote": "workspace:*"
+    "@keundal/mcp": "workspace:*"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",

@@ -3,8 +3,7 @@ import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlit
 import { parseHistoryBackup, type HistoryBackup } from '@keundal/backup'
 import { MessageAssembly, type AGUIEvent, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import { type GenerationJournalEntry, type GenerationRequest, type GenerationStatus } from '@keundal/generation'
-import { parseMemoryEntry, type MemoryEntry } from '@keundal/memory'
-import type { MemoryAdapter } from '@keundal/plugin-memory'
+import { parseMemoryEntry, type MemoryEntry, type MemoryAdapter } from '@keundal/memory'
 
 /** 스레드 하나의 확정된 저장 상태입니다. */
 export interface StoredThread {

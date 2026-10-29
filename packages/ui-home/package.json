@@ -11,8 +11,6 @@
   "dependencies": {
     "@keundal/chat": "workspace:*",
     "@keundal/ui": "workspace:*",
-    "@keundal/ui-composer": "workspace:*",
-    "@keundal/ui-layout": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
     "cordis": "catalog:",

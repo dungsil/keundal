@@ -19,6 +19,7 @@
   "dependencies": {
     "@keundal/core": "workspace:*",
     "@keundal/memory": "workspace:*",
+    "@keundal/memory-store": "workspace:*",
     "cordis": "catalog:"
   },
   "devDependencies": {

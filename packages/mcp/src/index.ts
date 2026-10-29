@@ -1,3 +1,5 @@
+import type { ExecutableTool } from '@keundal/tools'
+
 export interface McpPermissions {
   readonly tools?: '*' | readonly string[]
   readonly resources?: '*' | readonly string[]
@@ -43,6 +45,17 @@ export interface McpConnectOptions extends McpRequestOptions {
   readonly authentication?: McpAuthentication
 }
 
+/** Consumers own connection lifetimes; the application selects the transport implementation. */
+export interface McpConnection {
+  tools(options?: McpRequestOptions): Promise<ExecutableTool[]>
+  close(): Promise<void>
+}
+
+export interface McpConnector {
+  connect(config: McpClientConfig, options?: McpConnectOptions): Promise<McpConnection>
+  probe(config: McpClientConfig, options?: McpConnectOptions): Promise<McpProbeResult>
+}
+
 /** Implement with an OS secret store or an access-controlled server-side secret store. Never localStorage. */
 export interface McpCredentialStorage {
   load(key: string): Promise<string | null>
@@ -50,6 +63,22 @@ export interface McpCredentialStorage {
 }
 
 export type McpAuthenticationState = 'disconnected' | 'authorizing' | 'connected' | 'reauthentication-required'
+
+export interface McpOAuthOptions {
+  readonly serverUrl: string
+  readonly redirectUrl: string
+  readonly clientId?: string
+  readonly scope?: string
+  /** Must be isolated by application user/account on a shared server. */
+  readonly storage: McpCredentialStorage
+}
+
+export interface McpOAuthAccount extends McpAuthentication {
+  status(options?: McpRequestOptions): Promise<McpAuthenticationState>
+  authorize(options?: McpRequestOptions): Promise<string>
+  complete(callbackUrl: string, options?: McpRequestOptions): Promise<void>
+  disconnect(options?: McpRequestOptions): Promise<void>
+}
 
 /** Account actions never expose tokens to the settings UI. */
 export interface McpOAuthManager {

@@ -1,5 +1,6 @@
 import type {} from '@keundal/ui-slots'
 
+/** Shared slot contracts; implementations own their runtime declarations. */
 /** Values every sidebar entry receives. */
 export interface SidebarOwner {
   /** The sidebar shows icons only. */

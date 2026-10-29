@@ -1,4 +1,4 @@
-import type {} from '@keundal/ui-chat/slots'
+import type {} from '@keundal/ui/app/contracts/chat.ts'
 import { lazyView } from '@keundal/ui-slots'
 import type { Context } from 'cordis'
 

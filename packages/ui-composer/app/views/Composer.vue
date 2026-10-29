@@ -7,7 +7,7 @@ import { useElementBounding, useMediaQuery } from '@vueuse/core'
 import type { Ref } from 'vue'
 
 import { useText } from '../locale'
-import type { DeliveryMode, DictationState } from '../slots'
+import type { DeliveryMode, DictationState } from '@keundal/ui/app/contracts/composer.ts'
 import Files from './Files.vue'
 import PromptMenu from './PromptMenu.vue'
 import SubmitControls from './SubmitControls.vue'

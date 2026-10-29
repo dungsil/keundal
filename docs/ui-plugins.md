@@ -29,7 +29,7 @@
 
 ## 슬롯 선언
 
-슬롯은 등록할 위치를 소유한 항목이 선언합니다. 항목은 `register()`의 `children`에 하위 슬롯과 종류를 적고, 같은 이름을 `SlotMap`에 선언 병합합니다. 선언은 렌더링 권한도 함께 정합니다. 항목은 자신이 선언한 슬롯만 `SlotOutlet`으로 그릴 수 있습니다.
+슬롯의 공용 타입과 `SlotMap` 선언 병합은 `@keundal/ui/app/contracts/{chat,composer,layout,settings}.ts`에 둡니다. 소비 플러그인은 다른 UI 구현 대신 이 계약을 가져옵니다. 실행 중에는 등록할 위치를 소유한 항목이 `register()`의 `children`에 하위 슬롯과 종류를 선언합니다. 타입을 가져오는 것만으로 슬롯이 등록되지는 않습니다. 선언은 렌더링 권한도 함께 정하며, 항목은 자신이 선언한 슬롯만 `SlotOutlet`으로 그릴 수 있습니다.
 
 ```ts
 declare module '@keundal/ui-slots' {
@@ -95,7 +95,6 @@ LLM 본문·추론·서브에이전트 결과는 `@keundal/ui`의 `ChatMarkdown`
 packages/ui-<name>/
   nuxt.config.ts     빈 Nuxt 레이어
   app/plugin.ts      Cordis 플러그인: name, inject, apply
-  app/slots.ts       이 패키지가 선언하는 슬롯과 소유자 타입
   app/views/*.vue    등록하는 컴포넌트
   app/lib/*.ts       명시적으로 가져오는 순수 함수
   app/locale.ts      useText()
@@ -126,4 +125,4 @@ factory composer                   ui-composer
 └─ composer.dictation              ui-dictation (항목이 없으면 전송 버튼)
 ```
 
-각 슬롯의 소유자 값은 선언한 패키지의 `app/slots.ts`에서 확인합니다.
+각 슬롯의 소유자 값은 `packages/ui/app/contracts/`에서 확인합니다. UI 등록 목록은 `chat-app/app/ui-plugins.ts`, 수명과 선택 관리는 `chat-app/app/ui-plugin-manager.ts`에 둡니다.

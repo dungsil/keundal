@@ -1,7 +1,7 @@
 import type { Context } from 'cordis'
 import type { ChatMessage } from '@keundal/chat/chat-message'
-import type {} from '@keundal/ui-composer/slots'
-import type {} from '@keundal/ui-layout/slots'
+import type {} from '@keundal/ui/app/contracts/composer.ts'
+import type {} from '@keundal/ui/app/contracts/layout.ts'
 import type {} from '@keundal/ui-runtime'
 
 import HomePage from './views/HomePage.vue'

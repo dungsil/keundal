@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@keundal/chat": "workspace:*",
+    "@keundal/core": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
     "@nuxt/ui": "^4.11.3",
     "@vueuse/core": "^14.4.0",

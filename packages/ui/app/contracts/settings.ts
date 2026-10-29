@@ -1,5 +1,6 @@
 import type {} from '@keundal/ui-slots'
-import type { LocalizedText } from '@keundal/ui/app/utils/locale.ts'
+
+import type { LocalizedText } from '../utils/locale.ts'
 
 /** Navigation data of one settings section. The entry's `key` is the path segment under `/settings/`. */
 export interface SettingsSectionMeta {

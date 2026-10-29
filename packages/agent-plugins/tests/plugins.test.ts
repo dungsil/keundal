@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { loadAgentPlugin, PLUGIN_SCHEMA, MCP_SCHEMA, type LoadedAgentPlugin } from '@keundal/agent-plugins'
+import { McpClient } from '@keundal/plugin-mcp-client'
 import { expect, test, type TestContext } from 'vitest'
 
 async function fixture(t: TestContext) {
@@ -24,11 +25,14 @@ async function fixture(t: TestContext) {
   const skill = (name = 'hello', content = 'Instructions') =>
     file(`skills/${name}/SKILL.md`, `---\nname: ${name}\ndescription: A skill\n---\n${content}`)
   const load = async (mcp = false) => {
-    const p = await loadAgentPlugin({
-      root,
-      dataDirectory,
-      ...(mcp ? { mcp: { permissions: { good: { tools: '*' } }, timeoutMs: 2000 } } : {})
-    })
+    const p = await loadAgentPlugin(
+      {
+        root,
+        dataDirectory,
+        ...(mcp ? { mcp: { permissions: { good: { tools: '*' } }, timeoutMs: 2000 } } : {})
+      },
+      { connectMcp: (config, options) => McpClient.connect(config, options) }
+    )
     plugins.push(p)
     return p
   }
@@ -327,11 +331,14 @@ test('서버별 cwd 경계와 일회성 치환을 실제 프로세스에서 적�
       }
     })
   )
-  const p = await loadAgentPlugin({
-    root,
-    dataDirectory: f.dataDirectory,
-    mcp: { permissions: { good: { tools: '*' } } }
-  })
+  const p = await loadAgentPlugin(
+    {
+      root,
+      dataDirectory: f.dataDirectory,
+      mcp: { permissions: { good: { tools: '*' } } }
+    },
+    { connectMcp: (config, options) => McpClient.connect(config, options) }
+  )
   try {
     const tools = await p.tools()
     const result = JSON.parse(

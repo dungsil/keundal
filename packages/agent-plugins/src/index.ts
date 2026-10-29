@@ -5,8 +5,7 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 
 import type { ExecutionOptions } from '@keundal/core'
-import type { McpClientConfig, McpPermissions } from '@keundal/mcp'
-import { McpClient } from '@keundal/plugin-mcp-client'
+import type { McpClientConfig, McpConnection, McpConnector, McpPermissions } from '@keundal/mcp'
 import type { SkillProvider } from '@keundal/skill'
 import type { ExecutableTool } from '@keundal/tools'
 
@@ -37,11 +36,12 @@ export interface LoadedAgentPlugin {
 
 export async function loadAgentPlugin(
   config: AgentPluginOptions,
-  options: ExecutionOptions = {}
+  options: ExecutionOptions & { connectMcp?: McpConnector['connect'] } = {}
 ): Promise<LoadedAgentPlugin> {
   options.signal?.throwIfAborted()
   if (!config.root?.trim() || !config.dataDirectory?.trim())
     throw new Error('plugin root and dataDirectory are required')
+  if (config.mcp && !options.connectMcp) throw new Error('MCP connector is required when MCP is enabled')
   const root = await realpath(config.root)
   const diagnostics: PluginDiagnostic[] = []
   const reported = new Set<string>()
@@ -58,7 +58,7 @@ export async function loadAgentPlugin(
   )
   const lifetime = new globalThis.AbortController()
   const signal = globalThis.AbortSignal.any([lifetime.signal, ...(options.signal ? [options.signal] : [])])
-  const clients = new Map<string, McpClient>()
+  const clients = new Map<string, McpConnection>()
   let closing: Promise<void> | undefined
   const close = () => {
     lifetime.abort(new Error('agent plugin closed'))
@@ -140,7 +140,7 @@ export async function loadAgentPlugin(
                   redirect: 'error'
                 }
               }
-              clients.set(name, await McpClient.connect(connection, { signal }))
+              clients.set(name, await options.connectMcp!(connection, { signal }))
             } catch (error) {
               signal.throwIfAborted()
               report('mcp', error instanceof Error ? error.message : String(error), name)

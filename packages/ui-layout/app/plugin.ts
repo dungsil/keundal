@@ -1,7 +1,7 @@
 import type { Context } from 'cordis'
 import type {} from '@keundal/ui-slots'
 
-import type {} from './slots'
+import type {} from '@keundal/ui/app/contracts/layout.ts'
 import AppFrame from './views/AppFrame.vue'
 
 export const name = 'ui-layout'

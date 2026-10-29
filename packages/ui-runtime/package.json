@@ -31,7 +31,7 @@
     "cordis": "catalog:"
   },
   "devDependencies": {
-    "@keundal/plugin-llm-browser": "workspace:*",
+    "@keundal/browser-composition": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "tsdown": "catalog:",

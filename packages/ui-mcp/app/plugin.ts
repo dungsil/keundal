@@ -1,7 +1,7 @@
 import type { Context } from 'cordis'
 import type { McpRequestOptions } from '@keundal/mcp'
 import type {} from '@keundal/ui-runtime'
-import type {} from '@keundal/ui-settings/slots'
+import type {} from '@keundal/ui/app/contracts/settings.ts'
 import { sharedText } from '@keundal/ui/app/utils/locale.ts'
 
 import McpSettingsSection from './views/McpSettings.vue'

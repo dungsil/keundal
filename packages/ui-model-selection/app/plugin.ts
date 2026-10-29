@@ -1,8 +1,8 @@
 import type { Context } from 'cordis'
 import type { ModelRecoveryPolicy } from '@keundal/chat/model-preferences'
-import type {} from '@keundal/ui-composer/slots'
+import type {} from '@keundal/ui/app/contracts/composer.ts'
 import type {} from '@keundal/ui-runtime'
-import type {} from '@keundal/ui-settings/slots'
+import type {} from '@keundal/ui/app/contracts/settings.ts'
 import { localizedText } from '@keundal/ui/app/utils/locale.ts'
 
 import { messages } from './locale'
