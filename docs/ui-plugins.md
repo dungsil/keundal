@@ -1,18 +1,18 @@
 # UI 플러그인과 슬롯
 
-채팅 화면은 `packages/ui-*` 플러그인의 조합으로 만든다. 각 플러그인은 Nuxt 레이어이면서 Cordis 플러그인이다. Nuxt 레이어는 앱의 모듈, Tailwind, 아이콘 설정으로 플러그인의 컴포넌트를 컴파일한다. Cordis 플러그인의 `apply(ctx)`는 컴포넌트를 슬롯에 등록한다. `@keundal/chat-app`은 Nuxt UI 공급자, 경로 페이지, 플러그인 조립을 담당한다. `@keundal/ui-shell`은 시작 화면과 전역 메타데이터를, `@keundal/ui-layout`은 본문 틀과 페이지 슬롯을, `@keundal/ui-sidebar`는 사이드바를 소유한다. 세 플러그인은 관리 화면에 계속 접근할 수 있도록 항상 등록한다.
+채팅 화면은 `packages/ui-*` 플러그인의 조합으로 만든다. 각 플러그인은 Nuxt 레이어이면서 Cordis 플러그인이다. Nuxt 레이어는 앱의 모듈, Tailwind, 아이콘 설정으로 플러그인의 컴포넌트를 컴파일한다. Cordis 플러그인의 `apply(ctx)`는 컴포넌트를 슬롯에 등록한다. 각 앱은 필요한 UI 플러그인을 직접 조립한다. `@keundal/ui-shell`은 Nuxt UI 공급자, 시작·오류 화면, 전역 메타데이터, 본문 틀과 페이지 슬롯을, `@keundal/ui-sidebar`는 사이드바를 소유한다. 두 플러그인은 관리 화면에 계속 접근할 수 있도록 항상 등록한다. 홈·대화·기록·설정 경로는 각 기능 패키지가 제공한다.
 
 ## 구성 요소
 
-| 패키지                | 역할                                                                                                  |
-| --------------------- | ----------------------------------------------------------------------------------------------------- |
-| `@keundal/ui-slots`   | 슬롯 레지스트리 `ctx.slots`와 `SlotRoot`, `SlotOutlet`, `SlotFactory`, `useSlotEntries`를 제공합니다. |
-| `@keundal/ui-runtime` | 채팅 플랫폼 연결과 플러그인 사이에서 공유하는 화면 상태를 `ctx.chatRuntime`으로 제공합니다.           |
-| `@keundal/ui`         | 공통 컴포넌트, 공유 사전, `defineMessages`, `useChatActions`, `useFileUploadWithStatus`를 제공합니다. |
-| `@keundal/ui-*`       | 화면 기능 하나를 슬롯에 등록합니다.                                                                   |
-| `@keundal/chat-app`   | `app/plugins/ui.ts`에서 Cordis `Context`를 만들고 `app/ui-plugins.ts`의 플러그인을 등록합니다.        |
+| 패키지                     | 역할                                                                                                  |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `@keundal/ui-slots`        | 슬롯 레지스트리 `ctx.slots`와 `SlotRoot`, `SlotOutlet`, `SlotFactory`, `useSlotEntries`를 제공합니다. |
+| `@keundal/ui-runtime`      | 채팅 플랫폼 연결과 플러그인 사이에서 공유하는 화면 상태를 `ctx.chatRuntime`으로 제공합니다.           |
+| `@keundal/ui`              | 공통 컴포넌트, 공유 사전, `defineMessages`, `useChatActions`, `useFileUploadWithStatus`를 제공합니다. |
+| `@keundal/ui-*`            | 화면 기능 하나를 슬롯에 등록합니다.                                                                   |
+| `apps/web`, `apps/desktop` | 각 앱의 `app/ui-plugins.ts`에서 UI 목록을 정하고 `createUIPlugin(catalog)`로 초기화합니다.            |
 
-`app/plugins/ui.ts`는 서버 렌더링과 최초 하이드레이션에서 같은 기본 UI를 등록합니다. `ChatRuntime.start()`는 브라우저에서만 플랫폼을 연결하며, 앱이 마운트된 뒤 실제 실행 방식의 선택과 UI를 동기화합니다. 저장된 선택에서 기능을 꺼 두었어도 하이드레이션이 끝나기 전에는 기본 UI를 유지합니다. 이전 `keundal-ui-plugins` 쿠키는 읽거나 선택에 반영하지 않습니다. 플랫폼이 필요한 멤버는 연결하기 전에 호출하면 예외를 던집니다.
+각 앱의 `app/plugins/ui.ts`는 `@keundal/ui-runtime/nuxt`의 `createUIPlugin(catalog)`를 호출합니다. 이 함수는 서버 렌더링과 최초 하이드레이션에서 같은 기본 UI를 등록합니다. `ChatRuntime.start()`는 브라우저에서만 플랫폼을 연결하며, 앱이 마운트된 뒤 실제 실행 방식의 선택과 UI를 동기화합니다. 저장된 선택에서 기능을 꺼 두었어도 하이드레이션이 끝나기 전에는 기본 UI를 유지합니다. 이전 `keundal-ui-plugins` 쿠키는 읽거나 선택에 반영하지 않습니다. 플랫폼이 필요한 멤버는 연결하기 전에 호출하면 예외를 던집니다.
 
 `UIPluginManager`는 UI의 Cordis 등록 범위를 소유하지만 독립적인 UI 선택은 제공하지 않습니다. **설정 → 큰달 플러그인**에는 실행 방식이 제공하는 필수 서비스인 LLM·저장소·에이전트와 선택 기능인 스킬·MCP·날씨·차트 도구만 표시합니다. `ui-*`는 행이나 스위치로 표시하지 않습니다. `ChatRuntime.pluginManager`도 이 기능 목록만 제공하며, `platform.runtimePlugins`가 있을 때만 노출합니다. 원격 연결처럼 실행 방식의 관리자가 없으면 관리 화면은 사용할 수 없음을 표시하고 기본 UI를 유지합니다.
 
@@ -79,7 +79,7 @@ LLM 본문·추론·서브에이전트 결과는 `@keundal/ui`의 `ChatMarkdown`
 
 현재 구현은 `@keundal/ui-markdown-comark` 하나입니다. Comark Nuxt 모듈, 지연 로딩, 코드 강조와 다크 테마, 출처 문법 변환, 보안 처리를 이 패키지에서 관리합니다. 보안 테스트도 구현 패키지에 둡니다. `SourceLink`의 URL 검증은 공통 UI에 유지합니다.
 
-구현을 교체할 때는 `@keundal/chat-app`의 Nuxt `extends`와 `uiPluginCatalog`에서 구현 패키지를 함께 바꿉니다. 새 구현은 `ctx.slots.registerFactory({ name: 'markdown' }, component)`로 등록하고 `value`, `streaming`, `sources`를 props로 받습니다. `lazyView`를 쓰면 세 이름을 전달 목록에 포함합니다. 소비 컴포넌트나 저장된 대화 형식은 바꾸지 않습니다. 별도의 사용자 선택 화면이나 런타임 매니페스트 항목은 추가하지 않습니다.
+구현을 교체할 때는 각 앱의 Nuxt `extends`와 `uiPluginCatalog`에서 구현 패키지를 함께 바꿉니다. 새 구현은 `ctx.slots.registerFactory({ name: 'markdown' }, component)`로 등록하고 `value`, `streaming`, `sources`를 props로 받습니다. `lazyView`를 쓰면 세 이름을 전달 목록에 포함합니다. 소비 컴포넌트나 저장된 대화 형식은 바꾸지 않습니다. 별도의 사용자 선택 화면이나 런타임 매니페스트 항목은 추가하지 않습니다.
 
 ## 번역
 
@@ -100,32 +100,31 @@ packages/ui-<name>/
   app/locale.ts      useText()
 ```
 
-Nuxt는 레이어의 `components`, `composables`, `utils`, `plugins`, `pages`, `layouts`, `middleware` 디렉터리를 전역으로 등록합니다. 플러그인 패키지는 이 디렉터리를 만들지 않습니다. 번들 목록에 패키지를 추가하거나 빼려면 `packages/chat-app/app/ui-plugins.ts`의 `uiPluginCatalog`와 `nuxt.config.ts`의 `extends`를 함께 고칩니다.
+Nuxt는 레이어의 `components`, `composables`, `utils`, `plugins`, `pages`, `layouts`, `middleware` 디렉터리를 전역으로 등록합니다. 플러그인 패키지는 이 디렉터리를 만들지 않습니다. 경로를 제공하는 기능은 `app/routes`에 페이지를 두고 자신의 `nuxt.config.ts`에서 `pages:extend`로 등록합니다. 앱은 `pages: true`를 설정합니다. 번들 목록에 패키지를 추가하거나 빼려면 해당 앱의 `app/ui-plugins.ts`의 `uiPluginCatalog`와 `nuxt.config.ts`의 `extends`를 함께 고칩니다.
 
 ## 슬롯 구조
 
 ```text
 root                               ui-shell
-└─ app.layout                      ui-layout
-   ├─ layout.navigation            ui-sidebar
-   │  ├─ layout.sidebar            ui-chat-list
-   │  └─ layout.sidebar.footer     ui-settings
-   ├─ page.home                    ui-home
-   ├─ page.history                 ui-chat-list
-   ├─ page.chat                    ui-chat
-   │  ├─ chat.message.tool         ui-tool, ui-chart, ui-weather (항목이 없으면 기본 도구 카드)
-   │  ├─ chat.message.footer       ui-trace
-   │  ├─ chat.indicator            ui-trace
-   │  ├─ chat.execution            ui-acp (메시지와 분리된 실행 패널)
-   │  └─ chat.observer             ui-trace, ui-acp
-   ├─ page.settings                ui-settings
-   │  └─ settings.section          ui-settings, ui-settings-llm, ui-model-selection,
-   │                               ui-agent-plugins, ui-skill, ui-mcp, ui-automation
-   └─ layout.overlay               ui-chat-list, ui-automation
+├─ layout.navigation               ui-sidebar
+│  ├─ layout.sidebar               ui-chat-list
+│  └─ layout.sidebar.footer        ui-settings
+├─ page.home                       ui-home
+├─ page.history                    ui-chat-list
+├─ page.chat                       ui-chat
+│  ├─ chat.message.tool            ui-tool, ui-chart, ui-weather (항목이 없으면 기본 도구 카드)
+│  ├─ chat.message.footer          ui-trace
+│  ├─ chat.indicator               ui-trace
+│  ├─ chat.execution               ui-acp (메시지와 분리된 실행 패널)
+│  └─ chat.observer                ui-trace, ui-acp
+├─ page.settings                   ui-settings
+│  └─ settings.section             ui-settings, ui-settings-llm, ui-model-selection,
+│                                  ui-agent-plugins, ui-skill, ui-mcp, ui-automation
+└─ layout.overlay                  ui-chat-list, ui-automation
 
 factory composer                   ui-composer
 ├─ composer.actions                ui-model-selection
 └─ composer.dictation              ui-dictation (항목이 없으면 전송 버튼)
 ```
 
-각 슬롯의 소유자 값은 `packages/ui/app/contracts/`에서 확인합니다. UI 등록 목록은 `chat-app/app/ui-plugins.ts`, 수명과 선택 관리는 `chat-app/app/ui-plugin-manager.ts`에 둡니다.
+각 슬롯의 소유자 값은 `packages/ui/app/contracts/`에서 확인합니다. UI 등록 목록은 각 앱의 `app/ui-plugins.ts`, 수명과 선택 관리는 `ui-runtime/src/ui-plugin-manager.ts`에 둡니다.

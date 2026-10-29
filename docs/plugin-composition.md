@@ -1,21 +1,22 @@
 # 플랫폼별 플러그인 조립
 
-web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도구를 런타임 JSON 설정으로 선택합니다. 앱의 `app/platform.ts`는 실행 환경과 기본 플러그인 목록을 제공합니다. 공통 채팅 레이어는 `@keundal/ui-runtime`을 거쳐 `ChatPlatform` 계약으로 설정·대화·모델 목록·받아쓰기를 사용합니다. 화면 구성은 [UI 플러그인 문서](ui-plugins.md)를 따릅니다.
+web과 desktop은 공통 UI를 사용하며, LLM·저장소·에이전트·도구를 런타임 JSON 설정으로 선택합니다. 앱의 `app/platform.ts`는 실행 환경과 기본 플러그인 목록을 제공합니다. UI 기능은 `@keundal/ui-runtime`을 거쳐 `ChatPlatform` 계약으로 설정·대화·모델 목록·받아쓰기를 사용합니다. 화면 구성은 [UI 플러그인 문서](ui-plugins.md)를 따릅니다.
 
-| 경계                                         | 담당 패키지 또는 경로                  |
-| -------------------------------------------- | -------------------------------------- |
-| 채팅 데이터와 플랫폼 계약                    | `@keundal/chat`                        |
-| 화면 셸과 UI 플러그인 조립                   | `@keundal/chat-app`                    |
-| 화면 기능과 공유 화면 상태                   | `@keundal/ui-*`, `@keundal/ui-runtime` |
-| Cordis 서비스로 대화 실행                    | `@keundal/plugin-chat-local`           |
-| HTTP 호스트 연결                             | `@keundal/chat-http`                   |
-| sidecar·OS 보안 저장소·로컬 스킬 IPC         | `@keundal/plugin-chat-desktop`         |
-| 브라우저 설정 저장과 MCP 연결 관리           | `@keundal/plugin-chat-browser`         |
-| 브라우저 LLM 설정과 모델 목록 캐시           | `@keundal/plugin-llm-browser`          |
-| 브라우저 LLM·MCP·받아쓰기의 기본 공급자 조립 | `@keundal/browser-composition`         |
-| 공급자와 무관한 호스트와 HTTP 연결           | `@keundal/agent-host`                  |
-| Node.js 환경 설정과 기본 플러그인 구성       | `@keundal/agent-runtime-node`          |
-| 런타임 플러그인 설정과 Cordis 모듈 로딩      | `@keundal/plugin-runtime`              |
+| 경계                                         | 담당 패키지 또는 경로                         |
+| -------------------------------------------- | --------------------------------------------- |
+| 채팅 데이터와 플랫폼 계약                    | `@keundal/chat`                               |
+| UI 레이어와 기능 목록 조립                   | 각 앱의 `nuxt.config.ts`, `app/ui-plugins.ts` |
+| 화면 셸과 사이드바                           | `@keundal/ui-shell`, `@keundal/ui-sidebar`    |
+| 화면 기능과 공유 화면 상태                   | `@keundal/ui-*`, `@keundal/ui-runtime`        |
+| Cordis 서비스로 대화 실행                    | `@keundal/plugin-chat-local`                  |
+| HTTP 호스트 연결                             | `@keundal/chat-http`                          |
+| sidecar·OS 보안 저장소·로컬 스킬 IPC         | `@keundal/plugin-chat-desktop`                |
+| 브라우저 설정 저장과 MCP 연결 관리           | `@keundal/plugin-chat-browser`                |
+| 브라우저 LLM 설정과 모델 목록 캐시           | `@keundal/plugin-llm-browser`                 |
+| 브라우저 LLM·MCP·받아쓰기의 기본 공급자 조립 | `@keundal/browser-composition`                |
+| 공급자와 무관한 호스트와 HTTP 연결           | `@keundal/agent-host`                         |
+| Node.js 환경 설정과 기본 플러그인 구성       | `@keundal/agent-runtime-node`                 |
+| 런타임 플러그인 설정과 Cordis 모듈 로딩      | `@keundal/plugin-runtime`                     |
 
 `@keundal/llm`, `@keundal/session`, `@keundal/generation`, `@keundal/skill`은 각 서비스 계약과 Cordis Context 확장을 소유합니다. `@keundal/agent`, `@keundal/tools`, `@keundal/context`, `@keundal/mcp`, `@keundal/shell`, `@keundal/transcription`, `@keundal/fs`, `@keundal/workspace`도 구현 플러그인에 의존하지 않습니다. `@keundal/core`는 AG-UI 프로토콜과 공통 실행·메시지만 제공하며 기능별 계약을 다시 내보내지 않습니다.
 
@@ -29,7 +30,7 @@ Git 작업공간은 `@keundal/workspace` 계약, `@keundal/plugin-workspace-git`
 
 메모리 저장 어댑터의 계약은 `@keundal/memory`, 공통 검색·revision 처리는 `@keundal/memory-store`가 소유합니다. 메모리·IndexedDB·SQLite 저장소 플러그인과 `plugin-memory`는 이 공통 처리를 재사용하며 서로의 구현을 가져오지 않습니다. `plugin-memory`는 어댑터를 받아 서비스를 등록하는 진입점만 제공합니다.
 
-기능 추가는 해당 플러그인과 조립 목록에서 처리합니다. `chat-app/app/ui-plugins.ts`는 목록만 소유하며 등록·해제 로직은 `ui-plugin-manager.ts`에 둡니다. Node.js의 MCP·Agent Plugins 수명은 `agent-integrations.ts`, 코딩 파일시스템 구성은 `coding-agent.ts`에서 관리합니다. 저장소 형식과 기존 플러그인 선택 식별자는 바꾸지 않습니다.
+기능 추가는 해당 플러그인과 각 앱의 조립 목록에서 처리합니다. `apps/web`과 `apps/desktop`은 각각 `nuxt.config.ts`의 `extends`와 `app/ui-plugins.ts` 목록을 소유합니다. 공통 초기화는 `@keundal/ui-runtime/nuxt`의 `createUIPlugin(catalog)`, 등록·해제는 `packages/ui-runtime/src/ui-plugin-manager.ts`가 담당합니다. `@keundal/ui-shell`은 앱 루트·시작 및 오류 화면·본문 틀과 `page.*`, `layout.navigation`, `layout.overlay` 슬롯을 소유하고, `@keundal/ui-sidebar`는 사이드바와 `layout.sidebar`, `layout.sidebar.footer` 슬롯을 소유합니다. 기능 경로는 `@keundal/ui-home`, `@keundal/ui-chat`, `@keundal/ui-chat-list`, `@keundal/ui-settings`의 `app/routes`에서 제공합니다. Node.js의 MCP·Agent Plugins 수명은 `agent-integrations.ts`, 코딩 파일시스템 구성은 `coding-agent.ts`에서 관리합니다. 저장소 형식과 기존 플러그인 선택 식별자는 바꾸지 않습니다.
 
 ### 가져오기와 주입 변경
 
@@ -38,7 +39,7 @@ Git 작업공간은 `@keundal/workspace` 계약, `@keundal/plugin-workspace-git`
 - `@keundal/plugin-transcription-browser`의 `openaiTranscription`은 `@keundal/browser-composition/transcription`으로 옮겼습니다.
 - `McpManager`에는 `McpConnector`를, `BrowserMcpOAuth`의 세 번째 인자에는 계정 팩터리를 전달합니다. 웹 기본값은 `@keundal/browser-composition/mcp`의 `browserMcpConnector`와 `createBrowserMcpAccount`입니다. `BrowserAgentPluginManager`의 두 번째 인자도 같은 연결자를 받습니다.
 - `loadAgentPlugin(config, options)`에서 MCP를 사용하면 `options.connectMcp`를 전달합니다. Node.js 기본 조립은 `McpClient.connect`를 주입합니다.
-- `@keundal/ui-{chat,composer,layout,settings}/slots`는 각각 `@keundal/ui/app/contracts/{chat,composer,layout,settings}.ts`로 바꿉니다. 타입만 사용하는 플러그인은 슬롯 소유자 패키지에 의존하지 않습니다.
+- 채팅·입력창·레이아웃·설정 슬롯 타입은 각각 `@keundal/ui/app/contracts/{chat,composer,layout,settings}.ts`에서 가져옵니다. 타입만 사용하는 플러그인은 슬롯 소유자 패키지에 의존하지 않습니다.
 
 ## 구현 교체
 
@@ -97,14 +98,14 @@ Git 작업공간은 `@keundal/workspace` 계약, `@keundal/plugin-workspace-git`
 
 ### UI에서 선택 기능 관리
 
-**설정 → 큰달 플러그인**(`/settings/runtime-plugins`)은 앱에 함께 패키징한 실행 목록과 UI 목록을 함께 표시합니다. 필수 서비스인 LLM·저장소와 선택을 복구하는 관리 셸인 `@keundal/ui-layout`, `@keundal/ui-settings`, `@keundal/ui-agent-plugins`는 잠긴 항목입니다. 나머지 번들 실행·UI 플러그인은 각각 끄고 켤 수 있습니다. 채팅 에이전트를 끄면 새 응답을 막되 기존 세션과 기능 목록·관리 화면은 유지합니다. desktop에서는 외부 큰달 플러그인도 설치하고 관리합니다. web은 번들된 모듈만 관리합니다. **에이전트 플러그인**(영문 **Agent plugins**)의 폴더 가져오기는 스킬·MCP 묶음을 관리하는 별도 기능입니다.
+**설정 → 큰달 플러그인**(`/settings/runtime-plugins`)은 앱에 함께 패키징한 실행 목록과 UI 목록을 함께 표시합니다. 필수 서비스인 LLM·저장소와 선택을 복구하는 관리 셸인 `@keundal/ui-shell`, `@keundal/ui-sidebar`, `@keundal/ui-settings`, `@keundal/ui-agent-plugins`는 잠긴 항목입니다. 나머지 번들 실행·UI 플러그인은 각각 끄고 켤 수 있습니다. 채팅 에이전트를 끄면 새 응답을 막되 기존 세션과 기능 목록·관리 화면은 유지합니다. desktop에서는 외부 큰달 플러그인도 설치하고 관리합니다. web은 번들된 모듈만 관리합니다. **에이전트 플러그인**(영문 **Agent plugins**)의 폴더 가져오기는 스킬·MCP 묶음을 관리하는 별도 기능입니다.
 
-- **화면**: 셸의 UI 관리자가 저장한 선택과 `requires`에 따라 UI의 Cordis 등록 범위를 해제하거나 다시 등록합니다. 의존 대상이 꺼지면 해당 UI와 탐색 항목을 일시 해제하지만 저장한 활성화 선택은 유지합니다. 의존 대상을 다시 켜면 활성화해 둔 UI만 복원하며, 직접 끈 UI는 꺼진 상태를 유지합니다. Nuxt 레이어는 모두 빌드에 유지합니다.
+- **화면**: `@keundal/ui-runtime`의 UI 관리자가 저장한 선택과 `requires`에 따라 UI의 Cordis 등록 범위를 해제하거나 다시 등록합니다. 의존 대상이 꺼지면 해당 UI와 탐색 항목을 일시 해제하지만 저장한 활성화 선택은 유지합니다. 의존 대상을 다시 켜면 활성화해 둔 UI만 복원하며, 직접 끈 UI는 꺼진 상태를 유지합니다. Nuxt 레이어는 모두 빌드에 유지합니다.
 - **web 로컬 실행**: 스킬을 끄면 해당 서비스의 효과를 해제하고, 도구와 MCP를 끄면 이후 실행 목록에서 제외합니다. 실행 선택은 기존 `BrowserRuntimePluginManager`가 `keundal:bundled-plugins` localStorage에 저장합니다. UI 선택은 브라우저 localStorage의 `keundal:ui-plugin-selections`에 별도로 저장합니다.
 - **desktop 실행**: 번들 실행 선택과 외부 설치 목록을 기존 네이티브 저장소인 앱 데이터 디렉터리에 유지합니다. 실행 선택을 바꾸면 sidecar를 다시 시작하며 실패하면 이전 선택으로 복구합니다. UI 선택은 브라우저 localStorage의 `keundal:ui-plugin-selections`에 저장하고 서버 구성을 바꾸지 않습니다. npm을 앱에 포함하므로 시스템에 Node.js나 npm을 따로 설치할 필요가 없습니다.
-- **원격 서버 연결**: `platform.runtimePlugins`가 없어도 셸의 `runtime.pluginManager`는 로컬 UI 목록과 선택을 제공합니다. 이 경우 서버의 실행 목록은 관리하지 않습니다. 서버의 실행 기능을 바꾸거나 서버에 패키지를 설치하는 API는 제공하지 않습니다.
+- **원격 서버 연결**: `platform.runtimePlugins`가 없어도 `runtime.pluginManager`는 로컬 UI 목록과 선택을 제공합니다. 이 경우 서버의 실행 목록은 관리하지 않습니다. 서버의 실행 기능을 바꾸거나 서버에 패키지를 설치하는 API는 제공하지 않습니다.
 
-각 항목의 `requires`는 의존 대상을 나타냅니다. 관리 화면은 **의존 대상**(Requires)과 이 항목을 참조하는 **사용하는 플러그인**(Used by)을 함께 표시합니다. UI는 공통으로 `@keundal/ui-layout`에 의존하며, 기능별 관계는 다음과 같습니다.
+각 항목의 `requires`는 의존 대상을 나타냅니다. 관리 화면은 **의존 대상**(Requires)과 이 항목을 참조하는 **사용하는 플러그인**(Used by)을 함께 표시합니다. 화면 셸과 사이드바는 항상 유지하며, 기능별 UI 의존성은 각 앱의 `app/ui-plugins.ts`에서 선언합니다. 실행 기능과의 관계는 다음과 같습니다.
 
 | UI 항목                                  | 의존하는 실행 기능           |
 | ---------------------------------------- | ---------------------------- |
@@ -121,7 +122,7 @@ Git 작업공간은 `@keundal/workspace` 계약, `@keundal/plugin-workspace-git`
 
 변경 전에는 진행 중인 응답을 중단합니다. 기본 선택은 기존 번들 구성을 유지하며, 비활성화해도 사용자 설정과 IndexedDB·SQLite 대화 기록은 지우지 않습니다. 이전의 외부 모듈 설치 목록은 자동으로 불러오지 않으며 다운로드했던 파일도 자동 삭제하지 않습니다. 배포 매니페스트는 운영자가 관리하는 별도 설정으로 유지합니다.
 
-새 번들 선택 기능을 제공하려면 모노레포 패키지를 앱의 정적 기능 목록에 추가하고 함께 빌드합니다. UI는 `@keundal/chat-app`의 UI 목록에 추가하고 해당 기능이 있어야 동작한다면 `requires`도 선언합니다. 기존 기록을 표시하는 결과 UI에는 실행 도구 의존성을 두지 않습니다. 목록의 의존 관계와 별개로 플러그인은 `inject`로 서비스 의존성을 선언하고 전달받은 컨텍스트에 효과를 등록해야 비활성화 시 올바르게 해제됩니다.
+새 번들 선택 기능을 제공하려면 모노레포 패키지를 앱의 정적 기능 목록에 추가하고 함께 빌드합니다. UI는 사용할 앱의 `nuxt.config.ts`의 `extends`와 `app/ui-plugins.ts`에 추가하고 해당 기능이 있어야 동작한다면 `requires`도 선언합니다. 기존 기록을 표시하는 결과 UI에는 실행 도구 의존성을 두지 않습니다. 목록의 의존 관계와 별개로 플러그인은 `inject`로 서비스 의존성을 선언하고 전달받은 컨텍스트에 효과를 등록해야 비활성화 시 올바르게 해제됩니다.
 
 ### desktop 외부 큰달 플러그인
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { SlotOutlet } from '@keundal/ui-slots'
 import type { Ref } from 'vue'
+import AppFrame from './AppFrame.vue'
 import StartupSplash from './StartupSplash.vue'
 
 const { locale, t } = useLocale()
@@ -82,6 +82,6 @@ useSeoMeta({
   <div :inert="!startupReady" :aria-busy="!startupReady" style="display: contents;">
     <NuxtLoadingIndicator color="var(--ui-primary)" />
 
-    <SlotOutlet name="app.layout" />
+    <AppFrame />
   </div>
 </template>

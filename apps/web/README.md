@@ -2,7 +2,7 @@
 
 [Nuxt UI Chat](https://github.com/nuxt-ui-templates/chat)의 화면·컴포넌트·스타일을 사용합니다. 대화·제목·검색·추론·도구 실행과 Vue 채팅 상태 관리는 프로젝트 내부의 Cordis·AG-UI 기반 구현이 담당합니다. Vercel AI SDK·AI Gateway·UI Message Stream 규격은 사용하지 않습니다. 공급자 연결에는 공식 OpenAI·Anthropic·Gemini SDK를 사용합니다.
 
-화면과 채팅 실행 코드는 [공용 채팅 레이어](../../packages/chat-app/README.md)에 있습니다. 웹 앱은 이 레이어를 상속하고 웹 서버와 Cloudflare 배포 설정을 관리합니다. 다른 앱에는 의존하지 않습니다.
+공용 화면과 기능은 [공용 채팅 기능 안내](../../docs/chat-features.md)를 참고합니다. 웹 앱은 `nuxt.config.ts`의 `extends`와 `app/ui-plugins.ts`에서 UI 패키지를 직접 조립하고 웹 서버와 Cloudflare 배포 설정을 관리합니다. 다른 앱에는 의존하지 않습니다.
 
 ## 실행
 
@@ -168,7 +168,7 @@ LLM 공급자 키는 Worker에 등록하지 않고 각 사용자가 웹 설정�
 
 ```sh
 pnpm build
-pnpm --filter @keundal/chat-app test
+pnpm test
 pnpm --filter @keundal/web test
 pnpm --filter @keundal/web typecheck
 pnpm --filter @keundal/web lint
@@ -184,4 +184,4 @@ pnpm --filter @keundal/web lint
 
 ## MCP
 
-브라우저 실행 모드에서는 **Settings → MCP**에서 Streamable HTTP 서버를 등록합니다. 서버가 앱 origin의 CORS 접근을 허용해야 합니다. Node.js 에이전트 호스트 모드에서는 서버의 `KEUNDAL_MCP_SERVERS` 환경 변수로 설정합니다. [공용 MCP 설정 안내](../../packages/chat-app/README.md#mcp-서버)를 참고합니다.
+브라우저 실행 모드에서는 **Settings → MCP**에서 Streamable HTTP 서버를 등록합니다. 서버가 앱 origin의 CORS 접근을 허용해야 합니다. Node.js 에이전트 호스트 모드에서는 서버의 `KEUNDAL_MCP_SERVERS` 환경 변수로 설정합니다. [공용 MCP 설정 안내](../../docs/chat-features.md#mcp-서버)를 참고합니다.

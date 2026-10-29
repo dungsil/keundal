@@ -12,6 +12,7 @@
     "@keundal/ui": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
+    "@nuxt/ui": "^4.11.3",
     "cordis": "catalog:",
     "nuxt": "^4.6.2",
     "vue": "3.5.44"

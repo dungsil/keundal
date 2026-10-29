@@ -25,7 +25,8 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
     "@keundal/chat": "workspace:*",
@@ -36,6 +37,7 @@
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
+    "@tauri-apps/api": "2.12.4",
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

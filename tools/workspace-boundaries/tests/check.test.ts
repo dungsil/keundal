@@ -138,7 +138,7 @@ test('baseUrl과 상속한 paths 별칭으로 앱 경계를 우회할 수 없다
 
 test('계약과 공통 UI는 구현 패키지를 실행 의존성으로 가져올 수 없다', async (t) => {
   for (const [contract, provider] of [
-    ['@keundal/chat-app', '@keundal/plugin-chat-local'],
+    ['@keundal/ui-shell', '@keundal/plugin-chat-local'],
     ['@keundal/ui', '@keundal/plugin-chat-browser'],
     ['@keundal/ui-chat', '@keundal/plugin-store-memory'],
     ['@keundal/llm', '@keundal/plugin-llm-openai'],

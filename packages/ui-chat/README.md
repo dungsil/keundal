@@ -8,7 +8,7 @@ import * as chat from '@keundal/ui-chat/plugin'
 
 ## 등록하는 슬롯
 
-- `page.chat`(`@keundal/ui-layout`이 선언, 소유자 `{ chatId }`): 대화 화면 전체입니다.
+- `page.chat`(`@keundal/ui-shell`이 선언, 소유자 `{ chatId }`): 대화 화면 전체입니다. `/chat/:id` 경로는 이 패키지의 `app/routes/chat.vue`에서 제공합니다.
   - 로딩 스켈레톤, 404 화면, 제목 메뉴(이름 변경·삭제), 공개 범위 대화상자, 메시지 목록, 대기열, 파일 끌어놓기를 그립니다.
   - 메시지 편집, 다시 생성, 분기, 투표를 처리하고 실패하면 알림을 표시합니다.
   - 입력창은 `<SlotFactory name="composer">`로 그립니다. 소유자는 `ComposerOwner`(`variant: 'docked'`)이며, 입력창 높이는 감싼 요소에서 측정해 `--chat-prompt-height`로 전달합니다.

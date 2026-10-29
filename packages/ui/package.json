@@ -15,7 +15,14 @@
       "default": "./app/*"
     }
   },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json"
+  },
   "dependencies": {
+    "@iconify-json/logos": "^1.2.15",
+    "@iconify-json/lucide": "^1.2.142",
+    "@iconify-json/simple-icons": "^1.2.99",
     "@keundal/chat": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
@@ -23,11 +30,14 @@
     "@vueuse/core": "^14.4.0",
     "motion-v": "^2.6.0",
     "nuxt": "^4.6.2",
+    "pretendard": "1.3.9",
     "tailwindcss": "^4.3.3",
     "vue": "3.5.44"
   },
   "devDependencies": {
+    "@keundal/tsconfig": "workspace:*",
     "@types/node": "^24.19.2",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "catalog:"
   }
 }
