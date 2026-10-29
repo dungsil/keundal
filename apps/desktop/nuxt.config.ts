@@ -1,5 +1,10 @@
+import { fileURLToPath } from 'node:url'
+
 export default defineNuxtConfig({
-  extends: ['@keundal/chat-app'],
+  extends: ['@keundal/chat-app', '@keundal/ui-workspace'],
+  alias: {
+    '#ui-plugins': fileURLToPath(new URL('./app/ui-plugins.ts', import.meta.url))
+  },
   ssr: false,
   devtools: { enabled: false },
   runtimeConfig: { public: { chatCapabilities: { secureSettings: true, localSkills: true } } },
