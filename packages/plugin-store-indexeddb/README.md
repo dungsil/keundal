@@ -24,6 +24,13 @@ await ctx.plugin(indexedDBStorePlugin, { databaseName: 'my-agent' })
 교체하며 `messages: []`로 모두 비울 수 있습니다. revision 검사와 종료 기록의 중복 적용
 방지는 그대로 유지됩니다.
 
+실행 요청, session 커밋과 journal 배치는 트랜잭션을 열기 전에 `structuredClone()`으로
+복사합니다. 함수나 Proxy 등 복제할 수 없는 값은 저장 경계를 명시한 `TypeError`로 거부하며
+원래 오류는 `cause`에 보존합니다. 호출자는 Vue 반응형 상태를 순수 데이터로 정규화해 전달해야
+합니다. JSON 변환은 사용하지 않으므로 `undefined`와 `Date` 등 구조화 복제 가능한 값은
+유지합니다. 저장한 복사본은 호출 뒤 원본을 바꿔도 영향을 받지 않으며, 복구 시 실행 요청이나
+도구를 다시 실행하지 않습니다.
+
 `session.delete(threadId, expectedRevision, { signal }?)`는 현재 revision(없는 스레드는 0)을
 검사하고 스레드와 모든 실행·journal을 하나의 `readwrite` transaction에서 삭제합니다.
 빈 threadId와 음수·안전하지 않은 정수 revision은 거부합니다. `running` 실행이 있으면

@@ -1,5 +1,5 @@
 import { EventType, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
-import { type GenerationRequest } from '@keundal/generation'
+import { type GenerationJournalEntry, type GenerationRequest } from '@keundal/generation'
 import { LLMService, type LLMEvent, type LLMModel, type LLMRequest } from '@keundal/llm'
 import indexedDBStorePlugin, { IndexedDBStore, type WebLockManager } from '@keundal/plugin-store-indexeddb'
 import type { TaskSnapshot, TaskStatus } from '@keundal/task'
@@ -175,55 +175,78 @@ test('승인 이벤트를 전달하기 전에 IndexedDB 배치를 확정한다',
   }
 })
 
-test('지정한 이벤트 공급자의 도구 결과를 저장하고 복구할 때 다시 실행하지 않는다', async (t) => {
-  const { ctx, calls, store, fibers } = await setup(t)
-  let invoked = 0
-  const events: LLMEvent[] = [
-    { type: EventType.TOOL_CALL_START, toolCallId: 'lookup-1', toolCallName: 'lookup' },
-    { type: EventType.TOOL_CALL_ARGS, toolCallId: 'lookup-1', delta: '{}' },
-    { type: EventType.TOOL_CALL_END, toolCallId: 'lookup-1' },
-    { type: EventType.TOOL_CALL_RESULT, messageId: 'result-1', toolCallId: 'lookup-1', content: 'found', role: 'tool' },
-    { type: EventType.TOOL_CALL_START, toolCallId: 'lookup-2', toolCallName: 'lookup' },
-    { type: EventType.TOOL_CALL_ARGS, toolCallId: 'lookup-2', delta: '{}' },
-    { type: EventType.TOOL_CALL_END, toolCallId: 'lookup-2' },
-    {
-      type: EventType.TOOL_CALL_RESULT,
-      messageId: 'result-2',
-      toolCallId: 'lookup-2',
-      content: 'found again',
-      role: 'tool'
+test.for([[], [{ name: 'reviewer', description: 'Review', instructions: 'Check', allowedTools: ['lookup'] }]])(
+  '역할 설정과 실행 요청 및 도구 결과를 다시 열어 복구하며 공급자를 재실행하지 않는다',
+  async (roles, t) => {
+    const factory = new IDBFactory()
+    const options = { databaseName: crypto.randomUUID(), indexedDB: factory, locks: new Locks() }
+    const { ctx, calls, store, fibers } = await setup(t, [], new IndexedDBStore(options))
+    const generation = request()
+    generation.input.state = { subagentRoles: roles, optional: undefined, savedAt: new Date('2026-10-29T00:00:00Z') }
+    generation.input.forwardedProps = {
+      keundalPromptPreset: { id: 'preset', variables: { audience: 'reviewer' }, blocks: [{ type: 'history' }] },
+      keundalModelRecovery: { retry: false, fallbackModels: ['test/backup'] }
     }
-  ]
-  const delivered = []
-  for await (const event of ctx.generation.run(request(), {
-    stream: async function* (provided, options) {
-      invoked++
-      expect(provided.input.runId).toBe('run')
-      expect(options?.signal).toBeInstanceOf(globalThis.AbortSignal)
-      yield* events
+    let invoked = 0
+    const events: LLMEvent[] = [
+      { type: EventType.TOOL_CALL_START, toolCallId: 'lookup-1', toolCallName: 'lookup' },
+      { type: EventType.TOOL_CALL_ARGS, toolCallId: 'lookup-1', delta: '{}' },
+      { type: EventType.TOOL_CALL_END, toolCallId: 'lookup-1' },
+      {
+        type: EventType.TOOL_CALL_RESULT,
+        messageId: 'result-1',
+        toolCallId: 'lookup-1',
+        content: 'found',
+        role: 'tool'
+      },
+      { type: EventType.TOOL_CALL_START, toolCallId: 'lookup-2', toolCallName: 'lookup' },
+      { type: EventType.TOOL_CALL_ARGS, toolCallId: 'lookup-2', delta: '{}' },
+      { type: EventType.TOOL_CALL_END, toolCallId: 'lookup-2' },
+      {
+        type: EventType.TOOL_CALL_RESULT,
+        messageId: 'result-2',
+        toolCallId: 'lookup-2',
+        content: 'found again',
+        role: 'tool'
+      }
+    ]
+    const delivered = []
+    for await (const event of ctx.generation.run(generation, {
+      stream: async function* (provided, options) {
+        invoked++
+        expect(provided.input.runId).toBe('run')
+        expect(options?.signal).toBeInstanceOf(globalThis.AbortSignal)
+        yield* events
+      }
+    })) {
+      delivered.push(event)
+      // 배치 확정이라 전달 시점에는 도구 결과가 아직 journal에 반영되지 않을 수 있습니다.
+      if (event.type === EventType.RUN_FINISHED) {
+        expect((await ctx.session.get('thread'))?.messages.map((message) => message.id)).toEqual([
+          'lookup-1',
+          'result-1',
+          'lookup-2',
+          'result-2'
+        ])
+      }
     }
-  })) {
-    delivered.push(event)
-    // 배치 확정이라 전달 시점에는 도구 결과가 아직 journal에 반영되지 않을 수 있습니다.
-    if (event.type === EventType.RUN_FINISHED) {
-      expect((await ctx.session.get('thread'))?.messages.map((message) => message.id)).toEqual([
-        'lookup-1',
-        'result-1',
-        'lookup-2',
-        'result-2'
-      ])
-    }
+    expect(calls()).toBe(0)
+    const recorded = await ctx.generation.get('run')
+    expect(recorded?.request).toStrictEqual(generation)
+    expect(recorded?.journal.map(({ event }) => event)).toEqual(delivered)
+    const session = await ctx.session.get('thread')
+    expect(session?.revision).toBe(1)
+    expect(session?.state).toStrictEqual(generation.input.state)
+    await fibers.at(-1)!.dispose()
+    store.close()
+    const reopened = await setup(t, [], new IndexedDBStore(options))
+    expect(await reopened.ctx.generation.recover()).toStrictEqual([recorded])
+    expect(await reopened.ctx.generation.recover()).toStrictEqual([recorded])
+    expect(await reopened.ctx.session.get('thread')).toStrictEqual(session)
+    expect(reopened.methodCalls).toEqual([])
+    expect(invoked).toBe(1)
   }
-  expect(calls()).toBe(0)
-  const recorded = await ctx.generation.get('run')
-  expect(recorded?.request).toEqual(request())
-  expect(recorded?.journal.map(({ event }) => event)).toEqual(delivered)
-  expect((await ctx.session.get('thread'))?.revision).toBe(1)
-  await fibers.at(-1)!.dispose()
-  const reopened = await setup(t, [], store)
-  expect(await reopened.ctx.generation.recover()).toEqual([recorded])
-  expect(invoked).toBe(1)
-})
+)
 
 class Locks implements WebLockManager {
   private readonly states = new Map<string, { locked: boolean; waiters: (() => void)[] }>()
@@ -560,7 +583,38 @@ test('잘못된 스트림 이벤트는 저장 전에 거부하고 마지막 유�
   expect(run?.journal.map((entry) => entry.event.type)).toEqual([EventType.RUN_STARTED])
 })
 
-test('구조화 복제할 수 없는 session 변경은 transaction 전체를 되돌린다', async (t) => {
+test.for(['roles', 'preset', 'callback'] as const)(
+  '복제할 수 없는 실행 설정은 저장 전에 거부하고 같은 runId로 정상 요청을 다시 실행한다',
+  async (field, t) => {
+    const { ctx, methodCalls } = await setup(t)
+    const generation = request()
+    if (field === 'roles') generation.input.state = { subagentRoles: new Proxy([], {}) }
+    if (field === 'preset') generation.input.forwardedProps = { keundalPromptPreset: { variables: new Proxy({}, {}) } }
+    if (field === 'callback') generation.input.state = { nested: { callback: () => {} } }
+    const iterator = ctx.generation.run(generation)[Symbol.asyncIterator]()
+    await expect(iterator.next()).rejects.toThrow('IndexedDB generation request is not structured-cloneable')
+    expect(await ctx.generation.list()).toEqual([])
+    expect(await ctx.session.list()).toEqual([])
+    expect(methodCalls).toEqual([])
+    for await (const _event of ctx.generation.run(request())) void _event
+    expect((await ctx.generation.get('run'))?.status).toBe('completed')
+  }
+)
+
+test('저장 대기 중 원본을 바꿔도 호출 시점의 실행 요청을 보존한다', async (t) => {
+  const { ctx, store } = await setup(t)
+  const generation = request()
+  const state = { subagentRoles: [{ name: 'reviewer', allowedTools: ['lookup'] }] }
+  generation.input.state = state
+  const saving = store.startRun(generation)
+  state.subagentRoles[0]!.allowedTools.push('write')
+  await saving
+  expect((await ctx.generation.get('run'))?.request.input.state).toEqual({
+    subagentRoles: [{ name: 'reviewer', allowedTools: ['lookup'] }]
+  })
+})
+
+test('구조화 복제할 수 없는 session 변경은 저장 전에 거부한다', async (t) => {
   const { ctx } = await setup(t)
   await expect(
     ctx.session.commit({
@@ -569,11 +623,11 @@ test('구조화 복제할 수 없는 session 변경은 transaction 전체를 되
       messages: [],
       state: { callback: () => {} }
     })
-  ).rejects.toThrow()
+  ).rejects.toThrow('IndexedDB session commit is not structured-cloneable')
   expect(await ctx.session.get('clone-error')).toBeUndefined()
 })
 
-test('generation 종료 transaction의 구조화 복제 오류는 run과 journal 변경도 함께 되돌린다', async (t) => {
+test('generation 종료의 구조화 복제 오류는 run과 journal을 변경하지 않는다', async (t) => {
   const { ctx, store } = await setup(t)
   const generation = request('clone-run')
   await store.startRun(generation)
@@ -604,10 +658,28 @@ test('generation 종료 transaction의 구조화 복제 오류는 run과 journal
         ]
       }
     })
-  ).rejects.toThrow()
+  ).rejects.toThrow('IndexedDB session commit is not structured-cloneable')
   const run = await ctx.generation.get('clone-run')
   expect(run?.status).toBe('running')
   expect(run?.journal.map((entry) => entry.event.type)).toEqual([EventType.RUN_STARTED])
+})
+
+test('복제할 수 없는 journal 배치는 이전 기록을 보존하며 올바른 배치로 다시 저장할 수 있다', async (t) => {
+  const { ctx, store } = await setup(t)
+  await store.startRun(request())
+  const started: GenerationJournalEntry = {
+    sequence: 0,
+    event: { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' }
+  }
+  await expect(
+    store.appendEvents('run', [
+      started,
+      { sequence: 1, event: { type: EventType.CUSTOM, name: 'invalid', value: { callback: () => {} } } }
+    ])
+  ).rejects.toThrow('IndexedDB journal batch is not structured-cloneable')
+  expect((await ctx.generation.get('run'))?.journal).toEqual([])
+  await store.appendEvents('run', [started])
+  expect((await ctx.generation.get('run'))?.journal).toEqual([started])
 })
 
 test('같은 종료 commit을 다시 적용해도 revision과 메시지를 중복 반영하지 않는다', async (t) => {
