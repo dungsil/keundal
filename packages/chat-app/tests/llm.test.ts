@@ -1,7 +1,7 @@
 import { mountAgent } from './fixtures/agent'
 import { Buffer } from 'node:buffer'
 import { createServer, type ServerResponse, type IncomingMessage } from 'node:http'
-import { EventType, type AGUIEvent } from '@keundal/core'
+import { EventType, type AGUIEvent, type RunAgentInput } from '@keundal/core'
 import { LLM_SOURCE_EVENT, type Reasoning } from '@keundal/llm'
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import { expect, test, onTestFinished, vi } from 'vitest'
@@ -11,6 +11,30 @@ import { browserLLMPlugin } from '@keundal/browser-composition/llm'
 import { createKeundalChat as createChat } from '@keundal/plugin-chat-local/keundal'
 import { ChatStore } from '@keundal/plugin-chat-local'
 import { defaultLLMSettings, providerSettingsSchema } from '@keundal/llm-settings'
+
+test('브라우저 목업 공급자는 키와 네트워크 없이 텍스트와 명시한 도구 호출을 반환한다', async () => {
+  const ctx = new Context()
+  const settings = defaultLLMSettings()
+  settings['mock@demo'] = { name: 'Mock LLM', apiKey: '', baseURL: '' }
+  const llm = await ctx.plugin(browserLLMPlugin, { getSettings: () => settings })
+  onTestFinished(() => llm.dispose())
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Network must not be used'))
+  onTestFinished(() => fetch.mockRestore())
+  const input: RunAgentInput = {
+    threadId: 'mock-thread', runId: 'mock-run', state: {}, context: [],
+    tools: [{ name: 'lookup', description: 'lookup', parameters: { type: 'object' } }],
+    messages: [{ id: 'user', role: 'user', content: [{ type: 'text', text: 'browser mock' }] }]
+  }
+  const events = await collect(ctx.llm.stream({ input, model: 'mock@demo/mock-text', maxOutputTokens: 100 }))
+  expect(events.filter(event => event.type === EventType.TEXT_MESSAGE_CONTENT).map(event => event.delta).join('')).toBe('Mock LLM: browser mock')
+  input.messages = [{ id: 'user', role: 'user', content: [{ type: 'text', text: '{"name":"lookup","arguments":{"id":42}}' }] }]
+  expect(await collect(ctx.llm.stream({ input, model: 'mock@demo/mock-tool', maxOutputTokens: 100 }))).toEqual([
+    { type: EventType.TOOL_CALL_START, toolCallId: expect.any(String), toolCallName: 'lookup' },
+    { type: EventType.TOOL_CALL_ARGS, toolCallId: expect.any(String), delta: '{"id":42}' },
+    { type: EventType.TOOL_CALL_END, toolCallId: expect.any(String) }
+  ])
+  await expect(collect(ctx.llm.stream({ input, model: 'mock@demo/mock-error', maxOutputTokens: 100 }))).rejects.toThrow('simulated provider error')
+})
 
 test('공급자 모듈을 불러오는 동안 취소하면 모델 조회를 중단한다', async () => {
   const ctx = new Context()

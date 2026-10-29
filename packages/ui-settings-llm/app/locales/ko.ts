@@ -57,6 +57,7 @@ export default {
   'common.key': '키',
   'common.value': '값',
   'llm.title': 'LLM 설정',
+  'llm.mockDescription': 'API 키나 네트워크 요청 없이 실행합니다. Text, Error, Slow stream 모델로 응답을 시험하세요. Tool 모델에는 {"name":"weather","arguments":{"location":"Seoul"}} 같은 JSON을 보내세요. 지정한 도구는 실제로 실행되며 외부 서비스에 접속할 수 있습니다.',
   'llm.providerType': '공급자 종류',
   'llm.addProvider': '공급자 추가',
   'llm.invalidName': '공급자 이름은 100자 이내로 입력하세요.',

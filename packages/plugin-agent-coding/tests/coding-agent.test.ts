@@ -1,10 +1,11 @@
 import { EventType, type AGUIEvent, type RunAgentInput } from '@keundal/core'
-import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
+import { type LLMEvent } from '@keundal/llm'
 import codingAgentPlugin, {
   CODING_SYSTEM_PROMPT,
   CodingAgent,
   codingAgentConfigSchema
 } from '@keundal/plugin-agent-coding'
+import mockLLMPlugin, { MockLLMService } from '@keundal/plugin-llm-mock'
 import memoryStorePlugin from '@keundal/plugin-store-memory'
 import { Context } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
@@ -32,20 +33,12 @@ async function collect(stream: AsyncIterable<AGUIEvent>) {
 
 async function setup(t: TestContext, config: { systemPrompt?: string } = {}) {
   const ctx = new Context()
-  const requests: LLMRequest[] = []
-  class LLM extends LLMService {
-    async getModel() {
-      return { contextWindow: 2000, maxOutputTokens: 200 }
-    }
-    async countTokens() {
-      return 10
-    }
-    async *stream(request: LLMRequest) {
-      requests.push(structuredClone(request))
-      yield* answer
-    }
-  }
-  const llm = await ctx.plugin(LLM)
+  const llm = await ctx.plugin(mockLLMPlugin, {
+    models: { test: { contextWindow: 2000, maxOutputTokens: 200 } },
+    inputTokens: 10,
+    responses: [{ events: answer }]
+  })
+  const { requests } = ctx.llm as MockLLMService
   const store = await ctx.plugin(memoryStorePlugin)
   t.onTestFinished(async () => {
     await store.dispose()
