@@ -28,6 +28,7 @@ test('저장소 적합성과 동시 커밋의 단일 반영 및 journal 재생�
     return {
       session: ctx.session,
       generation: ctx.generation,
+      backup: ctx.backup,
       disposeAll: async () => {
         for (const fiber of fibers.toReversed()) await fiber.dispose()
       }

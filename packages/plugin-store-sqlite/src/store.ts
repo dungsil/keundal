@@ -13,6 +13,7 @@ export interface StoredThread {
   messages: AgentMessage[]
   /** 마지막으로 확정된 상태입니다. */
   state: RunAgentInput['state']
+  metadata?: Record<string, unknown>
 }
 
 /** 실행 하나의 저장 상태입니다. */
@@ -25,6 +26,7 @@ export interface StoredRun {
   readonly journal: GenerationJournalEntry[]
   /** 실행이 생성한 메시지입니다. 실행 중에는 부분 응답이 담깁니다. */
   readonly messages: AgentMessage[]
+  readonly state: unknown
 }
 
 /** 실행의 소유권과 임차 상태입니다. */
@@ -46,7 +48,8 @@ CREATE TABLE IF NOT EXISTS memories (
 CREATE TABLE IF NOT EXISTS threads (
   thread_id TEXT PRIMARY KEY,
   revision INTEGER NOT NULL,
-  state TEXT
+  state TEXT,
+  metadata TEXT
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS thread_messages (
@@ -119,13 +122,13 @@ CREATE INDEX IF NOT EXISTS project_memories_project ON project_memories (project
 /** 데이터베이스 잠금을 기다리는 최대 시간입니다. */
 const BUSY_TIMEOUT_MS = 5_000
 
-const READ_THREAD = 'SELECT revision, state FROM threads WHERE thread_id = ?'
-const READ_THREADS = 'SELECT thread_id, revision, state FROM threads ORDER BY rowid'
+const READ_THREAD = 'SELECT revision, state, metadata FROM threads WHERE thread_id = ?'
+const READ_THREADS = 'SELECT thread_id, revision, state, metadata FROM threads ORDER BY rowid'
 const READ_THREAD_MESSAGES = 'SELECT message FROM thread_messages WHERE thread_id = ? ORDER BY position'
 const ENSURE_THREAD =
   'INSERT INTO threads (thread_id, revision, state) VALUES (?, 0, NULL) ON CONFLICT (thread_id) DO NOTHING'
-const WRITE_THREAD = `INSERT INTO threads (thread_id, revision, state) VALUES (?, ?, ?)
-ON CONFLICT (thread_id) DO UPDATE SET revision = excluded.revision, state = excluded.state`
+const WRITE_THREAD = `INSERT INTO threads (thread_id, revision, state, metadata) VALUES (?, ?, ?, ?)
+ON CONFLICT (thread_id) DO UPDATE SET revision = excluded.revision, state = excluded.state, metadata = excluded.metadata`
 const WRITE_THREAD_MESSAGE = `INSERT INTO thread_messages (thread_id, message_id, position, message)
 SELECT ?, ?, COALESCE(MAX(position) + 1, 0), ? FROM thread_messages WHERE thread_id = ?
 ON CONFLICT (thread_id, message_id) DO UPDATE SET message = excluded.message`
@@ -160,12 +163,14 @@ const RELEASE_LEASES = `UPDATE runs SET lease_expires_at = NULL WHERE status = '
 interface ThreadRow {
   readonly revision: number
   readonly state: string | null
+  readonly metadata: string | null
 }
 
 interface ThreadListRow {
   readonly thread_id: string
   readonly revision: number
   readonly state: string | null
+  readonly metadata: string | null
 }
 
 interface RunRow {
@@ -324,6 +329,9 @@ export class SqliteStore {
       const columns = this.database.prepare('PRAGMA table_info(runs)').all()
       if (!columns.some((column) => column.name === 'messages_from_journal'))
         this.database.exec('ALTER TABLE runs ADD COLUMN messages_from_journal INTEGER NOT NULL DEFAULT 0')
+      const threadColumns = this.database.prepare('PRAGMA table_info(threads)').all()
+      if (!threadColumns.some((column) => column.name === 'metadata'))
+        this.database.exec('ALTER TABLE threads ADD COLUMN metadata TEXT')
     })
   }
 
@@ -366,7 +374,8 @@ export class SqliteStore {
       messages: this.rows<MessageRow>(READ_THREAD_MESSAGES, threadId).map((message) =>
         parse<AgentMessage>(message.message)
       ),
-      state: row.state === null ? undefined : parse<RunAgentInput['state']>(row.state)
+      state: row.state === null ? undefined : parse<RunAgentInput['state']>(row.state),
+      ...(row.metadata === null ? {} : { metadata: parse<Record<string, unknown>>(row.metadata) })
     }
   }
 
@@ -378,7 +387,8 @@ export class SqliteStore {
       messages: this.rows<MessageRow>(READ_THREAD_MESSAGES, row.thread_id).map((message) =>
         parse<AgentMessage>(message.message)
       ),
-      state: row.state === null ? undefined : parse<RunAgentInput['state']>(row.state)
+      state: row.state === null ? undefined : parse<RunAgentInput['state']>(row.state),
+      ...(row.metadata === null ? {} : { metadata: parse<Record<string, unknown>>(row.metadata) })
     }))
   }
 
@@ -388,8 +398,18 @@ export class SqliteStore {
   }
 
   /** 스레드의 revision과 상태를 덮어씁니다. */
-  writeThread(threadId: string, revision: number, state: RunAgentInput['state']): void {
-    this.statement(WRITE_THREAD).run(threadId, revision, state === undefined ? null : JSON.stringify(state))
+  writeThread(
+    threadId: string,
+    revision: number,
+    state: RunAgentInput['state'],
+    metadata?: Record<string, unknown>
+  ): void {
+    this.statement(WRITE_THREAD).run(
+      threadId,
+      revision,
+      state === undefined ? null : JSON.stringify(state),
+      metadata === undefined ? null : JSON.stringify(metadata)
+    )
   }
 
   /** 스레드의 메시지를 id 기준으로 추가하거나 대체합니다. 새 메시지는 뒤에 붙습니다. */
@@ -483,7 +503,7 @@ export class SqliteStore {
         if (this.readRunHeader(run.request.input.runId))
           throw new Error(`backup run collision: ${run.request.input.runId}`)
       for (const thread of parsed.threads) {
-        this.writeThread(thread.threadId, thread.revision, thread.state)
+        this.writeThread(thread.threadId, thread.revision, thread.state, thread.metadata)
         this.writeThreadMessages(thread.threadId, thread.messages)
       }
       for (const run of parsed.runs) {
@@ -575,10 +595,11 @@ export class SqliteStore {
       sequence: entry.sequence,
       event: parse<AGUIEvent>(entry.event)
     }))
+    const request = parse<GenerationRequest>(row.request)
+    const assembly = new MessageAssembly(request.input.state)
+    for (const entry of journal) assembly.apply(entry.event)
     let messages: AgentMessage[]
     if (row.messages_from_journal) {
-      const assembly = new MessageAssembly()
-      for (const entry of journal) assembly.apply(entry.event)
       messages = assembly.messages
     } else {
       messages = this.rows<MessageRow>(READ_RUN_MESSAGES, row.run_id).map((message) =>
@@ -588,10 +609,11 @@ export class SqliteStore {
     return {
       runId: row.run_id,
       threadId: row.thread_id,
-      request: parse<GenerationRequest>(row.request),
+      request,
       status: row.status,
       journal,
-      messages
+      messages,
+      state: assembly.state
     }
   }
 

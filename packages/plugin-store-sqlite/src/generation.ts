@@ -44,7 +44,8 @@ const snapshot = (run: StoredRun): GenerationSnapshot => ({
   request: run.request,
   status: run.status,
   journal: reconcileTerminalTraceJournal(run.journal, run.status),
-  messages: run.messages
+  messages: run.messages,
+  state: run.state
 })
 
 /**
@@ -214,7 +215,13 @@ export class SqliteGenerationService extends GenerationService {
         runId,
         threadId,
         request,
-        recorder: new RunRecorder(this.store, runId, this.ownerId, (entry) => this.hub.publish(runId, entry)),
+        recorder: new RunRecorder(
+          this.store,
+          runId,
+          this.ownerId,
+          (entry) => this.hub.publish(runId, entry),
+          request.input.state
+        ),
         token,
         settled: false
       }
@@ -294,14 +301,15 @@ export class SqliteGenerationService extends GenerationService {
       request: run.request,
       status,
       journal: finished ? [...stored.journal, { sequence: stored.journal.length, event: finished }] : stored.journal,
-      messages: stored.messages
+      messages: stored.messages,
+      state: stored.state
     }
     try {
       await this.ctx.session.commit({
         threadId: run.threadId,
         expectedRevision: run.request.sessionRevision,
         messages: status === 'completed' ? stored.messages : [],
-        state: status === 'completed' ? run.request.input.state : undefined,
+        state: status === 'completed' ? stored.state : undefined,
         generation
       })
       return status

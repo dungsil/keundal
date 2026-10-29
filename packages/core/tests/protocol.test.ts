@@ -2,6 +2,12 @@ import { parseAGUIEvent, parseRunAgentInput, type RunAgentInput } from '@keundal
 import { describe, expect, test } from 'vitest'
 
 describe('실행 입력 계약', () => {
+  test('명시한 null 상태를 누락된 상태와 구분한다', () => {
+    const input = { threadId: 'thread', runId: 'run', messages: [], tools: [], context: [], state: null }
+    expect(parseRunAgentInput(input).state).toBeNull()
+    expect(parseRunAgentInput({ ...input, state: undefined }).state).toBeUndefined()
+  })
+
   test('수신한 요청의 대화, 도구, 실행 데이터를 보존한다', () => {
     const input: RunAgentInput = {
       threadId: 'conversation-1',

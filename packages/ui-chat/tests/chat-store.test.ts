@@ -42,6 +42,11 @@ test.each(['memory', 'indexeddb', 'sqlite'] as const)('%s 플러그인만 교체
       if (!title) requests.push(request)
       const text = title ? '로컬 제목' : JSON.stringify(request.input).includes('편집한 질문') ? '편집 응답' : '원본 응답'
       const messageId = crypto.randomUUID()
+      if (!title) {
+        yield { type: EventType.STATE_SNAPSHOT, snapshot: { progress: 1 } }
+        yield { type: EventType.STATE_DELTA, delta: [{ op: 'replace', path: '/progress', value: 2 }] }
+        yield { type: EventType.ACTIVITY_SNAPSHOT, messageId: `${messageId}-plan`, activityType: 'PLAN', content: { done: true } }
+      }
       yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' as const }
       yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: text }
       yield { type: EventType.TEXT_MESSAGE_END, messageId }
@@ -80,6 +85,10 @@ test.each(['memory', 'indexeddb', 'sqlite'] as const)('%s 플러그인만 교체
   const reloaded = new ChatStore(ctx, mountAgent)
   let saved = (await reloaded.get('chat'))!
   expect(saved.title).toBe('로컬 제목')
+  expect((await ctx.session.get('chat'))?.state).toEqual({ progress: 2 })
+  expect((await ctx.session.get('chat'))?.metadata?.web).toMatchObject({ title: '로컬 제목' })
+  expect(saved.messages[1]!.parts).toContainEqual({ type: 'data-state', data: { progress: 2 } })
+  expect(saved.messages[1]!.parts).toContainEqual(expect.objectContaining({ type: 'activity', content: { done: true } }))
   expect(saved.messages[0]).toEqual(user)
   expect(saved.messages[1]!.parts).toContainEqual({ type: 'text', text: '원본 응답' })
   expect((await ctx.generation.list())[0]!.status).toBe('completed')
@@ -100,6 +109,8 @@ test.each(['memory', 'indexeddb', 'sqlite'] as const)('%s 플러그인만 교체
   expect(saved.messages).toHaveLength(2)
   expect(saved.votes).toEqual([])
   expect(JSON.stringify(requests[1])).not.toContain('원본 응답')
+  expect(requests[1]!.input.state).toEqual({ progress: 2 })
+  expect(requests[1]!.input.messages.some(message => message.role === 'activity')).toBe(false)
   expect(JSON.stringify((await ctx.session.get('chat'))!.messages)).not.toContain('원본 질문')
   await reloaded.truncate('chat', saved.messages[1]!.id, 'regenerate')
   expect((await reloaded.get('chat'))!.messages).toEqual([edited])
@@ -222,7 +233,7 @@ test('IndexedDB를 다시 열면 미완료 journal을 한 번 복구하고 LLM�
   await chats.create('chat', user, model)
   const snapshot = (await ctx.session.get('chat'))!
   const chat = { ...(await chats.get('chat'))!, started: true, pendingRunId: 'interrupted' }
-  const saved = await ctx.session.commit({ ...snapshot, expectedRevision: snapshot.revision, state: { web: chat } })
+  const saved = await ctx.session.commit({ ...snapshot, expectedRevision: snapshot.revision, metadata: { web: chat } })
   const iterator = ctx.generation.run({
     model: 'gpt-5-nano', maxOutputTokens: 4096, sessionRevision: saved.revision,
     input: { threadId: 'chat', runId: 'interrupted', messages: saved.messages, state: saved.state, tools: [], context: [] }
@@ -309,7 +320,8 @@ test('웹 대화가 다음 턴에서도 준비한 축약을 재사용하고 최�
   expect(requests).toHaveLength(2)
   expect(requests[1]!.input.messages.some(message => message.id === 'history-0')).toBe(false)
   expect(requests[1]!.input.messages.some(message => message.id === next.id)).toBe(true)
-  expect((requests[1]!.input.state as { web: { messages: ChatMessage[] } }).web.messages.at(-1)).toEqual(next)
+  expect(requests[1]!.input.state).toEqual({})
+  expect((await ctx.session.get('proactive'))?.metadata?.web).toMatchObject({ messages: expect.arrayContaining([next]) })
 })
 
 test.each([undefined, 'anthropic/title', 'anthropic/failing'])('제목 모델 %s을 사용해도 채팅 모델과 응답은 유지한다', async (titleModel) => {

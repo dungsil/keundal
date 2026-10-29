@@ -10,6 +10,7 @@ export interface StoredThread {
   messages: AgentMessage[]
   /** 마지막으로 확정된 상태입니다. */
   state: RunAgentInput['state']
+  metadata?: Record<string, unknown>
 }
 
 /** 실행 하나의 저장 상태입니다. */

@@ -218,7 +218,7 @@ test('원격 요약 요청은 상태 필드를 제한하고 캐시를 사용하�
     requests.push({ url: String(url), cache: init?.cache })
     return new Response(JSON.stringify([
       { state: { web: { id: 'b', title: null, createdAt: '2026-10-23', messages: ['must not escape'] } } },
-      { state: { web: { id: 'a', title: 'first', createdAt: '2026-10-23' } } },
+      { metadata: { web: { id: 'a', title: 'first', createdAt: '2026-10-23' } } },
       { state: { unrelated: true } }
     ]), { headers: { 'content-type': 'application/json' } })
   })
@@ -226,5 +226,5 @@ test('원격 요약 요청은 상태 필드를 제한하고 캐시를 사용하�
     { id: 'a', title: 'first', createdAt: '2026-10-23' },
     { id: 'b', title: null, createdAt: '2026-10-23' }
   ])
-  expect(requests).toEqual([{ url: 'https://example.test/threads?view=summary&stateFields=web.id,web.title,web.createdAt', cache: 'no-store' }])
+  expect(requests).toEqual([{ url: 'https://example.test/threads?view=summary&stateFields=web.id,web.title,web.createdAt&metadataFields=web.id,web.title,web.createdAt', cache: 'no-store' }])
 })

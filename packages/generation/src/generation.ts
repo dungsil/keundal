@@ -34,6 +34,7 @@ export interface GenerationSnapshot {
   readonly status: GenerationStatus
   readonly journal: GenerationJournalEntry[]
   readonly messages: AgentMessage[]
+  readonly state?: unknown
 }
 
 export type TerminalGeneration = Omit<GenerationSnapshot, 'status'> & {

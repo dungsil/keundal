@@ -5,6 +5,26 @@ import { expect, test } from 'vitest'
 
 type ToolResult = Extract<AGUIEvent, { type: typeof EventType.TOOL_CALL_RESULT }>
 
+test('공유 상태와 Activity를 제자리 갱신하고 경고를 보존하되 모델 메시지에 넣지 않는다', () => {
+  const assembly = new ChatMessageAssembly('run', { progress: 1 })
+  assembly.apply({ type: EventType.STATE_DELTA, delta: [{ op: 'replace', path: '/progress', value: 2 }] })
+  assembly.apply({ type: EventType.ACTIVITY_SNAPSHOT, messageId: 'plan', activityType: 'PLAN', content: { done: 0 } })
+  assembly.apply({
+    type: EventType.ACTIVITY_DELTA,
+    messageId: 'plan',
+    activityType: 'PLAN',
+    patch: [{ op: 'replace', path: '/done', value: 1 }]
+  })
+  assembly.apply({ type: EventType.STATE_DELTA, delta: [{ op: 'remove', path: '/missing' }] })
+  expect(assembly.message.parts).toEqual([
+    { type: 'data-state', data: { progress: 2 } },
+    { type: 'activity', messageId: 'plan', activityType: 'PLAN', content: { done: 1 } },
+    { type: 'data-state-warning', message: expect.stringContaining('STATE_DELTA') }
+  ])
+  assembly.finish('openai/gpt-5-nano')
+  expect(toMessages([assembly.message], 'openai/gpt-5-nano')).toEqual([])
+})
+
 test('CHUNK를 화면 블록과 재생 메시지로 조립하고 실행 종료 때 스트리밍 상태를 해제한다', () => {
   const assembly = new ChatMessageAssembly('run')
   assembly.apply({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'policy', role: 'system', delta: 'Policy' })

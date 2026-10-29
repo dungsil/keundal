@@ -40,9 +40,51 @@ const fixture = () => ({
 test('백업 검증은 임의의 상태와 독립적인 메시지 스냅숏을 정규화하지 않고 깊은 복사한다', () => {
   const original = fixture()
   const parsed = parseHistoryBackup(original)
-  expect(parsed).toEqual(original)
+  expect(parsed).toEqual({ ...original, runs: original.runs.map((run) => ({ ...run, state: { custom: 1 } })) })
   original.threads[0]!.state.arbitrary.enabled = false
   expect(parsed.threads[0]!.state).toEqual({ arbitrary: { enabled: true } })
+})
+
+test('백업은 metadata를 보존하고 입력 상태와 journal로 실행 상태를 다시 조립한다', () => {
+  const data = fixture()
+  const metadata = { web: { title: 'saved' } }
+  data.runs[0]!.journal.splice(1, 0, {
+    sequence: 1,
+    event: { type: EventType.STATE_DELTA, delta: [{ op: 'replace', path: '/custom', value: 2 }] }
+  })
+  data.runs[0]!.journal[2]!.sequence = 2
+  const parsed = parseHistoryBackup({
+    threads: [{ ...data.threads[0], metadata }],
+    runs: [{ ...data.runs[0], state: { stale: true } }]
+  })
+  expect(parsed.runs[0]!.state).toEqual({ custom: 2 })
+  expect(parsed.threads[0]!.metadata).toEqual(metadata)
+  metadata.web.title = 'changed'
+  expect(parsed.threads[0]!.metadata).toEqual({ web: { title: 'saved' } })
+})
+
+test('백업의 명시적인 null 입력 상태는 빈 객체로 바뀌지 않는다', () => {
+  const data = fixture()
+  const run = data.runs[0]!
+  expect(
+    parseHistoryBackup({
+      ...data,
+      runs: [
+        {
+          ...run,
+          request: {
+            ...run.request,
+            input: { ...run.request.input, state: null }
+          }
+        }
+      ]
+    }).runs[0]!.state
+  ).toBeNull()
+})
+
+test.each([null, [], 'invalid'])('객체가 아닌 백업 metadata는 거부한다: %j', (metadata) => {
+  const data = fixture()
+  expect(() => parseHistoryBackup({ ...data, threads: [{ ...data.threads[0], metadata }] })).toThrow('metadata')
 })
 
 const invalid: [string, (data: ReturnType<typeof fixture>) => void][] = [

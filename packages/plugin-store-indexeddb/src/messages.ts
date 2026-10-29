@@ -9,7 +9,15 @@ import { type GenerationJournalEntry } from '@keundal/generation'
 export class GenerationRecorder {
   readonly journal: GenerationJournalEntry[] = []
 
-  private readonly assembly = new MessageAssembly()
+  private readonly assembly: MessageAssembly
+
+  constructor(initialState: unknown = {}) {
+    this.assembly = new MessageAssembly(initialState)
+  }
+
+  get state(): unknown {
+    return this.assembly.state
+  }
 
   get messages(): AgentMessage[] {
     return this.assembly.messages
@@ -17,15 +25,18 @@ export class GenerationRecorder {
 
   /** 이벤트를 journal에 기록하고 추가한 항목을 돌려줍니다. */
   record(event: AGUIEvent): GenerationJournalEntry {
+    this.assembly.apply(event)
     const entry = { sequence: this.journal.length, event }
     this.journal.push(entry)
-    this.assembly.apply(event)
     return entry
   }
 }
 
-export function recordJournal(entries: readonly GenerationJournalEntry[]): GenerationRecorder {
-  const recorder = new GenerationRecorder()
+export function recordJournal(
+  entries: readonly GenerationJournalEntry[],
+  initialState: unknown = {}
+): GenerationRecorder {
+  const recorder = new GenerationRecorder(initialState)
   for (const entry of entries) recorder.record(entry.event)
   return recorder
 }

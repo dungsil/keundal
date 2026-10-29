@@ -41,6 +41,7 @@ interface StoredThread {
   readonly revision: number
   readonly messages: AgentMessage[]
   readonly state: RunAgentInput['state']
+  readonly metadata?: Record<string, unknown>
 }
 
 interface StoredRun {
@@ -366,11 +367,13 @@ export class IndexedDBStore {
           }
         }
 
+        const metadata = change.metadata ?? current.metadata
         const next: StoredThread = {
           threadId: change.threadId,
           revision: current.revision + 1,
           messages: change.mode === 'replace' ? [...change.messages] : mergeMessages(current.messages, change.messages),
-          state: change.state ?? current.state
+          state: change.state === undefined ? current.state : change.state,
+          ...(metadata === undefined ? {} : { metadata })
         }
         threads.put(next)
         return snapshotThread(next)
@@ -565,7 +568,13 @@ export class IndexedDBStore {
 }
 
 function snapshotThread(thread: StoredThread): SessionSnapshot {
-  return { threadId: thread.threadId, revision: thread.revision, messages: thread.messages, state: thread.state }
+  return {
+    threadId: thread.threadId,
+    revision: thread.revision,
+    messages: thread.messages,
+    state: thread.state,
+    ...(thread.metadata === undefined ? {} : { metadata: thread.metadata })
+  }
 }
 
 function cloneForStorage<T>(value: T, boundary: string): T {
@@ -577,9 +586,14 @@ function cloneForStorage<T>(value: T, boundary: string): T {
 }
 
 function snapshotRun(run: StoredRun, journal: GenerationJournalEntry[]): GenerationSnapshot {
-  if (run.messages !== undefined) return { request: run.request, status: run.status, journal, messages: run.messages }
-  const recorder = recordJournal(journal)
-  return { request: run.request, status: run.status, journal, messages: recorder.messages }
+  const recorder = recordJournal(journal, run.request.input.state)
+  return {
+    request: run.request,
+    status: run.status,
+    journal,
+    messages: run.messages ?? recorder.messages,
+    state: recorder.state
+  }
 }
 
 async function readJournal(store: IDBObjectStore, runId: string): Promise<GenerationJournalEntry[]> {

@@ -10,7 +10,15 @@ import { type GenerationJournalEntry } from '@keundal/generation'
 export class GenerationRecorder {
   readonly journal: GenerationJournalEntry[] = []
 
-  private readonly assembly = new MessageAssembly()
+  private readonly assembly: MessageAssembly
+
+  constructor(initialState: unknown = {}) {
+    this.assembly = new MessageAssembly(initialState)
+  }
+
+  get state(): unknown {
+    return this.assembly.state
+  }
 
   /** 조립한 실행 메시지입니다. 실행 중에는 부분 응답이 담깁니다. */
   get messages(): AgentMessage[] {

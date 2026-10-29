@@ -1,4 +1,7 @@
 export default {
+  'state.title': 'Shared state',
+  'activity.title': 'Activity',
+  'state.warning': 'Could not apply an update. The previous value was kept.',
   'approval.title': 'Tool approval required',
   'approval.operation': 'Operation',
   'approval.command': 'Command',

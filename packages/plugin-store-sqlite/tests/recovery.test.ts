@@ -282,6 +282,33 @@ test('이전 스키마의 실행 메시지를 journal로 덮어쓰지 않고 읽
   }
 })
 
+test('이전 스키마에 metadata 열을 추가하고 JSON null과 metadata를 재연결 뒤에도 보존한다', (t) => {
+  const path = databasePath(t)
+  const first = new SqliteStore(path)
+  first.writeThread('thread', 1, { previous: true })
+  first.database.exec('ALTER TABLE threads DROP COLUMN metadata')
+  first.release()
+
+  const migrated = new SqliteStore(path)
+  expect(migrated.readThread('thread')).toEqual({ revision: 1, messages: [], state: { previous: true } })
+  migrated.writeThread('thread', 2, null, { web: { title: 'saved' } })
+  expect(migrated.database.prepare('SELECT state FROM threads WHERE thread_id = ?').get('thread')?.state).toBe('null')
+  migrated.release()
+
+  const reopened = new SqliteStore(path)
+  try {
+    expect(reopened.readThread('thread')).toEqual({
+      revision: 2,
+      messages: [],
+      state: null,
+      metadata: { web: { title: 'saved' } }
+    })
+    expect(reopened.listThreads()[0]?.metadata).toEqual({ web: { title: 'saved' } })
+  } finally {
+    reopened.release()
+  }
+})
+
 test('next가 대기 중일 때 return을 호출하면 스트림을 중단하고 interrupted로 확정한다', async (t) => {
   const { ctx, held } = await setup(t, { events: reply, holdAfter: 2 }, databasePath(t))
   const iterator = ctx.generation.run(request()) as AsyncIterableIterator<AGUIEvent>
@@ -492,7 +519,7 @@ test('완료한 실행은 재등록 뒤에도 completed를 유지한다', async 
     threadId: 'thread',
     revision: 1,
     messages: [{ id: 'reply', role: 'assistant', content: 'hello' }],
-    state: undefined
+    state: {}
   })
   expect(second.calls).toEqual([])
 })

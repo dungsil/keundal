@@ -191,7 +191,8 @@ test('프로젝트와 대화별 Worktree를 격리하고 일반 대화에는 코
   for (const path of [first, second, b.path, c.path])
     expect(await readFile(join(path, 'a.txt'), 'utf8')).toBe('original\n')
   expect((await run(app, 'ordinary')).tools).not.toContain('write_file')
-})
+  // Real Git process startup can exceed the default five-second budget on CI.
+}, 15_000)
 
 test('코딩 TODO 결과는 대화별로 격리되고 호스트를 다시 열어도 세션에 남는다', async (t) => {
   const { repository, host, run } = await setup(t)

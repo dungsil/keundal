@@ -9,6 +9,7 @@ export interface SessionSnapshot {
   readonly revision: number
   readonly messages: AgentMessage[]
   readonly state: RunAgentInput['state']
+  readonly metadata?: Record<string, unknown>
 }
 
 export interface PreparedSession {
@@ -23,6 +24,7 @@ export interface SessionCommit {
   readonly mode?: 'merge' | 'replace'
   readonly messages: AgentMessage[]
   readonly state: RunAgentInput['state']
+  readonly metadata?: Record<string, unknown>
   readonly generation?: TerminalGeneration
 }
 

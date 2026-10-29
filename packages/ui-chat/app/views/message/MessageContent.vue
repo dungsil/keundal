@@ -50,8 +50,17 @@ function isToolStreaming(part: ToolPart): boolean {
 
 <template>
   <template v-for="(part, index) in getMergedParts(message.parts)" :key="`${message.id}-${part.type}-${index}`">
+    <section v-if="part.type === 'data-state' || part.type === 'activity'" class="my-3 min-w-0 rounded-lg border border-default bg-muted p-4 text-sm" :aria-label="t(part.type === 'data-state' ? 'state.title' : 'activity.title')">
+      <h3 class="mb-2 font-medium">{{ part.type === 'data-state' ? t('state.title') : `${t('activity.title')} · ${part.activityType}` }}</h3>
+      <pre dir="auto" class="max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs" tabindex="0">{{ JSON.stringify(part.type === 'data-state' ? part.data : part.content, null, 2) }}</pre>
+    </section>
+
+    <p v-else-if="part.type === 'data-state-warning'" role="status" class="my-3 text-sm text-warning">
+      {{ t('state.warning') }} <span class="break-all font-mono text-xs">{{ part.message }}</span>
+    </p>
+
     <UChatReasoning
-      v-if="part.type === 'reasoning'"
+      v-else-if="part.type === 'reasoning'"
       :text="part.text"
       :streaming="part.state === 'streaming'"
       chevron="leading"

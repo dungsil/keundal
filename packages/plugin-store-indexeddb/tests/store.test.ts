@@ -780,6 +780,7 @@ test('부분 응답을 남기고 다시 열면 recover가 원본 기록을 보�
   expect(await first.ctx.generation.get('run')).toEqual({
     request: generationRequest,
     status: 'running',
+    state: { step: 1 },
     messages: [],
     journal: [{ sequence: 0, event: { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' } }]
   })
@@ -793,6 +794,7 @@ test('부분 응답을 남기고 다시 열면 recover가 원본 기록을 보�
   const expected = {
     request: generationRequest,
     status: 'running',
+    state: { step: 1 },
     messages: [{ id: 'partial', role: 'assistant', content: 'unfinished reply' }],
     journal: [
       { sequence: 0, event: { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' } },
@@ -852,6 +854,7 @@ test.for(['completed', 'failed', 'cancelled', 'interrupted'] as const)(
     const expected = {
       request: generationRequest,
       status,
+      state: { step: 1 },
       messages: [{ id: 'reply', role: 'assistant', content: 'stored reply' }],
       journal: [
         { sequence: 0, event: { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' } },
@@ -994,6 +997,7 @@ test('소비자가 순회를 중단해도 플러시된 journal로 복구한다',
   const expected = {
     request: request(),
     status: 'interrupted',
+    state: { step: 1 },
     messages: [{ id: 'partial', role: 'assistant', content: 'one' }],
     journal: [
       { sequence: 0, event: { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' } },

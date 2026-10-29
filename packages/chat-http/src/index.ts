@@ -269,7 +269,7 @@ export class RemoteChatStore implements ChatStoreLike {
   }
 
   private chat(snapshot: SessionSnapshot | undefined): LocalChat | undefined {
-    return (snapshot?.state as ChatState | undefined)?.web
+    return (snapshot?.metadata?.web as LocalChat | undefined) ?? (snapshot?.state as ChatState | undefined)?.web
   }
 
   async list(): Promise<LocalChat[]> {
@@ -284,11 +284,13 @@ export class RemoteChatStore implements ChatStoreLike {
   }
 
   async listSummaries(): Promise<ChatSummary[]> {
-    const response = await this.call('/threads?view=summary&stateFields=web.id,web.title,web.createdAt')
-    const snapshots = (await response.json()) as { state?: { web?: ChatSummary } }[]
+    const response = await this.call(
+      '/threads?view=summary&stateFields=web.id,web.title,web.createdAt&metadataFields=web.id,web.title,web.createdAt'
+    )
+    const snapshots = (await response.json()) as { state?: { web?: ChatSummary }; metadata?: { web?: ChatSummary } }[]
     return snapshots
       .flatMap((snapshot) => {
-        const chat = snapshot.state?.web
+        const chat = snapshot.metadata?.web ?? snapshot.state?.web
         return chat &&
           typeof chat.id === 'string' &&
           typeof chat.createdAt === 'string' &&
@@ -334,7 +336,8 @@ export class RemoteChatStore implements ChatStoreLike {
         expectedRevision: snapshot?.revision ?? 0,
         mode: 'replace',
         messages: toMessages(chat.messages, chat.model),
-        state: { web: chat }
+        state: snapshot?.metadata?.web ? snapshot.state : {},
+        metadata: { ...snapshot?.metadata, web: chat }
       })
     })
     return this.snapshot(await response.json())
@@ -594,7 +597,8 @@ export class RemoteChatStore implements ChatStoreLike {
               )
             }
           : undefined
-      const projection = new ChatMessageAssembly(runId)
+      const initialState = resuming ? (await this.getRun(runId))?.request.input.state : saved.state
+      const projection = new ChatMessageAssembly(runId, initialState)
       const publisher = new ChatMessagePublisher(request.onMessage)
       let finished: Extract<AGUIEvent, { type: 'RUN_FINISHED' }> | undefined
       let failed = false
@@ -631,10 +635,7 @@ export class RemoteChatStore implements ChatStoreLike {
                 threadId: id,
                 runId,
                 ...(runBudget === undefined ? {} : { budget: runBudget }),
-                state: {
-                  web: chat,
-                  ...(request.subagentRoles === undefined ? {} : { subagentRoles: request.subagentRoles })
-                },
+                state: initialState,
                 context: [],
                 tools: [],
                 forwardedProps: {
@@ -643,6 +644,7 @@ export class RemoteChatStore implements ChatStoreLike {
                     custom: request.systemPrompt
                   },
                   keundalPromptPreset: promptPreset,
+                  keundalSubagentRoles: request.subagentRoles,
                   memoryProjectId: request.memoryProjectId,
                   keundalModelRecovery: recovery
                 },
@@ -809,7 +811,7 @@ export class RemoteChatStore implements ChatStoreLike {
       if (!chat || chat.pendingRunId !== run.request.input.runId) continue
       const active = this.active.get(id)
       if (active?.subscribed) continue
-      const projection = new ChatMessageAssembly(run.request.input.runId)
+      const projection = new ChatMessageAssembly(run.request.input.runId, run.request.input.state)
       for (const entry of run.journal) projection.apply(entry.event)
       projection.finish(chat.model)
       await this.complete(id, run.request.input.runId, projection.message, projection.steered, active)

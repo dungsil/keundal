@@ -11,6 +11,7 @@ import { type Reasoning } from '@keundal/llm'
 import { type PromptPreset } from '@keundal/prompt'
 import type {} from '@keundal/session'
 import type {} from '@keundal/skill'
+import type { SubagentRole } from '@keundal/subagent'
 import type { Fiber } from 'cordis'
 import type { Context } from 'cordis'
 export { toMessages } from '@keundal/chat/messages'
@@ -32,6 +33,7 @@ export interface KeundalChatRequest {
   signal?: AbortSignal
   runId?: string
   state?: unknown
+  subagentRoles?: readonly SubagentRole[]
   /** A stored journal may be rendered without rerunning the agent or provider. */
   events?: AsyncIterable<AGUIEvent>
   onMessage?: (message: ChatMessage) => void
@@ -128,7 +130,7 @@ export async function createKeundalChat(
     },
     async *respond(request: KeundalChatRequest): AsyncGenerator<AGUIEvent> {
       const runId = request.runId ?? randomUUID()
-      const projection = new ChatMessageAssembly(runId)
+      const projection = new ChatMessageAssembly(runId, request.state)
       const publisher = new ChatMessagePublisher(request.onMessage)
       let finished: Extract<AGUIEvent, { type: 'RUN_FINISHED' }> | undefined
       let failed = false
@@ -141,6 +143,7 @@ export async function createKeundalChat(
                 forwardedProps: {
                   keundalChatInstructions: { defaults: request.instructions, custom: request.systemPrompt },
                   keundalPromptPreset: request.promptPreset,
+                  keundalSubagentRoles: request.subagentRoles,
                   memoryProjectId: request.memoryProjectId,
                   keundalModelRecovery: request.modelRecovery
                 }

@@ -61,7 +61,7 @@ test('404 본문은 소비하지 않고 취소하며 정상 오류 본문은 유
 })
 
 function runFixture(stream: () => Response) {
-  let snapshot: { revision: number, state: { web: LocalChat } } = {
+  let snapshot: { revision: number, state: unknown, metadata?: { web: LocalChat } } = {
     revision: 1,
     state: { web: { id: 'chat', title: 'title', createdAt: '', messages: [user], votes: [], model, started: false, isOwner: true, visibility: 'private' } }
   }
@@ -74,7 +74,7 @@ function runFixture(stream: () => Response) {
     if (path === '/threads/chat') {
       if (init?.method === 'PUT') {
         const body = JSON.parse(String(init.body))
-        snapshot = { revision: snapshot.revision + 1, state: body.state }
+        snapshot = { revision: snapshot.revision + 1, state: body.state, metadata: body.metadata }
       }
       return Response.json(snapshot)
     }

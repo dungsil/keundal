@@ -14,7 +14,8 @@ const snapshot = (threadId: string, thread: StoredThread): SessionSnapshot => ({
   threadId,
   revision: thread.revision,
   messages: thread.messages,
-  state: thread.state
+  state: thread.state,
+  ...(thread.metadata === undefined ? {} : { metadata: thread.metadata })
 })
 
 /**
@@ -46,12 +47,7 @@ export class SqliteSessionService extends SessionService {
   async list(options?: ExecutionOptions): Promise<SessionSnapshot[]> {
     this.assertOpen()
     options?.signal?.throwIfAborted()
-    return this.store.listThreads().map(({ threadId, revision, messages, state }) => ({
-      threadId,
-      revision,
-      messages,
-      state
-    }))
+    return this.store.listThreads().map(({ threadId, ...thread }) => snapshot(threadId, thread))
   }
 
   async prepare(input: RunAgentInput, options?: ExecutionOptions): Promise<PreparedSession> {
@@ -63,7 +59,7 @@ export class SqliteSessionService extends SessionService {
       input: {
         ...request,
         messages: mergeMessages(thread?.messages ?? [], request.messages),
-        state: request.state ?? thread?.state
+        state: input.state === undefined ? thread?.state : input.state
       },
       revision: thread?.revision ?? 0
     }
@@ -114,12 +110,14 @@ export class SqliteSessionService extends SessionService {
         this.store.writeRunMessages(runId, generation.messages)
         this.store.finishRun(runId, generation.status)
       }
+      const metadata = change.metadata ?? current.metadata
       const next: StoredThread = {
         revision: current.revision + 1,
         messages: change.mode === 'replace' ? [...change.messages] : mergeMessages(current.messages, change.messages),
-        state: change.state ?? current.state
+        state: change.state === undefined ? current.state : change.state,
+        ...(metadata === undefined ? {} : { metadata })
       }
-      this.store.writeThread(change.threadId, next.revision, next.state)
+      this.store.writeThread(change.threadId, next.revision, next.state, next.metadata)
       if (change.mode === 'replace') this.store.clearThreadMessages(change.threadId)
       this.store.writeThreadMessages(change.threadId, change.messages)
       return snapshot(change.threadId, next)

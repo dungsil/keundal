@@ -1,5 +1,5 @@
 import type { AGUIEvent, RunAgentInput } from '@keundal/core'
-import { CONTEXT_MESSAGE_EVENT, EventType } from '@keundal/core'
+import { CONTEXT_MESSAGE_EVENT, EventType, MessageAssembly } from '@keundal/core'
 import type { GenerationRequest, GenerationSnapshot } from '@keundal/generation'
 import type { SessionSnapshot } from '@keundal/session'
 
@@ -18,6 +18,7 @@ export interface ConformanceStore {
       mode?: 'merge' | 'replace'
       messages: RunAgentInput['messages']
       state?: RunAgentInput['state']
+      metadata?: Record<string, unknown>
       generation?: unknown
     }): Promise<{ threadId: string; revision: number; messages: RunAgentInput['messages'] }>
     get(threadId: string): Promise<SessionSnapshot | undefined>
@@ -33,10 +34,15 @@ export interface ConformanceStore {
     ): AsyncIterable<AGUIEvent>
     get(runId: string): Promise<GenerationSnapshot | undefined>
     list(): Promise<GenerationSnapshot[]>
+    recover(): Promise<GenerationSnapshot[]>
     subscribe(
       runId: string,
       options?: { afterSequence?: number; signal?: AbortSignal }
     ): AsyncIterable<{ sequence: number; event: AGUIEvent }>
+  }
+  backup: {
+    export(): Promise<{ threads: SessionSnapshot[]; runs: GenerationSnapshot[] }>
+    import(data: { threads: SessionSnapshot[]; runs: GenerationSnapshot[] }): Promise<void>
   }
   disposeAll(): Promise<void>
 }
@@ -427,7 +433,251 @@ async function chunkScenario(store: ConformanceStore): Promise<unknown> {
   }
 }
 
-const scenarios: ReadonlyArray<{ name: string; run: (store: ConformanceStore) => Promise<unknown> }> = [
+async function stateSeedScenario(store: ConformanceStore): Promise<unknown> {
+  const states: unknown[] = [{ step: 1 }, undefined, null, false]
+  const snapshots: unknown[] = []
+  for (const [index, state] of states.entries()) {
+    const run = request(`state-seed-${index}`)
+    run.input.threadId = `state-thread-${index}`
+    run.input.state = state
+    await collect(
+      store.generation.run(run, {
+        stream: async function* () {
+          if (index === 0) yield { type: EventType.STATE_DELTA, delta: [{ op: 'replace', path: '/step', value: 2 }] }
+        }
+      })
+    )
+    snapshots.push((await store.generation.get(run.input.runId))?.state)
+  }
+  return {
+    snapshots,
+    listed: (await store.generation.list()).map((run) => run.state),
+    recovered: (await store.generation.recover()).map((run) => run.state),
+    committed: (await store.session.list()).map((session) => session.state),
+    original: states[0]
+  }
+}
+
+async function stateActivityScenario(store: ConformanceStore): Promise<unknown> {
+  let streamCalls = 0
+  const runRequest = request('state-activity')
+  const activity = (messageId: string, content: Record<string, unknown>, replace = true): AGUIEvent => ({
+    type: EventType.ACTIVITY_SNAPSHOT,
+    messageId,
+    activityType: 'progress',
+    content,
+    replace
+  })
+  await collect(
+    store.generation.run(runRequest, {
+      stream: async function* () {
+        streamCalls++
+        yield { type: EventType.STATE_SNAPSHOT, snapshot: { items: [], phase: 'snapshot' } }
+        yield { type: EventType.STATE_DELTA, delta: [{ op: 'add', path: '/items/-', value: 'first' }] }
+        yield {
+          type: EventType.STATE_DELTA,
+          delta: [
+            { op: 'replace', path: '/items/0', value: 'updated' },
+            { op: 'add', path: '/items/-', value: 'second' }
+          ]
+        }
+        yield {
+          type: EventType.STATE_DELTA,
+          delta: [
+            { op: 'replace', path: '/phase', value: 'must not survive' },
+            { op: 'remove', path: '/missing' }
+          ]
+        }
+        yield activity('activity-a', { step: 0, obsolete: true })
+        yield activity('activity-b', { step: 10 })
+        yield activity('activity-a', { step: 1 })
+        yield activity('activity-a', { step: 99 }, false)
+        yield {
+          type: EventType.ACTIVITY_DELTA,
+          messageId: 'activity-a',
+          activityType: 'progress',
+          patch: [{ op: 'replace', path: '/step', value: 2 }]
+        }
+        yield {
+          type: EventType.ACTIVITY_DELTA,
+          messageId: 'activity-a',
+          activityType: 'progress',
+          patch: [
+            { op: 'replace', path: '/step', value: 99 },
+            { op: 'remove', path: '/missing' }
+          ]
+        }
+        yield {
+          type: EventType.ACTIVITY_DELTA,
+          messageId: 'missing-activity',
+          activityType: 'progress',
+          patch: [{ op: 'add', path: '/step', value: 99 }]
+        }
+      }
+    })
+  )
+  const run = await store.generation.get(runRequest.input.runId)
+  const session = await store.session.get('thread')
+  const listed = (await store.generation.list())[0]
+  const recovered = (await store.generation.recover())[0]
+  const replay = new MessageAssembly(runRequest.input.state)
+  const entries = await Array.fromAsync(store.generation.subscribe(runRequest.input.runId))
+  for (const entry of entries) replay.apply(entry.event)
+  return {
+    state: run?.state,
+    activities: run?.messages.map(({ id, role, content }) => ({ id, role, content })),
+    sessionState: session?.state,
+    sessionMessagesMatch: JSON.stringify(session?.messages) === JSON.stringify(run?.messages),
+    listedState: listed?.state,
+    recoveredState: recovered?.state,
+    recoveredMessagesMatch: JSON.stringify(recovered?.messages) === JSON.stringify(run?.messages),
+    replayState: replay.state,
+    replayMessagesMatch: JSON.stringify(replay.messages) === JSON.stringify(run?.messages),
+    journalMatches: JSON.stringify(entries) === JSON.stringify(run?.journal),
+    warningCount: replay.warnings.length,
+    streamCalls
+  }
+}
+
+async function partialStateScenario(store: ConformanceStore, fail: boolean): Promise<unknown> {
+  await store.session.commit({ threadId: 'thread', expectedRevision: 0, messages: [], state: { committed: true } })
+  let streamCalls = 0
+  let error = ''
+  const runRequest = request(fail ? 'state-failed' : 'state-interrupted', 1)
+  try {
+    for await (const event of store.generation.run(runRequest, {
+      stream: async function* () {
+        streamCalls++
+        yield { type: EventType.STATE_DELTA, delta: [{ op: 'replace', path: '/step', value: 2 }] }
+        yield {
+          type: EventType.ACTIVITY_SNAPSHOT,
+          messageId: 'partial-activity',
+          activityType: 'progress',
+          content: { partial: true }
+        }
+        if (fail) throw new Error('state stream failed')
+      }
+    })) {
+      if (!fail && event.type === EventType.ACTIVITY_SNAPSHOT) break
+    }
+  } catch (e) {
+    error = (e as Error).message
+  }
+  const run = await store.generation.get(runRequest.input.runId)
+  const recovered = (await store.generation.recover())[0]
+  const replay = new MessageAssembly(runRequest.input.state)
+  for await (const entry of store.generation.subscribe(runRequest.input.runId)) replay.apply(entry.event)
+  return {
+    status: run?.status,
+    state: run?.state,
+    recoveredState: recovered?.state,
+    replayState: replay.state,
+    messagesMatch: JSON.stringify(replay.messages) === JSON.stringify(run?.messages),
+    activityIds: messageIds(run?.messages ?? []),
+    sessionState: (await store.session.get('thread'))?.state,
+    sessionMessageIds: messageIds((await store.session.get('thread'))?.messages ?? []),
+    streamCalls,
+    error
+  }
+}
+
+async function malformedStateScenario(store: ConformanceStore): Promise<unknown> {
+  let rejected = false
+  try {
+    await collect(
+      store.generation.run(request('malformed-state'), {
+        stream: async function* () {
+          yield {
+            type: EventType.STATE_DELTA,
+            delta: [{ op: 'replace', path: 12, value: 2 }]
+          } as unknown as AGUIEvent
+        }
+      })
+    )
+  } catch {
+    rejected = true
+  }
+  const run = await store.generation.get('malformed-state')
+  return { rejected, status: run?.status, state: run?.state, journal: journalTypes(run) }
+}
+
+async function metadataBackupScenario(
+  store: ConformanceStore,
+  make: () => Promise<ConformanceStore>
+): Promise<unknown> {
+  await store.session.commit({
+    threadId: 'thread',
+    expectedRevision: 0,
+    messages: [],
+    state: { step: 1 },
+    metadata: { web: { title: 'saved' } }
+  })
+  const first = await store.session.prepare({ ...request('metadata-first').input, state: undefined })
+  await collect(
+    store.generation.run(
+      { ...request('metadata-first', first.revision), input: first.input },
+      {
+        stream: async function* () {
+          yield { type: EventType.STATE_SNAPSHOT, snapshot: null }
+        }
+      }
+    )
+  )
+  const afterFirst = await store.session.get('thread')
+  const next = await store.session.prepare({ ...request('metadata-next').input, state: undefined })
+  await collect(
+    store.generation.run(
+      { ...request('metadata-next', next.revision), input: next.input },
+      {
+        stream: async function* () {
+          yield { type: EventType.STATE_DELTA, delta: [{ op: 'replace', path: '', value: { step: 2 } }] }
+        }
+      }
+    )
+  )
+  const explicitNull = await store.session.prepare({ ...request('metadata-null').input, state: null })
+  const preserved = await store.session.get('thread')
+  await store.session.commit({
+    threadId: 'thread',
+    expectedRevision: preserved!.revision,
+    messages: [],
+    state: undefined,
+    metadata: { web: { title: 'updated' } }
+  })
+  const data = await store.backup.export()
+  const target = await make()
+  try {
+    await target.backup.import(data)
+    const restored = await target.session.get('thread')
+    const restoredRuns = await target.generation.recover()
+    return {
+      initialBaseline: first.input.state,
+      nullCommitted: afterFirst?.state === null,
+      nullBaseline: next.input.state,
+      explicitNull: explicitNull.input.state,
+      metadataNotForwarded: !('metadata' in first.input) && !('metadata' in next.input),
+      preservedMetadata: preserved?.metadata,
+      state: restored?.state,
+      metadata: restored?.metadata,
+      listedMetadata: (await target.session.list())[0]?.metadata,
+      runStates: restoredRuns.map((run) => run.state),
+      roundtripMatches: JSON.stringify(await target.backup.export()) === JSON.stringify(data)
+    }
+  } finally {
+    await target.disposeAll()
+  }
+}
+
+const scenarios: ReadonlyArray<{
+  name: string
+  run: (store: ConformanceStore, make: () => Promise<ConformanceStore>) => Promise<unknown>
+}> = [
+  { name: 'malformedState', run: malformedStateScenario },
+  { name: 'metadataBackup', run: metadataBackupScenario },
+  { name: 'stateSeed', run: stateSeedScenario },
+  { name: 'stateActivity', run: stateActivityScenario },
+  { name: 'stateFailed', run: (store) => partialStateScenario(store, true) },
+  { name: 'stateInterrupted', run: (store) => partialStateScenario(store, false) },
   { name: 'chunks', run: chunkScenario },
   { name: 'messageCollisions', run: messageCollisionScenario },
   { name: 'success', run: successScenario },
@@ -444,6 +694,68 @@ const scenarios: ReadonlyArray<{ name: string; run: (store: ConformanceStore) =>
 
 /** 세 저장소가 같은 결과를 내야 하는 시나리오의 기대 보고서입니다. */
 export const expectedConformanceReport: ConformanceReport = {
+  malformedState: { rejected: true, status: 'failed', state: { step: 1 }, journal: ['RUN_STARTED'] },
+  metadataBackup: {
+    initialBaseline: { step: 1 },
+    nullCommitted: true,
+    nullBaseline: null,
+    explicitNull: null,
+    metadataNotForwarded: true,
+    preservedMetadata: { web: { title: 'saved' } },
+    state: { step: 2 },
+    metadata: { web: { title: 'updated' } },
+    listedMetadata: { web: { title: 'updated' } },
+    runStates: [null, { step: 2 }],
+    roundtripMatches: true
+  },
+  stateSeed: {
+    snapshots: [{ step: 2 }, {}, null, false],
+    listed: [{ step: 2 }, {}, null, false],
+    recovered: [{ step: 2 }, {}, null, false],
+    committed: [{ step: 2 }, {}, null, false],
+    original: { step: 1 }
+  },
+  stateActivity: {
+    state: { items: ['updated', 'second'], phase: 'snapshot' },
+    activities: [
+      { id: 'activity-a', role: 'activity', content: { step: 2 } },
+      { id: 'activity-b', role: 'activity', content: { step: 10 } }
+    ],
+    sessionState: { items: ['updated', 'second'], phase: 'snapshot' },
+    sessionMessagesMatch: true,
+    listedState: { items: ['updated', 'second'], phase: 'snapshot' },
+    recoveredState: { items: ['updated', 'second'], phase: 'snapshot' },
+    recoveredMessagesMatch: true,
+    replayState: { items: ['updated', 'second'], phase: 'snapshot' },
+    replayMessagesMatch: true,
+    journalMatches: true,
+    warningCount: 3,
+    streamCalls: 1
+  },
+  stateFailed: {
+    status: 'failed',
+    state: { step: 2 },
+    recoveredState: { step: 2 },
+    replayState: { step: 2 },
+    messagesMatch: true,
+    activityIds: ['partial-activity'],
+    sessionState: { committed: true },
+    sessionMessageIds: [],
+    streamCalls: 1,
+    error: 'state stream failed'
+  },
+  stateInterrupted: {
+    status: 'interrupted',
+    state: { step: 2 },
+    recoveredState: { step: 2 },
+    replayState: { step: 2 },
+    messagesMatch: true,
+    activityIds: ['partial-activity'],
+    sessionState: { committed: true },
+    sessionMessageIds: [],
+    streamCalls: 1,
+    error: ''
+  },
   chunks: {
     eventTypes: [
       'RUN_STARTED',
@@ -545,7 +857,7 @@ export async function runStoreConformance(make: () => Promise<ConformanceStore>)
   for (const scenario of scenarios) {
     const store = await make()
     try {
-      report[scenario.name] = await scenario.run(store)
+      report[scenario.name] = await scenario.run(store, make)
     } catch (error) {
       report[scenario.name] = { conformanceError: String((error as Error)?.stack ?? error) }
     } finally {

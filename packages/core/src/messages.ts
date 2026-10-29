@@ -1,5 +1,7 @@
+import jsonPatch from 'fast-json-patch'
+
 import { EventNormalizer } from './chunks.js'
-import { EventType, type AGUIEvent, type AgentMessage } from './protocol.js'
+import { EventType, parseAGUIEvent, type AGUIEvent, type AgentMessage } from './protocol.js'
 
 type AssistantMessage = Extract<AgentMessage, { role: 'assistant' }>
 type AssistantToolCall = NonNullable<AssistantMessage['toolCalls']>[number]
@@ -38,6 +40,7 @@ export function prepareReplayMessages(
   const sameModel = sourceModel === targetModel
   const results = new Set(messages.flatMap((message) => (message.role === 'tool' ? [message.toolCallId] : [])))
   return messages
+    .filter((message) => message.role !== 'activity')
     .filter((message) => message.role !== 'reasoning' || (sameModel && !!message.encryptedValue))
     .map((message) => {
       if (message.role !== 'assistant') return message
@@ -81,6 +84,12 @@ export function mergeMessages(stored: readonly AgentMessage[], incoming: readonl
 export class MessageAssembly {
   /** 조립한 순서대로의 실행 메시지입니다. */
   readonly messages: AgentMessage[] = []
+  readonly warnings: string[] = []
+  state: unknown
+
+  constructor(initialState: unknown = {}) {
+    this.state = initialState
+  }
 
   /** 메시지 id별 위치입니다. 같은 id를 다시 쓰면 저장된 위치를 대체합니다. */
   private readonly positions = new Map<string, number>()
@@ -99,6 +108,54 @@ export class MessageAssembly {
 
   private applyEvent(event: AGUIEvent): AgentMessage | undefined {
     switch (event.type) {
+      case EventType.STATE_SNAPSHOT:
+        parseAGUIEvent(event)
+        this.state = globalThis.structuredClone(event.snapshot)
+        return undefined
+      case EventType.STATE_DELTA:
+        parseAGUIEvent(event)
+        try {
+          this.state = jsonPatch.applyPatch(
+            globalThis.structuredClone(this.state),
+            globalThis.structuredClone(event.delta),
+            true
+          ).newDocument
+        } catch (error) {
+          this.warnings.push(`STATE_DELTA: ${String(error).split('\n')[0]}`)
+        }
+        return undefined
+      case EventType.ACTIVITY_SNAPSHOT: {
+        parseAGUIEvent(event)
+        const existing = this.message(event.messageId)
+        if (existing && (existing.role !== 'activity' || event.replace === false)) return undefined
+        return this.write({
+          id: event.messageId,
+          role: 'activity',
+          activityType: event.activityType,
+          content: globalThis.structuredClone(event.content),
+          ...(event.subagentRunId === undefined ? {} : { subagentRunId: event.subagentRunId }),
+          metadata: { ...existing?.metadata, ...event.metadata }
+        })
+      }
+      case EventType.ACTIVITY_DELTA: {
+        parseAGUIEvent(event)
+        const existing = this.message(event.messageId)
+        try {
+          if (existing?.role !== 'activity') throw new Error('no matching activity snapshot')
+          if (event.subagentRunId !== existing.subagentRunId) throw new Error('activity owner mismatch')
+          const content: unknown = jsonPatch.applyPatch(
+            globalThis.structuredClone(existing.content),
+            globalThis.structuredClone(event.patch),
+            true
+          ).newDocument
+          if (content === null || typeof content !== 'object' || Array.isArray(content))
+            throw new Error('activity content must remain an object')
+          return this.write({ ...existing, content, activityType: event.activityType }, event.metadata)
+        } catch (error) {
+          this.warnings.push(`ACTIVITY_DELTA ${event.messageId}: ${String(error).split('\n')[0]}`)
+          return undefined
+        }
+      }
       case EventType.CUSTOM: {
         if (event.name === STEER_MESSAGE_EVENT) {
           if (!isSteerMessage(event.value)) throw new Error('invalid steer message event')

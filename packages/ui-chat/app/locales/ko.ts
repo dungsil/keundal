@@ -1,6 +1,9 @@
 import type en from './en'
 
 export default {
+  'state.title': '공유 상태',
+  'activity.title': '활동',
+  'state.warning': '업데이트를 적용하지 못해 이전 값을 유지했습니다.',
   'approval.title': '도구 실행 승인 필요',
   'approval.operation': '작업 종류',
   'approval.command': '명령어',

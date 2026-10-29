@@ -72,7 +72,7 @@ export class ChatStore implements ChatStoreLike {
   }
 
   private chat(snapshot: SessionSnapshot | undefined): LocalChat | undefined {
-    return (snapshot?.state as ChatState | undefined)?.web
+    return (snapshot?.metadata?.web as LocalChat | undefined) ?? (snapshot?.state as ChatState | undefined)?.web
   }
 
   async list(): Promise<LocalChat[]> {
@@ -102,7 +102,8 @@ export class ChatStore implements ChatStoreLike {
       expectedRevision: snapshot?.revision ?? 0,
       mode: 'replace',
       messages: toMessages(chat.messages, chat.model),
-      state: { web: chat }
+      state: snapshot?.metadata?.web ? snapshot.state : {},
+      metadata: { ...snapshot?.metadata, web: chat }
     })
   }
 
@@ -318,7 +319,8 @@ export class ChatStore implements ChatStoreLike {
         modelRecovery,
         ...(budget === undefined ? {} : { budget }),
         signal: combined,
-        state: { web: chat, ...(subagentRoles === undefined ? {} : { subagentRoles }) },
+        state: saved.state,
+        subagentRoles,
         onMessage: request.onMessage,
         instructions: `You are a knowledgeable and helpful AI assistant. Be clear, accurate and concise.
 Do not use markdown headings. Use bold text for section labels instead.
@@ -357,6 +359,7 @@ ${request.webSearch && !request.model.startsWith('google/') ? 'Use native web se
         runId: run.request.input.runId,
         messages: chat.messages,
         instructions: '',
+        state: run.request.input.state,
         events: (async function* () {
           for (const entry of run.journal) yield entry.event
         })(),

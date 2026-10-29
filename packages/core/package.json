@@ -17,7 +17,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ag-ui/core": "catalog:"
+    "@ag-ui/core": "catalog:",
+    "fast-json-patch": "3.1.1"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",

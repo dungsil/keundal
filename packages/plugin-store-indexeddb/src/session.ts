@@ -40,7 +40,7 @@ export class IndexedDBSessionService extends SessionService {
       input: {
         ...request,
         messages: mergeMessages(thread?.messages ?? [], request.messages),
-        state: request.state ?? thread?.state
+        state: input.state === undefined ? thread?.state : input.state
       },
       revision: thread?.revision ?? 0
     }
