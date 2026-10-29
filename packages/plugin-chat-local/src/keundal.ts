@@ -1,4 +1,4 @@
-import type { RunBudget } from '@keundal/agent'
+import { prepareChatInput, type RunBudget } from '@keundal/agent'
 import type { AgentConfig } from '@keundal/agent-loop'
 import { ChatMessageAssembly, type ChatMessage } from '@keundal/chat/chat-message'
 import { ChatMessagePublisher } from '@keundal/chat/chat-message-publisher'
@@ -24,6 +24,7 @@ export interface KeundalChatRequest {
   threadId: string
   messages: ChatMessage[]
   instructions: string
+  systemPrompt?: string
   promptPreset?: PromptPreset
   memoryProjectId?: string
   modelRecovery?: ModelRecoveryPolicy
@@ -134,22 +135,18 @@ export async function createKeundalChat(
       try {
         for await (const event of request.events ??
           ctx.agent.run(
-            {
-              ...input(
-                [
-                  { id: 'keundal:web-instructions', role: 'system', content: request.instructions },
-                  ...toMessages(request.messages, name)
-                ],
-                request.threadId,
-                runId,
-                request.state
-              ),
-              forwardedProps: {
-                keundalPromptPreset: request.promptPreset,
-                memoryProjectId: request.memoryProjectId,
-                keundalModelRecovery: request.modelRecovery
-              }
-            },
+            prepareChatInput(
+              {
+                ...input(toMessages(request.messages, name), request.threadId, runId, request.state),
+                forwardedProps: {
+                  keundalChatInstructions: { defaults: request.instructions, custom: request.systemPrompt },
+                  keundalPromptPreset: request.promptPreset,
+                  memoryProjectId: request.memoryProjectId,
+                  keundalModelRecovery: request.modelRecovery
+                }
+              },
+              ctx.agent.inputCapabilities
+            ),
             {
               signal: request.signal,
               steer: request.steer,

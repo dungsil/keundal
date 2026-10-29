@@ -1,3 +1,4 @@
+import { prepareChatInput } from '@keundal/agent'
 import { parseHistoryBackup, type HistoryBackup } from '@keundal/backup'
 import { SteerQueue, EventType, type AgentMessage, type RunAgentInput } from '@keundal/core'
 import { parseReasoning, type Reasoning } from '@keundal/llm'
@@ -163,7 +164,11 @@ export async function createAgentHost(options: AgentHostOptions): Promise<AgentH
             const workspace = await options.workspaces?.get(input.threadId)
             signal.throwIfAborted()
             const fiber = await agent(selected.id, reasoning, workspace?.threadId, workspace?.path)
-            yield* fiber.ctx.agent.run(input, { ...execution, signal, steer })
+            yield* fiber.ctx.agent.run(prepareChatInput(input, fiber.ctx.agent.inputCapabilities), {
+              ...execution,
+              signal,
+              steer
+            })
           } finally {
             // 남은 지시는 실행이 끝난 뒤 반영할 수 없으므로 대기열을 닫습니다.
             steer.close()

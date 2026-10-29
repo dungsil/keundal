@@ -181,6 +181,30 @@ test('프로토콜 버전이 다르면 실행을 실패로 기록한다', async 
   expect((await ctx.generation.get(request.runId))?.status).toBe('failed')
 })
 
+test('직접 지정한 시스템·개발자 메시지와 컨텍스트·도구·이미지는 ACP 실행 전에 거부한다', async (t) => {
+  const { ctx } = await setup(t)
+  const requests: RunAgentInput[] = [
+    ...(['system', 'developer'] as const).map((role) => ({
+      ...input('hello'),
+      messages: [{ id: 'instructions', role, content: 'Follow these instructions' }, ...input('hello').messages]
+    })),
+    { ...input('hello'), context: [{ description: 'context', value: 'local context' }] },
+    { ...input('hello'), tools: [{ name: 'tool', description: 'local tool', parameters: {} }] },
+    {
+      ...input('hello'),
+      messages: [
+        {
+          id: 'image',
+          role: 'user',
+          content: [{ type: 'image', source: { type: 'url', value: 'https://example.test/image.png' } }]
+        }
+      ]
+    }
+  ]
+  for (const request of requests) await expect(collect(ctx.agent.run(request))).rejects.toThrow()
+  expect(await ctx.generation.list()).toEqual([])
+})
+
 test('동일 대화의 동시 실행과 이전 메시지 수정 및 복원 불가능한 세션을 거부한다', async (t) => {
   const { ctx, agent } = await setup(t)
   const request = input('wait')

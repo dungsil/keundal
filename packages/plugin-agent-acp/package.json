@@ -28,6 +28,9 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@keundal/agent-host": "workspace:*",
+    "@keundal/chat-http": "workspace:*",
+    "@keundal/plugin-chat-local": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/plugin-store-sqlite": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
