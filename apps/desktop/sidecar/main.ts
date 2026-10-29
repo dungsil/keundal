@@ -2,6 +2,7 @@ import { createServer } from 'node:http'
 
 import { createAgentRuntime } from '@keundal/agent-runtime-node'
 import { createChartTools } from '@keundal/plugin-tool-chart'
+import { createTodoTools } from '@keundal/plugin-tool-todo'
 import { createWeatherTools } from '@keundal/plugin-tool-weather'
 import { manageRuntimePlugins, createDesktopComposition } from './runtime-plugins.js'
 import { parseMcpServers } from '@keundal/mcp'
@@ -30,7 +31,7 @@ const mcpOAuth = sidecar && process.env.KEUNDAL_SHUTDOWN_ON_STDIN === '1'
   ? await createDesktopMcpOAuth(parseMcpServers(JSON.parse(process.env.KEUNDAL_MCP_SERVERS ?? '[]')), createNativeBridge())
   : undefined
 const agentHost = await createAgentRuntime(process.env, {
-  defaultTools: [...createChartTools(), ...createWeatherTools()],
+  defaultTools: [...createChartTools(), ...createWeatherTools(), ...createTodoTools()],
   mcpAuthentication: mcpOAuth?.authentication,
   compose: createDesktopComposition(process.env.KEUNDAL_MANAGED_PLUGINS)
 })

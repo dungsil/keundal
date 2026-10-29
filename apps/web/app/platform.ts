@@ -14,6 +14,7 @@ import { openaiTranscription } from '@keundal/browser-composition/transcription'
 import { BrowserRuntimePluginManager, createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
 import { mountRuntimePlugin, type RuntimeModuleRegistry } from '@keundal/plugin-runtime'
 import { createChartTools, metadata as chartMetadata } from '@keundal/plugin-tool-chart'
+import { createTodoTools, metadata as todoMetadata } from '@keundal/plugin-tool-todo'
 import { createWeatherTools, metadata as weatherMetadata } from '@keundal/plugin-tool-weather'
 import type { ChatPlatform } from '@keundal/chat/platform'
 import { loadWebRuntimePlugins } from './runtime-plugins'
@@ -50,6 +51,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
       let manager: BrowserRuntimePluginManager
       const chartTools = () => manager.isEnabled('@keundal/plugin-tool-chart') ? createChartTools() : []
       const weatherTools = () => manager.isEnabled('@keundal/plugin-tool-weather') ? createWeatherTools() : []
+      const todoTools = () => manager.isEnabled('@keundal/plugin-tool-todo') ? createTodoTools() : []
       const builtins: RuntimeModuleRegistry = {
         'builtin:llm': { exports: { default: browserLLMPlugin }, config: { getSettings: options.getSettings, getModels: options.getModels } },
         'builtin:store': { exports: { default: indexedDBStorePlugin }, config: { databaseName: 'keundal-web' } },
@@ -57,6 +59,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         'builtin:agent': { exports: { default: agentPlugin }, config: { maxToolRounds: 4, subagents: true, parallelTools: true } },
         'builtin:chart': { exports: { default: chartTools } },
         'builtin:weather': { exports: { default: weatherTools } },
+        'builtin:todo': { exports: { default: todoTools } },
         'builtin:chat-tools': { exports: { default: () => [...chartTools(), ...weatherTools()] } }
       }
       const composition = await loadWebRuntimePlugins(runtime.pluginConfig, builtins, undefined,
@@ -95,6 +98,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         { module: '@keundal/plugin-skill', metadata: skillMetadata, enabled: !!composition.skills, feature: 'skills' },
         { module: '@keundal/plugin-tool-chart', metadata: chartMetadata, enabled: true },
         { module: '@keundal/plugin-tool-weather', metadata: weatherMetadata, enabled: true },
+        { module: '@keundal/plugin-tool-todo', metadata: todoMetadata, enabled: true },
         { module: '@keundal/plugin-mcp-client', metadata: mcpMetadata, enabled: true, feature: 'mcp' }
       ], async (module, enabled) => {
         if (!connected) throw new Error('The browser plugin runtime is not connected')

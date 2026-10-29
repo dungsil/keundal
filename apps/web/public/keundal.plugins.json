@@ -5,5 +5,5 @@
     { "module": "builtin:skills" }
   ],
   "agent": { "module": "builtin:agent" },
-  "tools": [{ "module": "builtin:chart" }, { "module": "builtin:weather" }]
+  "tools": [{ "module": "builtin:chart" }, { "module": "builtin:weather" }, { "module": "builtin:todo" }]
 }

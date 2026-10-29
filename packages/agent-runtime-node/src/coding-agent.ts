@@ -2,6 +2,7 @@ import codingAgentPlugin from '@keundal/plugin-agent-coding'
 import { LocalFileSystemService } from '@keundal/plugin-fs-local'
 import { PolicyFileSystemService } from '@keundal/plugin-fs-policy'
 import { FileSystemToolsService } from '@keundal/plugin-tool-fs'
+import { createTodoTools } from '@keundal/plugin-tool-todo'
 import type { ExecutableTool } from '@keundal/tools'
 import type { Context } from 'cordis'
 
@@ -11,7 +12,7 @@ import type { HostComposition, NodeHostOptions } from './index.js'
 export async function mountCodingAgent(
   ctx: Context,
   config: Parameters<HostComposition['mountAgent']>[1],
-  options: Pick<NodeHostOptions, 'maxToolRounds'>
+  options: Pick<NodeHostOptions, 'maxToolRounds' | 'bundledPlugins'>
 ) {
   const backendContext = ctx.isolate('fs')
   let backend!: LocalFileSystemService
@@ -53,6 +54,6 @@ export async function mountCodingAgent(
     skills: false,
     promptPresets: false,
     subagents: false,
-    tools
+    tools: [...tools, ...(options.bundledPlugins?.['@keundal/plugin-tool-todo'] !== false ? createTodoTools() : [])]
   })
 }

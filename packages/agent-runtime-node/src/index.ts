@@ -25,6 +25,7 @@ export type BundledPluginModule =
   | '@keundal/plugin-skill'
   | '@keundal/plugin-mcp-client'
   | '@keundal/plugin-tool-chart'
+  | '@keundal/plugin-tool-todo'
   | '@keundal/plugin-tool-weather'
   /** Legacy preference used only as a fallback for the split tool selections. */
   | '@keundal/plugin-tool-chat'

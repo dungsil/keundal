@@ -33,6 +33,7 @@
     "@keundal/plugin-mcp-client": "workspace:*",
     "@keundal/plugin-runtime": "workspace:*",
     "@keundal/plugin-tool-chart": "workspace:*",
+    "@keundal/plugin-tool-todo": "workspace:*",
     "@keundal/plugin-tool-weather": "workspace:*",
     "@tauri-apps/api": "2.12.4",
     "cordis": "catalog:",

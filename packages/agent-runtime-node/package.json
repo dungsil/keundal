@@ -38,6 +38,7 @@
     "@keundal/plugin-skill": "workspace:*",
     "@keundal/plugin-store-sqlite": "workspace:*",
     "@keundal/plugin-tool-fs": "workspace:*",
+    "@keundal/plugin-tool-todo": "workspace:*",
     "@keundal/plugin-workspace-git": "workspace:*",
     "@keundal/skill": "workspace:*",
     "@keundal/task-memory": "workspace:*",

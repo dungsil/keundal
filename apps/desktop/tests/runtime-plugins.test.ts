@@ -10,6 +10,7 @@ import { createNodeAgentHost } from '@keundal/agent-runtime-node'
 import type { NativeInvoke } from '@keundal/chat/platform'
 import { createNativeRuntimePluginManager } from '@keundal/plugin-chat-desktop'
 import { createChartTools, metadata as chartMetadata } from '@keundal/plugin-tool-chart'
+import { createTodoTools } from '@keundal/plugin-tool-todo'
 import { createWeatherTools, metadata as weatherMetadata } from '@keundal/plugin-tool-weather'
 import { strToU8, zipSync } from 'fflate'
 import { expect, onTestFinished, test, vi } from 'vitest'
@@ -23,7 +24,7 @@ const mcp = '@keundal/plugin-mcp-client'
 const prompt = '@keundal/prompt'
 const subagent = '@keundal/subagent'
 const agent = '@keundal/plugin-agent-chat'
-const addedDefaults = [prompt, subagent, agent].map(module => ({ module, enabled: true }))
+const addedDefaults = [prompt, subagent, agent, '@keundal/plugin-tool-todo'].map(module => ({ module, enabled: true }))
 
 function fixture() {
   const directory = mkdtempSync(join(tmpdir(), 'keundal-bundled-'))
@@ -40,6 +41,26 @@ function fixture() {
   return { directory, options, compose, open, invoke }
 }
 
+test('기존 선택에 TODO를 기본 활성으로 추가하고 독립 선택을 재시작 뒤에도 유지한다', async () => {
+  const { directory, options, compose } = fixture()
+  const path = join(directory, 'bundled-selection.json')
+  writeFileSync(path, JSON.stringify([
+    { module: skills, enabled: true }, { module: mcp, enabled: false },
+    { module: chart, enabled: false }, { module: weather, enabled: false },
+    { module: prompt, enabled: false }, { module: subagent, enabled: false }, { module: agent, enabled: true }
+  ]))
+  for (const selection of [undefined, false, true]) {
+    const enabled = selection ?? true
+    if (selection !== undefined)
+      await manageRuntimePlugins(directory, { action: 'enable', module: '@keundal/plugin-tool-todo', enabled })
+    const host = await createNodeAgentHost({ ...options, defaultTools: createTodoTools() }, compose)
+    onTestFinished(() => host.dispose())
+    expect((await host.services.catalog!()).tools.map(tool => tool.name)).toEqual(enabled ? ['todo_write'] : [])
+    expect(await manageRuntimePlugins(directory, { action: 'list' })).toContainEqual(expect.objectContaining({ module: '@keundal/plugin-tool-todo', enabled }))
+    await host.dispose()
+  }
+})
+
 test('번들 목록은 LLM과 저장소만 잠그고 에이전트와 의존 관계를 노출한다', async () => {
   const { directory, open } = fixture()
   const host = await open()
@@ -51,7 +72,8 @@ test('번들 목록은 LLM과 저장소만 잠그고 에이전트와 의존 관�
     { module: chart, enabled: true }, { module: weather, enabled: true },
     { module: prompt, enabled: true, requires: [agent] },
     { module: subagent, enabled: true, requires: [agent] },
-    { module: agent, enabled: true, requires: ['@keundal/plugin-llm-openai', '@keundal/plugin-store-sqlite'] }
+    { module: agent, enabled: true, requires: ['@keundal/plugin-llm-openai', '@keundal/plugin-store-sqlite'] },
+    { module: '@keundal/plugin-tool-todo', enabled: true }
   ])
   if (!Array.isArray(entries)) throw new Error('Expected plugin list')
   expect(entries.find(entry => entry.module === chart)?.metadata).toEqual(chartMetadata)
@@ -368,7 +390,8 @@ test('이전 네 선택과 외부 설치를 유지하며 새 선택을 기본 �
   expect((await host.services.catalog!()).tools.map(tool => tool.name)).toEqual(['weather'])
   await manageRuntimePlugins(directory, { action: 'enable', module: prompt, enabled: false })
   expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual([
-    ...old.slice(0, 4), { module: prompt, enabled: false }, { module: subagent, enabled: true }, { module: agent, enabled: true }, external
+    ...old.slice(0, 4), { module: prompt, enabled: false }, { module: subagent, enabled: true }, { module: agent, enabled: true },
+    { module: '@keundal/plugin-tool-todo', enabled: true }, external
   ])
   const malformed = [...old.slice(0, 4), { ...external, config: {} }]
   writeFileSync(path, JSON.stringify(malformed))
@@ -506,7 +529,7 @@ test('ZIP 경로 탈출과 URL 패키지 및 상대 경로는 선택과 원본 �
     { type: 'jsr', value: 'not-scoped' }
   ]) {
     await expect(manageRuntimePlugins(directory, { action: 'install', source } as PluginRequest)).rejects.toThrow()
-    expect((await manageRuntimePlugins(directory, { action: 'list' }) as unknown[])).toHaveLength(9)
+    expect((await manageRuntimePlugins(directory, { action: 'list' }) as unknown[])).toHaveLength(10)
   }
   expect(existsSync(join(directory, 'escaped'))).toBe(false)
   expect(readdirSync(join(directory, 'installed'))).toEqual([])

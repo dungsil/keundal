@@ -13,6 +13,7 @@ import {
 import type { RuntimePluginInfo } from '@keundal/chat/platform'
 import { mountRuntimePlugin } from '@keundal/plugin-runtime'
 import { metadata as chartMetadata } from '@keundal/plugin-tool-chart'
+import { metadata as todoMetadata } from '@keundal/plugin-tool-todo'
 import { metadata as weatherMetadata } from '@keundal/plugin-tool-weather'
 
 import { mountDshBundle } from './dsh-plugins.js'
@@ -21,6 +22,7 @@ import { installPlugin, installedDirectory, validateSource, type InstalledPlugin
 const metadata: Record<string, RuntimePluginInfo['metadata']> = {
   ...nodePluginMetadata,
   '@keundal/plugin-tool-chart': chartMetadata,
+  '@keundal/plugin-tool-todo': todoMetadata,
   '@keundal/plugin-tool-weather': weatherMetadata
 }
 
@@ -31,7 +33,8 @@ const optionalModules: readonly BundledPluginModule[] = [
   '@keundal/plugin-tool-weather',
   '@keundal/prompt',
   '@keundal/subagent',
-  '@keundal/plugin-agent-chat'
+  '@keundal/plugin-agent-chat',
+  '@keundal/plugin-tool-todo'
 ]
 const legacyToolsModule = '@keundal/plugin-tool-chat'
 type Entry = { module: string; enabled: boolean } | InstalledPlugin
@@ -60,7 +63,7 @@ function validateEntries(value: unknown, configured: readonly string[] = []): En
   const modern = Array.isArray(value) && value.some(entry => record(entry) && optionalModules.slice(4).includes(entry.module as BundledPluginModule))
   const modules = legacy
     ? ['@keundal/plugin-skill', '@keundal/plugin-mcp-client', legacyToolsModule] as const
-    : modern ? optionalModules : optionalModules.slice(0, 4)
+    : modern ? optionalModules.filter(module => module !== '@keundal/plugin-tool-todo' || value.some(entry => record(entry) && entry.module === module)) : optionalModules.slice(0, 4)
   if (!Array.isArray(value) || value.length < modules.length) throw new Error('Invalid bundled selection')
   const entries = modules.map((module) => {
     const matches = value.filter((entry) => record(entry) && entry.module === module)
