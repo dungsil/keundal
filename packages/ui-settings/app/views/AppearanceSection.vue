@@ -24,6 +24,7 @@ const { skipDeleteConfirmation, setSkipDeleteConfirmation } = useChatPreferences
       :label="t('settings.skipDeleteConfirmation')"
       :aria-label="t('settings.skipDeleteConfirmation')"
       :description="t('settings.deleteWarning')"
+      :ui="{ root: 'flex-row-reverse justify-between gap-3', wrapper: 'ms-0 min-w-0', label: 'text-highlighted' }"
       @update:model-value="setSkipDeleteConfirmation"
     />
   </section>
