@@ -1,9 +1,12 @@
 import {
   CONTEXT_MESSAGE_EVENT,
   EventType,
+  EventNormalizer,
   MessageAssembly,
   mergeMessages,
+  normalizeEvents,
   prepareReplayMessages,
+  type AGUIEvent,
   type AgentMessage
 } from '@keundal/core'
 import { expect, test } from 'vitest'
@@ -301,6 +304,181 @@ test('컨텍스트 이벤트를 사용자 메시지로 복구하고 같은 ID의
   assembly.apply({ type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value })
   assembly.apply({ type: EventType.CUSTOM, name: CONTEXT_MESSAGE_EVENT, value })
   expect(assembly.messages).toEqual([value])
+})
+
+test('텍스트의 역할과 메시지·도구 호출별 metadata를 얕게 병합하고 마지막 값을 보존한다', () => {
+  const assembly = new MessageAssembly()
+  for (const role of ['user', 'system', 'developer', 'assistant'] as const) {
+    assembly.apply({
+      type: EventType.TEXT_MESSAGE_START,
+      messageId: role,
+      role,
+      metadata: { keep: role, stage: 'start', nested: { old: true } }
+    })
+    assembly.apply({
+      type: EventType.TEXT_MESSAGE_CONTENT,
+      messageId: role,
+      delta: `${role} text`,
+      metadata: { stage: 'content', nested: { new: true } }
+    })
+    assembly.apply({ type: EventType.TEXT_MESSAGE_END, messageId: role, metadata: { ended: null } })
+  }
+  assembly.apply({
+    type: EventType.REASONING_MESSAGE_START,
+    messageId: 'reason',
+    role: 'reasoning',
+    metadata: { keep: true }
+  })
+  assembly.apply({
+    type: EventType.REASONING_MESSAGE_CONTENT,
+    messageId: 'reason',
+    delta: 'summary',
+    metadata: { stage: 'content' }
+  })
+  assembly.apply({ type: EventType.REASONING_MESSAGE_END, messageId: 'reason', metadata: { stage: 'end' } })
+  assembly.apply({
+    type: EventType.TOOL_CALL_START,
+    toolCallId: 'call',
+    toolCallName: 'lookup',
+    parentMessageId: 'assistant',
+    metadata: { keep: 'call', stage: 'start' }
+  })
+  assembly.apply({
+    type: EventType.TOOL_CALL_ARGS,
+    toolCallId: 'call',
+    delta: '{}',
+    metadata: { stage: 'args', nested: { old: true } }
+  })
+  assembly.apply({ type: EventType.TOOL_CALL_END, toolCallId: 'call', metadata: { nested: { new: true } } })
+  assembly.apply({
+    type: EventType.TOOL_CALL_RESULT,
+    toolCallId: 'call',
+    messageId: 'result',
+    content: 'found',
+    metadata: { result: true }
+  })
+  expect(assembly.messages.slice(0, 4).map(({ id, role, metadata }) => ({ id, role, metadata }))).toEqual(
+    ['user', 'system', 'developer', 'assistant'].map((role) => ({
+      id: role,
+      role,
+      metadata: { keep: role, stage: 'content', nested: { new: true }, ended: null }
+    }))
+  )
+  expect(assembly.messages[3]).toMatchObject({
+    toolCalls: [{ metadata: { keep: 'call', stage: 'args', nested: { new: true } } }]
+  })
+  expect(assembly.messages[4]).toEqual({
+    id: 'reason',
+    role: 'reasoning',
+    content: 'summary',
+    metadata: { keep: true, stage: 'end' }
+  })
+  expect(assembly.messages[5]).toEqual({
+    id: 'result',
+    role: 'tool',
+    toolCallId: 'call',
+    content: 'found',
+    metadata: { result: true }
+  })
+})
+
+test('CHUNK의 생략된 ID와 역할·metadata를 복원하고 종류가 바뀌거나 실행이 끝나면 닫는다', async () => {
+  const chunks: AGUIEvent[] = [
+    {
+      type: EventType.TEXT_MESSAGE_CHUNK,
+      messageId: 'instruction',
+      role: 'developer',
+      name: 'policy',
+      delta: 'Do ',
+      metadata: { keep: true }
+    },
+    { type: EventType.TEXT_MESSAGE_CHUNK, delta: 'this' },
+    { type: EventType.TEXT_MESSAGE_CHUNK, metadata: { last: null } },
+    { type: EventType.REASONING_MESSAGE_CHUNK, messageId: 'reason', delta: 'Check' },
+    { type: EventType.REASONING_MESSAGE_CHUNK, delta: ' first', metadata: { reason: true } },
+    {
+      type: EventType.TOOL_CALL_CHUNK,
+      toolCallId: 'call',
+      toolCallName: 'lookup',
+      delta: '{"city":',
+      metadata: { stage: 1 }
+    },
+    { type: EventType.TOOL_CALL_CHUNK, delta: '"Seoul"}', metadata: { stage: 2 } },
+    { type: EventType.TOOL_CALL_RESULT, toolCallId: 'call', messageId: 'result', content: 'found' },
+    { type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'reply', delta: 'Done', rawEvent: { provider: 'payload' } },
+    { type: EventType.RUN_FINISHED, threadId: 'thread', runId: 'run' }
+  ]
+  const assembly = new MessageAssembly()
+  for (const chunk of chunks) assembly.apply(chunk)
+  expect(assembly.messages).toEqual([
+    { id: 'instruction', role: 'developer', name: 'policy', content: 'Do this', metadata: { keep: true, last: null } },
+    { id: 'reason', role: 'reasoning', content: 'Check first', metadata: { reason: true } },
+    {
+      id: 'call',
+      role: 'assistant',
+      toolCalls: [
+        {
+          id: 'call',
+          type: 'function',
+          function: { name: 'lookup', arguments: '{"city":"Seoul"}' },
+          metadata: { stage: 2 }
+        }
+      ]
+    },
+    { id: 'result', role: 'tool', toolCallId: 'call', content: 'found' },
+    { id: 'reply', role: 'assistant', content: 'Done' }
+  ])
+  const events = await Array.fromAsync(
+    normalizeEvents(
+      (async function* () {
+        yield* chunks
+      })()
+    )
+  )
+  expect(events.map((event) => event.type)).toEqual([
+    'TEXT_MESSAGE_START',
+    'TEXT_MESSAGE_CONTENT',
+    'TEXT_MESSAGE_CONTENT',
+    'TEXT_MESSAGE_CONTENT',
+    'TEXT_MESSAGE_END',
+    'REASONING_MESSAGE_START',
+    'REASONING_MESSAGE_CONTENT',
+    'REASONING_MESSAGE_CONTENT',
+    'REASONING_MESSAGE_END',
+    'TOOL_CALL_START',
+    'TOOL_CALL_ARGS',
+    'TOOL_CALL_ARGS',
+    'TOOL_CALL_END',
+    'TOOL_CALL_RESULT',
+    'TEXT_MESSAGE_START',
+    'TEXT_MESSAGE_CONTENT',
+    'TEXT_MESSAGE_END',
+    'RUN_FINISHED'
+  ])
+  expect(
+    events.find((event) => event.type === EventType.TEXT_MESSAGE_CONTENT && event.messageId === 'reply')
+  ).toMatchObject({ rawEvent: { provider: 'payload' } })
+  expect(events.filter((event) => event.type.endsWith('_END')).every((event) => event.metadata === undefined)).toBe(
+    true
+  )
+})
+
+test('서브에이전트 CHUNK를 교차 수신해도 다른 스트림을 닫지 않고 중단 뒤 이어 붙인다', () => {
+  const normalizer = new EventNormalizer()
+  normalizer.apply({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'a', subagentRunId: 'child-a', delta: 'A' })
+  normalizer.apply({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'b', subagentRunId: 'child-b', delta: 'B' })
+  expect(() => normalizer.apply({ type: EventType.TEXT_MESSAGE_CHUNK, delta: '?' })).toThrow('ambiguous')
+  expect(normalizer.apply({ type: EventType.RAW, event: 'side channel' })).toHaveLength(1)
+  expect(normalizer.apply({ type: EventType.TEXT_MESSAGE_CHUNK, subagentRunId: 'child-a', delta: '2' })).toEqual([
+    { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'a', subagentRunId: 'child-a', delta: '2' }
+  ])
+  expect(() => normalizer.apply({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'a', role: 'user' })).toThrow(
+    'changes'
+  )
+  expect(normalizer.finish()).toEqual([
+    { type: EventType.TEXT_MESSAGE_END, messageId: 'a', subagentRunId: 'child-a' },
+    { type: EventType.TEXT_MESSAGE_END, messageId: 'b', subagentRunId: 'child-b' }
+  ])
 })
 
 test.each([

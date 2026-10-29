@@ -62,6 +62,35 @@ async function start(script: Script, tools: Parameters<typeof agentPlugin>[1]['t
 
 const text = (messageId: string, delta: string): LLMEvent => ({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta })
 
+test('원격 CHUNK 도구 호출을 한 번 실행하고 역할·metadata와 전체 응답을 세션 및 후속 입력에 보존한다', async () => {
+  const executed: unknown[] = []
+  const { host, endpoint, requests } = await start(async function* (_request, index) {
+    if (index === 0) {
+      yield { type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'policy', role: 'developer', delta: 'Check policy', metadata: { policy: true } }
+      yield { type: EventType.TOOL_CALL_CHUNK, toolCallId: 'call', toolCallName: 'lookup', delta: '{"city":' }
+      yield { type: EventType.TOOL_CALL_CHUNK, delta: '"Seoul"}', metadata: { source: 'chunk' } }
+    } else {
+      yield { type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'answer', delta: 'All ' }
+      yield { type: EventType.TEXT_MESSAGE_CHUNK, delta: 'done', metadata: { finished: true } }
+    }
+  }, [{ name: 'lookup', description: 'lookup', parameters: { type: 'object', properties: { city: { type: 'string' } } }, execute(args) { executed.push(args); return 'found' } }])
+  const store = new RemoteChatStore({ endpoint, token })
+  await store.create('chat', user, model)
+  const events = await Array.fromAsync(store.respond('chat', { model, messages: [user] }))
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(executed).toEqual([{ city: 'Seoul' }])
+  expect(requests).toHaveLength(2)
+  expect(requests[1]!.input.messages).toContainEqual({ id: 'policy', role: 'developer', content: 'Check policy', metadata: { policy: true } })
+  expect(requests[1]!.input.messages).toContainEqual(expect.objectContaining({ role: 'assistant', toolCalls: [expect.objectContaining({ id: 'call', metadata: { source: 'chunk' }, function: { name: 'lookup', arguments: '{"city":"Seoul"}' } })] }))
+  const saved = (await store.get('chat'))!
+  expect(saved.pendingRunId).toBeUndefined()
+  expect(saved.messages[1]!.parts).toContainEqual({ type: 'text', role: 'developer', text: 'Check policy' })
+  expect(saved.messages[1]!.parts).toContainEqual({ type: 'text', text: 'All done' })
+  const run = (await host.services.generation.list())[0]!
+  expect(run.messages).toContainEqual({ id: 'answer', role: 'assistant', content: 'All done', metadata: { finished: true } })
+  expect((await new RemoteChatStore({ endpoint, token }).get('chat'))!.messages).toEqual(saved.messages)
+})
+
 /** 첫 응답 본문을 전달한 뒤 연결을 끊고, 재연결 커서를 마지막으로 전달한 id와 비교합니다. */
 function droppingFetch(onResume: (value: { url: string, cursor: number }) => void): typeof fetch {
   let dropped = false
@@ -103,7 +132,7 @@ function droppingFetch(onResume: (value: { url: string, cursor: number }) => voi
   }
 }
 
-test('원격 스트림이 끊기면 afterSequence로 다시 구독해 누락·중복 없이 응답을 이어받고 모델을 다시 호출하지 않는다', async () => {
+test.each([0, 1])('재연결 요청이 %i회 실패해도 afterSequence로 응답을 이어받고 모델을 다시 호출하지 않는다', async (failures) => {
   const resumed = Promise.withResolvers<{ url: string, cursor: number }>()
   const { requests, endpoint } = await start(async function* () {
     yield { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' }
@@ -113,7 +142,12 @@ test('원격 스트림이 끊기면 afterSequence로 다시 구독해 누락·�
     yield text('reply', '뒷부분')
     yield { type: EventType.TEXT_MESSAGE_END, messageId: 'reply' }
   })
-  const store = new RemoteChatStore({ endpoint, token }, droppingFetch(value => resumed.resolve(value)))
+  const dropped = droppingFetch(value => resumed.resolve(value))
+  let attempts = 0
+  const store = new RemoteChatStore({ endpoint, token }, (input, init) => {
+    if (String(input).includes('/events?') && attempts++ < failures) throw new TypeError('reconnect unavailable')
+    return dropped(input, init)
+  })
   await store.create('chat', user, model)
   const deltas: string[] = []
   for await (const event of store.respond('chat', { model, messages: [user] })) {
@@ -125,6 +159,43 @@ test('원격 스트림이 끊기면 afterSequence로 다시 구독해 누락·�
   expect(requests).toHaveLength(1)
   const saved = (await store.get('chat'))!
   expect(saved.pendingRunId).toBeUndefined()
+  expect(saved.messages[1]!.parts).toContainEqual({ type: 'text', text: '앞부분 뒷부분' })
+})
+
+test('재연결을 소진해도 pendingRunId와 원본 세션을 보존하고 같은 실행의 journal로 전체 응답을 복원한다', async () => {
+  const release = Promise.withResolvers<void>()
+  onTestFinished(() => release.resolve())
+  const { requests, endpoint } = await start(async function* () {
+    yield { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' }
+    yield text('reply', '앞부분 ')
+    await release.promise
+    yield text('reply', '뒷부분')
+    yield { type: EventType.TEXT_MESSAGE_END, messageId: 'reply' }
+  })
+  const dropped = droppingFetch(() => {})
+  let offline = true
+  const store = new RemoteChatStore({ endpoint, token }, (input, init) => {
+    if (offline && String(input).includes('/events?')) throw new TypeError('reconnect unavailable')
+    return dropped(input, init)
+  })
+  await store.create('chat', user, model)
+  const events = []
+  for await (const event of store.respond('chat', { model, messages: [user] })) events.push(event)
+  expect(events.at(-1)?.type).toBe(EventType.RUN_ERROR)
+  const pending = (await store.get('chat'))!
+  expect(pending.pendingRunId).toBeTruthy()
+  expect(pending.messages).toEqual([user])
+  const queued: ChatMessage = { id: 'queued', role: 'user', parts: [{ type: 'text', text: '다음 질문' }] }
+  await store.enqueue('chat', queued)
+  expect((await store.get('chat'))!.queue).toEqual([queued])
+  release.resolve()
+  offline = false
+  for await (const _event of store.respond('chat', { model, messages: [user] })) { /* Reuse the host run. */ }
+  expect(requests).toHaveLength(1)
+  const saved = (await store.get('chat'))!
+  expect(saved.pendingRunId).toBeUndefined()
+  expect(saved.queue).toEqual([queued])
+  expect(saved.messages[1]!.id).toBe(pending.pendingRunId)
   expect(saved.messages[1]!.parts).toContainEqual({ type: 'text', text: '앞부분 뒷부분' })
 })
 
@@ -151,7 +222,14 @@ test('새 클라이언트가 pendingRunId의 journal을 구독하면 모델과 �
       return 'done'
     }
   }])
-  const store = new RemoteChatStore({ endpoint, token })
+  let subscriptionFailed = false
+  const store = new RemoteChatStore({ endpoint, token }, async (input, init) => {
+    if (!subscriptionFailed && String(input).includes('/events?')) {
+      subscriptionFailed = true
+      throw new TypeError('initial subscription unavailable')
+    }
+    return fetch(input, init)
+  })
   const chat = await store.create('chat', user, model)
   const snapshot = (await host.services.session.get('chat'))!
   const saved = await host.services.session.commit({
@@ -169,6 +247,7 @@ test('새 클라이언트가 pendingRunId의 journal을 구독하면 모델과 �
   for await (const event of store.respond('chat', { model: 'openai/other-selection', messages: [user], onMessage: message => received.push(message) })) {
     if (event.type === EventType.TOOL_CALL_END) release.resolve()
   }
+  expect(subscriptionFailed).toBe(true)
   await running
   expect(executed).toBe(1)
   expect(requests).toHaveLength(2)
@@ -208,6 +287,54 @@ test('원격 중단은 연결 종료와 달리 명시적인 취소로 호스트 
   expect(saved.pendingRunId).toBeUndefined()
   expect(saved.messages[1]!.parts).toContainEqual({ type: 'text', text: '부분' })
 })
+
+test.each(['http', 'network', 'rejected', 'unfinished'] as const)('취소 응답이 %s이면 중단을 무한히 기다리지 않고 같은 실행을 다시 구독할 수 있다', async (failure) => {
+  const release = Promise.withResolvers<void>()
+  const { host, endpoint, requests } = await start(async function* () {
+    yield { type: EventType.TEXT_MESSAGE_START, messageId: 'reply', role: 'assistant' }
+    yield text('reply', '부분 ')
+    await release.promise
+    yield text('reply', '완료')
+    yield { type: EventType.TEXT_MESSAGE_END, messageId: 'reply' }
+  })
+  let interrupted = true
+  const store = new RemoteChatStore({ endpoint, token }, (input, init) => {
+    if (String(input).endsWith('/cancel')) {
+      if (failure === 'network') throw new TypeError('cancel unavailable')
+      return Promise.resolve(failure === 'http'
+        ? new Response('cancel unavailable', { status: 503 })
+        : Response.json({ cancelled: failure === 'unfinished' }))
+    }
+    return fetch(input, init)
+  })
+  await store.create('chat', user, model)
+  const running = (async () => {
+    for await (const event of store.respond('chat', { model, messages: [user] })) {
+      if (interrupted && event.type === EventType.TEXT_MESSAGE_CONTENT) void store.stop()
+    }
+  })()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const returned = await Promise.race([
+      running.then(() => true),
+      new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), 6500) })
+    ])
+    expect(returned).toBe(true)
+    const pending = (await store.get('chat'))!
+    expect(pending.pendingRunId).toBeTruthy()
+    expect((await host.services.generation.list())[0]!.status).toBe('running')
+    expect(pending.messages).toEqual([user])
+    interrupted = false
+    release.resolve()
+    for await (const _event of store.respond('chat', { model, messages: [user] })) { /* Resume, do not restart. */ }
+    expect(requests).toHaveLength(1)
+    expect((await store.get('chat'))!.messages[1]!.parts).toContainEqual({ type: 'text', text: '부분 완료' })
+  } finally {
+    clearTimeout(timer)
+    release.resolve()
+    await running
+  }
+}, 15_000)
 
 test('원격 Steer는 도구 실행 뒤 같은 실행의 다음 요청에 반영되고, 이후 대기열은 정상 종료 뒤 처리할 수 있게 저장된다', async () => {
   const toolStarted = Promise.withResolvers<undefined>()

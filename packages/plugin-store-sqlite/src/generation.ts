@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { clearInterval, setInterval } from 'node:timers'
 
-import { EventType, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
+import { EventType, normalizeEvents, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
 import {
   GenerationService,
   JournalHub,
@@ -227,7 +227,7 @@ export class SqliteGenerationService extends GenerationService {
       signal.throwIfAborted()
       const budget = new StreamBudget()
       const events = stream ? stream(request, { signal }) : this.ctx.llm.stream(request, { signal })
-      for await (const event of events) {
+      for await (const event of normalizeEvents(events)) {
         signal.throwIfAborted()
         budget.accept(event)
         // 실행이 종료를 확정했거나 다른 소유자가 넘겨받았으면 기록을 멈춥니다.

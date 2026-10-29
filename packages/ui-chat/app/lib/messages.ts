@@ -16,7 +16,7 @@ export function getMergedParts(parts: ChatPart[]): RenderPart[] {
       }
       continue
     }
-    if (part.type === 'text' && prev?.type === 'text') {
+    if (part.type === 'text' && prev?.type === 'text' && (part.role ?? 'assistant') === (prev.role ?? 'assistant')) {
       result[result.length - 1] = { ...part, text: prev.text + part.text, sources: prev.sources }
     } else {
       result.push(part)

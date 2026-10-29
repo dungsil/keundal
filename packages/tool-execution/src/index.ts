@@ -4,6 +4,7 @@ import {
   STEER_MESSAGE_EVENT,
   EventType,
   MessageAssembly,
+  normalizeEvents,
   type AGUIEvent,
   type AgentMessage,
   type RunAgentInput
@@ -166,7 +167,9 @@ export async function* streamWithTools(
     resolvedToolsPrepared = false
     const assembly = new MessageAssembly()
     const calls = new Map<string, PendingCall>()
-    for await (const event of options.stream ? options.stream(current, { signal }) : llm.stream(current, { signal })) {
+    for await (const event of normalizeEvents(
+      options.stream ? options.stream(current, { signal }) : llm.stream(current, { signal })
+    )) {
       signal.throwIfAborted()
       if (event.type === EventType.TOOL_CALL_START) {
         if (usedIds.has(event.toolCallId)) throw new Error(`duplicate tool call id: ${event.toolCallId}`)

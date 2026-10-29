@@ -1,3 +1,4 @@
+import { EventNormalizer } from './chunks.js'
 import { EventType, type AGUIEvent, type AgentMessage } from './protocol.js'
 
 type AssistantMessage = Extract<AgentMessage, { role: 'assistant' }>
@@ -87,9 +88,16 @@ export class MessageAssembly {
   private readonly callHosts = new Map<string, string>()
   /** 도구 호출을 붙일 열린 메시지 id입니다. */
   private open?: string
+  private readonly normalizer = new EventNormalizer()
 
   /** 이벤트를 조립에 반영하고, 바뀐 메시지를 돌려줍니다. 메시지를 만들지 않는 이벤트는 undefined입니다. */
   apply(event: AGUIEvent): AgentMessage | undefined {
+    let changed: AgentMessage | undefined
+    for (const normalized of this.normalizer.apply(event)) changed = this.applyEvent(normalized) ?? changed
+    return changed
+  }
+
+  private applyEvent(event: AGUIEvent): AgentMessage | undefined {
     switch (event.type) {
       case EventType.CUSTOM: {
         if (event.name === STEER_MESSAGE_EVENT) {
@@ -116,32 +124,49 @@ export class MessageAssembly {
       }
       case EventType.TEXT_MESSAGE_START: {
         const existing = this.message(event.messageId)
-        const message = existing?.role === 'assistant' ? existing : undefined
-        this.open = event.messageId
-        return this.write({
-          ...message,
-          id: event.messageId,
-          role: 'assistant',
-          content: message?.content ?? '',
-          ...(event.metadata === undefined ? {} : { metadata: { ...message?.metadata, ...event.metadata } })
-        })
+        const role = event.role ?? 'assistant'
+        const message = existing?.role === role ? existing : undefined
+        this.open = role === 'assistant' ? event.messageId : undefined
+        return this.write(
+          {
+            ...message,
+            id: event.messageId,
+            role,
+            content: message && typeof message.content === 'string' ? message.content : '',
+            ...(event.name === undefined ? {} : { name: event.name })
+          },
+          event.metadata
+        )
       }
       case EventType.TEXT_MESSAGE_CONTENT:
-        return this.append(event.messageId, { id: event.messageId, role: 'assistant', content: '' }, event.delta)
-      case EventType.TEXT_MESSAGE_END: {
+        return this.append(
+          event.messageId,
+          { id: event.messageId, role: 'assistant', content: '' },
+          event.delta,
+          event.metadata
+        )
+      case EventType.TEXT_MESSAGE_END:
+      case EventType.REASONING_MESSAGE_END: {
         const message = this.message(event.messageId)
         if (!message || event.metadata === undefined) return undefined
-        return this.write({ ...message, metadata: { ...message.metadata, ...event.metadata } })
+        return this.write(message, event.metadata)
       }
       case EventType.TOOL_CALL_START: {
         const host = this.host(event.toolCallId, event.parentMessageId)
         this.callHosts.set(event.toolCallId, host.id)
         return this.write({
           ...host,
-          toolCalls: [...(host.toolCalls ?? []), toolCall(event.toolCallId, event.toolCallName)]
+          toolCalls: [
+            ...(host.toolCalls ?? []),
+            {
+              ...toolCall(event.toolCallId, event.toolCallName),
+              ...(event.metadata === undefined ? {} : { metadata: { ...event.metadata } })
+            }
+          ]
         })
       }
-      case EventType.TOOL_CALL_ARGS: {
+      case EventType.TOOL_CALL_ARGS:
+      case EventType.TOOL_CALL_END: {
         const hostId = this.callHosts.get(event.toolCallId)
         const host = hostId === undefined ? undefined : this.message(hostId)
         if (!host || host.role !== 'assistant' || !host.toolCalls) {
@@ -151,23 +176,37 @@ export class MessageAssembly {
           ...host,
           toolCalls: host.toolCalls.map((call) =>
             call.id === event.toolCallId
-              ? { ...call, function: { ...call.function, arguments: call.function.arguments + event.delta } }
+              ? {
+                  ...call,
+                  ...(event.type === EventType.TOOL_CALL_ARGS
+                    ? { function: { ...call.function, arguments: call.function.arguments + event.delta } }
+                    : {}),
+                  ...(event.metadata === undefined ? {} : { metadata: { ...call.metadata, ...event.metadata } })
+                }
               : call
           )
         })
       }
       case EventType.TOOL_CALL_RESULT:
         this.open = undefined
-        return this.write({
-          id: event.messageId,
-          role: 'tool',
-          toolCallId: event.toolCallId,
-          content: event.content
-        })
+        return this.write(
+          {
+            id: event.messageId,
+            role: 'tool',
+            toolCallId: event.toolCallId,
+            content: event.content
+          },
+          event.metadata
+        )
       case EventType.REASONING_MESSAGE_START:
-        return this.write({ id: event.messageId, role: 'reasoning', content: '' })
+        return this.write({ id: event.messageId, role: 'reasoning', content: '' }, event.metadata)
       case EventType.REASONING_MESSAGE_CONTENT:
-        return this.append(event.messageId, { id: event.messageId, role: 'reasoning', content: '' }, event.delta)
+        return this.append(
+          event.messageId,
+          { id: event.messageId, role: 'reasoning', content: '' },
+          event.delta,
+          event.metadata
+        )
       case EventType.REASONING_ENCRYPTED_VALUE: {
         if (event.subtype === 'tool-call') {
           const hostId = this.callHosts.get(event.entityId)
@@ -212,14 +251,20 @@ export class MessageAssembly {
     return position === undefined ? undefined : this.messages[position]
   }
 
-  private append(id: string, seed: AgentMessage, delta: string): AgentMessage | undefined {
-    if (!delta) return undefined
+  private append(
+    id: string,
+    seed: AgentMessage,
+    delta: string,
+    metadata?: AgentMessage['metadata']
+  ): AgentMessage | undefined {
+    if (!delta && metadata === undefined) return undefined
     const existing = this.message(id)
     const content = existing && 'content' in existing && typeof existing.content === 'string' ? existing.content : ''
-    return this.write({ ...(existing ?? seed), content: content + delta } as AgentMessage)
+    return this.write({ ...(existing ?? seed), content: content + delta } as AgentMessage, metadata)
   }
 
-  private write(message: AgentMessage): AgentMessage {
+  private write(message: AgentMessage, metadata?: AgentMessage['metadata']): AgentMessage {
+    if (metadata !== undefined) message = { ...message, metadata: { ...message.metadata, ...metadata } }
     const position = this.positions.get(message.id)
     if (position === undefined) {
       this.positions.set(message.id, this.messages.length)
