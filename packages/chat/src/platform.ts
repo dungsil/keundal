@@ -1,3 +1,4 @@
+import type { AutomationService } from '@keundal/automation'
 import type { ExecutionOptions } from '@keundal/core'
 import type { LLMSettings } from '@keundal/llm-settings'
 import type { McpOAuthManager, McpProbeResult, McpRequestOptions } from '@keundal/mcp'
@@ -32,6 +33,7 @@ export interface ChatConnection {
   }
   workspaces?: CodingWorkspaceClient
   tasks?: Pick<TaskService, 'list' | 'get' | 'cancel'>
+  automation?: Pick<AutomationService, 'list' | 'put' | 'delete' | 'history'>
   remoteAgent: boolean
   remoteModels?: ModelOption[]
   selectedModel?: string

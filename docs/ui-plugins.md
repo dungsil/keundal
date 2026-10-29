@@ -115,10 +115,10 @@ root                               ui-layout
 │  └─ chat.observer                ui-trace
 ├─ page.settings                   ui-settings
 │  └─ settings.section             ui-settings, ui-settings-llm, ui-model-selection,
-│                                  ui-agent-plugins, ui-skill, ui-mcp
+│                                  ui-agent-plugins, ui-skill, ui-mcp, ui-automation
 ├─ layout.sidebar                  ui-chat-list
 ├─ layout.sidebar.footer           ui-settings
-└─ layout.overlay                  ui-chat-list
+└─ layout.overlay                  ui-chat-list, ui-automation
 
 factory composer                   ui-composer
 ├─ composer.actions                ui-model-selection
