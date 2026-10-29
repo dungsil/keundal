@@ -1,4 +1,5 @@
-import { exportDataBackup, parseDataBackup, readDataBackup, restoreDataBackup, loadPromptPresets } from '@keundal/chat'
+import { createDecipheriv, pbkdf2Sync } from 'node:crypto'
+import { exportDataBackup, parseDataBackup, readDataBackup, restoreDataBackup, loadPromptPresets, serializeDataBackup, openDataBackup } from '@keundal/chat'
 import { defaultLLMSettings } from '@keundal/llm-settings'
 import { EventType } from '@keundal/core'
 import { toMessages } from '@keundal/chat/messages'
@@ -135,4 +136,69 @@ test('미지원 버전·손상된 대화·인증 정보가 있는 파일은 거�
   expect(await target.ctx.backup.export()).toEqual(history)
   expect(JSON.parse(target.storage.getItem('keundal:run-budget')!)).toEqual({ maxTokens: 6789 })
   expect(loadPromptPresets(target.storage).presets[0]?.blocks[0]).toMatchObject({ content: 'Previous prompt' })
+})
+
+test('선택적 암호화는 JSON v1을 보존하고 매번 다른 파일로 대화와 설정을 보호한다', async (t) => {
+  const source = await setup(t)
+  source.storage.setItem('keundal:system-prompt', '비공개 지침 🔒')
+  await source.store.create('encrypted-chat', { id: 'q', role: 'user', parts: [{ type: 'text', text: '비공개 대화' }] }, 'openai/custom')
+  const backup = await exportDataBackup(source)
+  const plain = await serializeDataBackup(backup)
+  expect(JSON.parse(plain)).toEqual(JSON.parse(JSON.stringify(backup)))
+  expect(await openDataBackup(plain)).toEqual(readDataBackup(plain))
+  const password = ' 긴 비밀번호 🔑 with spaces '
+  const text = await serializeDataBackup(backup, password)
+  for (const secret of ['비공개 지침', '비공개 대화', 'encrypted-chat', backup.createdAt, password])
+    expect(text).not.toContain(secret)
+  expect(() => readDataBackup(text)).toThrow()
+  const encrypted = JSON.parse(text)
+  const second = JSON.parse(await serializeDataBackup(backup, password))
+  for (const key of ['salt', 'iv', 'ciphertext']) expect(second[key]).not.toEqual(encrypted[key])
+  // Independently decrypt with Node's implementation to check the portable file contract.
+  const key = pbkdf2Sync(password, Buffer.from(encrypted.salt, 'base64'), 600_000, 32, 'sha256')
+  const cipher = Buffer.from(encrypted.ciphertext, 'base64')
+  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(encrypted.iv, 'base64'))
+  decipher.setAAD(Buffer.from('keundal-backup-encrypted:1:PBKDF2-SHA-256:600000:AES-256-GCM'))
+  decipher.setAuthTag(cipher.subarray(-16))
+  expect(Buffer.concat([decipher.update(cipher.subarray(0, -16)), decipher.final()]).toString('utf8')).toEqual(plain)
+  expect(await openDataBackup(text, password)).toEqual(readDataBackup(plain))
+  const target = await setup(t)
+  await target.store.create('existing', { id: 'old', role: 'user', parts: [] }, 'openai/custom')
+  await restoreDataBackup(target, text, password)
+  expect(await target.store.get('encrypted-chat')).toMatchObject({ messages: [{ parts: [{ text: '비공개 대화' }] }] })
+  expect(await target.store.get('existing')).toBeDefined()
+  expect(loadPromptPresets(target.storage).presets[0]?.blocks[0]).toMatchObject({ content: '비공개 지침 🔒' })
+  await expect(serializeDataBackup(backup, '')).rejects.toThrow('password')
+})
+
+test('비밀번호 누락·오입력·변조·미지원 암호화는 기존 대화와 모든 설정을 바꾸지 않는다', async (t) => {
+  const source = await setup(t)
+  await source.store.create('incoming', { id: 'q', role: 'user', parts: [] }, 'openai/custom')
+  const text = await serializeDataBackup(await exportDataBackup(source), 'correct password')
+  const target = await setup(t)
+  await target.store.create('existing', { id: 'old', role: 'user', parts: [] }, 'openai/custom')
+  await target.platform.settings.save({ ...defaultLLMSettings(), openai: { apiKey: 'keep-me', baseURL: '' } })
+  target.storage.setItem('keundal:system-prompt', 'Keep my settings')
+  const history = await target.ctx.backup.export()
+  const settings = new Map(target.values)
+  const invalid = [text, text]
+  for (const field of ['salt', 'iv', 'ciphertext']) {
+    const damaged = JSON.parse(text)
+    const bytes = Buffer.from(damaged[field], 'base64')
+    bytes[0] = bytes[0]! ^ 1
+    damaged[field] = bytes.toString('base64')
+    invalid.push(JSON.stringify(damaged))
+  }
+  const tag = JSON.parse(text)
+  const bytes = Buffer.from(tag.ciphertext, 'base64')
+  bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 1
+  tag.ciphertext = bytes.toString('base64')
+  invalid.push(JSON.stringify(tag))
+  for (const change of [{ version: 2 }, { iterations: 1 }, { cipher: 'AES-CBC' }, { salt: 'bad!' }, { iv: '' }, { ciphertext: '' }])
+    invalid.push(JSON.stringify({ ...JSON.parse(text), ...change }))
+  for (const [index, file] of invalid.entries()) {
+    await expect(restoreDataBackup(target, file, index === 0 ? undefined : index === 1 ? 'wrong' : 'correct password')).rejects.toThrow()
+    expect(await target.ctx.backup.export()).toEqual(history)
+    expect(target.values).toEqual(settings)
+  }
 })
