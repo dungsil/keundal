@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import {
   createNodeComposition,
@@ -14,6 +15,7 @@ import { mountRuntimePlugin } from '@keundal/plugin-runtime'
 import { metadata as chartMetadata } from '@keundal/plugin-tool-chart'
 import { metadata as weatherMetadata } from '@keundal/plugin-tool-weather'
 
+import { mountDshBundle } from './dsh-plugins.js'
 import { installPlugin, installedDirectory, validateSource, type InstalledPlugin } from './install-plugin.js'
 
 const metadata: Record<string, RuntimePluginInfo['metadata']> = {
@@ -89,7 +91,8 @@ function validateEntries(value: unknown, configured: readonly string[] = []): En
     if (!record(entry) || typeof entry.module !== 'string' || !/^external:[a-f0-9-]{36}$/.test(entry.module) ||
       seen.has(entry.module) || typeof entry.enabled !== 'boolean' || typeof entry.resolvedModule !== 'string' ||
       !entry.resolvedModule.startsWith('file:') ||
-      Object.keys(entry).some(key => !['module', 'enabled', 'source', 'resolvedModule', 'metadata', 'version'].includes(key))) {
+      (entry.format !== undefined && entry.format !== 'dsh') ||
+      Object.keys(entry).some(key => !['module', 'enabled', 'source', 'resolvedModule', 'format', 'metadata', 'version'].includes(key))) {
       throw new Error('Invalid external selection')
     }
     validateSource(entry.source)
@@ -233,9 +236,13 @@ export function createDesktopComposition(directory?: string): HostCompositionFac
           for (const entry of entries) {
             if (!('source' in entry) || !entry.enabled) continue
             try {
-              await mountRuntimePlugin(ctx, { module: entry.resolvedModule }, {
-                importModule: async specifier => await import(/* @vite-ignore */ specifier)
-              })
+              if (entry.format === 'dsh') {
+                await mountDshBundle(ctx, fileURLToPath(entry.resolvedModule))
+              } else {
+                await mountRuntimePlugin(ctx, { module: entry.resolvedModule }, {
+                  importModule: async specifier => await import(/* @vite-ignore */ specifier)
+                })
+              }
             } catch (error) {
               diagnostics[entry.module] = error instanceof Error ? error.message : String(error)
             }
