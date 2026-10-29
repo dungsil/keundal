@@ -84,6 +84,8 @@ OAuth를 쓰는 호스트는 `mcpAuthentication: { documents: account }`로 서�
 
 기본 Node 조립은 SQLite에 등록한 Cron·Webhook·이름 기반 이벤트를 `TaskService`의 백그라운드 작업으로 제출합니다. 예약 실행은 호스트가 켜져 있을 때만 동작합니다. `automation: false` 옵션으로 끌 수 있습니다. 등록 API, 중복 실행 방지와 복구 정책은 [자동화 문서](../automation/README.md)를 참고하세요.
 
+`KEUNDAL_NOTIFICATION_WEBHOOK_URL`을 설정하면 앱 연결 없이 완료·실패·중단 결과를 외부 Webhook으로 보냅니다. `KEUNDAL_NOTIFICATION_WEBHOOK_TOKEN`은 선택 사항인 Bearer 인증 정보입니다. `createNodeAgentHost()`에서는 `notificationWebhook: { url, token? }`로 지정합니다. 전송 이력은 SQLite에 보존하고 일시적 오류만 최대 5회 시도합니다. 수신 측은 `Idempotency-Key`로 중복 처리를 막아야 합니다. 과거 결과의 첫 전송, 재시도와 호스트 종료의 한계는 [외부 Webhook 알림](../automation/README.md#외부-webhook-알림)을 참고하세요.
+
 ## 코딩 작업공간
 
 기본 Node.js 구성과 데스크톱 sidecar는 대화마다 Git Worktree를 연결할 수 있습니다. 채팅 입력창의 **코딩 작업공간**에서 호스트에 있는 Git 저장소의 최상위 폴더 경로를 입력하고 **Worktree 만들기**를 선택합니다. 커밋이 하나 이상 있는 신뢰할 수 있는 프로젝트만 선택하세요. 원본의 미커밋 변경은 복사하지 않습니다.

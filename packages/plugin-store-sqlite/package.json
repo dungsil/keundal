@@ -24,6 +24,7 @@
     "@keundal/llm": "workspace:*",
     "@keundal/memory": "workspace:*",
     "@keundal/memory-store": "workspace:*",
+    "@keundal/notification": "workspace:*",
     "@keundal/session": "workspace:*",
     "@keundal/task": "workspace:*",
     "@keundal/tool-approval": "workspace:*",

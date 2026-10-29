@@ -19,6 +19,7 @@
   "dependencies": {
     "@keundal/automation": "workspace:*",
     "@keundal/core": "workspace:*",
+    "@keundal/notification": "workspace:*",
     "@keundal/task": "workspace:*",
     "cordis": "catalog:",
     "cron-parser": "5.10.2"

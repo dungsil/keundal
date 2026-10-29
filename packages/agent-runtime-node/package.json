@@ -33,6 +33,7 @@
     "@keundal/plugin-llm-openai": "workspace:*",
     "@keundal/plugin-llm-openai-chat": "workspace:*",
     "@keundal/plugin-mcp-client": "workspace:*",
+    "@keundal/plugin-notification-webhook": "workspace:*",
     "@keundal/plugin-runtime": "workspace:*",
     "@keundal/plugin-skill": "workspace:*",
     "@keundal/plugin-store-sqlite": "workspace:*",

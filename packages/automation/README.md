@@ -14,9 +14,44 @@ Node 호스트에 연결한 web 앱과 desktop 앱의 **설정 → 예약 작업
 
 등록한 작업을 활성화·비활성화하거나 삭제하고, 실행 이력에서 완료·실패·생략·중단 상태와 응답·오류를 확인할 수 있습니다. 삭제한 정의의 실행 이력도 전체 목록에 남습니다. 브라우저 전용 실행 방식에는 호스트 연결이 필요하다는 안내를 표시합니다.
 
-`@keundal/ui-automation`은 앱이 열려 있는 동안 정의와 전체 실행 이력을 5초 간격으로 조회합니다. 첫 조회의 과거 이력은 알리지 않고, 이후 새로 확인한 완료·실패·중단만 앱 알림으로 표시합니다. 알림에서 실행 이력으로 이동할 수 있으며, 알림이 사라진 뒤에도 결과는 이력에 남습니다. 앱을 닫았을 때의 알림이나 OS 알림은 제공하지 않습니다.
+`@keundal/ui-automation`은 앱이 열려 있는 동안 정의와 전체 실행 이력을 5초 간격으로 조회합니다. 첫 조회의 과거 이력은 알리지 않고, 이후 새로 확인한 완료·실패·중단만 앱 알림으로 표시합니다. 알림에서 실행 이력으로 이동할 수 있으며, 알림이 사라진 뒤에도 결과는 이력에 남습니다. OS 알림은 제공하지 않습니다. 앱을 닫았을 때는 아래의 외부 Webhook 알림을 사용할 수 있습니다.
 
-실행 상태의 기준은 `AutomationHistory`와 연결된 `TaskSnapshot`입니다. 앱 알림은 UI 플러그인이 이 상태를 표시하는 방식이며 스케줄러나 저장소가 UI에 의존하지 않습니다. 이후 외부 알림 공급자도 같은 서비스 계약에서 상태를 읽도록 연결할 수 있습니다. 외부 Webhook 전송, 전달 보장과 재시도는 아직 구현하지 않았습니다.
+실행 상태의 기준은 `AutomationHistory`와 연결된 `TaskSnapshot`입니다. 앱 알림은 UI 플러그인이 이 상태를 표시하는 방식이며 스케줄러나 저장소가 UI에 의존하지 않습니다. 외부 알림도 같은 실행 상태를 사용합니다.
+
+## 외부 Webhook 알림
+
+`@keundal/notification`은 `NotificationService`, `NotificationStore`와 `ctx.notification`, `ctx.notificationStore` 계약을 제공합니다. `@keundal/plugin-notification-webhook`의 `WebhookNotificationService`가 HTTP 전송을 담당하고, SQLite 플러그인이 전송 이력을 저장합니다. 기존 앱 내 알림과 독립적으로 동작하며 UI 조회나 브라우저 연결이 필요하지 않습니다.
+
+Node 호스트에 `KEUNDAL_NOTIFICATION_WEBHOOK_URL`을 지정하면 외부 알림을 켭니다. 인증이 필요한 수신 서버에는 `KEUNDAL_NOTIFICATION_WEBHOOK_TOKEN`을 함께 지정하면 `Authorization: Bearer <token>`을 보냅니다. 프로그램에서 조립할 때는 `createNodeAgentHost()`의 `notificationWebhook: { url, token? }`을 사용합니다. 사용자 조립은 `notificationStore`를 제공해야 하며, 다른 공급자는 `NotificationService`를 구현해 `ctx.notification`에 등록할 수 있습니다.
+
+주소와 인증 정보는 호스트 운영자가 관리합니다. 자동화 정의나 HTTP 등록 본문으로 받지 않고 SQLite 전송 이력에도 저장하지 않습니다. 대상은 정규화한 URL의 SHA-256 값으로 구분합니다. 같은 URL에서 토큰만 바꾸면 기존 전달 이력을 유지하지만 URL을 바꾸면 새로운 대상으로 취급합니다. HTTP(S)만 허용하고 URL의 사용자 정보·fragment와 리다이렉트는 허용하지 않습니다. 실제 운영에는 HTTPS를 사용하고, 실행 결과와 오류를 받아도 되는 신뢰할 수 있는 수신 서버만 지정하세요.
+
+호스트는 1초 간격으로 완료·실패·중단된 실행을 확인해 전송 대기 상태로 저장합니다. 대기·실행·겹침으로 생략된 작업은 알리지 않습니다. 작업 취소는 `automation.interrupted`로 전달합니다. 제출 실패와 복구 중 확인한 중단도 알리며, 정의를 삭제해도 남아 있는 실행 결과는 전달합니다. 알림을 처음 켜거나 URL을 바꾸면 저장된 과거 종료 이력도 해당 대상으로 한 번씩 전달합니다.
+
+요청은 JSON 본문의 `POST`이며, `Idempotency-Key` 헤더에 본문의 `id`와 같은 값을 보냅니다. `type`은 `automation.completed`, `automation.failed`, `automation.interrupted` 중 하나입니다. `content`에는 실행 응답 또는 부분 응답을 담고, 오류가 있으면 `error`를 추가합니다. `taskId`는 작업 제출에 성공한 경우에만 있습니다. `createdAt`은 작업의 마지막 변경 시각이며, 작업이 없으면 수신 시각을 사용합니다. 시각은 Unix 밀리초입니다.
+
+```json
+{
+  "id": "automation:attempt-23",
+  "type": "automation.completed",
+  "automationId": "morning",
+  "attemptId": "attempt-23",
+  "runId": "run-42",
+  "taskId": "task-17",
+  "content": "예약 실행 결과",
+  "createdAt": 1793232000000
+}
+```
+
+전송 정책은 다음과 같습니다.
+
+- 2xx 응답이면 `delivered`로 저장하고 같은 대상·ID를 다시 보내지 않습니다. 동시에 조회하거나 호스트를 재시작해도 전달 이력을 유지합니다.
+- 네트워크 오류, 10초 응답 제한 초과, HTTP 408·429·5xx만 최초 요청을 포함해 최대 5회 시도합니다. 재시도 간격은 1·2·4·8초이며, 429·503의 `Retry-After`가 더 길면 최대 60초까지 기다립니다.
+- 그 밖의 응답과 재시도 소진은 `failed`로 남기고 자동으로 다시 보내지 않습니다. 알림 실패는 작업 결과를 바꾸거나 작업을 다시 실행하지 않습니다.
+- 종료 시 진행 중인 HTTP 요청을 취소하고 대기 기록을 보존합니다. 같은 SQLite 파일과 URL로 호스트를 다시 시작하면 남은 횟수 안에서 전송을 이어갑니다. 호스트 종료로 중단된 작업의 알림은 다음 시작 때 확인합니다.
+- 수신 성공 직후 응답이 유실되거나 `delivered` 저장 전에 프로세스가 종료되면 같은 알림이 다시 도착할 수 있습니다. 수신 측은 `Idempotency-Key` 또는 본문의 `id`로 중복 처리를 막아야 합니다. 정확히 한 번 전달이나 무제한 전달 보장은 제공하지 않습니다.
+
+전송 상태·횟수·다음 시각과 오류 분류는 `host.ctx.notificationStore.list(target)`으로 조회할 수 있습니다. 이 조회 API는 호스트 내부 계약이며 별도 HTTP 관리 API나 설정 UI는 없습니다. 같은 SQLite 파일에는 전송 실행자를 하나만 연결합니다. 앱을 닫아도 **Node 호스트가 계속 실행 중이면** 알림을 보냅니다. desktop을 종료해 sidecar도 멈추거나 서버가 꺼진 동안에는 예약 실행과 전송이 동작하지 않습니다.
 
 ## HTTP 등록과 조회
 

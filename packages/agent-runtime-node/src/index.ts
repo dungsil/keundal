@@ -5,6 +5,7 @@ import { createAgentApp, type AgentAppOptions } from '@keundal/agent-host/http'
 import type { AgentPluginOptions, LoadedAgentPlugin } from '@keundal/agent-plugins'
 import { NodeAutomationService } from '@keundal/automation-node'
 import type { McpAuthentication, McpClientConfig } from '@keundal/mcp'
+import { WebhookNotificationService, type WebhookNotificationOptions } from '@keundal/plugin-notification-webhook'
 import type { RuntimePluginManifest } from '@keundal/plugin-runtime'
 import { ToolApproval, type ToolApprovalPolicy } from '@keundal/tool-approval'
 import type { ExecutableTool, ToolProvider } from '@keundal/tools'
@@ -34,6 +35,8 @@ export interface NodeHostOptions {
   readonly toolApproval?: ToolApprovalPolicy
   /** Defaults to enabled when the composition supplies tasks and automationStore. */
   readonly automation?: boolean
+  /** Operator-owned outbound destination; credentials are never saved with automations. */
+  readonly notificationWebhook?: WebhookNotificationOptions
   readonly plugins?: readonly AgentPluginOptions[]
   /** Bundled optional features default to enabled; deployment manifests remain operator-owned. */
   readonly bundledPlugins?: BundledPluginSelection
@@ -81,11 +84,18 @@ export async function createNodeAgentHost(options: NodeHostOptions, compose: Hos
     ...composition
   })
   let automation: NodeAutomationService | undefined
+  let notification: WebhookNotificationService | undefined
   try {
+    if (options.notificationWebhook) {
+      if (!host.ctx.notificationStore) throw new Error('notification Webhook requires a notificationStore')
+      notification = new WebhookNotificationService(host.ctx, host.ctx.notificationStore, options.notificationWebhook)
+      notification.start()
+    }
     if (options.automation !== false && host.ctx.tasks && host.ctx.automationStore) {
       automation = new NodeAutomationService(host.ctx, {
         store: host.ctx.automationStore,
         tasks: host.ctx.tasks,
+        notification: host.ctx.notification,
         run: (input, execution) => host.services.run(input, execution)
       })
       await automation.start()
@@ -96,11 +106,13 @@ export async function createNodeAgentHost(options: NodeHostOptions, compose: Hos
       plugins: composition.plugins ?? [],
       async dispose() {
         await automation?.dispose()
+        await notification?.dispose()
         await host.dispose()
       }
     }
   } catch (error) {
     await automation?.dispose()
+    await notification?.dispose()
     await host.dispose()
     throw error
   }
@@ -160,6 +172,9 @@ export async function createAgentRuntime(
       toolApproval:
         options.toolApproval ?? (env.KEUNDAL_TOOL_APPROVAL ? JSON.parse(env.KEUNDAL_TOOL_APPROVAL) : undefined),
       automation: options.automation,
+      notificationWebhook: env.KEUNDAL_NOTIFICATION_WEBHOOK_URL
+        ? { url: env.KEUNDAL_NOTIFICATION_WEBHOOK_URL, token: env.KEUNDAL_NOTIFICATION_WEBHOOK_TOKEN }
+        : undefined,
       tools: options.tools,
       defaultTools: options.defaultTools,
       subagents: options.subagents,

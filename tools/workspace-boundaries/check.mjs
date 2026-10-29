@@ -29,6 +29,7 @@ const implementationIndependent = new Set([
   '@keundal/subagent',
   '@keundal/task',
   '@keundal/automation',
+  '@keundal/notification',
   '@keundal/agent',
   '@keundal/agent-loop',
   '@keundal/tools',
