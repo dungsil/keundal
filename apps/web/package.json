@@ -27,6 +27,7 @@
     "@keundal/task-memory": "workspace:*",
     "@keundal/plugin-agent-chat": "workspace:*",
     "@keundal/plugin-tool-chart": "workspace:*",
+    "@keundal/plugin-tool-todo": "workspace:*",
     "@keundal/plugin-tool-weather": "workspace:*",
     "@keundal/llm-settings": "workspace:*",
     "@keundal/plugin-store-indexeddb": "workspace:*",

@@ -163,6 +163,7 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
   const legacyToolsEnabled = options.bundledPlugins?.['@keundal/plugin-tool-chat'] ?? true
   const chartEnabled = options.bundledPlugins?.['@keundal/plugin-tool-chart'] ?? legacyToolsEnabled
   const weatherEnabled = options.bundledPlugins?.['@keundal/plugin-tool-weather'] ?? legacyToolsEnabled
+  const todoEnabled = options.bundledPlugins?.['@keundal/plugin-tool-todo'] !== false
   const selection = readManifest(options, skillsEnabled && Boolean(options.plugins?.length))
   const agentEnabled =
     options.bundledPlugins?.['@keundal/plugin-agent-chat'] !== false &&
@@ -257,7 +258,10 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
     defaultTools || options.tools || options.projectId !== undefined
       ? async (execution) => [
           ...(typeof defaultTools === 'function' ? await defaultTools(execution) : (defaultTools ?? [])).filter(
-            (tool) => (chartEnabled || tool.name !== 'chart') && (weatherEnabled || tool.name !== 'weather')
+            (tool) =>
+              (chartEnabled || tool.name !== 'chart') &&
+              (weatherEnabled || tool.name !== 'weather') &&
+              (todoEnabled || tool.name !== 'todo_write')
           ),
           ...(typeof options.tools === 'function' ? await options.tools(execution) : (options.tools ?? [])),
           ...memoryTools

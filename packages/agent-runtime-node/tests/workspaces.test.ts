@@ -81,7 +81,7 @@ async function setup(t: TestContext) {
   async function run(
     host: Awaited<ReturnType<typeof createNodeAgentHost>>,
     threadId: string,
-    steps: { name: string; args: Record<string, string> }[] = []
+    steps: { name: string; args: Record<string, unknown> }[] = []
   ) {
     const events = await Array.fromAsync(
       host.services.run({
@@ -185,12 +185,30 @@ test('프로젝트와 대화별 Worktree를 격리하고 일반 대화에는 코
     { name: 'read_file', args: { path: 'a.txt' } },
     { name: 'edit_file', args: { path: 'a.txt', oldText: 'original', newText: 'coding' } }
   ])
-  expect(result.tools).toEqual(['read_file', 'list_directory', 'write_file', 'edit_file'])
+  expect(result.tools).toEqual(['read_file', 'list_directory', 'write_file', 'edit_file', 'todo_write'])
   expect(result.system.join('\n')).toContain('coding')
   expect(await readFile(join(a.path, 'a.txt'), 'utf8')).toBe('coding\n')
   for (const path of [first, second, b.path, c.path])
     expect(await readFile(join(path, 'a.txt'), 'utf8')).toBe('original\n')
   expect((await run(app, 'ordinary')).tools).not.toContain('write_file')
+})
+
+test('코딩 TODO 결과는 대화별로 격리되고 호스트를 다시 열어도 세션에 남는다', async (t) => {
+  const { repository, host, run } = await setup(t)
+  const project = await repository('todo-project')
+  const first = await host()
+  await first.services.workspaces!.create('todo-thread', project)
+  const todos = [{ id: 'verify', content: '검증 실행', status: 'in_progress' }]
+  const result = await run(first, 'todo-thread', [{ name: 'todo_write', args: { todos } }])
+  expect(result.results.map((value) => JSON.parse(value))).toEqual([{ todos }])
+  const snapshot = await first.services.session.get('todo-thread')
+  expect(snapshot?.messages.filter((message) => message.role === 'tool').map((message) => message.content)).toEqual([
+    JSON.stringify({ todos })
+  ])
+  expect((await run(first, 'other')).results).toEqual([])
+  await first.dispose()
+  const reopened = await host()
+  expect((await reopened.services.session.get('todo-thread'))?.messages).toEqual(snapshot?.messages)
 })
 
 test('원본의 미커밋 변경은 작업으로 복사하지 않고 관련 없는 staged 변경을 보존한다', async (t) => {

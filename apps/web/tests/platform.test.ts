@@ -29,7 +29,7 @@ test('웹 조립은 네이티브 IPC 없이 IndexedDB 대화를 저장하고 재
   const id = crypto.randomUUID()
   try {
     expect(first.remoteAgent).toBe(false)
-    expect((await first.catalog!()).tools.map(tool => tool.name)).toEqual(['chart', 'weather'])
+    expect((await first.catalog!()).tools.map(tool => tool.name)).toEqual(['chart', 'weather', 'todo_write'])
     await first.store.create(id, { id: 'user', role: 'user', parts: [{ type: 'text', text: 'Hello' }] }, 'openai/test')
   } finally {
     await first.dispose()
@@ -46,6 +46,7 @@ test('웹 조립은 네이티브 IPC 없이 IndexedDB 대화를 저장하고 재
 test.for([
   { modules: ['builtin:chart'], names: ['chart'] },
   { modules: ['builtin:weather'], names: ['weather'] },
+  { modules: ['builtin:todo'], names: ['todo_write'] },
   { modules: [], names: [] },
   { modules: ['builtin:chat-tools'], names: ['chart', 'weather'] }
 ])('웹 매니페스트의 $modules 도구만 제공하고 다른 기능은 포함하지 않는다', async ({ modules, names }, t) => {
@@ -87,12 +88,13 @@ test('번들 스킬과 도구의 on/off를 실제 목록에 반영하고 재연�
     expect((await platform.runtimePlugins!.list()).map(entry => entry.module)).toEqual([
       '@keundal/plugin-llm-browser', '@keundal/plugin-store-indexeddb', '@keundal/plugin-agent-chat',
       '@keundal/prompt', '@keundal/subagent',
-      '@keundal/plugin-skill', '@keundal/plugin-tool-chart', '@keundal/plugin-tool-weather', '@keundal/plugin-mcp-client'
+      '@keundal/plugin-skill', '@keundal/plugin-tool-chart', '@keundal/plugin-tool-weather', '@keundal/plugin-tool-todo', '@keundal/plugin-mcp-client'
     ])
     await expect(platform.runtimePlugins!.setEnabled('https://not-requested.invalid/plugin.mjs', true)).rejects.toThrow('Unknown bundled')
     await expect(platform.runtimePlugins!.setEnabled('@keundal/plugin-store-indexeddb', false)).rejects.toThrow('Required')
-    expect(await connection.catalog!()).toMatchObject({ skills: [{ name: 'review' }], tools: [{ name: 'chart' }, { name: 'weather' }] })
+    expect(await connection.catalog!()).toMatchObject({ skills: [{ name: 'review' }], tools: [{ name: 'chart' }, { name: 'weather' }, { name: 'todo_write' }] })
     await connection.store.create(id, { id: 'retained', role: 'user', parts: [{ type: 'text', text: 'Keep this chat' }] }, 'openai/test')
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-todo', false)
     await platform.runtimePlugins!.setEnabled('@keundal/plugin-skill', false)
     await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chart', false)
     expect((await connection.catalog!()).tools.map(tool => tool.name)).toEqual(['weather'])
@@ -112,6 +114,8 @@ test('번들 스킬과 도구의 on/off를 실제 목록에 반영하고 재연�
     expect((await restored.catalog!()).tools.map(tool => tool.name)).toEqual(['chart'])
     await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-weather', true)
     expect((await restored.catalog!()).tools.map(tool => tool.name)).toEqual(['chart', 'weather'])
+    await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-todo', true)
+    expect((await restored.catalog!()).tools.map(tool => tool.name)).toEqual(['chart', 'weather', 'todo_write'])
     await restored.store.delete(id)
   } finally {
     await restored.dispose()
@@ -128,16 +132,16 @@ test('이전 통합 도구 선택을 개별 도구로 옮기고 명시한 선택
   const platform = createWebPlatform(saved)
   const first = await platform.connect(options)
   try {
-    expect((await first.catalog!()).tools.map(tool => tool.name)).toEqual(['chart'])
+    expect((await first.catalog!()).tools.map(tool => tool.name)).toEqual(['chart', 'todo_write'])
     await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-chart', false)
   } finally {
     await first.dispose()
   }
   const second = await platform.connect(options)
   try {
-    expect((await second.catalog!()).tools).toEqual([])
+    expect((await second.catalog!()).tools.map(tool => tool.name)).toEqual(['todo_write'])
     await platform.runtimePlugins!.setEnabled('@keundal/plugin-tool-weather', true)
-    expect((await second.catalog!()).tools.map(tool => tool.name)).toEqual(['weather'])
+    expect((await second.catalog!()).tools.map(tool => tool.name)).toEqual(['weather', 'todo_write'])
   } finally {
     await second.dispose()
   }
