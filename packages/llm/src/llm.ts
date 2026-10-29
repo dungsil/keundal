@@ -28,7 +28,15 @@ export interface LLMModelInfo {
   readonly id: string
   readonly name: string
   readonly contextWindow?: number
+  readonly maxInputTokens?: number
   readonly maxOutputTokens?: number
+  /** USD per million tokens; absent prices are unknown, not zero. */
+  readonly cost?: {
+    readonly input?: number
+    readonly output?: number
+    readonly cacheRead?: number
+    readonly cacheWrite?: number
+  }
   readonly capabilities?: LLMModel['capabilities']
 }
 
