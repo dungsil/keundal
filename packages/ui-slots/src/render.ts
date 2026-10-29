@@ -99,7 +99,7 @@ const SlotEntryHost = defineComponent({
         ? Object.fromEntries(accepted.filter((name) => name in values).map((name) => [name, values[name]]))
         : {}
       const node = h(props.entry.component, passed)
-      return LAZY in props.entry.component ? h(Suspense, null, { default: () => node }) : node
+      return LAZY in props.entry.component ? h(Suspense, { suspensible: true }, { default: () => node }) : node
     }
   }
 })

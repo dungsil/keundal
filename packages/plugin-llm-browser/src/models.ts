@@ -1,5 +1,6 @@
 import { modelSchema, type ModelOption } from '@keundal/chat/models'
 import type { LLMModelInfo } from '@keundal/llm'
+import { listModelsDevModels } from '@keundal/llm'
 export { resolveModel, type ModelOption } from '@keundal/chat/models'
 const cacheSchema = z.object({ scope: z.string(), fetchedAt: z.number(), models: z.array(modelSchema) })
 import {
@@ -41,7 +42,9 @@ async function cacheScope(provider: string, settings: LLMSettings) {
         settings[provider]?.name,
         baseURL,
         credentials.apiKey,
-        Object.entries(credentials.headers ?? {}).sort(([a], [b]) => a.localeCompare(b))
+        Object.entries(credentials.headers ?? {}).sort(([a], [b]) => a.localeCompare(b)),
+        settings[provider]?.modelsDev,
+        settings[provider]?.models
       ])
     )
   )
@@ -59,7 +62,18 @@ export async function loadModels(
   storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>,
   options: { force?: boolean; signal?: AbortSignal } = {}
 ): Promise<ModelOption[]> {
-  settings = { ...settings, [provider]: { ...settings[provider]!, headers: { ...settings[provider]?.headers } } }
+  const configured = settings[provider]!
+  settings = {
+    ...settings,
+    [provider]: {
+      ...configured,
+      headers: { ...configured.headers },
+      models: configured.models ? [...configured.models] : undefined,
+      modelsDev: configured.modelsDev
+        ? { ...configured.modelsDev, models: { ...configured.modelsDev.models } }
+        : undefined
+    }
+  }
   const key = `keundal:models:${provider}`
   let requests = latestRequests.get(storage)
   if (!requests) latestRequests.set(storage, (requests = new Map()))
@@ -96,7 +110,43 @@ export async function loadModels(
   try {
     const load = await modelLoaders[providerType(provider)]()
     options.signal?.throwIfAborted()
-    const models = await load({ ...credentials, dangerouslyAllowBrowser: true }, { signal })
+    let models = await load({ ...credentials, dangerouslyAllowBrowser: true }, { signal })
+    for (const id of settings[provider]?.models ?? []) {
+      if (!models.some((model) => model.id === id)) models.push({ id, name: id })
+    }
+    const type = providerType(provider)
+    const preset = LLM_PROVIDERS.find((item) => item.id === type)!
+    // An API protocol is not a vendor identity: never apply OpenAI prices to arbitrary gateways.
+    const official = (credentials.baseURL || preset.baseURL).replace(/\/+$/, '') === preset.baseURL
+    const mapping = settings[provider]?.modelsDev
+    const catalogProvider = mapping?.provider ?? (official ? (type === 'openai-chat' ? 'openai' : type) : undefined)
+    if (catalogProvider) {
+      try {
+        const catalog = new Map(
+          (
+            await listModelsDevModels(catalogProvider, {
+              signal: AbortSignal.any([signal, AbortSignal.timeout(5000)])
+            })
+          ).map((model) => [model.id, model])
+        )
+        models = models.map((model) => {
+          const id = mapping?.models && Object.hasOwn(mapping.models, model.id) ? mapping.models[model.id]! : model.id
+          const metadata = catalog.get(id)
+          if (!metadata) return model
+          return {
+            ...model,
+            name: model.name === model.id ? metadata.name : model.name,
+            contextWindow: model.contextWindow ?? metadata.contextWindow,
+            maxInputTokens: model.maxInputTokens ?? metadata.maxInputTokens,
+            maxOutputTokens: model.maxOutputTokens ?? metadata.maxOutputTokens,
+            cost: model.cost ?? metadata.cost
+          }
+        })
+      } catch {
+        // Supplementary metadata must not turn successful provider discovery into a failure.
+        options.signal?.throwIfAborted()
+      }
+    }
     options.signal?.throwIfAborted()
     const result = models.map((model) => ({
       value: `${provider}/${model.id}`,
@@ -106,7 +156,9 @@ export async function loadModels(
           : model.name,
       icon: providerIcon(provider),
       contextWindow: model.contextWindow,
+      maxInputTokens: model.maxInputTokens,
       maxOutputTokens: model.maxOutputTokens,
+      cost: model.cost,
       capabilities: model.capabilities
     }))
     try {

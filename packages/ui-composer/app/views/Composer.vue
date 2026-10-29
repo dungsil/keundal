@@ -243,7 +243,7 @@ const dictationOwner = computed(() => ({
       aria-autocomplete="list"
       color="neutral"
       variant="subtle"
-      :ui="{ base: ['px-1.5', dictation !== 'idle' && 'placeholder:italic'], footer: 'gap-y-2' }"
+      :ui="{ root: 'outline-inverted', base: ['px-1.5', dictation !== 'idle' && 'placeholder:italic'], footer: 'gap-y-2' }"
       @update:model-value="setInput"
       @focus="focused = true; updateCursor()"
       @click="updateCursor"
@@ -299,3 +299,10 @@ const dictationOwner = computed(() => ({
     </UChatPrompt>
   </div>
 </template>
+
+<style scoped>
+/* The prompt form already indicates textarea focus; avoid a second outline inside it. */
+:deep(textarea:focus-visible) {
+  outline: none;
+}
+</style>
