@@ -36,7 +36,11 @@ test('API 키 없이 주소만 저장한 공급자의 모델을 조회하고 설
   await vi.waitFor(() => expect(catalog.loading.value).toBe(false))
   expect(paths).toEqual([])
   settings.value.openai.baseURL = `http://127.0.0.1:${address.port}`
-  await vi.waitFor(() => expect(catalog.models.value.map(model => model.value)).toEqual(['openai/local-model']))
+  expect(catalog.loading.value).toBe(true)
+  // Join the watcher-started request instead of imposing waitFor's one-second deadline on HTTP.
+  await catalog.refresh()
+  expect(catalog.error.value).toBe('')
+  expect(catalog.models.value.map(model => model.value)).toEqual(['openai/local-model'])
   expect(paths).toEqual(['/models'])
   expect(values.has('keundal:models:openai')).toBe(true)
   settings.value = defaultLLMSettings()
@@ -47,7 +51,10 @@ test('API 키 없이 주소만 저장한 공급자의 모델을 조회하고 설
   })
   expect(paths).toEqual(['/models'])
   settings.value['openai@work'] = { name: 'Work', apiKey: '', baseURL: `http://127.0.0.1:${address.port}` }
-  await vi.waitFor(() => expect(catalog.models.value.map(model => model.value)).toEqual(['openai@work/local-model']))
+  expect(catalog.loading.value).toBe(true)
+  await catalog.refresh()
+  expect(catalog.error.value).toBe('')
+  expect(catalog.models.value.map(model => model.value)).toEqual(['openai@work/local-model'])
   expect(values.has('keundal:models:openai@work')).toBe(true)
   delete settings.value['openai@work']
   await vi.waitFor(() => {
