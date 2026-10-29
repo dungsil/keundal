@@ -10,6 +10,7 @@ import {
   type AutomationStore
 } from '@keundal/automation'
 import { parseRunAgentInput, type AGUIEvent, type ExecutionOptions, type RunAgentInput } from '@keundal/core'
+import type { NotificationService } from '@keundal/notification'
 import type { TaskService } from '@keundal/task'
 import type { Context } from 'cordis'
 import { CronExpressionParser } from 'cron-parser'
@@ -17,6 +18,7 @@ import { CronExpressionParser } from 'cron-parser'
 export interface NodeAutomationOptions {
   store: AutomationStore
   tasks: TaskService
+  notification?: NotificationService
   run(input: RunAgentInput, options: ExecutionOptions): AsyncIterable<AGUIEvent>
 }
 
@@ -67,6 +69,7 @@ export class NodeAutomationService extends AutomationService {
         ...(task ? { status: 'submitted', taskId: task.id } : { status: 'interrupted', error: 'dispatch interrupted' })
       })
     }
+    await this.notifyResults()
     this.timer = globalThis.setInterval(() => {
       void this.tick().catch((error: unknown) => console.error('automation tick failed', error))
     }, 1000)
@@ -148,6 +151,7 @@ export class NodeAutomationService extends AutomationService {
         await this.dispatch(automation, `cron:${automation.nextRunAt}`)
         await this.options.store.save({ ...automation, nextRunAt: nextRun(automation, now) })
       }
+      await this.notifyResults()
     })
   }
 
@@ -244,6 +248,32 @@ export class NodeAutomationService extends AutomationService {
     }
     await store.saveAttempt(attempt)
     return attempt
+  }
+
+  private async notifyResults(): Promise<void> {
+    const notification = this.options.notification
+    if (!notification) return
+    for (const attempt of await this.options.store.attempts()) {
+      const { task } = await this.result(attempt)
+      const status = task?.status ?? attempt.status
+      if (!['completed', 'failed', 'cancelled', 'interrupted'].includes(status)) continue
+      await notification.notify({
+        id: `automation:${attempt.id}`,
+        type:
+          status === 'completed'
+            ? 'automation.completed'
+            : status === 'failed'
+              ? 'automation.failed'
+              : 'automation.interrupted',
+        automationId: attempt.automationId,
+        attemptId: attempt.id,
+        runId: attempt.runId,
+        taskId: attempt.taskId,
+        content: task?.content ?? '',
+        error: task?.error ?? attempt.error ?? (status === 'cancelled' ? 'task cancelled' : undefined),
+        createdAt: task?.updatedAt ?? attempt.createdAt
+      })
+    }
   }
 
   private async result(attempt: AutomationAttempt): Promise<AutomationHistory> {

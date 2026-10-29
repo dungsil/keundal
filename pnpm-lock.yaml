@@ -834,6 +834,9 @@ importers:
       '@keundal/plugin-mcp-client':
         specifier: workspace:*
         version: link:../plugin-mcp-client
+      '@keundal/plugin-notification-webhook':
+        specifier: workspace:*
+        version: link:../plugin-notification-webhook
       '@keundal/plugin-runtime':
         specifier: workspace:*
         version: link:../plugin-runtime
@@ -935,6 +938,9 @@ importers:
       '@keundal/core':
         specifier: workspace:*
         version: link:../core
+      '@keundal/notification':
+        specifier: workspace:*
+        version: link:../notification
       '@keundal/task':
         specifier: workspace:*
         version: link:../task
@@ -1725,6 +1731,28 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  packages/notification:
+    dependencies:
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
   packages/plugin-agent-acp:
     dependencies:
       '@agentclientprotocol/sdk':
@@ -2495,6 +2523,37 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/plugin-notification-webhook:
+    dependencies:
+      '@keundal/notification':
+        specifier: workspace:*
+        version: link:../notification
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
+    devDependencies:
+      '@keundal/plugin-store-sqlite':
+        specifier: workspace:*
+        version: link:../plugin-store-sqlite
+      '@keundal/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@keundal/tsdown':
+        specifier: workspace:*
+        version: link:../../tools/tsdown
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/plugin-runtime:
     dependencies:
       '@keundal/core':
@@ -2758,6 +2817,9 @@ importers:
       '@keundal/memory-store':
         specifier: workspace:*
         version: link:../memory-store
+      '@keundal/notification':
+        specifier: workspace:*
+        version: link:../notification
       '@keundal/session':
         specifier: workspace:*
         version: link:../session
