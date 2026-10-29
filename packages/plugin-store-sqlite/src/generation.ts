@@ -118,7 +118,7 @@ export class SqliteGenerationService extends GenerationService {
       if (!controller.signal.aborted) controller.abort(new Error('SQLite generation run stopped'))
       cleanup()
     }
-    const iterator = this.execute(request, controller.signal, token, () => stopped, cleanup, options.stream)
+    const iterator = this.execute(request, controller.signal, token, () => stopped, cleanup, options)
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -195,7 +195,7 @@ export class SqliteGenerationService extends GenerationService {
     token: symbol,
     stopped: () => boolean,
     cleanup: () => void,
-    stream?: GenerationOptions['stream']
+    { stream, durableCustomEvents }: GenerationOptions
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     const { threadId, runId } = request.input
     let run: ActiveRun | undefined
@@ -232,7 +232,12 @@ export class SqliteGenerationService extends GenerationService {
         budget.accept(event)
         // 실행이 종료를 확정했거나 다른 소유자가 넘겨받았으면 기록을 멈춥니다.
         if (!run.recorder.record(event)) return
-        if (event.type === EventType.CUSTOM && event.name === TOOL_APPROVAL_EVENT && !run.recorder.flush()) return
+        if (
+          event.type === EventType.CUSTOM &&
+          (event.name === TOOL_APPROVAL_EVENT || durableCustomEvents?.includes(event.name)) &&
+          !run.recorder.flush()
+        )
+          return
         yield event
       }
       signal.throwIfAborted()

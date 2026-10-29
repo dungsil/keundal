@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@keundal/plugin-store-memory": "workspace:*",
+    "@keundal/plugin-store-sqlite": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",

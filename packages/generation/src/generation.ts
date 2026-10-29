@@ -13,6 +13,8 @@ export interface GenerationRequest extends LLMRequest {
 export interface GenerationOptions extends ExecutionOptions {
   /** 실행에 사용할 이벤트 공급자입니다. 생략하면 주입된 llm.stream을 사용하며, 저장하거나 복구 시 재실행하지 않습니다. */
   readonly stream?: LLMService['stream']
+  /** Named CUSTOM events that must be durable before advancing the stream. */
+  readonly durableCustomEvents?: readonly string[]
 }
 
 export type GenerationStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
