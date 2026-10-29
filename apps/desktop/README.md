@@ -44,7 +44,7 @@ pnpm build:preview
 pnpm --filter @keundal/desktop tauri build --no-bundle
 ```
 
-정적 UI는 `apps/desktop/dist`, 네이티브 실행 파일은 `apps/desktop/src-tauri/target/release`, 설치 파일은 그 아래 `bundle`에 생성됩니다. macOS·Windows·Linux 패키지는 해당 OS의 도구로 빌드해야 합니다. 코드 서명·공증·업데이트 배포는 포함하지 않습니다.
+정적 UI는 `apps/desktop/dist`, 네이티브 실행 파일은 `apps/desktop/src-tauri/target/release`, 설치 파일은 그 아래 `bundle`에 생성됩니다. macOS·Windows·Linux 패키지는 해당 OS의 도구로 빌드해야 합니다. 일반 빌드와 PR 프리뷰는 서명된 정식 릴리스와 구분합니다. 정식 릴리스의 서명·공증·업데이트 배포는 아래 절차를 따릅니다.
 
 `pnpm build`는 정적 UI까지만 빌드하므로 Rust나 OS 라이브러리가 필요하지 않습니다. `@keundal/chat-app`과 `@keundal/agent-host` 워크스페이스 의존성으로 공유 패키지 빌드 순서를 보장합니다. 다른 앱에는 의존하지 않습니다.
 
@@ -63,6 +63,56 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 Windows 포터블 배포는 이 프로젝트에서 구성한 방식이며, Tauri가 공식 지원하는 포터블 모드는 아닙니다.
 
 웹과 데스크톱 빌드가 모두 성공하면 웹 프리뷰를 배포하고 댓글에 데스크톱 다운로드 링크를 표시합니다. 빌드가 실패하면 CI 실행 로그에서 원인을 확인합니다.
+
+### 서명된 정식 릴리스
+
+`.github/workflows/desktop-release.yml`의 **Desktop signed release**를 수동 실행합니다. 버전은 `1.2.3`처럼 접두사 없는 안정 버전으로 지정합니다. 워크플로는 빌드 설정의 앱 버전을 입력값으로 바꾸고 `desktop-v1.2.3` 태그에 대응하는 **초안 릴리스**를 만듭니다. 소스의 개발 버전과 PR 프리뷰 설정은 변경하지 않습니다.
+
+GitHub Actions에 다음 값을 먼저 등록합니다. 비밀 키와 인증서·암호는 저장소나 로그에 남기지 않습니다.
+
+| 종류 | 이름 | 값 |
+| --- | --- | --- |
+| Variable | `TAURI_UPDATER_PUBLIC_KEY` | Tauri signer가 만든 `.pub` 파일의 내용. 경로가 아니라 인코딩된 공개 키 문자열 |
+| Secret | `TAURI_SIGNING_PRIVATE_KEY` | 같은 키 쌍의 비밀 키 파일 내용 |
+| Secret | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 비밀 키의 비어 있지 않은 암호 |
+| Secret | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD` | base64 인코딩한 Developer ID Application P12 인증서와 암호 |
+| Secret | `APPLE_SIGNING_IDENTITY` | Developer ID Application 서명 ID. ad-hoc(`-`)은 거부 |
+| Secret | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | 공증 계정, 앱 전용 암호, Apple 팀 ID |
+| Secret | `WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD` | base64 인코딩한 코드 서명 PFX와 암호 |
+
+업데이트 키는 `pnpm --filter @keundal/desktop tauri signer generate -w <보관할 경로>`로 만듭니다. 암호는 대화형 프롬프트에서 입력하고 키 쌍은 안전한 곳에 백업합니다. 이미 배포한 공개 키에 대응하는 비밀 키를 잃으면 그 앱에 후속 업데이트를 제공할 수 없습니다. OS 코드 서명 인증서와 Tauri 업데이트 서명 키는 서로 다른 용도입니다.
+
+- macOS Apple Silicon: Developer ID로 서명하고 공증한 DMG와 서명된 `.app.tar.gz` 업데이트 묶음
+- Windows x64: 앱·Node.js sidecar·설치 파일에 Authenticode 서명을 적용한 NSIS 설치 파일과 업데이트 서명
+- Linux x64: DEB, AppImage와 AppImage 업데이트 서명. Linux에는 macOS·Windows의 OS 코드 서명을 적용하지 않습니다.
+
+세 플랫폼이 모두 성공해야 `latest.json`을 생성합니다. 매니페스트는 플랫폼별 다운로드 URL과 `.sig` 파일의 **내용**을 포함합니다. 게시 전에는 매니페스트·서명과 릴리스 아티팩트가 완전한지 검사합니다. 자격 증명이 없거나 서명·공증 검증이 실패하면 초안을 만들지 않으며, 기존 릴리스를 덮어쓰지 않습니다. 실패 후 남은 불완전한 초안은 내용을 확인한 뒤 별도로 정리합니다.
+
+초안은 앱에서 보이지 않습니다. 아래 인수 검증을 마친 뒤 담당자가 초안을 안정 릴리스로 게시하고 **최신 릴리스**로 지정합니다. 앱은 `https://github.com/dungsil/keundal/releases/latest/download/latest.json`을 읽으므로, 다른 용도의 GitHub 릴리스를 최신으로 지정할 때도 이 파일이 필요합니다. 릴리스 게시와 워크플로 실행은 코드 푸시만으로 자동 수행하지 않습니다.
+
+### 앱 업데이트와 데이터 보존 검증
+
+앱의 네이티브 메뉴 **Updates → Check for Updates…**에서 새 버전을 확인합니다. 새 버전이 있으면 **Later**로 취소하거나 **Install and Restart**로 설치합니다. 확인·다운로드·설치 중에는 메뉴를 다시 실행할 수 없으며 진행 상태를 메뉴에 표시합니다. 네트워크·서명·설치 오류는 대화상자로 알리고 다시 시도할 수 있습니다.
+
+앱은 HTTPS로 업데이트를 조회하고, 다운로드 서명과 서명에 묶인 버전을 검증한 다음 설치합니다. 매니페스트의 버전만 바꿔 과거 아티팩트를 설치하는 것도 거부합니다. Windows는 설치 전에 sidecar를 정리하고 NSIS가 앱을 다시 시작합니다. macOS·Linux는 설치 성공 후 sidecar를 정리하고 앱을 다시 시작합니다. 진행 중인 응답은 종료될 수 있으므로 작업을 마친 뒤 설치합니다.
+
+자동 업데이트는 정식 macOS 앱, Windows NSIS 설치, Linux AppImage를 대상으로 합니다. Linux DEB는 새 DEB로 직접 갱신합니다. 기존 포터블·PR 프리뷰에는 업데이트 키를 넣지 않으며 정식 설치 파일로 한 번 전환해야 합니다. 앱 식별자 `com.keundal.desktop`, 보안 저장소의 서비스·계정명, SQLite와 WebView 저장 경로는 버전이 바뀌어도 유지합니다. 업데이트를 위해 설정이나 대화를 삭제하거나 새 경로로 복사하지 않습니다.
+
+정식 배포 전에는 지원하는 OS마다 이전 버전과 다음 버전으로 아래 흐름을 직접 검증하고 PR 또는 릴리스 기록에 결과를 남깁니다. 서명 없는 로컬 빌드만 통과한 결과를 정식 배포 검증으로 간주하지 않습니다.
+
+1. 이전 정식 버전에서 LLM·MCP 설정을 OS 보안 저장소에 저장하고, 모델 선택·테마·선택 기능을 바꿉니다. 제목과 메시지가 있는 대화를 두 개 이상 만들고 앱을 다시 시작해 보존을 확인합니다.
+2. 같은 버전 응답은 최신 상태로 표시되는지, 오프라인 오류 후 다시 확인할 수 있는지 확인합니다. 새 버전 안내에서 **Later**를 누르면 버전과 데이터가 바뀌지 않아야 합니다.
+3. 격리된 로컬 검증 환경에서 손상된 다운로드·다른 키의 서명·서명된 버전과 다른 매니페스트를 각각 제공해 설치와 재시작을 거부하는지 확인합니다. 운영 키나 운영 매니페스트는 바꾸지 않습니다.
+4. 올바른 서명으로 업데이트를 설치하고 재시작합니다. 새 버전, 저장한 LLM·MCP 설정, 모델·테마·선택 기능, 기존 대화의 제목·메시지를 확인합니다. 비밀 값은 화면 캡처나 로그에 기록하지 않습니다.
+5. 기존 대화에 메시지를 추가하고 다시 시작해 읽기뿐 아니라 쓰기도 유지되는지 확인합니다. 이전 sidecar가 남지 않았는지도 확인합니다. 밝은·어두운 테마와 키보드 메뉴 탐색도 확인합니다.
+
+기존 패키징 검증 스크립트는 두 번째 경로를 주면 이전·다음 sidecar를 차례로 실행하고, 같은 SQLite에서 메시지·상태·revision 보존과 후속 쓰기를 검사합니다. 경로에는 `keundal-host`(Windows는 `.exe`)와 `sidecar/main.js`가 있어야 합니다.
+
+```sh
+node apps/desktop/scripts/smoke-portable.mjs <이전-리소스-경로> <다음-리소스-경로>
+```
+
+이 스크립트는 임시 SQLite를 사용합니다. 실제 설치·업데이트 서명·WebView 저장소·OS 보안 저장소 검증은 대체하지 않습니다. Windows에서는 기존과 같이 다음 경로의 네이티브 앱 시작도 확인합니다.
 
 ## 동작과 데이터
 
