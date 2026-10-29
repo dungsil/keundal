@@ -1,5 +1,7 @@
 import { LazyModalConfirm, LazyModalRename } from '#components'
 
+import { useChatPreferences } from './useChatPreferences'
+
 /** Conversation operations the caller's plugin injects. */
 export interface ChatActionOperations {
   rename(id: string, title: string): Promise<void>
@@ -12,6 +14,7 @@ export function useChatActions(operations: ChatActionOperations) {
   const route = useRoute()
   const toast = useToast()
   const overlay = useOverlay()
+  const { skipDeleteConfirmation } = useChatPreferences()
 
   const renameModal = overlay.create(LazyModalRename)
   const deleteModal = overlay.create(LazyModalConfirm)
@@ -38,14 +41,16 @@ export function useChatActions(operations: ChatActionOperations) {
   }
 
   async function deleteChat(id: string): Promise<boolean> {
-    const instance = deleteModal.open({
-      title: t('chat.deleteTitle'),
-      description: t('chat.deleteDescription'),
-      color: 'error'
-    })
-    const result = await instance.result
+    if (!skipDeleteConfirmation.value) {
+      const instance = deleteModal.open({
+        title: t('chat.deleteTitle'),
+        description: t('chat.deleteDescription'),
+        color: 'error'
+      })
+      const result = await instance.result
 
-    if (!result) return false
+      if (!result) return false
+    }
 
     try {
       await operations.remove(id)

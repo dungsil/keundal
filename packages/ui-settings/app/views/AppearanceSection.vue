@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { useChatPreferences } from '@keundal/ui/app/composables/useChatPreferences.ts'
 import { useText } from '../locale'
 
 const { t } = useText()
+const { skipDeleteConfirmation, setSkipDeleteConfirmation } = useChatPreferences()
 </script>
 
 <template>
@@ -17,5 +19,13 @@ const { t } = useText()
       <span class="text-sm font-medium text-highlighted">{{ t('settings.colorMode') }}</span>
       <UColorModeSwitch :aria-label="t('settings.colorMode')" />
     </div>
+    <USwitch
+      :model-value="skipDeleteConfirmation"
+      :label="t('settings.skipDeleteConfirmation')"
+      :aria-label="t('settings.skipDeleteConfirmation')"
+      :description="t('settings.deleteWarning')"
+      :ui="{ root: 'flex-row-reverse justify-between gap-3', wrapper: 'ms-0 min-w-0', label: 'text-highlighted' }"
+      @update:model-value="setSkipDeleteConfirmation"
+    />
   </section>
 </template>
