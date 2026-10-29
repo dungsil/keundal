@@ -9,7 +9,6 @@ export default defineNuxtConfig({
     '@keundal/ui-chat-list',
     '@keundal/ui-home',
     '@keundal/ui-composer',
-    '@keundal/ui-dictation',
     '@keundal/ui-model-selection',
     '@keundal/ui-chat',
     '@keundal/ui-trace',
