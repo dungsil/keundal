@@ -1,3 +1,4 @@
+import * as acp from '@keundal/ui-acp/plugin'
 import * as agentPlugins from '@keundal/ui-agent-plugins/plugin'
 import * as chat from '@keundal/ui-chat/plugin'
 import * as chatList from '@keundal/ui-chat-list/plugin'
@@ -34,6 +35,7 @@ export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-dictation', plugin: dictation, requires: ['@keundal/ui-composer'] },
   { module: '@keundal/ui-trace', plugin: trace, requires: ['@keundal/ui-chat'] },
   // Renderers remain independent of execution tools so saved results can still be read.
+  { module: '@keundal/ui-acp', plugin: acp, requires: ['@keundal/ui-chat'] },
   { module: '@keundal/ui-tool', plugin: tool, requires: ['@keundal/ui-chat'] },
   { module: '@keundal/ui-chart', plugin: chart, requires: ['@keundal/ui-chat'] },
   { module: '@keundal/ui-weather', plugin: weather, requires: ['@keundal/ui-chat'] },

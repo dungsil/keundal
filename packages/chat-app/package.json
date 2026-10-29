@@ -15,6 +15,7 @@
     "@keundal/chat": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/ui": "workspace:*",
+    "@keundal/ui-acp": "workspace:*",
     "@keundal/ui-agent-plugins": "workspace:*",
     "@keundal/ui-chat": "workspace:*",
     "@keundal/ui-chat-list": "workspace:*",

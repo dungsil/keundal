@@ -407,6 +407,7 @@ onBeforeUnmount(() => {
 
         <UContainer class="flex-1 flex flex-col gap-4 sm:gap-6">
           <div ref="transcript" class="flex flex-1 flex-col pt-(--ui-header-height)">
+            <SlotOutlet name="chat.execution" :owner="{ chatId, messages, status }" />
             <UButton
               v-if="hiddenCount > 0"
               class="my-4 self-start scroll-mt-[calc(var(--ui-header-height)+1rem)]"
