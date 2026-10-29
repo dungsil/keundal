@@ -411,6 +411,10 @@ test('저장소 밖으로 옮긴 번들 IPC는 시스템 npm 없이 ZIP을 설�
   expect(JSON.parse((await command({ action: 'list' })).output)).toContainEqual(expect.objectContaining({
     enabled: false, source: { type: 'zip', value: zip }, version: '1.0.0'
   }))
+  const dsh = dshPackage(directory, '- insert:\n  - { name: dsh-fixture/main }', { main: 'export function apply() {}' })
+  const dshInstalled = await command({ action: 'install', source: { type: 'zip', value: dsh.zip } })
+  expect(dshInstalled.status, dshInstalled.errors).toBe(0)
+  expect(JSON.parse(dshInstalled.output).expected.at(-1)).toMatchObject({ enabled: false, format: 'dsh' })
 }, 20_000)
 
 test('로컬 패키지와 ZIP은 설치 스크립트와 import 없이 등록하고 활성화할 때 ESM 진입점을 실행한다', async () => {
@@ -562,3 +566,120 @@ test('npm과 JSR은 버전 지정과 실제 패키지 의존성 설치를 지원
   expect(requests).toContain('/package.tgz')
   expect(requests).toContain('/fixture-dependency')
 }, 20_000)
+
+function dshPackage(directory: string, patch: string, modules: Record<string, string>) {
+  const source = join(directory, 'dsh-source')
+  mkdirSync(source)
+  const files = {
+    'package.json': JSON.stringify({
+      name: 'dsh-fixture', version: '1.0.0', type: 'module',
+      exports: Object.fromEntries(Object.keys(modules).map(name => [`./${name}`, `./${name}.js`])),
+      dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } }
+    }),
+    'cordis.patch.yml': patch,
+    ...Object.fromEntries(Object.entries(modules).map(([name, code]) => [`${name}.js`, code])),
+    'client.js': 'throw new Error("DSH React client must not be imported")'
+  }
+  for (const [name, value] of Object.entries(files)) writeFileSync(join(source, name), value)
+  const zip = join(directory, 'dsh.zip')
+  writeFileSync(zip, zipSync(Object.fromEntries(Object.entries(files).map(([name, value]) => [name, strToU8(value)]))))
+  return { source, zip }
+}
+
+test.each(['path', 'zip'] as const)('DSH %s 번들은 root export 없이 YAML 설정과 named apply 및 뒤쪽 서비스 주입을 적용하고 해제한다', async type => {
+  const { directory, open } = fixture()
+  const active = join(directory, 'active')
+  const { source, zip } = dshPackage(directory, `
+- insert:
+  - id: consumer
+    name: dsh-fixture/consumer
+    config: { offset: 17 }
+  - id: ignored
+    name: dsh-fixture/not-exported
+    disabled: true
+- insert:
+  - id: provider
+    name: dsh-fixture/provider
+    config: { value: 23 }
+`, {
+    consumer: `export const inject = ['dshFixtureValue'];
+      export const Config = { '~standard': { version: 1, vendor: 'fixture', validate: value => ({ value: { ...value, label: 'defaulted' } }) } };
+      export function apply(ctx, config) { ctx.provide('dshFixtureResult', { sum: ctx.get('dshFixtureValue') + config.offset, label: config.label }) }`,
+    provider: `import { writeFileSync, rmSync } from 'node:fs';
+      export function apply(ctx, config) {
+        ctx.provide('dshFixtureValue', config.value);
+        ctx.effect(() => { writeFileSync(${JSON.stringify(active)}, 'active'); return () => rmSync(${JSON.stringify(active)}) })
+      }`
+  })
+  const transaction = await manageRuntimePlugins(directory, { action: 'install', source: { type, value: type === 'path' ? source : zip } })
+  if (Array.isArray(transaction)) throw new Error('Expected transaction')
+  const entry = transaction.expected.at(-1)!
+  expect(entry).toMatchObject({ enabled: false, format: 'dsh', version: '1.0.0' })
+  expect(existsSync(active)).toBe(false)
+  await manageRuntimePlugins(directory, { action: 'enable', module: entry.module, enabled: true })
+  const host = await open()
+  expect(host.ctx.get('dshFixtureResult')).toEqual({ sum: 40, label: 'defaulted' })
+  expect(readFileSync(active, 'utf8')).toBe('active')
+  await host.dispose()
+  expect(existsSync(active)).toBe(false)
+  await manageRuntimePlugins(directory, { action: 'enable', module: entry.module, enabled: false })
+  const disabled = await open()
+  expect(disabled.ctx.get('dshFixtureResult')).toBeUndefined()
+  expect(existsSync(active)).toBe(false)
+  await disabled.dispose()
+  const removed = await manageRuntimePlugins(directory, { action: 'remove', module: entry.module })
+  if (Array.isArray(removed)) throw new Error('Expected transaction')
+  await manageRuntimePlugins(directory, { action: 'finalize', ...removed })
+  expect(existsSync(source)).toBe(true)
+  expect(existsSync(join(directory, 'installed', entry.module.slice('external:'.length)))).toBe(false)
+}, 20_000)
+
+test.each([
+  { code: "export const inject = ['dshLoader']; export function apply() { throw new Error('must not run') }", error: 'DSH host services unavailable: dshLoader' },
+  { code: "export function apply() { throw new Error('DSH apply failed') }", error: 'DSH apply failed' }
+])('DSH 활성화 오류 $error는 앞쪽 행의 효과를 해제하고 이전 선택과 호스트를 복구한다', async ({ code, error }) => {
+  const { directory, open, invoke } = fixture()
+  const active = join(directory, 'partial-dsh')
+  const { source } = dshPackage(directory, `
+- insert:
+  - { id: first, name: dsh-fixture/first }
+  - { id: second, name: dsh-fixture/second }
+`, {
+    first: `import { writeFileSync, rmSync } from 'node:fs';
+      export default ctx => { ctx.provide('partialDsh', true); ctx.effect(() => { writeFileSync(${JSON.stringify(active)}, 'partial'); return () => rmSync(${JSON.stringify(active)}) }) }`,
+    second: code
+  })
+  let host = await open()
+  const manager = createNativeRuntimePluginManager(invoke, async () => { await host.dispose(); host = await open() })
+  await manager.install!({ type: 'path', value: source })
+  const entry = (await manager.list()).find(entry => entry.source)!
+  await expect(manager.setEnabled(entry.module, true)).rejects.toThrow(error)
+  expect(host.ctx.get('partialDsh')).toBeUndefined()
+  expect(existsSync(active)).toBe(false)
+  expect((await manager.list()).find(item => item.module === entry.module)?.enabled).toBe(false)
+}, 20_000)
+
+test.each([
+  ['- remove: [existing-host]', 'Only DSH bundle insert'],
+  ['- insert:\n  - { name: dsh-fixture/main, config: [] }', 'Invalid or unsupported'],
+  ['- insert:\n  - { id: same, name: dsh-fixture/main }\n  - { id: same, name: dsh-fixture/main }', 'Duplicate'],
+  ['- insert: [', 'Invalid DSH bundle YAML']
+])('DSH 설치에서 지원하지 않는 YAML %s를 거부하고 설치 파일과 선택을 남기지 않는다', async (patch, error) => {
+  const { directory } = fixture()
+  const { zip } = dshPackage(directory, patch, { main: 'throw new Error("must not import")' })
+  await expect(manageRuntimePlugins(directory, { action: 'install', source: { type: 'zip', value: zip } })).rejects.toThrow(error)
+  expect(existsSync(join(directory, 'bundled-selection.json'))).toBe(false)
+  expect(readdirSync(join(directory, 'installed'))).toEqual([])
+}, 20_000)
+
+test('DSH patch 경로가 패키지 밖의 설치 매니페스트를 가리키면 등록하지 않는다', async () => {
+  const { directory } = fixture()
+  const { source } = dshPackage(directory, '- insert: []', {})
+  const manifestPath = join(source, 'package.json')
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  manifest.dsh.bundle.patch = '../../package.json'
+  writeFileSync(manifestPath, JSON.stringify(manifest))
+  await expect(manageRuntimePlugins(directory, { action: 'install', source: { type: 'path', value: source } })).rejects.toThrow('must stay inside its package')
+  expect(existsSync(join(directory, 'bundled-selection.json'))).toBe(false)
+  expect(readdirSync(join(directory, 'installed'))).toEqual([])
+})

@@ -10,11 +10,14 @@ import type { RuntimePluginInfo, RuntimePluginSource } from '@keundal/chat/platf
 import { unzipSync } from 'fflate'
 import { resolve as resolveModule } from 'import-meta-resolve'
 
+import { readDshBundle } from './dsh-plugins.js'
+
 export interface InstalledPlugin {
   module: string
   enabled: boolean
   source: RuntimePluginSource
   resolvedModule: string
+  format?: 'dsh'
   metadata?: RuntimePluginInfo['metadata']
   version?: string
 }
@@ -76,6 +79,7 @@ export async function installPlugin(directory: string, input: unknown): Promise<
   mkdirSync(root, { recursive: true })
   try {
     let resolvedModule: string
+    let format: 'dsh' | undefined
     let packageInfo: Record<string, unknown> = {}
     if (source.type === 'path' && statSync(source.value).isFile()) {
       if (!/\.(?:mjs|cjs|js)$/.test(source.value)) throw new Error('Local plugin files must be compiled JavaScript')
@@ -96,13 +100,20 @@ export async function installPlugin(directory: string, input: unknown): Promise<
       const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
       const names = Object.keys(manifest.dependencies ?? {})
       if (names.length !== 1) throw new Error('Expected one installed plugin package')
-      resolvedModule = resolveModule(names[0], pathToFileURL(join(root, 'entry.mjs')).href)
-      packageInfo = JSON.parse(readFileSync(join(root, 'node_modules', names[0], 'package.json'), 'utf8'))
+      const packageRoot = join(root, 'node_modules', names[0])
+      packageInfo = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'))
+      if (readDshBundle(packageRoot, packageInfo)) {
+        format = 'dsh'
+        resolvedModule = pathToFileURL(packageRoot).href
+      } else {
+        resolvedModule = resolveModule(names[0], pathToFileURL(join(root, 'entry.mjs')).href)
+      }
     }
     const name = typeof packageInfo.name === 'string' ? packageInfo.name : basename(source.value)
     const description = typeof packageInfo.description === 'string' ? packageInfo.description : ''
     return {
       module: `external:${id}`, enabled: false, source, resolvedModule,
+      ...(format ? { format } : {}),
       metadata: { name: { en: name, ko: name }, description: { en: description, ko: description } },
       ...(typeof packageInfo.version === 'string' ? { version: packageInfo.version } : {})
     }

@@ -279,6 +279,9 @@ importers:
       '@tauri-apps/api':
         specifier: 2.12.4
         version: 2.12.4
+      cordis:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.11
       desktop-npm:
         specifier: npm:npm@11.12.0
         version: npm@11.12.0
@@ -291,6 +294,9 @@ importers:
       nuxt:
         specifier: ^4.6.2
         version: 4.6.2(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.154.0)(@types/node@24.13.6)(@vercel/blob@2.8.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.89.0(oxlint-tsgolint@7.0.2004))(rolldown@1.2.14)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.14)(rollup@4.64.7))(rollup@4.64.7)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.4(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
     devDependencies:
       '@keundal/agent-host':
         specifier: workspace:*
