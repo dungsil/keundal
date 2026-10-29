@@ -5,6 +5,7 @@ import {
   defaultLLMSettings,
   configuredProviders,
   registeredProviders,
+  providerType,
   providerSettingsSchema,
   type LLMProvider,
   type LLMSettings
@@ -114,7 +115,7 @@ async function addHeader() {
 
 async function fetchModels(providerId: string) {
   const settings = draft.value[providerId]
-  if (!settings || (!settings.apiKey?.trim() && !settings.baseURL?.trim() && !Object.keys(settings.headers ?? {}).length)) {
+  if (!settings || (providerType(providerId) !== 'mock' && !settings.apiKey?.trim() && !settings.baseURL?.trim() && !Object.keys(settings.headers ?? {}).length)) {
     fetchedModels.value[providerId] = []
     modelError.value[providerId] = ''
     return
@@ -292,7 +293,10 @@ async function save(forget = false) {
                 class="w-full"
               />
             </UFormField>
-            <UFormField :label="t('llm.apiKey')" name="apiKey" :error="errorField === 'apiKey' ? error : undefined">
+            <p v-if="current.providerType === 'mock'" class="text-sm text-muted">
+              {{ t('llm.mockDescription') }}
+            </p>
+            <UFormField v-else :label="t('llm.apiKey')" name="apiKey" :error="errorField === 'apiKey' ? error : undefined">
               <UInput
                 id="llm-api-key"
                 v-model="currentDraft.apiKey"
@@ -305,7 +309,7 @@ async function save(forget = false) {
                 :disabled="!mounted || saving"
               />
             </UFormField>
-            <UFormField :label="t('llm.baseURL')" name="baseURL" :description="t('llm.baseURLDescription')" :error="errorField === 'baseURL' ? error : undefined">
+            <UFormField v-if="current.providerType !== 'mock'" :label="t('llm.baseURL')" name="baseURL" :description="t('llm.baseURLDescription')" :error="errorField === 'baseURL' ? error : undefined">
               <UInput
                 id="llm-base-url"
                 v-model="currentDraft.baseURL"
@@ -316,7 +320,7 @@ async function save(forget = false) {
                 :disabled="!mounted || saving"
               />
             </UFormField>
-            <fieldset class="space-y-2">
+            <fieldset v-if="current.providerType !== 'mock'" class="space-y-2">
               <legend class="text-sm font-medium text-highlighted">
                 {{ t('llm.headers') }}
               </legend>
@@ -403,6 +407,7 @@ async function save(forget = false) {
               <ul v-if="fetchedModels[provider]?.length" class="space-y-1">
                 <li v-for="model in fetchedModels[provider]" :key="model.value" class="flex items-center gap-2">
                   <UCheckbox
+                    :aria-label="model.label || model.value.slice(provider.length + 1)"
                     :model-value="isModelEnabled(provider, model.value.slice(provider.length + 1))"
                     :disabled="!mounted || saving"
                     @update:model-value="toggleModel(provider, model.value.slice(provider.length + 1), !!$event)"
@@ -410,7 +415,7 @@ async function save(forget = false) {
                   <span class="break-all text-sm">{{ model.label || model.value.slice(provider.length + 1) }}</span>
                 </li>
               </ul>
-              <div class="flex gap-2">
+              <div v-if="current.providerType !== 'mock'" class="flex gap-2">
                 <UInput
                   v-model="newModelId"
                   :placeholder="t('llm.addModel')"
@@ -433,6 +438,7 @@ async function save(forget = false) {
               </p>
             </fieldset>
             <UAlert
+              v-if="current.providerType !== 'mock'"
               :icon="secureSettings ? 'i-lucide-shield-check' : 'i-lucide-shield-alert'"
               color="neutral"
               variant="subtle"

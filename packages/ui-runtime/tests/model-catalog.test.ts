@@ -6,7 +6,7 @@ import * as modelRequests from '@keundal/browser-composition/llm'
 import type { ModelOption } from '@keundal/chat/models'
 import { useModelCatalog } from '../src/model-catalog'
 
-test('API 키 없이 주소만 저장한 공급자의 모델을 조회하고 설정 삭제 시 목록과 캐시를 비운다', async () => {
+test('API 주소가 있는 공급자와 인증 없는 목업의 모델을 조회하고 삭제 시 목록과 캐시를 비운다', async () => {
   const paths: string[] = []
   const server = createServer((req, res) => {
     paths.push(req.url!)
@@ -62,6 +62,17 @@ test('API 키 없이 주소만 저장한 공급자의 모델을 조회하고 설
     expect(catalog.models.value).toEqual([])
     expect(values.has('keundal:models:openai@work')).toBe(false)
   })
+  settings.value['mock@demo'] = { name: 'Mock LLM', apiKey: '', baseURL: '' }
+  await catalog.refresh()
+  expect(catalog.error.value).toBe('')
+  expect(catalog.models.value.map(model => model.value)).toEqual([
+    'mock@demo/mock-text', 'mock@demo/mock-tool', 'mock@demo/mock-error', 'mock@demo/mock-slow'
+  ])
+  expect(values.has('keundal:models:mock@demo')).toBe(true)
+  delete settings.value['mock@demo']
+  await catalog.refresh()
+  expect(catalog.models.value).toEqual([])
+  expect(values.has('keundal:models:mock@demo')).toBe(false)
 })
 
 test('모델 조회의 일반 오류는 현재 표시 언어를 따르고 공급자 진단은 유지한다', async () => {

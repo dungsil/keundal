@@ -7,13 +7,14 @@ export const LLM_PROVIDERS = [
   { id: 'anthropic', label: 'Anthropic', baseURL: 'https://api.anthropic.com', icon: 'anthropic' },
   { id: 'google', label: 'Google Gemini', baseURL: 'https://generativelanguage.googleapis.com', icon: 'google' },
   { id: 'openai', label: 'OpenAI Responses', baseURL: 'https://api.openai.com/v1', icon: 'openai' },
-  { id: 'openai-chat', label: 'OpenAI Chat Completions', baseURL: 'https://api.openai.com/v1', icon: 'openai' }
+  { id: 'openai-chat', label: 'OpenAI Chat Completions', baseURL: 'https://api.openai.com/v1', icon: 'openai' },
+  { id: 'mock', label: 'Mock LLM', baseURL: '', icon: 'i-lucide-flask-conical' }
 ] as const
 
 export type LLMProvider = (typeof LLM_PROVIDERS)[number]['id']
 
 export function providerType(id: string): LLMProvider {
-  if (!/^(openai-chat|openai|anthropic|google)(@[a-zA-Z0-9-]+)?$/.test(id))
+  if (!/^(openai-chat|openai|anthropic|google|mock)(@[a-zA-Z0-9-]+)?$/.test(id))
     throw new Error('Unknown provider configuration')
   return id.split('@')[0] as LLMProvider
 }
@@ -21,6 +22,7 @@ export function providerType(id: string): LLMProvider {
 /** 같은 회사의 API 종류는 같은 아이콘을 공유합니다. */
 export function providerIcon(id: string): string {
   const type = providerType(id)
+  if (type === 'mock') return 'i-lucide-flask-conical'
   return `i-simple-icons-${LLM_PROVIDERS.find((item) => item.id === type)!.icon}`
 }
 
@@ -87,11 +89,17 @@ export const providerSettingsSchema = z.object({
       }
     }, 'Use an HTTPS API URL without credentials, query or fragment (HTTP is allowed for localhost)'),
   headers: headersSchema.optional(),
-  models: z.array(z.string().trim().min(1).max(256)).optional()
+  models: z.array(z.string().trim().min(1).max(256)).optional(),
+  modelsDev: z
+    .object({
+      provider: z.string().trim().min(1).max(256),
+      models: z.record(z.string().trim().min(1).max(1024), z.string().trim().min(1).max(1024)).optional()
+    })
+    .optional()
 })
 
 export type ProviderSettings = z.infer<typeof providerSettingsSchema>
-export type LLMSettings = Record<LLMProvider, ProviderSettings> & Record<string, ProviderSettings>
+export type LLMSettings = Record<Exclude<LLMProvider, 'mock'>, ProviderSettings> & Record<string, ProviderSettings>
 
 export const llmSettingsSchema = z
   .object({
@@ -121,7 +129,7 @@ export function providerCredentials(settings: LLMSettings, provider: string) {
   return { apiKey: parsed.data.apiKey, baseURL: parsed.data.baseURL || undefined, headers: parsed.data.headers }
 }
 
-/** Only display a bounded 400 diagnostic, never the response object, headers or cause. */
+/** Only display bounded 400 or local mock diagnostics, never the response object, headers or cause. */
 export function providerError(
   provider: LLMProvider,
   error: unknown,
@@ -146,7 +154,10 @@ export function providerError(
     }
     return ''
   }
-  let detail = status === 400 && failure.success ? message(failure.data.error ?? failure.data.message) : ''
+  let detail =
+    (status === 400 || provider === 'mock') && failure.success
+      ? message(failure.data.error ?? failure.data.message)
+      : ''
   const secrets = [
     credentials.apiKey,
     credentials.baseURL,

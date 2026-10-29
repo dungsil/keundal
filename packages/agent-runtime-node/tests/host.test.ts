@@ -8,7 +8,13 @@ import { type LLMEvent } from '@keundal/llm'
 import { readTraceSpans, summarizeTrace } from '@keundal/trace'
 import { afterEach, expect, test } from 'vitest'
 
-import { createNodeAgentHost, createNodeComposition, createAgentRuntime } from '../src/index.js'
+import {
+  createNodeAgentHost,
+  createNodeComposition,
+  createAgentRuntime,
+  getRequiredNodePluginModules,
+  nodePluginMetadata
+} from '../src/index.js'
 const createAgentHost = (options: Parameters<typeof createNodeAgentHost>[0]) =>
   createNodeAgentHost(options, createNodeComposition)
 
@@ -25,6 +31,106 @@ afterEach(async () => {
   for (const host of hosts.splice(0)) await host.dispose()
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
+
+test('mock 런타임은 API 키와 모델 환경 변수 없이 기본 모델로 응답하고 결과를 저장한다', async () => {
+  const runtime = await createAgentRuntime(
+    { KEUNDAL_PROVIDER: 'mock', KEUNDAL_API_TOKEN: 'mock-test-token', KEUNDAL_SQLITE_PATH: ':memory:' },
+    { compose: createNodeComposition, subagents: false }
+  )
+  hosts.push(runtime)
+  expect(runtime.model).toBe('mock-text')
+  expect(runtime.services.models()).toEqual(
+    ['mock-text', 'mock-tool', 'mock-error', 'mock-slow'].map((id) => ({
+      id,
+      provider: 'mock',
+      contextWindow: 128000,
+      maxOutputTokens: 4096
+    }))
+  )
+  const events: AGUIEvent[] = []
+  for await (const event of runtime.services.run({
+    threadId: 'mock-thread',
+    runId: 'mock-run',
+    state: {},
+    tools: [],
+    context: [],
+    messages: [{ id: 'user', role: 'user', content: 'Hello' }]
+  }))
+    events.push(event)
+  expect(events.at(-1)?.type).toBe(EventType.RUN_FINISHED)
+  expect(events).toContainEqual(expect.objectContaining({ type: EventType.TEXT_MESSAGE_CONTENT }))
+  expect((await runtime.services.session.get('mock-thread'))?.messages).toContainEqual(
+    expect.objectContaining({ role: 'assistant', content: expect.any(String) })
+  )
+  expect(await runtime.services.generation.get('mock-run')).toMatchObject({ status: 'completed' })
+})
+
+test.each(['provider', 'config', 'export', 'default'])(
+  'mock 공급자는 %s 선택에서 필수 플러그인과 메타데이터를 노출하고 API 키 검사를 건너뛴다',
+  async (selection) => {
+    const options = {
+      provider: selection === 'provider' || selection === 'default' ? 'mock' : 'openai',
+      apiKey: '',
+      requireProviderApiKey: true,
+      model: 'mock-text',
+      sqlitePath: ':memory:',
+      runtimePlugins: {
+        plugins: [
+          {
+            module: 'builtin:llm',
+            ...(selection === 'config' ? { config: { provider: 'mock' } } : {}),
+            ...(selection === 'export' ? { export: 'mock' } : {}),
+            ...(selection === 'default' ? { export: 'default' } : {})
+          },
+          { module: 'builtin:store' }
+        ],
+        agent: { module: 'builtin:agent' }
+      }
+    }
+    expect(getRequiredNodePluginModules(options)).toEqual(['@keundal/plugin-llm-mock', '@keundal/plugin-store-sqlite'])
+    expect(nodePluginMetadata['@keundal/plugin-llm-mock']).toMatchObject({
+      name: { en: expect.any(String), ko: expect.any(String) },
+      description: { en: expect.any(String), ko: expect.any(String) }
+    })
+    const host = await createAgentHost(options)
+    hosts.push(host)
+    expect(await host.ctx.llm.getModel('mock-text')).toMatchObject({
+      contextWindow: 128000,
+      maxOutputTokens: 4096
+    })
+  }
+)
+
+test('mock 런타임은 명시한 모델과 환경 변수의 토큰 한도를 보존한다', async () => {
+  const runtime = await createAgentRuntime(
+    {
+      KEUNDAL_PROVIDER: 'mock',
+      KEUNDAL_MODEL: 'mock-tool',
+      KEUNDAL_CONTEXT_WINDOW: '16000',
+      KEUNDAL_MAX_OUTPUT_TOKENS: '512',
+      KEUNDAL_API_TOKEN: 'mock-test-token',
+      KEUNDAL_SQLITE_PATH: ':memory:'
+    },
+    { compose: createNodeComposition }
+  )
+  hosts.push(runtime)
+  expect(runtime.model).toBe('mock-tool')
+  expect(runtime.services.models()).toContainEqual({
+    id: 'mock-tool',
+    provider: 'mock',
+    contextWindow: 16000,
+    maxOutputTokens: 512
+  })
+})
+
+test.each(['openai', 'openai-chat', 'gemini', 'anthropic'])(
+  '기존 %s 공급자는 모델 환경 변수가 없으면 mock 모델로 대체하지 않는다',
+  async (provider) => {
+    await expect(
+      createAgentRuntime({ KEUNDAL_PROVIDER: provider }, { compose: createNodeComposition })
+    ).rejects.toThrow('KEUNDAL_MODEL')
+  }
+)
 
 test('프로젝트 메모리를 에이전트 도구로 저장하고 호스트 재시작 후 새 대화에서 출처와 함께 검색한다', async () => {
   const path = sqlitePath()

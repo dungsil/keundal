@@ -11,6 +11,7 @@ const props = defineProps<{
 const { t, locale } = useText()
 const route = useRoute()
 const returnTo = computed(() => settingsReturnTo(route.query.returnTo))
+const sectionPending = ref(false)
 
 const entries = useSlotEntries('settings.section')
 const sections = computed(() => entries.value.map(entry => ({
@@ -118,10 +119,13 @@ useHead(() => {
               </div>
             </div>
           </nav>
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0 flex-1" :aria-busy="sectionPending" :inert="sectionPending">
             <!-- Each section keeps its unsaved drafts while another section is open. -->
+            <!-- Keep the previous section visible until the next lazy view is ready. -->
             <KeepAlive>
-              <SlotOutlet :key="section" name="settings.section" :entry-key="section" />
+              <Suspense @pending="sectionPending = true" @resolve="sectionPending = false">
+                <SlotOutlet :key="section" name="settings.section" :entry-key="section" />
+              </Suspense>
             </KeepAlive>
           </div>
         </div>

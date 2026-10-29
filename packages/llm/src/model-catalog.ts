@@ -28,13 +28,17 @@ export class ModelCatalogBudget {
   private entries = 0
   private nodes = 0
 
+  constructor(
+    private readonly limits: Readonly<Record<keyof typeof MODEL_CATALOG_LIMITS, number>> = MODEL_CATALOG_LIMITS
+  ) {}
+
   beginPage(): void {
-    if (++this.pages > MODEL_CATALOG_LIMITS.pages) throw new Error('model catalog page limit exceeded')
+    if (++this.pages > this.limits.pages) throw new Error('model catalog page limit exceeded')
   }
 
   acceptEntries(count: number): void {
     this.entries += count
-    if (this.entries > MODEL_CATALOG_LIMITS.entries) throw new Error('model catalog entry limit exceeded')
+    if (this.entries > this.limits.entries) throw new Error('model catalog entry limit exceeded')
   }
 
   async readJSON(response: globalThis.Response): Promise<unknown> {
@@ -49,7 +53,7 @@ export class ModelCatalogBudget {
         if (next.done) break
         pageBytes += next.value.byteLength
         this.bytes += next.value.byteLength
-        if (pageBytes > MODEL_CATALOG_LIMITS.pageBytes || this.bytes > MODEL_CATALOG_LIMITS.bytes) {
+        if (pageBytes > this.limits.pageBytes || this.bytes > this.limits.bytes) {
           throw new Error('model catalog byte limit exceeded')
         }
         text += decoder.decode(next.value, { stream: true })
@@ -63,7 +67,7 @@ export class ModelCatalogBudget {
     }
     const value: unknown = JSON.parse(text)
     const visit = (item: unknown, depth: number): void => {
-      if (++this.nodes > MODEL_CATALOG_LIMITS.nodes || depth > MODEL_CATALOG_LIMITS.depth) {
+      if (++this.nodes > this.limits.nodes || depth > this.limits.depth) {
         throw new Error('model catalog structure limit exceeded')
       }
       if (item !== null && typeof item === 'object') {

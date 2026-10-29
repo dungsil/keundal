@@ -24,12 +24,7 @@
       }
     },
     {
-      "files": [
-        "packages/ui/nuxt.config.ts",
-        "packages/ui-*/nuxt.config.ts",
-        "packages/chat-app/nuxt.config.ts",
-        "apps/*/nuxt.config.ts"
-      ],
+      "files": ["packages/ui/nuxt.config.ts", "packages/ui-*/nuxt.config.ts", "apps/*/nuxt.config.ts"],
       "env": {
         "node": true
       },
@@ -38,7 +33,7 @@
       }
     },
     {
-      "files": ["packages/ui/app/**", "packages/ui-*/app/**", "packages/chat-app/app/**", "apps/*/app/**"],
+      "files": ["packages/ui/app/**", "packages/ui-*/app/**", "apps/*/app/**"],
       "env": {
         "browser": true
       },
@@ -77,7 +72,7 @@
       }
     },
     {
-      "files": ["packages/ui/app/**", "packages/ui-*/app/**", "packages/chat-app/app/**"],
+      "files": ["packages/ui/app/**", "packages/ui-*/app/**"],
       "globals": {
         "abortNavigation": "readonly",
         "defineMarkdownComponent": "readonly",
@@ -93,12 +88,7 @@
       }
     },
     {
-      "files": [
-        "packages/ui/app/**/*.vue",
-        "packages/ui-*/app/**/*.vue",
-        "packages/chat-app/app/**/*.vue",
-        "apps/*/app/**/*.vue"
-      ],
+      "files": ["packages/ui/app/**/*.vue", "packages/ui-*/app/**/*.vue", "apps/*/app/**/*.vue"],
       "globals": {
         "defineEmits": "readonly",
         "defineModel": "readonly",

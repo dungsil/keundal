@@ -10,6 +10,7 @@ import acpAgentPlugin from '@keundal/plugin-agent-acp'
 import agentPlugin, { metadata as agentMetadata } from '@keundal/plugin-agent-chat'
 import anthropic, { metadata as anthropicMetadata } from '@keundal/plugin-llm-anthropic'
 import gemini, { metadata as geminiMetadata } from '@keundal/plugin-llm-gemini'
+import mock, { metadata as mockMetadata } from '@keundal/plugin-llm-mock'
 import openai, { metadata as openaiMetadata } from '@keundal/plugin-llm-openai'
 import openaiChat, { metadata as openaiChatMetadata } from '@keundal/plugin-llm-openai-chat'
 import { metadata as mcpMetadata } from '@keundal/plugin-mcp-client'
@@ -26,7 +27,7 @@ import { mountCodingAgent } from './coding-agent.js'
 import type { HostCompositionFactory, NodeHostOptions } from './index.js'
 import { NodeCodingWorkspaces } from './workspaces.js'
 
-const providerPlugins = { openai, 'openai-chat': openaiChat, anthropic, gemini }
+const providerPlugins = { openai, 'openai-chat': openaiChat, anthropic, gemini, mock }
 
 /** Display metadata for the statically bundled Node implementations, without loading external modules. */
 export const nodePluginMetadata = {
@@ -34,6 +35,7 @@ export const nodePluginMetadata = {
   '@keundal/plugin-llm-openai-chat': openaiChatMetadata,
   '@keundal/plugin-llm-anthropic': anthropicMetadata,
   '@keundal/plugin-llm-gemini': geminiMetadata,
+  '@keundal/plugin-llm-mock': mockMetadata,
   '@keundal/plugin-store-sqlite': storeMetadata,
   '@keundal/plugin-agent-chat': agentMetadata,
   '@keundal/plugin-skill': skillMetadata,
@@ -221,6 +223,8 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
   const builtinLlmSpec = manifest.plugins.find((spec) => spec.module === 'builtin:llm')
   const hasBuiltinLlm = Boolean(builtinLlmSpec)
   const builtinLlmProvider = String(builtinLlmSpec?.config?.provider ?? options.provider)
+  const selectedLlmProvider =
+    builtinLlmSpec?.export && builtinLlmSpec.export !== 'default' ? builtinLlmSpec.export : builtinLlmProvider
   const builtinRegistry = {
     'builtin:llm': {
       config: {
@@ -284,7 +288,7 @@ export const createNodeComposition: HostCompositionFactory = (options) => {
       if (hasBuiltinLlm && !providerPlugins[builtinLlmProvider as keyof typeof providerPlugins]) {
         throw new Error(`unsupported KEUNDAL_PROVIDER for builtin:llm: ${builtinLlmProvider}`)
       }
-      if (hasBuiltinLlm && options.requireProviderApiKey && !options.apiKey.trim()) {
+      if (hasBuiltinLlm && selectedLlmProvider !== 'mock' && options.requireProviderApiKey && !options.apiKey.trim()) {
         throw new Error('OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY 중 하나를 설정하세요.')
       }
       if (manifest.plugins.some((spec) => spec.module === 'builtin:store')) {

@@ -26,6 +26,7 @@
   "devDependencies": {
     "@keundal/core": "workspace:*",
     "@keundal/llm": "workspace:*",
+    "@keundal/plugin-llm-mock": "workspace:*",
     "@keundal/plugin-store-memory": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",

@@ -3,6 +3,8 @@ import type en from './en'
 export default {
   'settings.appearance': '화면 설정',
   'settings.colorMode': '컬러 모드',
+  'settings.skipDeleteConfirmation': '확인 없이 대화 삭제',
+  'settings.deleteWarning': '삭제한 대화는 복구할 수 없습니다.',
   'settings.back': '대화로 돌아가기',
   'data.title': '백업·복원',
   'data.export': '백업 다운로드',
