@@ -1,4 +1,3 @@
 export default {
-  'navigation.skipToContent': 'Skip to content',
-  'navigation.chats': 'Conversations'
+  'navigation.skipToContent': 'Skip to content'
 }

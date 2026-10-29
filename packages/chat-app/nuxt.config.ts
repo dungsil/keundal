@@ -5,7 +5,9 @@ export default defineNuxtConfig({
   extends: [
     '@keundal/ui',
     '@keundal/ui-markdown-comark',
+    '@keundal/ui-shell',
     '@keundal/ui-layout',
+    '@keundal/ui-sidebar',
     '@keundal/ui-chat-list',
     '@keundal/ui-home',
     '@keundal/ui-composer',

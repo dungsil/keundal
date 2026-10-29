@@ -1,6 +1,6 @@
 # 공용 채팅 레이어
 
-`@keundal/chat-app`은 web과 desktop이 공유하는 셸입니다. `app.vue`, 오류 화면, 시작 화면, 경로 페이지와 공용 에셋을 관리하고, `app/ui-plugins.ts`에 적힌 UI 플러그인을 조립합니다. 대화·설정·모델 목록·스킬 화면은 각 `@keundal/ui-*` 패키지가 슬롯에 등록합니다. 구조와 슬롯은 [UI 플러그인 문서](../../docs/ui-plugins.md)를 참고합니다.
+`@keundal/chat-app`은 web과 desktop이 공유하는 조립 레이어입니다. `app.vue`의 Nuxt UI 공급자, 오류 화면, 경로 페이지와 공용 에셋을 관리하고, `app/ui-plugins.ts`에 적힌 UI 플러그인을 조립합니다. 시작 화면과 전역 메타데이터는 `@keundal/ui-shell`, 본문 틀은 `@keundal/ui-layout`, 사이드바는 `@keundal/ui-sidebar`가 담당합니다. 대화·설정·모델 목록·스킬 화면도 각 `@keundal/ui-*` 패키지가 슬롯에 등록합니다. 구조와 슬롯은 [UI 플러그인 문서](../../docs/ui-plugins.md)를 참고합니다.
 
 앱은 `extends: ['@keundal/chat-app']`으로 레이어를 사용하고, 먼저 실행되는 `chat-platform` Nuxt 플러그인에서 `@keundal/chat/platform`의 `ChatPlatform`을 제공합니다. `app/plugins/ui.ts`는 이 계약으로 `@keundal/ui-runtime`을 시작하며, IndexedDB, LLM SDK, Tauri, sidecar 구현을 직접 가져오지 않습니다.
 

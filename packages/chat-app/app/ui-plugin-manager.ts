@@ -73,7 +73,7 @@ export class UIPluginManager implements RuntimePluginManager {
       enabled: entry.required || this.selections[entry.module] !== false,
       required: entry.required,
       requires: [
-        ...(entry.module === '@keundal/ui-layout' ? [] : ['@keundal/ui-layout']),
+        ...(['@keundal/ui-shell', '@keundal/ui-layout'].includes(entry.module) ? [] : ['@keundal/ui-layout']),
         ...(entry.requires ?? []),
         ...platform.filter(plugin => entry.feature && plugin.feature === entry.feature).map(plugin => plugin.module)
       ]

@@ -5,18 +5,16 @@ import { useText } from '../locale'
 
 const { t } = useText()
 
-const sidebarOpen = ref(false)
 const mainContent = useTemplateRef('mainContent')
-const removePageHook = useNuxtApp().hook('page:finish', async () => {
-  sidebarOpen.value = false
-  await nextTick()
-  mainContent.value?.focus()
+const nuxtApp = useNuxtApp()
+onMounted(() => {
+  // Child navigation closes its drawer before the frame restores focus.
+  const removePageHook = nuxtApp.hook('page:finish', async () => {
+    await nextTick()
+    mainContent.value?.focus()
+  })
+  onUnmounted(removePageHook)
 })
-onUnmounted(removePageHook)
-
-const close = () => {
-  sidebarOpen.value = false
-}
 </script>
 
 <template>
@@ -24,31 +22,7 @@ const close = () => {
     {{ t('navigation.skipToContent') }}
   </a>
   <UDashboardGroup unit="rem">
-    <UDashboardSidebar
-      id="default"
-      role="complementary"
-      :aria-label="t('navigation.chats')"
-      v-model:open="sidebarOpen"
-      :min-size="12"
-      collapsible
-      resizable
-      :menu="{ inset: true }"
-      class="border-r-0 py-4 dark:[--ui-bg-elevated:var(--ui-color-neutral-900)]"
-    >
-      <template #header>
-        <UDashboardSidebarCollapse />
-      </template>
-
-      <template #default="{ collapsed }">
-        <SlotOutlet name="layout.sidebar" :owner="{ collapsed, close }" />
-      </template>
-
-      <template #footer="{ collapsed }">
-        <div class="flex flex-col gap-1 w-full">
-          <SlotOutlet name="layout.sidebar.footer" :owner="{ collapsed, close }" />
-        </div>
-      </template>
-    </UDashboardSidebar>
+    <SlotOutlet name="layout.navigation" />
 
     <SlotOutlet name="layout.overlay" />
 

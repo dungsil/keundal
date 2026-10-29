@@ -12,6 +12,8 @@ import * as markdown from '@keundal/ui-markdown-comark/plugin'
 import * as mcp from '@keundal/ui-mcp/plugin'
 import * as memory from '@keundal/ui-memory/plugin'
 import * as modelSelection from '@keundal/ui-model-selection/plugin'
+import * as shell from '@keundal/ui-shell/plugin'
+import * as sidebar from '@keundal/ui-sidebar/plugin'
 import * as settings from '@keundal/ui-settings/plugin'
 import * as settingsLlm from '@keundal/ui-settings-llm/plugin'
 import * as prompt from '@keundal/ui-settings-llm/prompt-plugin'
@@ -26,7 +28,9 @@ import type { UIPluginEntry } from './ui-plugin-manager'
 /** Only the management shell is protected; all other views are selectable. */
 export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-markdown-comark', plugin: markdown },
-  { module: '@keundal/ui-layout', plugin: layout, required: true },
+  { module: '@keundal/ui-shell', plugin: shell, required: true },
+  { module: '@keundal/ui-layout', plugin: layout, required: true, requires: ['@keundal/ui-shell'] },
+  { module: '@keundal/ui-sidebar', plugin: sidebar, required: true },
   { module: '@keundal/ui-chat-list', plugin: chatList },
   { module: '@keundal/ui-home', plugin: home },
   { module: '@keundal/ui-chat', plugin: chat },

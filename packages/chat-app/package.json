@@ -30,6 +30,8 @@
     "@keundal/ui-memory": "workspace:*",
     "@keundal/ui-model-selection": "workspace:*",
     "@keundal/ui-runtime": "workspace:*",
+    "@keundal/ui-shell": "workspace:*",
+    "@keundal/ui-sidebar": "workspace:*",
     "@keundal/ui-settings": "workspace:*",
     "@keundal/ui-settings-llm": "workspace:*",
     "@keundal/ui-skill": "workspace:*",

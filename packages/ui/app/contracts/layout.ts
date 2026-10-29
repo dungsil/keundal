@@ -11,6 +11,10 @@ export interface SidebarOwner {
 
 declare module '@keundal/ui-slots' {
   interface SlotMap {
+    /** Application frame inside the startup shell. */
+    'app.layout': { kind: 'single'; owner: Record<string, never> }
+    /** Navigation container beside the main content. */
+    'layout.navigation': { kind: 'single'; owner: Record<string, never> }
     /** The page at `/`. */
     'page.home': { kind: 'single'; owner: Record<string, never> }
     /** The page at `/chat/:id`. */

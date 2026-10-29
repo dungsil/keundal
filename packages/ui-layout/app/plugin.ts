@@ -7,18 +7,17 @@ import AppFrame from './views/AppFrame.vue'
 export const name = 'ui-layout'
 export const inject = ['slots']
 
-/** Render the application frame at `root` and declare the page and sidebar slots inside it. */
+/** Render the page frame and declare navigation, page and overlay slots. */
 export function apply(ctx: Context) {
-  ctx.slots.register({
-    name: 'root',
+  ctx.slots.inject('app.layout', () => ctx.slots.register({
+    name: 'app.layout',
     children: {
       'page.home': 'single',
       'page.chat': 'single',
       'page.history': 'single',
       'page.settings': 'single',
-      'layout.sidebar': 'list',
-      'layout.sidebar.footer': 'list',
+      'layout.navigation': 'single',
       'layout.overlay': 'list'
     }
-  }, AppFrame)
+  }, AppFrame))
 }

@@ -1,6 +1,6 @@
 # UI 플러그인과 슬롯
 
-채팅 화면은 `packages/ui-*` 플러그인의 조합으로 만든다. 각 플러그인은 Nuxt 레이어이면서 Cordis 플러그인이다. Nuxt 레이어는 앱의 모듈, Tailwind, 아이콘 설정으로 플러그인의 컴포넌트를 컴파일한다. Cordis 플러그인의 `apply(ctx)`는 컴포넌트를 슬롯에 등록한다. `@keundal/chat-app`은 셸, 경로 페이지, 플러그인 조립만 담당한다.
+채팅 화면은 `packages/ui-*` 플러그인의 조합으로 만든다. 각 플러그인은 Nuxt 레이어이면서 Cordis 플러그인이다. Nuxt 레이어는 앱의 모듈, Tailwind, 아이콘 설정으로 플러그인의 컴포넌트를 컴파일한다. Cordis 플러그인의 `apply(ctx)`는 컴포넌트를 슬롯에 등록한다. `@keundal/chat-app`은 Nuxt UI 공급자, 경로 페이지, 플러그인 조립을 담당한다. `@keundal/ui-shell`은 시작 화면과 전역 메타데이터를, `@keundal/ui-layout`은 본문 틀과 페이지 슬롯을, `@keundal/ui-sidebar`는 사이드바를 소유한다. 세 플러그인은 관리 화면에 계속 접근할 수 있도록 항상 등록한다.
 
 ## 구성 요소
 
@@ -105,21 +105,23 @@ Nuxt는 레이어의 `components`, `composables`, `utils`, `plugins`, `pages`, `
 ## 슬롯 구조
 
 ```text
-root                               ui-layout
-├─ page.home                       ui-home
-├─ page.history                    ui-chat-list
-├─ page.chat                       ui-chat
-│  ├─ chat.message.tool            ui-tool, ui-chart, ui-weather (항목이 없으면 기본 도구 카드)
-│  ├─ chat.message.footer          ui-trace
-│  ├─ chat.indicator               ui-trace
-│  ├─ chat.execution               ui-acp (메시지와 분리된 실행 패널)
-│  └─ chat.observer                ui-trace, ui-acp
-├─ page.settings                   ui-settings
-│  └─ settings.section             ui-settings, ui-settings-llm, ui-model-selection,
-│                                  ui-agent-plugins, ui-skill, ui-mcp, ui-automation
-├─ layout.sidebar                  ui-chat-list
-├─ layout.sidebar.footer           ui-settings
-└─ layout.overlay                  ui-chat-list, ui-automation
+root                               ui-shell
+└─ app.layout                      ui-layout
+   ├─ layout.navigation            ui-sidebar
+   │  ├─ layout.sidebar            ui-chat-list
+   │  └─ layout.sidebar.footer     ui-settings
+   ├─ page.home                    ui-home
+   ├─ page.history                 ui-chat-list
+   ├─ page.chat                    ui-chat
+   │  ├─ chat.message.tool         ui-tool, ui-chart, ui-weather (항목이 없으면 기본 도구 카드)
+   │  ├─ chat.message.footer       ui-trace
+   │  ├─ chat.indicator            ui-trace
+   │  ├─ chat.execution            ui-acp (메시지와 분리된 실행 패널)
+   │  └─ chat.observer             ui-trace, ui-acp
+   ├─ page.settings                ui-settings
+   │  └─ settings.section          ui-settings, ui-settings-llm, ui-model-selection,
+   │                               ui-agent-plugins, ui-skill, ui-mcp, ui-automation
+   └─ layout.overlay               ui-chat-list, ui-automation
 
 factory composer                   ui-composer
 ├─ composer.actions                ui-model-selection
