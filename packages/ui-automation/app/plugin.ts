@@ -19,6 +19,14 @@ const AutomationNotifications = lazyView(() => import('./views/AutomationNotific
 export const name = 'ui-automation'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'Automation settings', ko: '자동화 설정' },
+  description: {
+    en: 'Manages scheduled automations, execution history, and notifications.',
+    ko: '예약 자동화와 실행 이력, 알림을 관리합니다.'
+  }
+}
+
 export function apply(ctx: Context) {
   const runtime = ctx.chatRuntime
   const automations = shallowRef<AutomationSnapshot[]>([])

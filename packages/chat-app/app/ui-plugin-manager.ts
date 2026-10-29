@@ -3,7 +3,7 @@ import type { Context, Fiber, Plugin } from 'cordis'
 
 export interface UIPluginEntry {
   module: string
-  plugin: Plugin
+  plugin: Plugin & { metadata?: RuntimePluginInfo['metadata'] }
   feature?: RuntimePluginInfo['feature']
   requires?: readonly string[]
   required?: boolean
@@ -70,6 +70,7 @@ export class UIPluginManager implements RuntimePluginManager {
   private entries(platform: RuntimePluginInfo[]): RuntimePluginInfo[] {
     const entries: RuntimePluginInfo[] = [...platform, ...this.catalog.map(entry => ({
       module: entry.module,
+      metadata: entry.plugin.metadata,
       enabled: entry.required || this.selections[entry.module] !== false,
       required: entry.required,
       requires: [

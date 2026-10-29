@@ -9,6 +9,14 @@ import McpSettingsSection from './views/McpSettings.vue'
 export const name = 'ui-mcp'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'MCP server settings', ko: 'MCP 서버 설정' },
+  description: {
+    en: 'Configures MCP servers, connection permissions, and authentication.',
+    ko: 'MCP 서버와 연결 권한, 인증을 설정합니다.'
+  }
+}
+
 /** Add the MCP server section to the settings page. */
 export function apply(ctx: Context) {
   const runtime = ctx.chatRuntime

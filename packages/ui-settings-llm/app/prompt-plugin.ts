@@ -9,6 +9,14 @@ import SystemPromptSettings from './views/SystemPromptSettings.vue'
 export const name = 'ui-prompt-presets'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'Prompt preset settings', ko: '프롬프트 프리셋 설정' },
+  description: {
+    en: 'Creates and edits reusable prompt presets.',
+    ko: '재사용할 프롬프트 프리셋을 만들고 편집합니다.'
+  }
+}
+
 export function apply(ctx: Context) {
   const runtime = ctx.chatRuntime
   ctx.slots.inject('settings.section', () => ctx.slots.register({

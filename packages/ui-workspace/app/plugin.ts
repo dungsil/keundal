@@ -7,6 +7,14 @@ import Workspace from './views/Workspace.vue'
 export const name = 'ui-workspace'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'Coding workspace view', ko: '코딩 작업공간 화면' },
+  description: {
+    en: 'Selects coding projects and provides diff review and application controls.',
+    ko: '코딩 프로젝트를 선택하고 변경 사항을 검토·적용합니다.'
+  }
+}
+
 export function apply(ctx: Context) {
   const runtime = ctx.chatRuntime
   ctx.slots.inject('composer.actions', () => ctx.slots.register({

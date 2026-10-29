@@ -75,11 +75,19 @@ async function fixture(options: {
 
 test('실행과 UI 플러그인을 모두 노출하고 관리 화면만 비활성화를 거부한다', async () => {
   const runtime = platform()
-  const { ctx, manager } = await fixture({ platform: runtime.manager })
+  const metadata = {
+    name: { en: 'Example settings', ko: '예시 설정' },
+    description: { en: 'Manages example preferences.', ko: '예시 설정을 관리합니다.' }
+  }
+  const { ctx, manager } = await fixture({
+    platform: runtime.manager,
+    entries: [{ module: '@example/settings', plugin: { metadata, apply() {} } }]
+  })
   expect((await manager.list()).map(entry => entry.module)).toEqual([
     ...runtime.records.map(entry => entry.module), '@keundal/ui-layout', '@keundal/ui-skill',
-    '@keundal/ui-agent-plugins', '@keundal/ui-mcp', '@keundal/ui-tool'
+    '@keundal/ui-agent-plugins', '@keundal/ui-mcp', '@keundal/ui-tool', '@example/settings'
   ])
+  expect((await manager.list()).find(entry => entry.module === '@example/settings')?.metadata).toEqual(metadata)
   for (const module of ['@keundal/ui-layout', '@keundal/ui-agent-plugins']) {
     await expect(manager.setEnabled(module, false)).rejects.toThrow('Required')
   }
