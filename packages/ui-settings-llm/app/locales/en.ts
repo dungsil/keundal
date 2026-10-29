@@ -55,6 +55,7 @@ export default {
   'common.key': 'Key',
   'common.value': 'Value',
   'llm.title': 'LLM settings',
+  'llm.mockDescription': 'Runs locally without an API key or network requests. Choose Text, Error or Slow stream to test responses. For Tool, send JSON such as {"name":"weather","arguments":{"location":"Seoul"}}; the named tool runs normally and may access external services.',
   'llm.providerType': 'Provider type',
   'llm.addProvider': 'Add provider',
   'llm.invalidName': 'Use a provider name of up to 100 characters.',

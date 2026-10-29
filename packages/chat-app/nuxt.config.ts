@@ -46,6 +46,7 @@ export default defineNuxtConfig({
       scan: { globInclude: ['**/*.{vue,ts}'] },
       icons: [
         'lucide:image',
+        'lucide:flask-conical',
         'simple-icons:anthropic',
         'simple-icons:google',
         'simple-icons:openai'

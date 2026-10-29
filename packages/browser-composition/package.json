@@ -30,6 +30,7 @@
     "@keundal/plugin-llm-anthropic": "workspace:*",
     "@keundal/plugin-llm-browser": "workspace:*",
     "@keundal/plugin-llm-gemini": "workspace:*",
+    "@keundal/plugin-llm-mock": "workspace:*",
     "@keundal/plugin-llm-openai": "workspace:*",
     "@keundal/plugin-llm-openai-chat": "workspace:*",
     "@keundal/plugin-mcp-client": "workspace:*",

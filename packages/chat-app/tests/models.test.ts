@@ -8,6 +8,23 @@ import { MODEL_CACHE_TTL, MODEL_CACHE_MAX_AGE } from '@keundal/plugin-llm-browse
 import { loadModels } from '@keundal/browser-composition/llm'
 import { defaultLLMSettings, llmSettingsSchema } from '@keundal/llm-settings'
 
+test('목업 모델 목록은 키와 네트워크 없이 등록한 공급자 ID와 모델 기능을 반환한다', async () => {
+  const settings = defaultLLMSettings()
+  settings['mock@demo'] = { name: 'Local test', apiKey: '', baseURL: '' }
+  const storage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+  const models = await loadModels('mock@demo', settings, storage)
+  expect(models.map(model => model.value)).toEqual([
+    'mock@demo/mock-text', 'mock@demo/mock-tool', 'mock@demo/mock-error', 'mock@demo/mock-slow'
+  ])
+  expect(models[1]).toMatchObject({
+    label: 'Mock · Tool (JSON: name, arguments) · Local test',
+    icon: 'i-lucide-flask-conical',
+    contextWindow: 128000,
+    maxOutputTokens: 4096,
+    capabilities: { tools: true, reasoning: [], webSearch: false }
+  })
+})
+
 async function fixture(handler: (req: IncomingMessage, res: ServerResponse) => void) {
   const requests: IncomingMessage[] = []
   const server = createServer((req, res) => {
