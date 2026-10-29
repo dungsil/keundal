@@ -7,6 +7,14 @@ import LLMSettingsSection from './views/LLMSettings.vue'
 export const name = 'ui-settings-llm'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'LLM provider settings', ko: 'LLM 공급자 설정' },
+  description: {
+    en: 'Configures LLM provider connections and loads their available models.',
+    ko: 'LLM 공급자 연결을 설정하고 사용할 수 있는 모델을 불러옵니다.'
+  }
+}
+
 /** Add the LLM provider section to the settings page. */
 export function apply(ctx: Context) {
   const runtime = ctx.chatRuntime

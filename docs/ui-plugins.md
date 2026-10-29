@@ -87,6 +87,8 @@ LLM 본문·추론·서브에이전트 결과는 `@keundal/ui`의 `ChatMarkdown`
 
 큰달 플러그인 목록의 이름과 설명은 각 기능 패키지가 내보내는 `metadata`를 사용합니다. `name`과 `description`은 각각 `{ en: string, ko: string }`으로 제공합니다. 앱의 조립 계층은 이를 `RuntimePluginInfo.metadata`에 담고, 화면은 현재 앱 언어의 이름·설명과 스위치의 접근성 이름을 표시합니다. `module`은 선택과 저장에 쓰는 식별자로 유지합니다. 메타데이터가 없는 항목은 `module`을 이름으로 표시하며 설명은 생략합니다. desktop의 외부 설치 항목은 `package.json`의 이름·설명·버전을 사용하며, 표시를 위해 외부 모듈을 불러오지 않습니다. 설치·삭제 콜백은 desktop의 관리자가 제공할 때만 노출합니다.
 
+새 UI 항목을 추가할 때는 `app/plugin.ts`나 해당 하위 진입점에서 비어 있지 않은 한국어·영어 이름과 설명을 내보냅니다. `UIPluginManager`는 목록에 등록된 `plugin.metadata`를 관리 화면에 전달합니다. `agentPluginSettings`처럼 별도 객체로 등록하는 항목은 그 객체에 메타데이터를 작성합니다. 실행 기능과 설정·결과 UI를 구분하는 이름을 사용하고, 모듈명 표시는 메타데이터가 없는 외부 항목의 대체 표시로만 둡니다.
+
 화면은 태그라인과 상시 도움말 대신 제목, 입력란 이름, 구분선과 컨트롤 배치로 구조를 전달합니다. 중복되는 보조 레이블은 표시하지 않습니다. 오류, 보안 경고, 사용자가 작성한 내용과 접근성 이름은 유지합니다.
 
 ## 패키지 구조
@@ -124,7 +126,9 @@ root                               ui-shell
 
 factory composer                   ui-composer
 ├─ composer.actions                ui-model-selection
-└─ composer.dictation              ui-dictation (항목이 없으면 전송 버튼)
+└─ composer.dictation              기본 등록 없음 (전송 버튼 표시)
 ```
+
+`@keundal/ui-dictation`은 기본 구성에서 제외하며, 별도로 조립하면 `composer.dictation`에 음성 입력을 등록합니다.
 
 각 슬롯의 소유자 값은 `packages/ui/app/contracts/`에서 확인합니다. UI 등록 목록은 각 앱의 `app/ui-plugins.ts`, 수명과 선택 관리는 `ui-runtime/src/ui-plugin-manager.ts`에 둡니다.

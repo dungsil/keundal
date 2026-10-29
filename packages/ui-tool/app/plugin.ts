@@ -6,6 +6,14 @@ import { lazyView } from '@keundal/ui-slots'
 export const name = 'ui-tool'
 export const inject = ['slots']
 
+export const metadata = {
+  name: { en: 'Tool result cards', ko: '도구 결과 카드' },
+  description: {
+    en: 'Displays subagent, skill, and web search tool results.',
+    ko: '서브에이전트·스킬·웹 검색 도구의 결과를 표시합니다.'
+  }
+}
+
 const toolView = (load: () => Promise<{ default: Component }>) => lazyView(load, ['part'])
 
 const Subagent = toolView(() => import('./views/Subagent.vue'))

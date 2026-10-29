@@ -22,6 +22,10 @@
       "types": "./dist/file.d.ts",
       "import": "./dist/file.js"
     },
+    "./documents": {
+      "types": "./dist/documents.d.ts",
+      "import": "./dist/documents.js"
+    },
     "./models": {
       "types": "./dist/models.d.ts",
       "import": "./dist/models.js"
@@ -81,12 +85,15 @@
     "@keundal/tool-approval": "workspace:*",
     "@keundal/tools": "workspace:*",
     "@keundal/workspace": "workspace:*",
+    "papaparse": "5.7.0",
+    "pdfjs-dist": "6.4.299",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",
+    "@types/papaparse": "5.5.2",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

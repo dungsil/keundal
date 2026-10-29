@@ -9,6 +9,14 @@ import { createLiveTrace, type LiveTrace } from './lib/live-trace'
 export const name = 'ui-trace'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'Execution trace view', ko: '실행 추적 화면' },
+  description: {
+    en: 'Displays live and saved execution traces, token usage, and costs.',
+    ko: '진행 중이거나 저장된 실행 추적과 토큰 사용량, 비용을 표시합니다.'
+  }
+}
+
 const TraceObserver = lazyView(() => import('./views/TraceObserver'), ['pendingRunId', 'subscribe', 'trace', 'release'])
 const TraceIndicator = lazyView(() => import('./views/TraceIndicator.vue'), ['messages', 'status', 'trace', 'getRun'])
 const TraceFooter = lazyView(

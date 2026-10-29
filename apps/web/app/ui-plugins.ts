@@ -5,7 +5,6 @@ import * as chat from '@keundal/ui-chat/plugin'
 import * as chatList from '@keundal/ui-chat-list/plugin'
 import * as chart from '@keundal/ui-chart/plugin'
 import * as composer from '@keundal/ui-composer/plugin'
-import * as dictation from '@keundal/ui-dictation/plugin'
 import * as home from '@keundal/ui-home/plugin'
 import * as markdown from '@keundal/ui-markdown-comark/plugin'
 import * as mcp from '@keundal/ui-mcp/plugin'
@@ -21,7 +20,6 @@ import * as subagents from '@keundal/ui-subagents/plugin'
 import * as tool from '@keundal/ui-tool/plugin'
 import * as trace from '@keundal/ui-trace/plugin'
 import * as weather from '@keundal/ui-weather/plugin'
-import * as workspace from '@keundal/ui-workspace/plugin'
 import type { UIPluginEntry } from '@keundal/ui-runtime'
 
 /** Only the management shell is protected; all other views are selectable. */
@@ -33,9 +31,7 @@ export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-home', plugin: home },
   { module: '@keundal/ui-chat', plugin: chat },
   { module: '@keundal/ui-composer', plugin: composer },
-  { module: '@keundal/ui-workspace', plugin: workspace, requires: ['@keundal/ui-composer'] },
   { module: '@keundal/ui-model-selection', plugin: modelSelection, requires: ['@keundal/ui-settings'] },
-  { module: '@keundal/ui-dictation', plugin: dictation, requires: ['@keundal/ui-composer'] },
   { module: '@keundal/ui-trace', plugin: trace, requires: ['@keundal/ui-chat'] },
   // Renderers remain independent of execution tools so saved results can still be read.
   { module: '@keundal/ui-acp', plugin: acp, requires: ['@keundal/ui-chat'] },

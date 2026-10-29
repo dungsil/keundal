@@ -6,7 +6,7 @@ import type { AgentConfig } from '@keundal/agent-loop'
 import type { ExecutableTool } from '@keundal/tools'
 import type { ChatMessage } from '@keundal/chat/chat-message'
 import { toMessages } from '@keundal/chat/messages'
-import { EventType } from '@keundal/core'
+import { EventType, type AGUIEvent } from '@keundal/core'
 import { LLMService, type LLMEvent, type LLMRequest } from '@keundal/llm'
 import agentPlugin from '@keundal/plugin-agent-chat'
 import { ChatStore } from '@keundal/plugin-chat-local'
@@ -87,6 +87,29 @@ const answer = (text: string): LLMEvent[] => {
 }
 
 const first: ChatMessage = { id: 'first', role: 'user', parts: [{ type: 'text', text: '첫 질문' }] }
+
+test.each(['legacy', 'success', 'cancelled', 'interrupt', 'unfinished'] as const)('%s 종료에서는 정상 완료일 때만 다음 대기 메시지를 실행한다', async (outcome) => {
+  const queued: ChatMessage = { id: 'queued', role: 'user', parts: [{ type: 'text', text: '다음 질문' }] }
+  let runs = 0
+  const chat = useKeundalChat({
+    async *respond() {
+      const runId = `run-${++runs}`
+      yield { type: EventType.RUN_STARTED, threadId: 'chat', runId }
+      if (outcome === 'unfinished') return
+      yield {
+        type: EventType.RUN_FINISHED, threadId: 'chat', runId,
+        ...(outcome === 'legacy' ? {} : { outcome: outcome === 'interrupt'
+          ? { type: 'interrupt', interrupts: [{ id: 'approval', reason: 'confirmation', message: '계속할까요?' }] }
+          : { type: outcome } })
+      } as AGUIEvent
+    },
+    load: async () => ({ messages: [first], queue: runs === 1 ? [queued] : [] })
+  })
+  await chat.sendMessage({ text: '첫 질문' })
+  const succeeded = outcome === 'legacy' || outcome === 'success'
+  expect(runs).toBe(succeeded ? 2 : 1)
+  expect(chat.queue.value).toEqual(succeeded ? [] : [queued])
+})
 
 function client(chats: ChatStore, id: string) {
   return useKeundalChat({

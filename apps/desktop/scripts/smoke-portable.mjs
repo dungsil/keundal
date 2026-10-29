@@ -7,11 +7,12 @@ import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 
 const portable = resolve(process.argv[2])
+const upgraded = process.argv[3] ? resolve(process.argv[3]) : portable
 const work = await mkdtemp(join(tmpdir(), 'keundal-portable-smoke-'))
-const runtime = join(portable, process.platform === 'win32' ? 'keundal-host.exe' : 'keundal-host')
 const token = 'portable-smoke-test-token'
 const model = 'portable-smoke-model'
 const message = { id: 'smoke-message', role: 'user', content: 'portable persistence check' }
+const savedState = { upgradeCheck: '기존 버전에서 저장한 대화 상태', count: 7 }
 let host
 let app
 
@@ -32,8 +33,9 @@ async function stop(child) {
   await exited
 }
 
-async function startHost() {
-  const child = spawn(runtime, [join(portable, 'sidecar/main.js')], {
+async function startHost(directory = portable) {
+  const runtime = join(directory, process.platform === 'win32' ? 'keundal-host.exe' : 'keundal-host')
+  const child = spawn(runtime, [join(directory, 'sidecar/main.js')], {
     cwd: work,
     env: {
       ...process.env,
@@ -119,16 +121,28 @@ try {
   assert.ok(models.models.some(entry => entry.id === model))
   await request(url, '/threads/portable-smoke', {
     method: 'PUT',
-    body: JSON.stringify({ expectedRevision: 0, messages: [message], state: {} })
+    body: JSON.stringify({ expectedRevision: 0, messages: [message], state: savedState })
   })
+  const original = await request(url, '/threads/portable-smoke')
   await stop(host)
-  const restarted = await startHost()
+  const restarted = await startHost(upgraded)
   const snapshot = await request(restarted, '/threads/portable-smoke')
   assert.deepEqual(snapshot.messages, [message])
-  console.log('PASS: packaged host starts outside the repository; auth, models and SQLite restart work')
+  assert.deepEqual(snapshot.state, savedState)
+  assert.equal(snapshot.revision, original.revision)
+  await request(restarted, '/threads/portable-smoke', {
+    method: 'PUT',
+    body: JSON.stringify({
+      expectedRevision: snapshot.revision,
+      messages: [...snapshot.messages, { id: 'after-upgrade', role: 'assistant', content: '새 버전에서도 쓰기 가능' }],
+      state: snapshot.state
+    })
+  })
+  assert.equal((await request(restarted, '/threads/portable-smoke')).messages.length, 2)
+  console.log('PASS: packaged hosts preserve SQLite messages, state and revision across restart/replacement and accept new writes')
 
   if (process.platform === 'win32') {
-    app = spawn(join(portable, 'keundal-desktop.exe'), [], {
+    app = spawn(join(upgraded, 'keundal-desktop.exe'), [], {
       cwd: work,
       stdio: 'inherit'
     })

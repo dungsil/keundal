@@ -399,7 +399,36 @@ const messageCollisionScenario = async (store: ConformanceStore): Promise<unknow
   }
 }
 
+async function chunkScenario(store: ConformanceStore): Promise<unknown> {
+  const events = await collect(
+    store.generation.run(request('chunks'), {
+      stream: async function* () {
+        yield {
+          type: EventType.TEXT_MESSAGE_CHUNK,
+          messageId: 'policy',
+          role: 'developer',
+          delta: 'Policy',
+          metadata: { keep: true }
+        }
+        yield { type: EventType.REASONING_MESSAGE_CHUNK, messageId: 'reason', delta: 'Check' }
+        yield { type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'reply', delta: 'All ' }
+        yield { type: EventType.TEXT_MESSAGE_CHUNK, delta: 'done', metadata: { done: true } }
+      }
+    })
+  )
+  const run = await store.generation.get('chunks')
+  const session = await store.session.get('thread')
+  return {
+    eventTypes: events.map((event) => event.type),
+    messages: run?.messages,
+    sessionMessages: session?.messages,
+    replayMatches:
+      JSON.stringify(await Array.fromAsync(store.generation.subscribe('chunks'))) === JSON.stringify(run?.journal)
+  }
+}
+
 const scenarios: ReadonlyArray<{ name: string; run: (store: ConformanceStore) => Promise<unknown> }> = [
+  { name: 'chunks', run: chunkScenario },
   { name: 'messageCollisions', run: messageCollisionScenario },
   { name: 'success', run: successScenario },
   { name: 'durableContext', run: contextScenario },
@@ -415,6 +444,33 @@ const scenarios: ReadonlyArray<{ name: string; run: (store: ConformanceStore) =>
 
 /** 세 저장소가 같은 결과를 내야 하는 시나리오의 기대 보고서입니다. */
 export const expectedConformanceReport: ConformanceReport = {
+  chunks: {
+    eventTypes: [
+      'RUN_STARTED',
+      'TEXT_MESSAGE_START',
+      'TEXT_MESSAGE_CONTENT',
+      'TEXT_MESSAGE_END',
+      'REASONING_MESSAGE_START',
+      'REASONING_MESSAGE_CONTENT',
+      'REASONING_MESSAGE_END',
+      'TEXT_MESSAGE_START',
+      'TEXT_MESSAGE_CONTENT',
+      'TEXT_MESSAGE_CONTENT',
+      'TEXT_MESSAGE_END',
+      'RUN_FINISHED'
+    ],
+    messages: [
+      { id: 'policy', role: 'developer', content: 'Policy', metadata: { keep: true } },
+      { id: 'reason', role: 'reasoning', content: 'Check' },
+      { id: 'reply', role: 'assistant', content: 'All done', metadata: { done: true } }
+    ],
+    sessionMessages: [
+      { id: 'policy', role: 'developer', content: 'Policy', metadata: { keep: true } },
+      { id: 'reason', role: 'reasoning', content: 'Check' },
+      { id: 'reply', role: 'assistant', content: 'All done', metadata: { done: true } }
+    ],
+    replayMatches: true
+  },
   messageCollisions: {
     rejected: [true, true, true, true],
     rejectionWasAtomic: true,

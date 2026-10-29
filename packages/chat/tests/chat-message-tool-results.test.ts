@@ -1,8 +1,53 @@
 import { ChatMessageAssembly } from '@keundal/chat/chat-message'
+import { toMessages } from '@keundal/chat/messages'
 import { EventType, type AGUIEvent } from '@keundal/core'
 import { expect, test } from 'vitest'
 
 type ToolResult = Extract<AGUIEvent, { type: typeof EventType.TOOL_CALL_RESULT }>
+
+test('CHUNK를 화면 블록과 재생 메시지로 조립하고 실행 종료 때 스트리밍 상태를 해제한다', () => {
+  const assembly = new ChatMessageAssembly('run')
+  assembly.apply({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'policy', role: 'system', delta: 'Policy' })
+  assembly.apply({ type: EventType.REASONING_MESSAGE_CHUNK, messageId: 'reason', delta: 'Think' })
+  assembly.apply({ type: EventType.TOOL_CALL_CHUNK, toolCallId: 'call', toolCallName: 'lookup', delta: '{"city":' })
+  assembly.apply({ type: EventType.TOOL_CALL_CHUNK, delta: '"Seoul"}' })
+  assembly.apply({ type: EventType.TOOL_CALL_RESULT, toolCallId: 'call', messageId: 'result', content: 'found' })
+  assembly.apply({ type: EventType.TEXT_MESSAGE_CHUNK, messageId: 'answer', delta: 'All ', metadata: { keep: true } })
+  assembly.apply({ type: EventType.TEXT_MESSAGE_CHUNK, delta: 'done', metadata: { end: true } })
+  assembly.apply({ type: EventType.RUN_FINISHED, threadId: 'thread', runId: 'run' })
+  assembly.finish('openai/test')
+  expect(assembly.message.parts.slice(0, 4)).toEqual([
+    { type: 'text', role: 'system', text: 'Policy' },
+    { type: 'reasoning', text: 'Think' },
+    { type: 'tool-lookup', toolCallId: 'call', state: 'output-available', input: { city: 'Seoul' }, output: 'found' },
+    { type: 'text', text: 'All done' }
+  ])
+  expect(toMessages([assembly.message], 'openai/test')).toContainEqual({
+    id: 'answer',
+    role: 'assistant',
+    content: 'All done',
+    metadata: { keep: true, end: true }
+  })
+})
+
+test('한 실행에 섞인 발신 역할과 metadata를 화면용 블록과 다음 요청에서 보존한다', () => {
+  const assembly = new ChatMessageAssembly('run')
+  for (const role of ['user', 'system', 'developer', 'assistant'] as const) {
+    assembly.apply({ type: EventType.TEXT_MESSAGE_START, messageId: role, role, metadata: { start: true } })
+    assembly.apply({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: role, delta: role, metadata: { content: true } })
+    assembly.apply({ type: EventType.TEXT_MESSAGE_END, messageId: role })
+  }
+  assembly.finish('openai/test')
+  expect(assembly.message.parts.slice(0, 4)).toEqual([
+    { type: 'text', role: 'user', text: 'user' },
+    { type: 'text', role: 'system', text: 'system' },
+    { type: 'text', role: 'developer', text: 'developer' },
+    { type: 'text', text: 'assistant' }
+  ])
+  expect(toMessages([assembly.message], 'openai/test').map(({ role, metadata }) => ({ role, metadata }))).toEqual(
+    ['user', 'system', 'developer', 'assistant'].map((role) => ({ role, metadata: { start: true, content: true } }))
+  )
+})
 
 function projectResult(name: string, content: ToolResult['content']) {
   const assembly = new ChatMessageAssembly('run-1')

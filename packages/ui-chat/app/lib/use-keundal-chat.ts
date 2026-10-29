@@ -35,6 +35,7 @@ export function useKeundalChat(options: {
     status.value = 'submitted'
     // Defer execution until active is assigned, including synchronous failures.
     const done = Promise.resolve().then(async () => {
+      let succeeded = false
       try {
         for await (const event of options.respond(
           messages.value,
@@ -49,6 +50,8 @@ export function useKeundalChat(options: {
           abort.signal
         )) {
           options.onEvent?.(event)
+          if (event.type === EventType.RUN_FINISHED)
+            succeeded = event.outcome === undefined || event.outcome.type === 'success'
           if (event.type === EventType.RUN_ERROR && !abort.signal.aborted) {
             // Drain the iterator before reporting the error so partial output is saved.
             error.value = new Error(event.message)
@@ -70,7 +73,7 @@ export function useKeundalChat(options: {
           active = undefined
         }
       }
-      return !abort.signal.aborted && !error.value
+      return succeeded && !abort.signal.aborted && !error.value
     })
     active = { abort, done }
     return done

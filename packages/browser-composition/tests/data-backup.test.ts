@@ -9,6 +9,7 @@ import {
   serializeDataBackup,
   openDataBackup
 } from '@keundal/chat'
+import type { StoredAttachment } from '@keundal/chat/file'
 import { toMessages } from '@keundal/chat/messages'
 import { EventType } from '@keundal/core'
 import { defaultLLMSettings } from '@keundal/llm-settings'
@@ -98,9 +99,19 @@ test('백업은 비밀 설정을 제외하고 대화·프리셋·로컬 스킬·
     ],
     async () => {}
   )
+  const document: StoredAttachment = {
+    type: 'file',
+    filename: '기록.csv',
+    mediaType: 'text/csv',
+    url: '',
+    text: JSON.stringify([
+      ['항목', '내용'],
+      ['서울 🌱', '쉼표, 줄바꿈\n=1+1']
+    ])
+  }
   await source.store.create(
     'portable-chat',
-    { id: 'question', role: 'user', parts: [{ type: 'text', text: 'Keep this question' }] },
+    { id: 'question', role: 'user', parts: [{ type: 'text', text: 'Keep this question' }, document] },
     'openai/custom'
   )
   await source.store.rename('portable-chat', 'Portable title')
@@ -173,7 +184,7 @@ test('백업은 비밀 설정을 제외하고 대화·프리셋·로컬 스킬·
     title: 'Portable title',
     started: true,
     messages: [
-      { id: 'question', parts: [{ type: 'text', text: 'Keep this question' }] },
+      { id: 'question', parts: [{ type: 'text', text: 'Keep this question' }, document] },
       { id: 'reply', parts: [{ type: 'text', text: 'Saved answer' }] }
     ],
     votes: [{ chatId: 'portable-chat', messageId: 'reply', isUpvoted: true }]

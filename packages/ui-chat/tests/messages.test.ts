@@ -28,3 +28,18 @@ test('인접 텍스트를 합쳐도 출처 위치와 순서 및 마지막 스트
   ])
   expect(parts).toEqual(original)
 })
+
+test('발신 역할이 다른 텍스트는 합치지 않고 같은 역할의 인접 텍스트만 합친다', () => {
+  expect(getMergedParts([
+    { type: 'text', text: 'assistant' },
+    { type: 'text', role: 'user', text: 'user ' },
+    { type: 'text', role: 'user', text: 'continued' },
+    { type: 'text', role: 'developer', text: 'instructions' },
+    { type: 'text', text: 'answer' }
+  ])).toEqual([
+    { type: 'text', text: 'assistant' },
+    { type: 'text', role: 'user', text: 'user continued', sources: undefined },
+    { type: 'text', role: 'developer', text: 'instructions' },
+    { type: 'text', text: 'answer' }
+  ])
+})

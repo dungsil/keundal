@@ -6,6 +6,7 @@ import { parseSubagentRoles } from '@keundal/subagent'
 import { z } from 'zod'
 
 import type { ChatStoreLike } from './chat-store'
+import { DOCUMENT_MEDIA_TYPES, MAX_DOCUMENT_CHARACTERS } from './file'
 import { toMessages } from './messages'
 import { DEFAULT_MODEL_KEY, MODEL_KEY, TITLE_MODEL_KEY } from './model-preferences'
 import { resolveModel } from './models'
@@ -44,6 +45,17 @@ const chatMessage = z.looseObject({
         mediaType: z.string().startsWith('image/'),
         url: z.string().regex(/^(?:data:image\/|https?:\/\/)/),
         filename: z.string().optional()
+      }),
+      z.looseObject({
+        type: z.literal('file'),
+        mediaType: z.enum(DOCUMENT_MEDIA_TYPES),
+        url: z.literal(''),
+        filename: z.string().optional(),
+        text: z
+          .string()
+          .min(1)
+          .max(MAX_DOCUMENT_CHARACTERS)
+          .refine((value) => !!value.trim())
       }),
       z.looseObject({
         type: z.literal('source-url'),

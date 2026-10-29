@@ -9,6 +9,14 @@ import { applyLiveExecutionEvent, createLiveExecution, type LiveExecution } from
 export const name = 'ui-acp'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'ACP execution view', ko: 'ACP 실행 화면' },
+  description: {
+    en: 'Displays external agent activity and saved ACP execution records.',
+    ko: '외부 에이전트의 활동과 저장된 ACP 실행 기록을 표시합니다.'
+  }
+}
+
 const AcpExecution = lazyView(() => import('./views/AcpExecution.vue'), [
   'messages', 'status', 'live', 'getRun'
 ])

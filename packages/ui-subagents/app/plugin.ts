@@ -13,6 +13,14 @@ const BackgroundTasks = lazyView(() => import('./views/BackgroundTasks.vue'), ['
 export const name = 'ui-subagents'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'Subagent settings', ko: '서브에이전트 설정' },
+  description: {
+    en: 'Configures subagent roles and manages background tasks.',
+    ko: '서브에이전트 역할을 설정하고 백그라운드 작업을 관리합니다.'
+  }
+}
+
 /** Add subagent roles to the settings page. */
 export function apply(ctx: Context) {
   const runtime = ctx.chatRuntime
