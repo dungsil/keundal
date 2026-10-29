@@ -15,6 +15,14 @@ const MemorySettings = lazyView(() => import('./views/MemorySettings.vue'), [
 export const name = 'ui-memory'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'Memory settings', ko: '메모리 설정' },
+  description: {
+    en: 'Manages and searches persistent memories and selects the memory project.',
+    ko: '영구 메모리를 관리·검색하고 메모리 프로젝트를 선택합니다.'
+  }
+}
+
 /** Add persistent memory management to settings. */
 export function apply(ctx: Context) {
   const runtime = ctx.chatRuntime

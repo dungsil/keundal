@@ -11,6 +11,14 @@ import ChatHistory from './views/ChatHistory.vue'
 export const name = 'ui-chat-list'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'Conversation history', ko: '대화 목록' },
+  description: {
+    en: 'Displays conversation history and provides search, rename, and delete controls.',
+    ko: '대화 목록을 표시하고 검색·이름 변경·삭제 기능을 제공합니다.'
+  }
+}
+
 const ChatSearch = lazyView(
   () => import('./views/ChatSearch.vue'),
   ['chats', 'settingsSections', 'search', 'setSearchOpen', 'rename', 'remove']

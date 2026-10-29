@@ -16,6 +16,14 @@ import SettingsPage from './views/SettingsPage.vue'
 export const name = 'ui-settings'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'Application settings', ko: '앱 설정' },
+  description: {
+    en: 'Provides settings navigation, appearance, execution budgets, and data management.',
+    ko: '설정 탐색과 화면 모양, 실행 예산, 데이터 관리를 제공합니다.'
+  }
+}
+
 const ExecutionBudgetSettings = lazyView(() => import('./views/ExecutionBudgetSettings.vue'), ['runBudget', 'saveRunBudget'])
 
 /** Render the settings page with its section navigation, the appearance section and the sidebar link. */

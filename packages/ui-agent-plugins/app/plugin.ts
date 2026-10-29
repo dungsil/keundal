@@ -11,6 +11,14 @@ import RuntimePluginSettings from './views/RuntimePluginSettings.vue'
 export const name = 'ui-agent-plugins'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'Keundal plugin settings', ko: '큰달 플러그인 설정' },
+  description: {
+    en: 'Manages bundled features and externally installed Keundal plugins.',
+    ko: '번들 선택 기능과 외부에 설치한 큰달 플러그인을 관리합니다.'
+  }
+}
+
 /** Add the agent plugin section to the settings page. */
 export function apply(ctx: Context) {
   const runtime = ctx.chatRuntime
@@ -43,6 +51,13 @@ export function apply(ctx: Context) {
 export const agentPluginSettings = {
   name: 'ui-agent-plugin-settings',
   inject,
+  metadata: {
+    name: { en: 'Agent plugin settings', ko: '에이전트 플러그인 설정' },
+    description: {
+      en: 'Imports and configures skill and MCP bundles from folders.',
+      ko: '폴더에서 스킬·MCP 묶음을 가져오고 설정합니다.'
+    }
+  },
   apply(ctx: Context) {
     const runtime = ctx.chatRuntime
     const manager = () => runtime.platform.plugins!

@@ -10,6 +10,14 @@ import type {} from '@keundal/ui/app/contracts/chat.ts'
 export const name = 'ui-chat'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'Conversation view', ko: '대화 화면' },
+  description: {
+    en: 'Displays conversations and provides message editing, branching, and response controls.',
+    ko: '대화를 표시하고 메시지 편집·분기와 응답 제어를 제공합니다.'
+  }
+}
+
 const ChatPage = lazyView(() => import('./views/ChatPage.vue'), [
   'chatId',
   'model',

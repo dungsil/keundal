@@ -13,6 +13,14 @@ import ReasoningSelect from './views/ReasoningSelect.vue'
 export const name = 'ui-model-selection'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'Model selection', ko: '모델 선택' },
+  description: {
+    en: 'Provides model and reasoning selection, default models, and model recovery settings.',
+    ko: '모델·추론 수준 선택과 기본 모델, 모델 복구 설정을 제공합니다.'
+  }
+}
+
 /** Add the model and reasoning pickers to the composer and the model section to the settings page. */
 export function apply(ctx: Context) {
   const runtime = ctx.chatRuntime

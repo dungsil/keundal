@@ -9,6 +9,14 @@ import SkillSettingsSection from './views/SkillSettings.vue'
 export const name = 'ui-skill'
 export const inject = ['slots', 'chatRuntime']
 
+export const metadata = {
+  name: { en: 'Skill settings', ko: '스킬 설정' },
+  description: {
+    en: 'Manages skill settings and available skill files.',
+    ko: '스킬 설정과 사용할 수 있는 스킬 파일을 관리합니다.'
+  }
+}
+
 /** Add the skill management section to the settings page. */
 export function apply(ctx: Context) {
   const runtime = ctx.chatRuntime
