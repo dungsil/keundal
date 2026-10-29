@@ -600,7 +600,7 @@ test.each(['path', 'zip'] as const)('DSH %s 번들은 root export 없이 YAML �
 - insert:
   - id: provider
     name: dsh-fixture/provider
-    config: { value: 23 }
+    config: ${JSON.stringify({ value: 23, activePath: active })}
 `, {
     consumer: `export const inject = ['dshFixtureValue'];
       export const Config = { '~standard': { version: 1, vendor: 'fixture', validate: value => ({ value: { ...value, label: 'defaulted' } }) } };
@@ -608,7 +608,7 @@ test.each(['path', 'zip'] as const)('DSH %s 번들은 root export 없이 YAML �
     provider: `import { writeFileSync, rmSync } from 'node:fs';
       export function apply(ctx, config) {
         ctx.provide('dshFixtureValue', config.value);
-        ctx.effect(() => { writeFileSync(${JSON.stringify(active)}, 'active'); return () => rmSync(${JSON.stringify(active)}) })
+        ctx.effect(() => { writeFileSync(config.activePath, 'active'); return () => rmSync(config.activePath) })
       }`
   })
   const transaction = await manageRuntimePlugins(directory, { action: 'install', source: { type, value: type === 'path' ? source : zip } })
@@ -642,11 +642,13 @@ test.each([
   const active = join(directory, 'partial-dsh')
   const { source } = dshPackage(directory, `
 - insert:
-  - { id: first, name: dsh-fixture/first }
+  - id: first
+    name: dsh-fixture/first
+    config: ${JSON.stringify({ activePath: active })}
   - { id: second, name: dsh-fixture/second }
 `, {
     first: `import { writeFileSync, rmSync } from 'node:fs';
-      export default ctx => { ctx.provide('partialDsh', true); ctx.effect(() => { writeFileSync(${JSON.stringify(active)}, 'partial'); return () => rmSync(${JSON.stringify(active)}) }) }`,
+      export default (ctx, config) => { ctx.provide('partialDsh', true); ctx.effect(() => { writeFileSync(config.activePath, 'partial'); return () => rmSync(config.activePath) }) }`,
     second: code
   })
   let host = await open()
