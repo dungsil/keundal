@@ -11,11 +11,13 @@ import { LLM_SOURCE_EVENT, type LLMSource } from '@keundal/llm'
 import { TOOL_APPROVAL_EVENT, isToolApprovalRecord, type ToolApprovalRecord } from '@keundal/tool-approval'
 import { TOOL_PROGRESS_EVENT } from '@keundal/tools'
 
+import type { StoredAttachment } from './file'
+
 export type ChatStatus = 'ready' | 'submitted' | 'streaming' | 'error'
 export type TextPart =
   | { type: 'text'; text: string; state?: 'streaming' | 'done' }
   | { type: 'reasoning'; text: string; state?: 'streaming' | 'done' }
-export type FilePart = { type: 'file'; mediaType: string; filename?: string; url: string }
+export type FilePart = StoredAttachment
 export type ToolInvocation<T extends { input: unknown; output: unknown } = { input: unknown; output: unknown }> = {
   toolCallId: string
 } & (

@@ -21,7 +21,8 @@ import { useKeundalChat } from '../../ui-chat/app/lib/use-keundal-chat'
 const model = 'openai/gpt-5-nano'
 const user: ChatMessage = { id: 'user', role: 'user', parts: [
   { type: 'text', text: '원본 질문' },
-  { type: 'file', filename: 'local.png', mediaType: 'image/png', url: 'data:image/png;base64,aW1hZ2U=' }
+  { type: 'file', filename: 'local.png', mediaType: 'image/png', url: 'data:image/png;base64,aW1hZ2U=' },
+  { type: 'file', filename: 'notes.txt', mediaType: 'text/plain', url: '', text: '보관한 문서 본문 🌱' }
 ] }
 
 async function collect(events: AsyncIterable<AGUIEvent>) {
@@ -30,7 +31,7 @@ async function collect(events: AsyncIterable<AGUIEvent>) {
   return result
 }
 
-test.each(['memory', 'indexeddb', 'sqlite'] as const)('%s 플러그인만 교체해도 웹 대화·이미지·투표·편집·재생성·삭제 계약이 같다', async (backend) => {
+test.each(['memory', 'indexeddb', 'sqlite'] as const)('%s 플러그인만 교체해도 웹 대화·이미지·문서·투표·편집·재생성·삭제 계약이 같다', async (backend) => {
   const ctx = new Context()
   const requests: LLMRequest[] = []
   class ScriptedLLM extends LLMService {
@@ -71,6 +72,11 @@ test.each(['memory', 'indexeddb', 'sqlite'] as const)('%s 플러그인만 교체
       expect((await chats.get('chat'))!.pendingRunId).toBeUndefined()
     }
   }
+  expect(requests[0]!.input.messages.find(message => message.id === user.id)).toMatchObject({
+    role: 'user', content: expect.arrayContaining([
+      { type: 'text', text: expect.stringContaining('보관한 문서 본문 🌱') }
+    ])
+  })
   const reloaded = new ChatStore(ctx, mountAgent)
   let saved = (await reloaded.get('chat'))!
   expect(saved.title).toBe('로컬 제목')

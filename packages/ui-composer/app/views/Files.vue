@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { FileWithStatus } from '@keundal/chat/file'
 
+const { t } = useLocale()
+
 defineProps<{
   files: FileWithStatus[]
 }>()
@@ -23,5 +25,8 @@ defineEmits<{
       removable
       @remove="$emit('remove', fileWithStatus.id)"
     />
+    <p v-if="files.some(file => file.attachment?.text)" class="w-full text-xs text-muted">
+      {{ t('file.documentPrivacy') }}
+    </p>
   </div>
 </template>
