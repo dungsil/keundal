@@ -41,7 +41,7 @@ export function createWebPlatform(storage: Storage, runtime: { agentEndpoint?: s
         const store = new RemoteChatStore({ endpoint: runtime.agentEndpoint, token: runtime.agentToken ?? '' })
         try {
           await store.recover()
-          return { store, memory: store.memory, workspaces: store.workspaces, tasks: store.tasks, remoteAgent: true, remoteModels: await store.models(), catalog: execution => store.catalog(execution), dispose: () => store.stop() }
+          return { store, memory: store.memory, workspaces: store.workspaces, tasks: store.tasks, automation: store.automation, remoteAgent: true, remoteModels: await store.models(), catalog: execution => store.catalog(execution), dispose: () => store.stop() }
         } catch (error) {
           await store.stop()
           throw error

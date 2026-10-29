@@ -1,4 +1,5 @@
 import { parseRunBudget, type RunBudget } from '@keundal/agent'
+import type { AutomationHistory, AutomationSnapshot } from '@keundal/automation'
 import { parseHistoryBackup, type HistoryBackup } from '@keundal/backup'
 import { ChatMessageAssembly } from '@keundal/chat/chat-message'
 import type { ChatMessage } from '@keundal/chat/chat-message'
@@ -203,6 +204,24 @@ export class RemoteChatStore implements ChatStoreLike {
       ).json()) as { cancelled: boolean }
       return result.cancelled
     }
+  }
+
+  readonly automation: NonNullable<ChatConnection['automation']> = {
+    list: async () => (await this.call('/automations')).json() as Promise<AutomationSnapshot[]>,
+    put: async (id, definition) =>
+      (
+        await this.call(`/automations/${encodeURIComponent(id)}`, {
+          method: 'PUT',
+          body: JSON.stringify(definition)
+        })
+      ).json() as Promise<AutomationSnapshot>,
+    delete: async (id) => {
+      await this.call(`/automations/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    },
+    history: async (id) =>
+      (
+        await this.call(id === undefined ? '/automation-history' : `/automations/${encodeURIComponent(id)}/history`)
+      ).json() as Promise<AutomationHistory[]>
   }
 
   constructor(

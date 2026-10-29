@@ -1,4 +1,5 @@
 import * as agentPlugins from '@keundal/ui-agent-plugins/plugin'
+import * as automation from '@keundal/ui-automation/plugin'
 import * as chat from '@keundal/ui-chat/plugin'
 import * as chatList from '@keundal/ui-chat-list/plugin'
 import * as chart from '@keundal/ui-chart/plugin'
@@ -42,6 +43,7 @@ export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-settings-llm/prompt-plugin', plugin: prompt, feature: 'prompt', requires: ['@keundal/ui-settings'] },
   { module: '@keundal/ui-subagents', plugin: subagents, feature: 'subagents', requires: ['@keundal/ui-settings'] },
   { module: '@keundal/ui-memory', plugin: memory, requires: ['@keundal/ui-settings'] },
+  { module: '@keundal/ui-automation', plugin: automation, requires: ['@keundal/ui-settings'] },
   { module: '@keundal/ui-agent-plugins', plugin: agentPlugins, required: true, requires: ['@keundal/ui-settings'] },
   { module: '@keundal/ui-agent-plugins/agent-plugin-settings', plugin: agentPlugins.agentPluginSettings, requires: ['@keundal/ui-settings'] },
   { module: '@keundal/ui-skill', plugin: skill, feature: 'skills', requires: ['@keundal/ui-settings'] },

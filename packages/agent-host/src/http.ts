@@ -348,6 +348,8 @@ export function createAgentApp(services: AgentAppServices, options: AgentAppOpti
 
       if (services.automation) {
         const automation = services.automation
+        if (request.method === 'GET' && segments.join('/') === 'automation-history')
+          return sendJson(response, 200, await automation.history())
         if (segments[0] === 'automations') {
           const id = segments[1] === undefined ? undefined : decodeURIComponent(segments[1])
           if (request.method === 'GET' && segments.length === 1) return sendJson(response, 200, await automation.list())

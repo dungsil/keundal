@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { RemoteChatStore } from '@keundal/chat-http'
 import { EventType, type AGUIEvent } from '@keundal/core'
 import { type LLMEvent } from '@keundal/llm'
 import { readTraceSpans, summarizeTrace } from '@keundal/trace'
@@ -839,6 +840,8 @@ test('자동화 HTTP API는 인증 뒤 Webhook과 이름 기반 이벤트로 작
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('server did not bind a port')
   const base = `http://127.0.0.1:${address.port}`
+  const client = new RemoteChatStore({ endpoint: base, token: 'automation-test-token' })
+  const unauthorized = new RemoteChatStore({ endpoint: base, token: 'wrong-token' })
   const request = (method: string, path: string, body?: unknown, token = 'automation-test-token') =>
     fetch(base + path, {
       method,
@@ -850,7 +853,13 @@ test('자동화 HTTP API는 인증 뒤 Webhook과 이름 기반 이벤트로 작
     enabled: true,
     trigger: { type: 'webhook' },
     input: { state: {}, context: [], tools: [], messages: [{ id: 'q', role: 'user', content: 'Respond' }] }
-  }
+  } satisfies Parameters<typeof client.automation.put>[1]
+  await expect(unauthorized.automation.list()).rejects.toThrow()
+  await expect(unauthorized.automation.put('hook', definition)).rejects.toThrow()
+  await expect(unauthorized.automation.delete('hook')).rejects.toThrow()
+  await expect(unauthorized.automation.history()).rejects.toThrow()
+  expect(await client.automation.list()).toEqual([])
+  expect(await client.automation.history()).toEqual([])
   expect((await request('PUT', '/automations/hook', definition, 'wrong-token')).status).toBe(401)
   expect(
     (
@@ -860,7 +869,14 @@ test('자동화 HTTP API는 인증 뒤 Webhook과 이름 기반 이벤트로 작
       })
     ).status
   ).toBe(400)
-  expect((await request('PUT', '/automations/hook', definition)).status).toBe(200)
+  expect(await client.automation.put('hook', definition)).toEqual({ id: 'hook', ...definition })
+  expect(await client.automation.list()).toEqual([{ id: 'hook', ...definition }])
+  expect(await client.automation.put('hook', { ...definition, enabled: false })).toMatchObject({ enabled: false })
+  expect(await client.automation.list()).toMatchObject([{ id: 'hook', enabled: false }])
+  expect((await request('POST', '/automations/hook/webhook', { id: 'disabled' })).status).toBe(404)
+  expect(await client.automation.history()).toEqual([])
+  expect(await runtime.services.tasks!.list()).toHaveLength(0)
+  await client.automation.put('hook', definition)
   expect((await request('POST', '/automations/hook/webhook', {})).status).toBe(400)
   expect((await request('POST', '/automations/hook/webhook', { id: 'one' }, 'wrong-token')).status).toBe(401)
   expect((await request('POST', '/automations/hook/webhook', { id: 'one', payload: { source: 'ci' } })).status).toBe(
@@ -868,8 +884,9 @@ test('자동화 HTTP API는 인증 뒤 Webhook과 이름 기반 이벤트로 작
   )
   expect((await request('POST', '/automations/hook/webhook', { id: 'one' })).status).toBe(202)
   await expect.poll(async () => (await runtime.services.automation!.history('hook'))[0]?.task?.status).toBe('completed')
-  const history = await (await request('GET', '/automations/hook/history')).json()
+  const history = await client.automation.history('hook')
   expect(history).toMatchObject([{ status: 'submitted', task: { status: 'completed', content: 'automatic response' } }])
+  expect(await client.automation.history()).toEqual(history)
   expect(await runtime.services.tasks!.list()).toHaveLength(1)
   const [attempt] = await runtime.services.automation!.history('hook')
   expect((await runtime.services.session.get(attempt!.task!.threadId))?.messages).toContainEqual(
@@ -886,9 +903,14 @@ test('자동화 HTTP API는 인증 뒤 Webhook과 이름 기반 이벤트로 작
     .poll(async () => (await runtime.services.automation!.history('named'))[0]?.task?.status)
     .toBe('completed')
   expect(await runtime.services.tasks!.list()).toHaveLength(2)
-  expect((await request('DELETE', '/automations/hook')).status).toBe(204)
+  await client.automation.delete('hook')
   expect((await request('POST', '/automations/hook/webhook', { id: 'two' })).status).toBe(404)
-  expect(await (await request('GET', '/automations')).json()).toMatchObject([{ id: 'named' }])
+  expect(await client.automation.list()).toMatchObject([{ id: 'named' }])
+  expect(await client.automation.history('hook')).toEqual(history)
+  const globalHistory = await client.automation.history()
+  expect(globalHistory).toHaveLength(2)
+  expect(globalHistory).toEqual(expect.arrayContaining(history))
+  expect(globalHistory).toEqual(expect.arrayContaining([expect.objectContaining({ automationId: 'named' })]))
 })
 
 test.each([['x'.repeat(101)], ['x'.repeat(60), 'x'.repeat(41)], [' '.repeat(1025)], ['x'.repeat(100_000)]])(

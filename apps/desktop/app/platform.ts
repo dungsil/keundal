@@ -36,6 +36,7 @@ export function createDesktopPlatform(storage: Storage, invoke: NativeInvoke): C
           memory: store.memory,
           workspaces: store.workspaces,
           tasks: store.tasks,
+          automation: store.automation,
           remoteAgent: true,
           selectedModel: store.selectedModel,
           selectModel: value => store.selectModel(value),

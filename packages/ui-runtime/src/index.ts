@@ -1,4 +1,5 @@
 import { parseRunBudget, type RunBudget } from '@keundal/agent'
+import type { AutomationDefinition } from '@keundal/automation'
 import {
   loadPromptPresets,
   parsePromptPresetSettings,
@@ -116,6 +117,7 @@ export class ChatRuntime extends Service {
   readonly runBudget = ref<RunBudget>()
   readonly switching = ref(false)
   readonly workspacesAvailable = ref(false)
+  readonly automationsAvailable = ref(false)
   readonly webSearch = computed<boolean>({
     get: () => this.options.preferences.webSearch.value ?? true,
     set: (value) => {
@@ -216,6 +218,26 @@ export class ChatRuntime extends Service {
     return this.connection.tasks.cancel(id)
   }
 
+  listAutomations() {
+    if (!this.connection?.automation) throw unavailable('Automations')
+    return this.connection.automation.list()
+  }
+
+  saveAutomation(id: string, definition: AutomationDefinition) {
+    if (!this.connection?.automation) throw unavailable('Automations')
+    return this.connection.automation.put(id, definition)
+  }
+
+  deleteAutomation(id: string) {
+    if (!this.connection?.automation) throw unavailable('Automations')
+    return this.connection.automation.delete(id)
+  }
+
+  automationHistory(id?: string) {
+    if (!this.connection?.automation) throw unavailable('Automations')
+    return this.connection.automation.history(id)
+  }
+
   listMemories() {
     if (!this.connection?.memory) throw unavailable('Memory')
     return this.connection.memory.list()
@@ -285,6 +307,7 @@ export class ChatRuntime extends Service {
     })
     this.connection = connection
     this.workspacesAvailable.value = !!connection.workspaces
+    this.automationsAvailable.value = !!connection.automation
     if (connection.selectedModel) this.model.value = connection.selectedModel
     if (connection.remoteModels) {
       this.remoteModels.value = connection.remoteModels
@@ -480,6 +503,7 @@ export class ChatRuntime extends Service {
     return (this.disposal ??= (async () => {
       this.scope.stop()
       this.unsubscribe?.()
+      this.automationsAvailable.value = false
       if (!this.options.platform) return
       try {
         await this.connection?.dispose()
