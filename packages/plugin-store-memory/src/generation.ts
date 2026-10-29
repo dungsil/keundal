@@ -1,4 +1,4 @@
-import { EventType, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
+import { EventType, normalizeEvents, type AGUIEvent, type ExecutionOptions } from '@keundal/core'
 import {
   GenerationService,
   JournalHub,
@@ -243,7 +243,7 @@ export class MemoryGenerationService extends GenerationService {
       signal.throwIfAborted()
       const budget = new StreamBudget()
       const events = stream ? stream(request, { signal }) : this.ctx.llm.stream(request, { signal })
-      for await (const event of events) {
+      for await (const event of normalizeEvents(events)) {
         signal.throwIfAborted()
         budget.accept(event)
         if (!current()) return

@@ -90,10 +90,11 @@ function isToolStreaming(part: ToolPart): boolean {
     </template>
 
     <template v-else-if="part.type === 'text'">
-      <ChatMarkdown v-if="message.role === 'assistant'" dir="auto" class="wrap-break-word" :value="part.text" :streaming="part.state === 'streaming'" :sources="part.sources" />
-      <template v-else-if="message.role === 'user'">
+      <p v-if="part.role && part.role !== 'assistant' && message.role === 'assistant'" class="mt-3 text-xs font-medium text-muted">{{ part.role }}</p>
+      <ChatMarkdown v-if="(part.role ?? message.role) === 'assistant'" dir="auto" class="wrap-break-word" :value="part.text" :streaming="part.state === 'streaming'" :sources="part.sources" />
+      <template v-else>
         <MessageEdit
-          v-if="editing"
+          v-if="editing && message.role === 'user'"
           :message="message"
           :text="part.text"
           @save="(msg, text) => emit('save', msg, text)"

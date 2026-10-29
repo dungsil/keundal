@@ -176,7 +176,8 @@ test('한도 위반 뒤에는 응답을 끝내지 않는 journal 복구 연결�
   await running
   expect(completed).toBe(true)
   expect(fixture.subscriptions()).toBe(1)
-  expect((await fixture.store.get('chat'))!.pendingRunId).toBeUndefined()
+  // 취소 접수만으로 종료를 확정하지 않습니다. 예산을 소진했으므로 이후 복구에 맡깁니다.
+  expect((await fixture.store.get('chat'))!.pendingRunId).toBeTruthy()
 })
 
 test('재연결해도 주석 프레임의 누적 바이트 한도를 초기화하지 않는다', async () => {

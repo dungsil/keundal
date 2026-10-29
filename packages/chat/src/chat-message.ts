@@ -1,5 +1,6 @@
 import {
   EventType,
+  EventNormalizer,
   MessageAssembly,
   STEER_MESSAGE_EVENT,
   isSteerMessage,
@@ -15,7 +16,7 @@ import type { StoredAttachment } from './file'
 
 export type ChatStatus = 'ready' | 'submitted' | 'streaming' | 'error'
 export type TextPart =
-  | { type: 'text'; text: string; state?: 'streaming' | 'done' }
+  | { type: 'text'; text: string; state?: 'streaming' | 'done'; role?: 'user' | 'system' | 'developer' | 'assistant' }
   | { type: 'reasoning'; text: string; state?: 'streaming' | 'done' }
 export type FilePart = StoredAttachment
 export type ToolInvocation<T extends { input: unknown; output: unknown } = { input: unknown; output: unknown }> = {
@@ -64,6 +65,7 @@ export class ChatMessageAssembly {
   /** 이 실행이 journal에 반영한 지시입니다. 반영한 순서를 유지합니다. */
   readonly steered: Extract<AgentMessage, { role: 'user' }>[] = []
   private readonly assembly = new MessageAssembly()
+  private readonly normalizer = new EventNormalizer()
   private readonly texts = new Map<string, TextPart>()
   private readonly calls = new Map<string, { args: string; part: ToolPart }>()
   private readonly sources = new Set<string>()
@@ -74,6 +76,10 @@ export class ChatMessageAssembly {
   }
 
   apply(event: AGUIEvent) {
+    for (const normalized of this.normalizer.apply(event)) this.applyEvent(normalized)
+  }
+
+  private applyEvent(event: AGUIEvent) {
     this.assembly.apply(event)
     if (event.type === EventType.CUSTOM && event.name === STEER_MESSAGE_EVENT && isSteerMessage(event.value)) {
       this.steered.push(event.value)
@@ -85,7 +91,10 @@ export class ChatMessageAssembly {
         const part: TextPart = {
           type: event.type === EventType.TEXT_MESSAGE_START ? 'text' : 'reasoning',
           text: '',
-          state: 'streaming'
+          state: 'streaming',
+          ...(event.type === EventType.TEXT_MESSAGE_START && event.role && event.role !== 'assistant'
+            ? { role: event.role }
+            : {})
         }
         this.texts.set(event.messageId, part)
         this.message.parts.push(part)
