@@ -279,6 +279,9 @@ importers:
       '@keundal/plugin-tool-weather':
         specifier: workspace:*
         version: link:../../packages/plugin-tool-weather
+      '@keundal/ui-workspace':
+        specifier: workspace:*
+        version: link:../../packages/ui-workspace
       '@tauri-apps/api':
         specifier: 2.12.4
         version: 2.12.4
@@ -1239,9 +1242,6 @@ importers:
       '@keundal/ui-weather':
         specifier: workspace:*
         version: link:../ui-weather
-      '@keundal/ui-workspace':
-        specifier: workspace:*
-        version: link:../ui-workspace
       '@nuxt/ui':
         specifier: ^4.11.3
         version: 4.11.3(4705b2a0419a8033a0a4c92ab2e65166)

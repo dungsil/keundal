@@ -17,7 +17,6 @@ export default defineNuxtConfig({
     '@keundal/ui-tool',
     '@keundal/ui-chart',
     '@keundal/ui-weather',
-    '@keundal/ui-workspace',
     '@keundal/ui-settings',
     '@keundal/ui-settings-llm',
     '@keundal/ui-subagents',
@@ -27,6 +26,9 @@ export default defineNuxtConfig({
     '@keundal/ui-mcp',
     '@keundal/ui-agent-plugins'
   ],
+  alias: {
+    '#ui-plugins': fileURLToPath(new URL('./app/ui-plugins.ts', import.meta.url))
+  },
   modules: ['@nuxt/ui'],
   app: { head: { style: [{ innerHTML: 'html.dark { --startup-bg: #09090b; --startup-fg: #fafafa; }' }] } },
   css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],

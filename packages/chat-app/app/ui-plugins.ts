@@ -20,7 +20,6 @@ import * as subagents from '@keundal/ui-subagents/plugin'
 import * as tool from '@keundal/ui-tool/plugin'
 import * as trace from '@keundal/ui-trace/plugin'
 import * as weather from '@keundal/ui-weather/plugin'
-import * as workspace from '@keundal/ui-workspace/plugin'
 import type { UIPluginEntry } from './ui-plugin-manager'
 
 /** Only the management shell is protected; all other views are selectable. */
@@ -31,7 +30,6 @@ export const uiPluginCatalog: readonly UIPluginEntry[] = [
   { module: '@keundal/ui-home', plugin: home },
   { module: '@keundal/ui-chat', plugin: chat },
   { module: '@keundal/ui-composer', plugin: composer },
-  { module: '@keundal/ui-workspace', plugin: workspace, requires: ['@keundal/ui-composer'] },
   { module: '@keundal/ui-model-selection', plugin: modelSelection, requires: ['@keundal/ui-settings'] },
   { module: '@keundal/ui-dictation', plugin: dictation, requires: ['@keundal/ui-composer'] },
   { module: '@keundal/ui-trace', plugin: trace, requires: ['@keundal/ui-chat'] },

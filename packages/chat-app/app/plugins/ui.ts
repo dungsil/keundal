@@ -5,7 +5,7 @@ import { SlotService } from '@keundal/ui-slots'
 import { Context } from 'cordis'
 
 import { UIPluginManager } from '../ui-plugin-manager'
-import { uiPluginCatalog } from '../ui-plugins'
+import { uiPluginCatalog } from '#ui-plugins'
 
 declare module '#app' {
   interface NuxtApp {

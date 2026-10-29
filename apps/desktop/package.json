@@ -35,6 +35,7 @@
     "@keundal/plugin-tool-chart": "workspace:*",
     "@keundal/plugin-tool-todo": "workspace:*",
     "@keundal/plugin-tool-weather": "workspace:*",
+    "@keundal/ui-workspace": "workspace:*",
     "@tauri-apps/api": "2.12.4",
     "cordis": "catalog:",
     "desktop-npm": "npm:npm@11.12.0",
