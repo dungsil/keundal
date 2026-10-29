@@ -5,6 +5,7 @@ import { createAgentApp, type AgentAppOptions } from '@keundal/agent-host/http'
 import type { AgentPluginOptions, LoadedAgentPlugin } from '@keundal/agent-plugins'
 import { NodeAutomationService } from '@keundal/automation-node'
 import type { McpAuthentication, McpClientConfig } from '@keundal/mcp'
+import { listMockModels } from '@keundal/plugin-llm-mock'
 import { WebhookNotificationService, type WebhookNotificationOptions } from '@keundal/plugin-notification-webhook'
 import type { RuntimePluginManifest } from '@keundal/plugin-runtime'
 import { ToolApproval, type ToolApprovalPolicy } from '@keundal/tool-approval'
@@ -17,7 +18,8 @@ export {
   nodePluginMetadata
 } from './default-composition.js'
 
-export type AgentHostProvider = 'openai' | 'gemini' | 'anthropic' | (string & {})
+export type AgentHostProvider = 'openai' | 'gemini' | 'anthropic' | 'mock' | (string & {})
+
 export type BundledPluginModule =
   | '@keundal/prompt'
   | '@keundal/subagent'
@@ -75,8 +77,15 @@ export type HostComposition = Pick<AgentHostOptions, 'setup' | 'mountAgent' | 't
 export type HostCompositionFactory = (options: NodeHostOptions) => HostComposition
 
 export async function createNodeAgentHost(options: NodeHostOptions, compose: HostCompositionFactory) {
-  const models = options.models ?? { [options.model]: { contextWindow: 128000, maxOutputTokens: 4096 } }
-  const composition = compose(options)
+  const models =
+    options.models ??
+    Object.fromEntries(
+      (options.provider === 'mock' ? (await listMockModels()).map((model) => model.id) : [options.model]).map((id) => [
+        id,
+        { contextWindow: 128000, maxOutputTokens: 4096 }
+      ])
+    )
+  const composition = compose({ ...options, models })
   const host = await createAgentHost({
     ...(options.toolApproval === undefined ? {} : { toolApproval: new ToolApproval(options.toolApproval) }),
     model: options.model,
@@ -154,7 +163,7 @@ export async function createAgentRuntime(
         : provider === 'anthropic'
           ? env.ANTHROPIC_API_KEY
           : undefined
-  const model = env.KEUNDAL_MODEL
+  const model = env.KEUNDAL_MODEL || (provider === 'mock' ? 'mock-text' : undefined)
   if (!model?.trim()) throw new Error('KEUNDAL_MODEL 환경 변수를 설정하세요.')
   const contextWindow = Number(env.KEUNDAL_CONTEXT_WINDOW ?? 128_000)
   const maxOutputTokens = Number(env.KEUNDAL_MAX_OUTPUT_TOKENS ?? 4_096)
@@ -191,7 +200,12 @@ export async function createAgentRuntime(
       provider,
       apiKey: apiKey ?? '',
       model,
-      models: { [model]: { contextWindow, maxOutputTokens } },
+      models: Object.fromEntries(
+        (provider === 'mock'
+          ? [...new Set([...(await listMockModels()).map((entry) => entry.id), model])]
+          : [model]
+        ).map((id) => [id, { contextWindow, maxOutputTokens }])
+      ),
       sqlitePath,
       projectId: env.KEUNDAL_PROJECT_ID,
       workspaceRoot: env.KEUNDAL_WORKSPACE_ROOT,

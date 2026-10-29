@@ -9,7 +9,13 @@ export default defineNuxtConfig({
     provider: 'none',
     clientBundle: {
       scan: { globInclude: ['**/*.{vue,ts}'] },
-      icons: ['lucide:image', 'simple-icons:anthropic', 'simple-icons:google', 'simple-icons:openai']
+      icons: [
+        'lucide:image',
+        'lucide:flask-conical',
+        'simple-icons:anthropic',
+        'simple-icons:google',
+        'simple-icons:openai'
+      ]
     }
   }
 })

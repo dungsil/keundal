@@ -58,7 +58,12 @@ export function useModelCatalog(
     const work = Promise.all(
       configuredProviders(snapshot).map(async (provider) => {
         const configured = snapshot[provider.id]
-        if (!configured?.apiKey && !configured?.baseURL && !Object.keys(configured?.headers ?? {}).length) {
+        if (
+          provider.providerType !== 'mock' &&
+          !configured?.apiKey &&
+          !configured?.baseURL &&
+          !Object.keys(configured?.headers ?? {}).length
+        ) {
           try {
             localStorage.removeItem(`keundal:models:${provider.id}`)
           } catch {

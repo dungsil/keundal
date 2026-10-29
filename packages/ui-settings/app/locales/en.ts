@@ -1,6 +1,8 @@
 export default {
   'settings.appearance': 'Appearance',
   'settings.colorMode': 'Color mode',
+  'settings.skipDeleteConfirmation': 'Delete conversations without confirmation',
+  'settings.deleteWarning': 'Deleted conversations cannot be recovered.',
   'settings.back': 'Back to chat',
   'data.title': 'Backup and restore',
   'data.export': 'Download backup',

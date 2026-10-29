@@ -7,14 +7,16 @@ const providers = {
   openai: () => import('@keundal/plugin-llm-openai').then((module) => module.default),
   'openai-chat': () => import('@keundal/plugin-llm-openai-chat').then((module) => module.default),
   anthropic: () => import('@keundal/plugin-llm-anthropic').then((module) => module.default),
-  google: () => import('@keundal/plugin-llm-gemini').then((module) => module.default)
+  google: () => import('@keundal/plugin-llm-gemini').then((module) => module.default),
+  mock: () => import('@keundal/plugin-llm-mock').then((module) => module.default)
 }
 
 const modelLoaders: ModelLoaders = {
   openai: () => import('@keundal/plugin-llm-openai').then((module) => module.listOpenAIModels),
   'openai-chat': () => import('@keundal/plugin-llm-openai-chat').then((module) => module.listOpenAIChatModels),
   anthropic: () => import('@keundal/plugin-llm-anthropic').then((module) => module.listAnthropicModels),
-  google: () => import('@keundal/plugin-llm-gemini').then((module) => module.listGeminiModels)
+  google: () => import('@keundal/plugin-llm-gemini').then((module) => module.listGeminiModels),
+  mock: () => import('@keundal/plugin-llm-mock').then((module) => module.listMockModels)
 }
 
 /** Default application wiring; consumers can register the browser adapter with other providers. */
