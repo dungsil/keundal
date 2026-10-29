@@ -160,6 +160,99 @@ export function readDataBackup(text: string): DataBackup {
   return parseDataBackup(JSON.parse(text))
 }
 
+const encryptedEnvelope = z
+  .object({
+    format: z.literal('keundal-backup-encrypted'),
+    version: z.literal(1),
+    kdf: z.literal('PBKDF2-SHA-256'),
+    iterations: z.literal(600_000),
+    cipher: z.literal('AES-256-GCM'),
+    salt: z.string(),
+    iv: z.string(),
+    ciphertext: z.string()
+  })
+  .strict()
+const encryptionContext = new TextEncoder().encode('keundal-backup-encrypted:1:PBKDF2-SHA-256:600000:AES-256-GCM')
+
+function encodeBase64(bytes: Uint8Array): string {
+  const chunks: string[] = []
+  for (let offset = 0; offset < bytes.length; offset += 8192)
+    chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 8192)))
+  return btoa(chunks.join(''))
+}
+
+function decodeBase64(value: string): Uint8Array<ArrayBuffer> {
+  if (value.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(value)) throw new Error('Invalid backup encoding')
+  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0))
+}
+
+async function backupKey(password: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
+  if (!password) throw new Error('Backup password is required')
+  const material = await globalThis.crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  )
+  return globalThis.crypto.subtle.deriveKey(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 600_000 },
+    material,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  )
+}
+
+/** Keeps JSON v1 unchanged unless a password is explicitly supplied. */
+export async function serializeDataBackup(value: unknown, password?: string): Promise<string> {
+  let text = JSON.stringify(parseDataBackup(value))
+  if (new TextEncoder().encode(text).byteLength > MAX_BACKUP_BYTES) throw new Error('Backup file exceeds 64 MiB')
+  if (password !== undefined) {
+    const salt = globalThis.crypto.getRandomValues(new Uint8Array(16))
+    const iv = globalThis.crypto.getRandomValues(new Uint8Array(12))
+    const key = await backupKey(password, salt)
+    const ciphertext = await globalThis.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv, additionalData: encryptionContext, tagLength: 128 },
+      key,
+      new TextEncoder().encode(text)
+    )
+    text = JSON.stringify({
+      format: 'keundal-backup-encrypted',
+      version: 1,
+      kdf: 'PBKDF2-SHA-256',
+      iterations: 600_000,
+      cipher: 'AES-256-GCM',
+      salt: encodeBase64(salt),
+      iv: encodeBase64(iv),
+      ciphertext: encodeBase64(new Uint8Array(ciphertext))
+    })
+  }
+  // Base64 expansion counts toward the same on-disk file limit.
+  if (new TextEncoder().encode(text).byteLength > MAX_BACKUP_BYTES) throw new Error('Backup file exceeds 64 MiB')
+  return text
+}
+
+/** No plaintext is returned until GCM authentication and the full backup validation succeed. */
+export async function openDataBackup(text: string, password?: string): Promise<DataBackup> {
+  if (new TextEncoder().encode(text).byteLength > MAX_BACKUP_BYTES) throw new Error('Backup file exceeds 64 MiB')
+  const value: unknown = JSON.parse(text)
+  if (!value || typeof value !== 'object' || !('format' in value) || value.format !== 'keundal-backup-encrypted')
+    return parseDataBackup(value)
+  const encrypted = encryptedEnvelope.parse(value)
+  const salt = decodeBase64(encrypted.salt)
+  const iv = decodeBase64(encrypted.iv)
+  const ciphertext = decodeBase64(encrypted.ciphertext)
+  if (salt.length !== 16 || iv.length !== 12 || ciphertext.length < 16) throw new Error('Invalid encrypted backup')
+  const key = await backupKey(password ?? '', salt)
+  const plaintext = await globalThis.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv, additionalData: encryptionContext, tagLength: 128 },
+    key,
+    ciphertext
+  )
+  return readDataBackup(new TextDecoder('utf-8', { fatal: true }).decode(plaintext))
+}
+
 interface BackupOptions {
   platform: Pick<ChatPlatform, 'settings' | 'skills' | 'mcp'>
   store: ChatStoreLike
@@ -252,8 +345,8 @@ export async function exportDataBackup(options: BackupOptions): Promise<DataBack
  * Settings are reversible and applied first. History is imported last, in one store transaction;
  * a collision or storage failure restores the previous settings rather than leaving a half import.
  */
-export async function restoreDataBackup(options: BackupOptions, value: unknown): Promise<string[]> {
-  const backup = parseDataBackup(value)
+export async function restoreDataBackup(options: BackupOptions, value: unknown, password?: string): Promise<string[]> {
+  const backup = typeof value === 'string' ? await openDataBackup(value, password) : parseDataBackup(value)
   const { platform, store, storage, plugins } = options
   if (!store.backup) throw new Error('This store does not support backups')
   await store.stop()
