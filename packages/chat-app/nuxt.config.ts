@@ -13,6 +13,7 @@ export default defineNuxtConfig({
     '@keundal/ui-model-selection',
     '@keundal/ui-chat',
     '@keundal/ui-trace',
+    '@keundal/ui-acp',
     '@keundal/ui-tool',
     '@keundal/ui-chart',
     '@keundal/ui-weather',

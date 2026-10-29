@@ -112,7 +112,8 @@ root                               ui-layout
 │  ├─ chat.message.tool            ui-tool, ui-chart, ui-weather (항목이 없으면 기본 도구 카드)
 │  ├─ chat.message.footer          ui-trace
 │  ├─ chat.indicator               ui-trace
-│  └─ chat.observer                ui-trace
+│  ├─ chat.execution               ui-acp (메시지와 분리된 실행 패널)
+│  └─ chat.observer                ui-trace, ui-acp
 ├─ page.settings                   ui-settings
 │  └─ settings.section             ui-settings, ui-settings-llm, ui-model-selection,
 │                                  ui-agent-plugins, ui-skill, ui-mcp, ui-automation

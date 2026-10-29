@@ -45,7 +45,8 @@ export function apply(ctx: Context) {
       'chat.message.tool': 'keyed',
       'chat.message.footer': 'list',
       'chat.indicator': 'list',
-      'chat.observer': 'list'
+      'chat.observer': 'list',
+      'chat.execution': 'list'
     },
     // The store is read lazily inside each callback: it does not exist until the runtime connects in the browser.
     inject: ({ chatId }) => ({

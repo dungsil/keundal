@@ -35,6 +35,8 @@ export interface ChatObserverOwner {
 
 declare module '@keundal/ui-slots' {
   interface SlotMap {
+    /** Execution panels separate from assistant message content. */
+    'chat.execution': { kind: 'list'; owner: ChatIndicatorOwner }
     /** Tool call views keyed by tool name. A generic card renders for tools without an entry. */
     'chat.message.tool': { kind: 'keyed'; owner: ChatToolOwner }
     /** Content below each message, ordered by `order`. */
