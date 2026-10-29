@@ -2,6 +2,7 @@ import { createDecipheriv, pbkdf2Sync } from 'node:crypto'
 import { exportDataBackup, parseDataBackup, readDataBackup, restoreDataBackup, loadPromptPresets, serializeDataBackup, openDataBackup } from '@keundal/chat'
 import { defaultLLMSettings } from '@keundal/llm-settings'
 import { EventType } from '@keundal/core'
+import type { StoredAttachment } from '@keundal/chat/file'
 import { toMessages } from '@keundal/chat/messages'
 import { BrowserRuntimePluginManager, createBrowserSettingsStorage } from '@keundal/plugin-chat-browser'
 import { McpManager, createBrowserMcpSettingsStorage } from '@keundal/plugin-chat-browser/mcp'
@@ -51,7 +52,11 @@ test('백업은 비밀 설정을 제외하고 대화·프리셋·로컬 스킬·
   await source.platform.mcp.save([{ serverName: 'docs', transport: 'streamable-http',
     url: 'https://mcp.example.com/?token=synthetic-url-secret', headers: { authorization: 'synthetic-mcp-secret' },
     permissions: { tools: '*', resources: '*' } }], async () => {})
-  await source.store.create('portable-chat', { id: 'question', role: 'user', parts: [{ type: 'text', text: 'Keep this question' }] }, 'openai/custom')
+  const document: StoredAttachment = { type: 'file', filename: '기록.csv', mediaType: 'text/csv', url: '',
+    text: JSON.stringify([['항목', '내용'], ['서울 🌱', '쉼표, 줄바꿈\n=1+1']]) }
+  await source.store.create('portable-chat', { id: 'question', role: 'user', parts: [
+    { type: 'text', text: 'Keep this question' }, document
+  ] }, 'openai/custom')
   await source.store.rename('portable-chat', 'Portable title')
   const snapshot = (await source.ctx.session.get('portable-chat'))!
   const original = (await source.store.get('portable-chat'))!
@@ -83,7 +88,7 @@ test('백업은 비밀 설정을 제외하고 대화·프리셋·로컬 스킬·
   expect(activeProviders).toEqual(backup.settings.providers)
   const restored = await target.store.get('portable-chat')
   expect(restored).toMatchObject({ title: 'Portable title', started: true,
-    messages: [{ id: 'question', parts: [{ type: 'text', text: 'Keep this question' }] }, { id: 'reply', parts: [{ type: 'text', text: 'Saved answer' }] }],
+    messages: [{ id: 'question', parts: [{ type: 'text', text: 'Keep this question' }, document] }, { id: 'reply', parts: [{ type: 'text', text: 'Saved answer' }] }],
     votes: [{ chatId: 'portable-chat', messageId: 'reply', isUpvoted: true }] })
   expect(Object.hasOwn(restored!, 'pendingRunId')).toBe(false)
   expect((await target.ctx.backup.export()).runs).toEqual(backup.history.runs)

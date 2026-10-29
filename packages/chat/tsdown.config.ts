@@ -6,6 +6,7 @@ export default defineConfig({
     'src/model-preferences.ts',
     'src/skills.ts',
     'src/file.ts',
+    'src/documents.ts',
     'src/models.ts',
     'src/chat-store.ts',
     'src/run-queue.ts',

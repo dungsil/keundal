@@ -1,46 +1,40 @@
-import { type FileWithStatus, FILE_UPLOAD_CONFIG } from '@keundal/chat/file'
-
-function createObjectUrl(file: File): string {
-  return URL.createObjectURL(file)
-}
+import { AttachmentError, type FileWithStatus, FILE_UPLOAD_CONFIG } from '@keundal/chat/file'
+import pdfWorkerSrc from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 
 export function useFileUploadWithStatus() {
   const { t } = useLocale()
   const files = ref<FileWithStatus[]>([])
   const toast = useToast()
+  const pending = new Set<AbortController>()
 
   async function uploadFiles(newFiles: File[]) {
+    // Document parsers run only after a browser file selection, never in the SSR/Workers bundle.
+    if (import.meta.server) return
+    const controller = new AbortController()
+    pending.add(controller)
     const filesWithStatus: FileWithStatus[] = newFiles.map((file) => ({
       file,
       id: crypto.randomUUID(),
-      previewUrl: createObjectUrl(file),
+      previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : '',
       status: 'uploading' as const
     }))
 
     files.value = [...files.value, ...filesWithStatus]
 
     const uploadPromises = filesWithStatus.map(async (fileWithStatus) => {
-      const index = files.value.findIndex((f) => f.id === fileWithStatus.id)
-      if (index === -1) return
-
       try {
-        if (!fileWithStatus.file.type.startsWith('image/')) throw new Error(t('file.imagesOnly'))
-        if (fileWithStatus.file.size > 8 * 1024 * 1024) throw new Error(t('file.tooLarge'))
-        const url = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(reader.result as string)
-          reader.onerror = () => reject(reader.error)
-          reader.readAsDataURL(fileWithStatus.file)
-        })
+        const { prepareAttachment } = await import('@keundal/chat/documents')
+        const attachment = await prepareAttachment(fileWithStatus.file, { pdfWorkerSrc, signal: controller.signal })
         const current = files.value.find((f) => f.id === fileWithStatus.id)
         if (!current) return
         Object.assign(current, {
           status: 'uploaded',
-          uploadedUrl: url
+          attachment
         })
       } catch (error) {
-        const errorMessage =
-          (error as { data?: { message?: string } }).data?.message || (error as Error).message || t('file.failed')
+        const current = files.value.find((f) => f.id === fileWithStatus.id)
+        if (!current || controller.signal.aborted) return
+        const errorMessage = error instanceof AttachmentError ? t(`file.${error.code}`) : t('file.failed')
         toast.add({
           title: t('file.failed'),
           description: errorMessage,
@@ -48,15 +42,15 @@ export function useFileUploadWithStatus() {
           color: 'error',
           duration: 0
         })
-        files.value[index] = {
-          ...files.value[index]!,
+        Object.assign(current, {
           status: 'error',
           error: errorMessage
-        }
+        })
       }
     })
 
     await Promise.allSettled(uploadPromises)
+    pending.delete(controller)
   }
 
   const { dropzoneRef, isDragging, open } = useFileUpload({
@@ -68,14 +62,8 @@ export function useFileUploadWithStatus() {
   const uploading = computed(() => files.value.some((f) => f.status === 'uploading'))
 
   const uploadedFiles = computed(() =>
-    files.value
-      .filter((f) => f.status === 'uploaded' && f.uploadedUrl)
-      .map((f) => ({
-        type: 'file' as const,
-        mediaType: f.file.type,
-        filename: f.file.name,
-        url: f.uploadedUrl!
-      }))
+    // Strip Vue's reactive proxy before the message reaches structured-clone storage.
+    files.value.flatMap((f) => (f.status === 'uploaded' && f.attachment ? [{ ...f.attachment }] : []))
   )
 
   function removeFile(id: string) {
@@ -87,6 +75,8 @@ export function useFileUploadWithStatus() {
   }
 
   function clearFiles() {
+    for (const controller of pending) controller.abort()
+    pending.clear()
     if (files.value.length === 0) return
     files.value.forEach((fileWithStatus) => URL.revokeObjectURL(fileWithStatus.previewUrl))
     files.value = []

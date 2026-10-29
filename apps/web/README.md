@@ -80,9 +80,11 @@ pnpm --filter @keundal/web preview
 
 - 브라우저의 Cordis Context에 `@keundal/plugin-store-indexeddb`와 런타임 설정을 읽는 `llm` 서비스를 등록합니다. `agentPlugin`이 입력 예산 검사·도구 실행·후속 생성을 수행하고, `session`과 `generation`이 대화·실행 journal을 IndexedDB `keundal-web`에 저장합니다.
 - 기존 OpenAI·Anthropic·Gemini 플러그인이 브라우저에서 모델 한도·토큰 계산·스트림을 제공합니다. OpenAI·Anthropic SDK는 명시적인 브라우저 실행 opt-in을 사용합니다. `/api/llm` 프록시는 없으며 서버 DB, D1, R2, NuxtHub도 사용하지 않습니다. 키·URL·헤더는 생성 요청이나 journal에 넣지 않고, 400 오류의 진단 메시지만 위 규칙으로 정제해 전달합니다.
-- 제목·투표·UI 메시지·첨부 이미지는 `session.state.web`에 보관합니다. 정규 AG-UI 대화는 `session.messages`에 저장합니다. 웹 앱은 저장소 내부 API나 독자적인 IndexedDB 테이블을 사용하지 않습니다.
+- 제목·투표·UI 메시지·첨부 파일은 `session.state.web`에 보관합니다. 정규 AG-UI 대화는 `session.messages`에 저장합니다. 웹 앱은 저장소 내부 API나 독자적인 IndexedDB 테이블을 사용하지 않습니다.
 - `ChatStore.respond()`는 HTTP나 SSE로 변환하지 않고 `AsyncIterable<AGUIEvent>`를 반환합니다. `useKeundalChat()`이 전송·중단·편집·재생성 상태를 관리하며 `ChatMessageAssembly`가 텍스트·추론·도구·출처 이벤트를 앱 소유의 `ChatMessage`로 투영합니다. `RUN_FINISHED`는 표시 메시지까지 저장한 뒤 전달합니다. 기존 `session.state.web` 메시지와 `data-keundal`의 정규 대화는 그대로 읽을 수 있습니다.
-- 이미지(파일당 최대 8MB)는 data URL로 저장하므로 새로고침 후에도 유지됩니다. 로그인은 필요하지 않습니다. PDF·CSV 등 미지원 형식은 오류로 알립니다.
+- 이미지·PDF·CSV·일반 텍스트 파일을 첨부할 수 있습니다. 파일당 최대 8MiB이며, 문서는 추출 텍스트 20만 자와 PDF 200쪽으로 제한합니다. 상한을 넘으면 내용을 자르지 않고 오류로 알립니다. CSV와 일반 텍스트는 UTF-8 인코딩을 사용합니다. 암호로 잠긴 PDF와 텍스트가 없는 스캔 PDF는 지원하지 않으며, 스캔 PDF는 OCR 처리 후 첨부해야 합니다.
+- `@keundal/chat/file`의 첨부 저장 계약과 `@keundal/chat/documents`의 형식별 파서를 분리합니다. 브라우저에서 PDF 텍스트와 CSV 셀을 추출하며 외부 파싱 서버를 사용하지 않습니다. 이미지는 data URL을, 문서는 원본 파일이나 URL 대신 파일명·형식·추출 텍스트를 저장하므로 새로고침·대화 분기·백업 복원 후에도 질문할 수 있습니다.
+- 문서 내용은 신뢰할 수 없는 참고 데이터로 표시한 사용자 메시지로 모델에 전달하며, 기존 입력 예산 검사와 축약을 거칩니다. 첨부한 텍스트는 선택한 모델 공급자에게 전송되고 대화·실행 기록과 백업에 포함됩니다. 비밀 정보는 첨부 전에 제거해야 하며 자동으로 탐지하거나 지우지 않습니다. API 키·헤더 등 앱의 비밀 설정을 제외하는 기존 백업 규칙은 유지합니다. Markdown 대화 내보내기는 파일명만 포함하고 문서 내용이나 URL을 추가하지 않습니다.
 - 재접속 시 `generation.recover()`가 저장된 부분 응답을 복원합니다. 미완료 실행은 `interrupted`이며 LLM 재호출·자동 재시도는 하지 않습니다. 마지막 journal 저장 이후의 조각은 유실될 수 있습니다.
 - 데이터는 **현재 브라우저·origin에만** 존재합니다. 브라우저 데이터 삭제·저장소 축출 시 사라질 수 있으며 다른 기기나 로그인 계정으로 동기화되지 않습니다. 공개 링크 공유는 비활성화합니다. 기존 서버 SQLite 데이터는 자동 이전하지 않습니다.
 
