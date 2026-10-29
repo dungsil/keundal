@@ -1,5 +1,5 @@
-import { MODEL_CATALOG_LIMITS, ModelCatalogBudget, parseModelCapabilities } from '@keundal/llm'
-import { expect, test, vi } from 'vitest'
+import { MODEL_CATALOG_LIMITS, ModelCatalogBudget, parseModelCapabilities, listModelsDevModels } from '@keundal/llm'
+import { expect, test, vi, onTestFinished } from 'vitest'
 
 test('모델 기능 메타데이터의 생략과 빈 값 및 모든 reasoning 값을 보존한다', () => {
   expect(parseModelCapabilities(undefined)).toBeUndefined()
@@ -77,4 +77,63 @@ test('정상 유니코드 JSON을 분할 청크에서도 보존한다', async ()
     })
   )
   await expect(new ModelCatalogBudget().readJSON(response)).resolves.toEqual({ name: '한국어 😀' })
+})
+
+test('models.dev의 공급자별 가격과 서로 다른 context·input·output 한도를 매핑한다', async () => {
+  const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+    Response.json({
+      openai: {
+        models: {
+          shared: {
+            name: 'Official',
+            limit: { context: 200000, input: 180000, output: 16000 },
+            cost: { input: 3, output: 15, cache_read: 0, cache_write: 3.75 }
+          }
+        }
+      },
+      other: { models: { shared: { cost: { input: 99 } } } }
+    })
+  )
+  onTestFinished(() => fetch.mockRestore())
+  expect(await listModelsDevModels('openai')).toEqual([
+    {
+      id: 'shared',
+      name: 'Official',
+      contextWindow: 200000,
+      maxInputTokens: 180000,
+      maxOutputTokens: 16000,
+      cost: { input: 3, output: 15, cacheRead: 0, cacheWrite: 3.75 }
+    }
+  ])
+  expect(await listModelsDevModels('missing')).toEqual([])
+  expect(await listModelsDevModels('constructor')).toEqual([])
+})
+
+test('models.dev의 잘못된 한도와 가격을 미상으로 두고 누락된 캐시 가격을 무료로 처리하지 않는다', async () => {
+  const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+    Response.json({
+      vendor: {
+        models: {
+          broken: {
+            limit: { context: -1, input: 1.5, output: '100' },
+            cost: { input: -2, output: 0, cache_read: '0.5' }
+          },
+          unknown: {},
+          ignored: null
+        }
+      }
+    })
+  )
+  onTestFinished(() => fetch.mockRestore())
+  expect(await listModelsDevModels('vendor')).toEqual([
+    {
+      id: 'broken',
+      name: 'broken',
+      contextWindow: undefined,
+      maxInputTokens: undefined,
+      maxOutputTokens: undefined,
+      cost: { input: undefined, output: 0, cacheRead: undefined, cacheWrite: undefined }
+    },
+    { id: 'unknown', name: 'unknown', contextWindow: undefined, maxInputTokens: undefined, maxOutputTokens: undefined }
+  ])
 })
