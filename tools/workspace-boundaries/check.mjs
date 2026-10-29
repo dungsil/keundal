@@ -13,7 +13,6 @@ function isWithin(path, directory) {
 
 const groups = ['apps', 'packages', 'tools', 'examples']
 const implementationIndependent = new Set([
-  '@keundal/chat-app',
   '@keundal/chat',
   '@keundal/chat-http',
   '@keundal/agent-plugins',

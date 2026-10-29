@@ -4,7 +4,18 @@ import { fileURLToPath } from 'node:url'
 const wrangler = { name: 'keundal-web', preview_urls: true, previews: {} }
 
 export default defineNuxtConfig({
-  extends: ['@keundal/chat-app'],
+  extends: [
+    '@keundal/ui', '@keundal/ui-shell', '@keundal/ui-sidebar',
+    '@keundal/ui-markdown-comark', '@keundal/ui-chat-list', '@keundal/ui-home',
+    '@keundal/ui-composer', '@keundal/ui-model-selection',
+    '@keundal/ui-chat', '@keundal/ui-trace', '@keundal/ui-acp', '@keundal/ui-tool',
+    '@keundal/ui-chart', '@keundal/ui-weather',
+    '@keundal/ui-settings', '@keundal/ui-settings-llm', '@keundal/ui-subagents',
+    '@keundal/ui-memory', '@keundal/ui-automation', '@keundal/ui-skill',
+    '@keundal/ui-mcp', '@keundal/ui-agent-plugins'
+  ],
+  pages: true,
+  compatibilityDate: '2026-06-30',
   devtools: { enabled: true },
   runtimeConfig: { public: { pluginConfig: '/keundal.plugins.json' } },
   alias: {

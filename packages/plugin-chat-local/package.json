@@ -17,7 +17,8 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
     "@keundal/agent": "workspace:*",
@@ -35,9 +36,16 @@
     "cordis": "catalog:"
   },
   "devDependencies": {
+    "@keundal/plugin-agent-chat": "workspace:*",
+    "@keundal/plugin-store-indexeddb": "workspace:*",
+    "@keundal/plugin-store-memory": "workspace:*",
+    "@keundal/plugin-store-sqlite": "workspace:*",
+    "@keundal/plugin-tool-chart": "workspace:*",
+    "@keundal/plugin-tool-weather": "workspace:*",
     "@keundal/tsconfig": "workspace:*",
     "@keundal/tsdown": "workspace:*",
     "@types/node": "catalog:",
+    "fake-indexeddb": "6.2.6",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

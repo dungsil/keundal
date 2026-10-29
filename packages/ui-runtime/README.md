@@ -2,6 +2,8 @@
 
 채팅 플랫폼 연결과 UI 플러그인이 공유하는 화면 상태를 Cordis 서비스 `ctx.chatRuntime`으로 제공합니다.
 
+`UIPluginManager`는 앱이 전달한 UI 목록의 등록·해제와 선택 저장을 담당합니다. 특정 UI 구현을 가져오지 않습니다. 각 앱은 `app/ui-plugins.ts`에서 목록을 정하고, `@keundal/ui-runtime/nuxt`의 `createUIPlugin(catalog)`로 Nuxt 플러그인을 만듭니다. 이 초기화 함수는 슬롯 서비스와 채팅 플랫폼 연결을 만들고 종료할 때 자원을 정리합니다.
+
 - 연결: `start()`, `store`, `platform`, `remoteAgent`
 - 설정: `settings`, `saveSettings()`, `ensureConfigured()`, `saveMcpSettings()`
 - 모델: `model`, `models`, `selectedModel`, `defaultModel`, `titleModel`, `switching`, `refreshModels()`

@@ -1,6 +1,6 @@
 # @keundal/ui-chat-list
 
-사이드바의 대화 목록, 대화 검색 대화상자, 대화 기록 화면을 제공하는 UI 플러그인입니다. Nuxt 레이어이면서 Cordis 플러그인이며, `ctx.chatRuntime`의 `chats`로 화면을 그립니다. 이 패키지는 슬롯을 선언하지 않고 `@keundal/ui-layout`이 선언한 슬롯에만 등록합니다.
+사이드바의 대화 목록, 대화 검색 대화상자, 대화 기록 화면을 제공하는 UI 플러그인입니다. Nuxt 레이어이면서 Cordis 플러그인이며, `ctx.chatRuntime`의 `chats`로 화면을 그립니다. 이 패키지는 슬롯을 선언하지 않고 `@keundal/ui-shell`과 `@keundal/ui-sidebar`가 선언한 슬롯에 등록합니다. `/history` 경로는 이 패키지의 `app/routes/history.vue`에서 제공합니다.
 
 ```ts
 import * as chatList from '@keundal/ui-chat-list/plugin'

@@ -1,6 +1,6 @@
 # Keundal Desktop
 
-`@keundal/chat-app` Nuxt 레이어를 사용하는 Tauri 2 데스크톱 앱입니다. `apps/desktop/nuxt.config.ts`에서 공용 레이어를 상속하고 정적 SPA를 생성해 앱에 포함합니다. 배포된 웹사이트나 별도 Node.js 서버 없이 실행합니다.
+공용 UI 패키지를 사용하는 Tauri 2 데스크톱 앱입니다. `apps/desktop/nuxt.config.ts`의 `extends`와 `app/ui-plugins.ts`에서 UI 패키지를 직접 조립하고 정적 SPA를 생성해 앱에 포함합니다. 배포된 웹사이트나 별도 Node.js 서버 없이 실행합니다.
 
 ## 준비
 
@@ -46,7 +46,7 @@ pnpm --filter @keundal/desktop tauri build --no-bundle
 
 정적 UI는 `apps/desktop/dist`, 네이티브 실행 파일은 `apps/desktop/src-tauri/target/release`, 설치 파일은 그 아래 `bundle`에 생성됩니다. macOS·Windows·Linux 패키지는 해당 OS의 도구로 빌드해야 합니다. 일반 빌드와 PR 프리뷰는 서명된 정식 릴리스와 구분합니다. 정식 릴리스의 서명·공증·업데이트 배포는 아래 절차를 따릅니다.
 
-`pnpm build`는 정적 UI까지만 빌드하므로 Rust나 OS 라이브러리가 필요하지 않습니다. `@keundal/chat-app`과 `@keundal/agent-host` 워크스페이스 의존성으로 공유 패키지 빌드 순서를 보장합니다. 다른 앱에는 의존하지 않습니다.
+`pnpm build`는 정적 UI까지만 빌드하므로 Rust나 OS 라이브러리가 필요하지 않습니다. 앱이 직접 선언한 공용 UI·호스트 패키지의 워크스페이스 의존성으로 공유 패키지 빌드 순서를 보장합니다. 다른 앱에는 의존하지 않습니다.
 
 `pnpm build:preview`는 Turbo에서 웹 Workers와 데스크톱 배포 파일을 함께 빌드합니다. 웹과 데스크톱은 Nuxt 출력 경로를 분리하여 병렬로 빌드합니다. 배포 파일 형식은 운영체제별 Tauri 설정을 따릅니다. Windows는 설치 파일을 만들지 않습니다. CI는 `keundal-desktop.exe`, Node.js 런타임인 `keundal-host.exe`, `sidecar` 폴더를 `apps/desktop/src-tauri/target/release/portable`에 모아 배포합니다. 실행할 PC에는 WebView2가 필요합니다.
 
@@ -116,7 +116,7 @@ node apps/desktop/scripts/smoke-portable.mjs <이전-리소스-경로> <다음-�
 
 ## 동작과 데이터
 
-- 채팅, 모델 선택, LLM settings와 IndexedDB 저장소는 [공용 채팅 레이어](../../packages/chat-app/README.md)의 구현을 공유합니다. API 키는 앱 안의 **LLM settings**에서 입력합니다.
+- 채팅, 모델 선택과 LLM settings는 [공용 채팅 기능](../../docs/chat-features.md)의 구현을 공유합니다. 저장소와 실행 연결은 앱이 조립합니다. API 키는 앱 안의 **LLM settings**에서 입력합니다.
 - 데스크톱은 SSR을 끄고 정적 SPA로 실행합니다. 대화·실행 기록은 앱 데이터 디렉터리의 SQLite에 저장합니다. 공급자 설정이 없어도 로컬 호스트를 시작하며, 호스트 시작 실패는 오류로 알립니다.
 - 웹 브라우저 및 개발 모드와 배포 앱은 origin이 달라 대화를 자동 공유하거나 이전하지 않습니다.
 - API 키·URL·헤더를 포함한 LLM 설정은 `keyring`으로 macOS Keychain·Windows Credential Manager·Linux Secret Service에 저장합니다. **Save in OS secret store**로 저장하며 마지막 공급자 설정까지 지우면 보안 저장소 항목도 삭제합니다. 보안 저장소의 서비스명은 `com.keundal.desktop`, 계정명은 `llm-settings`입니다. 개발·배포 앱은 같은 OS 사용자 보안 저장소 항목을 사용합니다.
@@ -174,6 +174,6 @@ LLM·저장소·에이전트·도구는 앱 데이터 디렉터리의 `keundal.p
 
 ## MCP
 
-**설정 → 에이전트 플러그인 → MCP 서버**에서 Streamable HTTP 서버와 로컬 stdio 서버를 등록합니다. 인증 헤더와 환경 변수를 포함한 설정은 OS 보안 저장소에 저장합니다. 설정을 저장하면 진행 중인 응답을 중단하고 로컬 호스트를 다시 시작합니다. [공용 MCP 설정 안내](../../packages/chat-app/README.md#mcp-서버)를 참고합니다.
+**설정 → 에이전트 플러그인 → MCP 서버**에서 Streamable HTTP 서버와 로컬 stdio 서버를 등록합니다. 인증 헤더와 환경 변수를 포함한 설정은 OS 보안 저장소에 저장합니다. 설정을 저장하면 진행 중인 응답을 중단하고 로컬 호스트를 다시 시작합니다. [공용 MCP 설정 안내](../../docs/chat-features.md#mcp-서버)를 참고합니다.
 
-**연결 확인**은 Streamable HTTP 서버만 지원합니다. 확인 요청은 로컬 호스트가 아니라 앱 창(WebView)이 보내므로, 서버가 앱 origin의 CORS를 허용하지 않으면 실제 대화에서는 연결되는 서버도 확인에 실패할 수 있습니다. 확인에 실패해도 저장할 수 있습니다. stdio 명령은 확인하지 않으며 실행하지도 않습니다. 자세한 내용은 [공용 MCP 설정 안내](../../packages/chat-app/README.md#연결-확인)를 참고합니다.
+**연결 확인**은 Streamable HTTP 서버만 지원합니다. 확인 요청은 로컬 호스트가 아니라 앱 창(WebView)이 보내므로, 서버가 앱 origin의 CORS를 허용하지 않으면 실제 대화에서는 연결되는 서버도 확인에 실패할 수 있습니다. 확인에 실패해도 저장할 수 있습니다. stdio 명령은 확인하지 않으며 실행하지도 않습니다. 자세한 내용은 [공용 MCP 설정 안내](../../docs/chat-features.md#연결-확인)를 참고합니다.

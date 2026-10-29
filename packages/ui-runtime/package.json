@@ -2,14 +2,16 @@
   "name": "@keundal/ui-runtime",
   "private": true,
   "files": [
-    "dist"
+    "dist",
+    "app"
   ],
   "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./nuxt": "./app/create-ui-plugin.ts"
   },
   "scripts": {
     "build": "tsdown",
@@ -27,9 +29,12 @@
     "@keundal/skill": "workspace:*",
     "@keundal/subagent": "workspace:*",
     "@keundal/task": "workspace:*",
+    "@keundal/ui": "workspace:*",
+    "@keundal/ui-slots": "workspace:*",
     "@keundal/workspace": "workspace:*",
     "@vueuse/core": "^14.4.0",
-    "cordis": "catalog:"
+    "cordis": "catalog:",
+    "nuxt": "^4.6.2"
   },
   "devDependencies": {
     "@keundal/browser-composition": "workspace:*",

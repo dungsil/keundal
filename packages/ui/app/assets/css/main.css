@@ -1,0 +1,73 @@
+@import 'tailwindcss' theme(static);
+@import '@nuxt/ui';
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+
+@theme static {
+  --font-sans: 'Pretendard Variable', sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-neutral-50 dark:bg-neutral-950;
+  }
+
+  /* Nuxt UI는 모든 버튼과 링크에 25% 불투명도의 outline 색을 붙인다. 흰 배경에서 대비가 1.7:1 밖에 되지 않아
+     키보드 사용자가 초점을 찾지 못한다. 프로젝트 토큰인 --ui-primary를 그대로 쓴다.
+     링크는 ::before에 링을 그리고 disclosure는 :has(:focus-visible)로 링을 그리므로 함께 바꾼다. */
+  a:focus-visible,
+  button:focus-visible,
+  [role='button']:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  summary:focus-visible,
+  a:focus-visible::before,
+  button:focus-visible::before,
+  [role='button']:focus-visible::before,
+  summary:focus-visible::before,
+  a:has(:focus-visible),
+  button:has(:focus-visible),
+  [role='button']:has(:focus-visible),
+  summary:has(:focus-visible) {
+    outline-color: var(--ui-primary);
+  }
+}
+
+:root {
+  /* UI 전체를 1.25배로 확대한다. Tailwind v4와 Nuxt UI v4의 크기 토큰이 모두 rem 기반이라
+     루트 글꼴 크기만 키우면 글자 크기와 여백, 아이콘, 컨트롤 높이가 함께 1.25배가 된다.
+     브라우저 기본 글꼴 크기에 대한 비율이라 사용자의 기본 글꼴 크기 설정도 그대로 반영된다. */
+  --ui-scale: 1.25;
+  font-size: calc(100% * var(--ui-scale));
+
+  --ui-primary: var(--ui-color-primary-600);
+  /* Nuxt UI 기본값인 500 단계는 흰 배경의 글자와 흰 글자의 배경 모두 4.5:1에 미달한다.
+     soft·subtle 변형의 10% 배경과 bg-elevated 위에서도 4.5:1을 넘는 단계를 색상마다 골랐다. */
+  --ui-success: var(--ui-color-success-800);
+  --ui-warning: var(--ui-color-warning-800);
+  --ui-error: var(--ui-color-error-700);
+  --ui-container: var(--container-3xl);
+}
+
+.dark {
+  --ui-primary: var(--ui-color-primary-400);
+  --ui-success: var(--ui-color-success-400);
+  --ui-warning: var(--ui-color-warning-400);
+  /* 400 단계는 soft 변형의 10% 배경 위에서 4.5:1에 미달한다. */
+  --ui-error: var(--ui-color-error-300);
+}
+
+body :where(a, button, input, textarea, select, [tabindex='0']):focus-visible {
+  outline: auto;
+  outline-color: revert;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  ::view-transition-old(chat-prompt),
+  ::view-transition-new(chat-prompt) {
+    animation: none;
+  }
+}

@@ -48,6 +48,7 @@ import { createModelSelection } from './model-selection'
 import { reasoningLevels, selectedReasoning } from './reasoning-settings'
 
 export { reasoningLevels, selectedReasoning } from './reasoning-settings'
+export { UIPluginManager, type UIPluginEntry } from './ui-plugin-manager'
 
 declare module 'cordis' {
   interface Context {

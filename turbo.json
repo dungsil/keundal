@@ -116,9 +116,6 @@
       "dependsOn": ["^build"],
       "outputs": [".nuxt/**", ".output/**", "dist/**", "dist-sidecar/**"],
       "inputs": ["$TURBO_DEFAULT$", "!tests/**", "!README.md"]
-    },
-    "@keundal/chat-app#typecheck": {
-      "dependsOn": ["^build"]
     }
   },
   "globalDependencies": ["package.json"],
