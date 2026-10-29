@@ -1752,6 +1752,9 @@ importers:
       '@keundal/plugin-store-memory':
         specifier: workspace:*
         version: link:../plugin-store-memory
+      '@keundal/plugin-store-sqlite':
+        specifier: workspace:*
+        version: link:../plugin-store-sqlite
       '@keundal/tsconfig':
         specifier: workspace:*
         version: link:../../tools/tsconfig

@@ -162,18 +162,23 @@ test('다른 탭이 소유한 대기·실행 작업은 복구하지 않고 잠�
   }
 })
 
-test('승인 이벤트를 전달하기 전에 IndexedDB 배치를 확정한다', async (t) => {
-  const event: LLMEvent = { type: EventType.CUSTOM, name: 'keundal.tool.approval', value: { status: 'requested' } }
-  const { ctx, store } = await setup(t, [event])
-  const iterator = ctx.generation.run(request())[Symbol.asyncIterator]()
-  try {
-    await iterator.next()
-    expect((await iterator.next()).value).toEqual(event)
-    expect((await store.getRun('run'))?.journal.map((entry) => entry.event)).toContainEqual(event)
-  } finally {
-    await iterator.return?.()
+test.for(['keundal.tool.approval', 'session-checkpoint'])(
+  '승인 또는 지정한 CUSTOM 이벤트 %s를 전달하기 전에 IndexedDB 배치를 확정한다',
+  async (name, t) => {
+    const event: LLMEvent = { type: EventType.CUSTOM, name, value: { status: 'requested' } }
+    const { ctx, store } = await setup(t, [event])
+    const iterator = ctx.generation
+      .run(request(), { durableCustomEvents: ['session-checkpoint'] })
+      [Symbol.asyncIterator]()
+    try {
+      await iterator.next()
+      expect((await iterator.next()).value).toEqual(event)
+      expect((await store.getRun('run'))?.journal.map((entry) => entry.event)).toContainEqual(event)
+    } finally {
+      await iterator.return?.()
+    }
   }
-})
+)
 
 test.for([[], [{ name: 'reviewer', description: 'Review', instructions: 'Check', allowedTools: ['lookup'] }]])(
   '역할 설정과 실행 요청 및 도구 결과를 다시 열어 복구하며 공급자를 재실행하지 않는다',

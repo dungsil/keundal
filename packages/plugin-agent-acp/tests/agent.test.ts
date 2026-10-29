@@ -1,8 +1,13 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 
 import { EventType, SteerQueue, parseAGUIEvent, type AGUIEvent, type RunAgentInput } from '@keundal/core'
 import acpAgentPlugin, { type AcpAgentConfig } from '@keundal/plugin-agent-acp'
 import { MemoryGenerationService, MemorySessionService, MemoryStore } from '@keundal/plugin-store-memory'
+import { SqliteGenerationService, SqliteSessionService, SqliteStore } from '@keundal/plugin-store-sqlite'
 import { ToolApproval, TOOL_APPROVAL_EVENT, isToolApprovalRecord } from '@keundal/tool-approval'
 import { Context } from 'cordis'
 import { expect, test, type TestContext } from 'vitest'
@@ -23,24 +28,35 @@ const collect = async (stream: AsyncIterable<AGUIEvent>) => {
 const text = (events: AGUIEvent[]) =>
   events.flatMap((event) => (event.type === EventType.TEXT_MESSAGE_CONTENT ? [event.delta] : [])).join('')
 
-async function setup(t: TestContext, config: Partial<AcpAgentConfig> = {}) {
+const agentConfig: AcpAgentConfig = {
+  command: process.execPath,
+  args: [fileURLToPath(new URL('./stdio.ts', import.meta.url))],
+  cwd: process.cwd()
+}
+
+async function setup(t: TestContext, config: Partial<AcpAgentConfig> = {}, path?: string) {
   const ctx = new Context()
-  const store = new MemoryStore()
   const root = await ctx.plugin((child: Context) => {
-    new MemorySessionService(child, store)
-    new MemoryGenerationService(child, store)
+    if (path) {
+      const store = new SqliteStore(path)
+      child.fiber.effect(() => () => store.release())
+      new SqliteSessionService(child, store)
+      new SqliteGenerationService(child, store)
+    } else {
+      const store = new MemoryStore()
+      new MemorySessionService(child, store)
+      new MemoryGenerationService(child, store)
+    }
   })
   const agent = await ctx.plugin(acpAgentPlugin, {
-    command: process.execPath,
-    args: [fileURLToPath(new URL('./stdio.ts', import.meta.url))],
-    cwd: process.cwd(),
+    ...agentConfig,
     ...config
   })
   t.onTestFinished(async () => {
     await agent.dispose()
     await root.dispose()
   })
-  return { ctx, agent }
+  return { ctx, agent, root }
 }
 
 test('stdio 세션은 새 사용자 메시지만 보내고 턴마다 식별자를 분리해 journal에 저장한다', async (t) => {
@@ -139,7 +155,7 @@ test('취소와 iterator 중단은 외부 프로세스를 끝내고 journal의 �
   expect(saved?.messages.some((message) => message.role === 'assistant' && message.content?.includes('1:wait:'))).toBe(
     true
   )
-  await expect(collect(ctx.agent.run(input('next')))).rejects.toThrow('session is closed')
+  await expect(collect(ctx.agent.run(input('next')))).rejects.toThrow('does not support session/load')
   const stopped = input('wait', 'iterator')
   for await (const event of ctx.agent.run(stopped)) {
     if (event.type === EventType.TEXT_MESSAGE_CONTENT) break
@@ -178,6 +194,78 @@ test('동일 대화의 동시 실행과 이전 메시지 수정 및 복원 불�
   edited.messages.unshift({ ...first.messages[0]!, content: 'changed', role: 'user' })
   await expect(collect(ctx.agent.run(edited))).rejects.toThrow('cannot edit')
   await agent.dispose()
-  await ctx.plugin(acpAgentPlugin, { command: process.execPath, cwd: process.cwd() })
+  await ctx.plugin(acpAgentPlugin, agentConfig)
   await expect(collect(ctx.agent.run(input('after restart', 'editable')))).rejects.toThrow('cannot be restored')
+})
+
+test('SQLite를 다시 열면 외부 세션을 load하고 과거 응답과 완료된 도구를 재생하거나 재실행하지 않는다', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-acp-'))
+  t.onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
+  const path = join(directory, 'history.sqlite')
+  const sessionFile = join(directory, 'remote.json')
+  const config = { env: { SESSION_FILE: sessionFile } }
+  const first = await setup(t, config, path)
+  const request = input('first')
+  const steer = new SteerQueue()
+  steer.push([{ id: 'steered', role: 'user', content: 'steered' }])
+  await collect(first.ctx.agent.run(request, { steer }))
+  const previous = await first.ctx.generation.get(request.runId)
+  await first.agent.dispose()
+  await first.root.dispose()
+
+  const restored = await setup(t, config, path)
+  await restored.ctx.generation.recover()
+  const edited = input('next')
+  edited.messages.unshift({ ...request.messages[0]!, role: 'user', content: 'changed' })
+  await expect(collect(restored.ctx.agent.run(edited))).rejects.toThrow('cannot edit')
+  const next = input('second')
+  next.messages.unshift(...request.messages)
+  const events = await collect(restored.ctx.agent.run(next))
+  expect(text(events)).toBe(`3:second:${process.cwd()}!`)
+  expect(events.filter((event) => event.type === EventType.TOOL_CALL_RESULT)).toHaveLength(1)
+  expect(
+    (await restored.ctx.session.get('thread'))?.messages.filter((message) => message.role === 'tool')
+  ).toHaveLength(3)
+  expect(await restored.ctx.generation.get(request.runId)).toEqual(previous)
+  expect(JSON.parse(readFileSync(sessionFile, 'utf8')).prompts).toEqual(['first', 'steered', 'second'])
+
+  await restored.agent.dispose()
+  const changed = await restored.ctx.plugin(acpAgentPlugin, {
+    ...agentConfig,
+    ...config,
+    args: [...agentConfig.args!, '--changed']
+  })
+  await expect(collect(restored.ctx.agent.run(input('changed config')))).rejects.toThrow('configuration changed')
+  await changed.dispose()
+  await restored.ctx.plugin(acpAgentPlugin, { ...agentConfig, env: { ...config.env, LOAD_ERROR: '1' } })
+  await expect(collect(restored.ctx.agent.run(input('missing')))).rejects.toThrow('session no longer exists')
+  expect(JSON.parse(readFileSync(sessionFile, 'utf8')).prompts).toEqual(['first', 'steered', 'second'])
+})
+
+test('중단된 턴의 전송 기록은 영속 저장하고 재연결 후 새 메시지만 실행한다', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'keundal-acp-'))
+  t.onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
+  const path = join(directory, 'history.sqlite')
+  const sessionFile = join(directory, 'remote.json')
+  const { ctx } = await setup(t, { env: { SESSION_FILE: sessionFile } }, path)
+  const request = input('wait')
+  for await (const event of ctx.agent.run(request)) {
+    if (event.type === EventType.CUSTOM && event.name === 'keundal.acp.session') {
+      const db = new DatabaseSync(path, { readOnly: true })
+      try {
+        const rows = db.prepare('SELECT event FROM run_journal WHERE run_id = ?').all(request.runId)
+        expect(rows.map((row) => JSON.parse(row.event as string).name)).toContain('keundal.acp.session')
+      } finally {
+        db.close()
+      }
+    }
+    if (event.type === EventType.TEXT_MESSAGE_CONTENT) break
+  }
+  const previous = await ctx.generation.get(request.runId)
+  const next = input('after interruption')
+  next.messages.unshift(...request.messages)
+  const events = await collect(ctx.agent.run(next))
+  expect(text(events)).toBe(`2:after interruption:${process.cwd()}!`)
+  expect(JSON.parse(readFileSync(sessionFile, 'utf8')).prompts).toEqual(['wait', 'after interruption'])
+  expect(await ctx.generation.get(request.runId)).toEqual(previous)
 })

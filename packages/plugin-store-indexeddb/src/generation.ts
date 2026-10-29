@@ -86,7 +86,7 @@ export class IndexedDBGenerationService extends GenerationService {
     if (external?.aborted) onAbort()
     else external?.addEventListener('abort', onAbort, { once: true })
 
-    const iterator = this.execute(request, controller.signal, token, () => stopped, cleanup, options.stream)
+    const iterator = this.execute(request, controller.signal, token, () => stopped, cleanup, options)
     return {
       next: () => iterator.next(),
       return: async () => {
@@ -169,7 +169,7 @@ export class IndexedDBGenerationService extends GenerationService {
     token: symbol,
     stopped: () => boolean,
     cleanup: () => void,
-    stream?: GenerationOptions['stream']
+    { stream, durableCustomEvents }: GenerationOptions
   ): AsyncGenerator<AGUIEvent, void, unknown> {
     const { threadId, runId } = request.input
     let active: ActiveRun | undefined
@@ -221,7 +221,10 @@ export class IndexedDBGenerationService extends GenerationService {
         if (!this.isCurrent(runId, token)) return
         this.hub.publish(runId, recorder.record(event))
         appendJournal(event)
-        if (event.type === EventType.CUSTOM && event.name === TOOL_APPROVAL_EVENT) {
+        if (
+          event.type === EventType.CUSTOM &&
+          (event.name === TOOL_APPROVAL_EVENT || durableCustomEvents?.includes(event.name))
+        ) {
           // An in-flight batch may not contain this event. Drain again until this barrier is durable.
           while (active.journal.length) await this.drain(active)
         } else if (shouldFlush()) await this.flush(active)

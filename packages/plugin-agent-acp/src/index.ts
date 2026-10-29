@@ -18,9 +18,21 @@ import type { LLMEvent } from '@keundal/llm'
 import type {} from '@keundal/session'
 import { ToolApproval } from '@keundal/tool-approval'
 import type { Context } from 'cordis'
+import { z } from 'zod'
 
 import { AcpEvents } from './events.js'
 export { ACP_UPDATE_EVENT } from './events.js'
+
+const SESSION_EVENT = 'keundal.acp.session'
+const sessionSchema = z.object({
+  version: z.literal(1),
+  command: z.string(),
+  args: z.array(z.string()),
+  cwd: z.string(),
+  sessionId: z.string().min(1),
+  sent: z.array(z.object({ id: z.string(), text: z.string() }))
+})
+type SavedSession = z.infer<typeof sessionSchema>
 
 export interface AcpAgentConfig {
   readonly command: string
@@ -38,6 +50,7 @@ interface RemoteSession {
   readonly connection: acp.ClientConnection
   readonly close: () => void
   sessionId?: string
+  ready: boolean
   active?: {
     input: RunAgentInput
     signal: AbortSignal
@@ -124,19 +137,39 @@ export class AcpAgent extends AgentService {
     try {
       const prepared = await this.ctx.session.prepare(input, { signal })
       let remote = this.sessions.get(input.threadId)
-      if (
-        !remote &&
-        (await this.ctx.generation.list({ signal })).some((run) => run.request.input.threadId === input.threadId)
-      ) {
-        throw new Error('ACP session cannot be restored; start a new thread')
+      let saved: SavedSession | undefined
+      if (!remote || remote.connection.signal.aborted) {
+        const runs = (await this.ctx.generation.list({ signal })).filter(
+          (run) => run.request.input.threadId === input.threadId
+        )
+        for (const run of runs) {
+          for (const { event } of run.journal) {
+            if (event.type === EventType.CUSTOM && event.name === SESSION_EVENT) {
+              saved = sessionSchema.parse(event.value)
+            }
+          }
+        }
+        if (runs.length && !saved) throw new Error('ACP session cannot be restored; start a new thread')
+        if (saved) {
+          if (
+            saved.command !== this.config.command ||
+            saved.cwd !== this.config.cwd ||
+            JSON.stringify(saved.args) !== JSON.stringify(this.config.args ?? [])
+          ) {
+            throw new Error('ACP session configuration changed; start a new thread')
+          }
+          remote?.close()
+          remote = undefined
+        }
       }
-      if (!remote && prepared.input.messages.some((message) => message.role !== 'user')) {
+      if (!remote && !saved && prepared.input.messages.some((message) => message.role !== 'user')) {
         throw new Error('ACP cannot import an existing conversation; start a new thread')
       }
       if (remote?.connection.signal.aborted) throw new Error('ACP session is closed; start a new thread')
       const users = prepared.input.messages.filter((message) => message.role === 'user').map(userPrompt)
+      const sentMessages = remote?.sent ?? new Map(saved?.sent.map(({ id, text }) => [id, text]))
       for (const message of users) {
-        const sent = remote?.sent.get(message.id)
+        const sent = sentMessages.get(message.id)
         if (sent !== undefined && sent !== message.text) throw new Error('ACP cannot edit a previously sent message')
       }
       if (
@@ -146,10 +179,10 @@ export class AcpAgent extends AgentService {
       ) {
         throw new Error('ACP system messages, context and caller tools are not supported')
       }
-      const pending = users.filter((message) => !remote?.sent.has(message.id))
+      const pending = users.filter((message) => !sentMessages.has(message.id))
       if (!pending.length) throw new Error('ACP requires a new user message')
       if (!remote) {
-        remote = this.connect()
+        remote = this.connect(saved)
         this.sessions.set(input.threadId, remote)
       }
       const session = remote
@@ -164,6 +197,7 @@ export class AcpAgent extends AgentService {
         },
         {
           signal,
+          durableCustomEvents: [SESSION_EVENT],
           stream: async function* (_request, execution) {
             let prompts = pending
             while (prompts.length) {
@@ -188,7 +222,7 @@ export class AcpAgent extends AgentService {
     }
   }
 
-  private connect(): RemoteSession {
+  private connect(saved?: SavedSession): RemoteSession {
     const child = spawn(this.config.command, [...(this.config.args ?? [])], {
       cwd: this.config.cwd,
       env: this.config.env ? { ...process.env, ...this.config.env } : process.env,
@@ -242,7 +276,9 @@ export class AcpAgent extends AgentService {
     let closed = false
     remote = {
       connection,
-      sent: new Map(),
+      sessionId: saved?.sessionId,
+      ready: false,
+      sent: new Map(saved?.sent.map(({ id, text }) => [id, text])),
       close: () => {
         if (closed) return
         closed = true
@@ -273,7 +309,6 @@ export class AcpAgent extends AgentService {
       wake.resolve()
     }
     const translator = new AcpEvents()
-    remote.active = { input, signal, push, events: translator }
     let completed = false
     const cancel = () => {
       if (remote.sessionId)
@@ -284,7 +319,7 @@ export class AcpAgent extends AgentService {
     signal.addEventListener('abort', cancel, { once: true })
     try {
       signal.throwIfAborted()
-      if (!remote.sessionId) {
+      if (!remote.ready) {
         const connectSignal = globalThis.AbortSignal.any([
           signal,
           globalThis.AbortSignal.timeout(this.config.connectTimeoutMs ?? 30000)
@@ -302,16 +337,47 @@ export class AcpAgent extends AgentService {
             { cancellationSignal: connectSignal }
           )
           if (init.protocolVersion !== acp.PROTOCOL_VERSION) throw new Error('unsupported ACP protocol version')
-          const session = await remote.connection.agent.request(
-            'session/new',
-            { cwd: this.config.cwd, mcpServers: [] },
-            { cancellationSignal: connectSignal }
-          )
-          remote.sessionId = session.sessionId
+          if (remote.sessionId) {
+            if (!init.agentCapabilities?.loadSession) {
+              throw new Error('ACP session cannot be restored: agent does not support session/load; start a new thread')
+            }
+            // session/load replays history. With no active run, updates are ignored and
+            // permission requests are cancelled instead of repeating completed work.
+            await remote.connection.agent.request(
+              'session/load',
+              { sessionId: remote.sessionId, cwd: this.config.cwd, mcpServers: [] },
+              { cancellationSignal: connectSignal }
+            )
+          } else {
+            const session = await remote.connection.agent.request(
+              'session/new',
+              { cwd: this.config.cwd, mcpServers: [] },
+              { cancellationSignal: connectSignal }
+            )
+            remote.sessionId = session.sessionId
+          }
+          remote.ready = true
         } finally {
           connectSignal.removeEventListener('abort', timedOut)
         }
       }
+      // Record dispatch before sending: an interrupted prompt must never be replayed
+      // automatically, even if its response was not committed locally.
+      for (const message of pending) remote.sent.set(message.id, message.text)
+      yield {
+        type: EventType.CUSTOM,
+        name: SESSION_EVENT,
+        value: {
+          version: 1,
+          command: this.config.command,
+          args: [...(this.config.args ?? [])],
+          cwd: this.config.cwd,
+          sessionId: remote.sessionId!,
+          sent: [...remote.sent].map(([id, text]) => ({ id, text }))
+        } satisfies SavedSession
+      }
+      signal.throwIfAborted()
+      remote.active = { input, signal, push, events: translator }
       let done = false
       let failure: unknown
       const prompt: acp.PromptRequest = {
@@ -342,7 +408,6 @@ export class AcpAgent extends AgentService {
       if (failure) throw failure
       signal.throwIfAborted()
       yield* translator.end()
-      for (const message of pending) remote.sent.set(message.id, message.text)
       completed = true
     } finally {
       remote.active = undefined
