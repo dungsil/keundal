@@ -123,7 +123,9 @@ root                               ui-layout
 
 factory composer                   ui-composer
 ├─ composer.actions                ui-model-selection
-└─ composer.dictation              ui-dictation (항목이 없으면 전송 버튼)
+└─ composer.dictation              기본 등록 없음 (전송 버튼 표시)
 ```
+
+`@keundal/ui-dictation`은 기본 구성에서 제외하며, 별도로 조립하면 `composer.dictation`에 음성 입력을 등록합니다.
 
 각 슬롯의 소유자 값은 `packages/ui/app/contracts/`에서 확인합니다. UI 등록 목록은 `chat-app/app/ui-plugins.ts`, 수명과 선택 관리는 `chat-app/app/ui-plugin-manager.ts`에 둡니다.

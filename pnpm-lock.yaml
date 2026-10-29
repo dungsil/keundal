@@ -1194,9 +1194,6 @@ importers:
       '@keundal/ui-composer':
         specifier: workspace:*
         version: link:../ui-composer
-      '@keundal/ui-dictation':
-        specifier: workspace:*
-        version: link:../ui-dictation
       '@keundal/ui-home':
         specifier: workspace:*
         version: link:../ui-home
