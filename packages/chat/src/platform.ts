@@ -59,9 +59,21 @@ export interface AgentPluginInfo extends AgentPluginSettings {
   servers: { name: string; url: string }[]
   diagnostics: { component: string; entry?: string; message: string }[]
 }
+export interface AgentPluginUpdate {
+  id: string
+  name: string
+  previousVersion?: string
+  version?: string
+  changes: { path: string; before?: string; after?: string }[]
+  /** New or changed server connections need fresh approval, even if their names are unchanged. */
+  permissionRequests: { name: string; url: string; previousUrl?: string }[]
+  diagnostics: AgentPluginInfo['diagnostics']
+}
 export interface AgentPluginManager {
   list(): Promise<AgentPluginInfo[]>
   import(files: Record<string, string>, restart: () => Promise<void>): Promise<void>
+  previewUpdate(name: string, files: Record<string, string>): Promise<AgentPluginUpdate>
+  update(id: string, permissions: AgentPluginSettings['permissions'], restart: () => Promise<void>): Promise<void>
   configure(name: string, settings: AgentPluginSettings, restart: () => Promise<void>): Promise<void>
   remove(name: string, restart: () => Promise<void>): Promise<void>
 }

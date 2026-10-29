@@ -41,6 +41,18 @@ export default {
   'plugin.none': '없음',
   'plugin.permissions': 'MCP 권한',
   'plugin.deleteHelp': '이 플러그인과 저장된 권한을 삭제할까요?',
+  'plugin.update': '폴더에서 업데이트',
+  'plugin.reviewUpdate': '업데이트 검토',
+  'plugin.applyUpdate': '업데이트 적용',
+  'plugin.updated': '{name} 업데이트를 적용했습니다. 기존 설정은 유지했습니다.',
+  'plugin.updateHelp': '교체할 파일을 먼저 확인하세요. 적용하면 진행 중인 응답을 중단합니다. 활성화 설정과 변경되지 않은 서버의 권한은 유지합니다.',
+  'plugin.changedFiles': '변경된 파일',
+  'plugin.noChanges': '선택한 파일이 설치된 버전과 같습니다.',
+  'plugin.before': '설치된 내용',
+  'plugin.after': '업데이트 내용',
+  'plugin.permissionRequests': '새 권한 요청',
+  'plugin.newPermissionsHelp': '추가되거나 연결 정보가 바뀐 MCP 서버는 다시 승인해야 합니다. 비워 두면 접근을 거부합니다. 도구 이름이나 리소스 URI를 한 줄에 하나씩 입력하거나 *로 모두 허용하세요. 다른 권한은 유지합니다.',
+  'plugin.permissionsPreserved': '새 MCP 연결이 없습니다. 기존 권한을 유지합니다.',
   'plugin.persistence':
-    '플러그인 본문과 인증 정보는 이 브라우저에 저장하며 호스트에 업로드하지 않습니다. 설정을 바꾸면 진행 중인 응답을 중단하고 다음 응답부터 적용합니다. 업데이트하려면 플러그인을 삭제한 뒤 폴더를 다시 가져오세요.'
+    '플러그인 본문과 인증 정보는 이 브라우저에 저장하며 호스트에 업로드하지 않습니다. 설정을 바꾸면 진행 중인 응답을 중단하고 다음 응답부터 적용합니다. 업데이트가 실패하면 설치된 버전과 설정을 유지합니다.'
 } satisfies Record<keyof typeof en, string>

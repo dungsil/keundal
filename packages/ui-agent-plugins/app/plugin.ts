@@ -56,6 +56,8 @@ export const agentPluginSettings = {
       isAvailable: () => runtime.platform.plugins !== undefined,
       list: () => manager().list(),
       importFiles: (files: Record<string, string>) => manager().import(files, stop),
+      previewUpdate: (name: string, files: Record<string, string>) => manager().previewUpdate(name, files),
+      update: (id: string, permissions: AgentPluginSettings['permissions']) => manager().update(id, permissions, stop),
       configure: (name: string, settings: AgentPluginSettings) => manager().configure(name, settings, stop),
       remove: (name: string) => manager().remove(name, stop)
     })

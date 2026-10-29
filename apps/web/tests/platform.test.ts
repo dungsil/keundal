@@ -147,17 +147,9 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   const requests: Record<string, unknown>[] = []
   const calls: string[] = []
   let generations = 0
-  const mcp = new Server({ name: 'reports', version: '1' }, { capabilities: { tools: {} } })
-  mcp.setRequestHandler('tools/list', () => ({ tools: [
-    { name: 'search', description: 'Search reports', inputSchema: { type: 'object' } },
-    { name: 'delete', description: 'Delete reports', inputSchema: { type: 'object' } }
-  ] }))
-  mcp.setRequestHandler('tools/call', (request) => {
-    calls.push(request.params.name)
-    return { content: [{ type: 'text', text: 'Total: 37' }] }
-  })
-  const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true, sessionIdGenerator: () => crypto.randomUUID() })
-  await mcp.connect(transport)
+  let holdResponse = false
+  let responseStarted!: () => void
+  const responseHeld = new Promise<void>(resolve => { responseStarted = resolve })
   const server = createServer(async (request, response) => {
     const chunks = []
     for await (const chunk of request) chunks.push(Buffer.from(chunk))
@@ -174,10 +166,26 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
         response.writeHead(405).end()
         return
       }
-      const result = await transport.handleRequest(new Request('http://localhost/mcp', {
-        method: request.method, headers: request.headers as Record<string, string>, body: Buffer.concat(chunks)
-      }))
-      response.writeHead(result.status, Object.fromEntries(result.headers)).end(Buffer.from(await result.arrayBuffer()))
+      // A fresh stateless server per request permits reconnecting after an update closes the client.
+      const mcp = new Server({ name: 'reports', version: '1' }, { capabilities: { tools: {} } })
+      mcp.setRequestHandler('tools/list', () => ({ tools: [
+        { name: 'search', description: 'Search reports', inputSchema: { type: 'object' } },
+        { name: 'delete', description: 'Delete reports', inputSchema: { type: 'object' } }
+      ] }))
+      mcp.setRequestHandler('tools/call', (request) => {
+        calls.push(request.params.name)
+        return { content: [{ type: 'text', text: 'Total: 37' }] }
+      })
+      const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true })
+      await mcp.connect(transport)
+      try {
+        const result = await transport.handleRequest(new Request('http://localhost/mcp', {
+          method: request.method, headers: request.headers as Record<string, string>, body: Buffer.concat(chunks)
+        }))
+        response.writeHead(result.status, Object.fromEntries(result.headers)).end(Buffer.from(await result.arrayBuffer()))
+      } finally {
+        await mcp.close()
+      }
       return
     }
     const body = JSON.parse(Buffer.concat(chunks).toString())
@@ -187,6 +195,12 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
     }
     const title = JSON.stringify(body.input).includes('Generate a chat title')
     if (!title) requests.push(body)
+    if (!title && holdResponse) {
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.write(': waiting for cancellation\n\n')
+      responseStarted()
+      return
+    }
     const tool = body.tools?.find((tool: { name: string }) => tool.name?.startsWith('mcp__plugin_') && tool.name.endsWith('__search'))
     const round = title ? -1 : generations++
     const outputs = !title && deferred && round === 0
@@ -206,7 +220,6 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   t.onTestFinished(async () => {
-    await mcp.close()
     server.closeAllConnections()
     await new Promise<void>(resolve => server.close(() => resolve()))
   })
@@ -215,13 +228,14 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   const endpoint = `http://127.0.0.1:${address.port}`
   const platform = createWebPlatform(storage(), deferred ? { pluginConfig: `${endpoint}/keundal.plugins.json` } : {})
   const markdown = '---\nname: review\ndescription: Review totals\n---\nCompare totals independently.'
-  await platform.plugins!.import({
+  const pluginFiles = {
     'plugin.json': JSON.stringify({ $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json', name: 'reports' }),
     'skills/review/SKILL.md': markdown,
     'mcp.json': JSON.stringify({ $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json', mcpServers: {
       reports: { type: 'streamable-http', url: `${endpoint}/mcp` }
     } })
-  }, async () => {})
+  }
+  await platform.plugins!.import(pluginFiles, async () => {})
   await platform.plugins!.configure('reports', { enabled: true, permissions: { reports: { tools: ['search'] } } }, async () => {})
   const settings = defaultLLMSettings()
   settings.openai = { apiKey: 'test-key', baseURL: `${endpoint}/v1` }
@@ -255,6 +269,33 @@ test.for([false, true])('웹 조립은 Deferred Tools=%s에서 허용한 MCP 도
   expect(JSON.stringify(followup.input)).toContain('Compare totals independently.')
   expect(JSON.stringify(followup.input)).toContain('Total: 37')
   expect(JSON.stringify(followup.input)).toContain('Preset focus: totals')
+  // Updating an enabled plugin cancels and settles the real generation before replacing its files.
+  holdResponse = true
+  const activeEvents: typeof events = []
+  const active = (async () => {
+    for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user] })) activeEvents.push(event)
+  })().catch(error => error)
+  await responseHeld
+  const update = await platform.plugins!.previewUpdate('reports', {
+    ...pluginFiles,
+    'plugin.json': JSON.stringify({ ...JSON.parse(pluginFiles['plugin.json']), version: '2.0.0' }),
+    'skills/review/SKILL.md': markdown + '\nCheck archived reports too.'
+  })
+  await platform.plugins!.update(update.id, {}, () => connection.store.stop())
+  await active
+  const started = activeEvents.find(event => event.type === 'RUN_STARTED')
+  expect(started?.type).toBe('RUN_STARTED')
+  if (started?.type !== 'RUN_STARTED') throw new Error('Missing run start')
+  expect((await connection.store.getRun!(started.runId))?.status).toBe('cancelled')
+  expect(activeEvents.some(event => event.type === 'RUN_FINISHED')).toBe(false)
+  expect((await platform.plugins!.list())[0]).toMatchObject({ version: '2.0.0', enabled: true, permissions: { reports: { tools: ['search'] } } })
+  holdResponse = false
+  generations = 0
+  const updatedStart = requests.length
+  const updatedEvents: typeof events = []
+  for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user] })) updatedEvents.push(event)
+  expect(calls, JSON.stringify({ events: updatedEvents, requests: requests.slice(updatedStart) })).toEqual(['search', 'search'])
+  expect(JSON.stringify(requests[updatedStart + (deferred ? 2 : 1)]!.input)).toContain('Check archived reports too.')
   const changedStart = requests.length
   for await (const event of connection.store.respond(id, { model: 'openai/test', messages: [user], systemPrompt: 'Use bullet points.', subagentRoles: [] })) void event
   expect(JSON.stringify(requests[changedStart]!.tools)).not.toContain('Review changes')
