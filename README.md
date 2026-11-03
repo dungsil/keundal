@@ -77,7 +77,7 @@ MCP 도구가 많으면 Deferred Tools를 선택하여 검색한 도구의 Schem
 
 ## 시작하기
 
-Node.js 24와 pnpm이 필요합니다. 버전은 루트 `package.json`의 `devEngines`를 따릅니다.
+Node.js 26과 pnpm이 필요합니다. 버전은 루트 `package.json`의 `devEngines`를 따릅니다.
 
 ```sh
 pnpm install
