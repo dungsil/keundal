@@ -19,6 +19,8 @@ export interface ActiveChatRun {
   closing: boolean
   /** 이 실행에 지시로 보낸 메시지입니다. 반영되지 않은 지시는 대기열 앞으로 옮깁니다. */
   readonly submitted: ChatMessage[]
+  /** 같은 id로 동시 전달한 Steer는 확정된 전달 결과를 공유합니다. */
+  readonly submitting: Map<string, Promise<boolean>>
   /** 실행 중에 대기열에 추가한 메시지입니다. */
   readonly queued: ChatMessage[]
   /** 실행 중에 취소한 저장된 대기 메시지 id입니다. */
@@ -26,7 +28,7 @@ export interface ActiveChatRun {
 }
 
 export function createActiveChatRun(abort: AbortController, done: Promise<void>): ActiveChatRun {
-  return { abort, done, closing: false, submitted: [], queued: [], removed: new Set() }
+  return { abort, done, closing: false, submitted: [], submitting: new Map(), queued: [], removed: new Set() }
 }
 
 /**
@@ -154,10 +156,14 @@ export class ChatRuns<T extends ActiveChatRun = ActiveChatRun> {
   async dequeue(id: string, messageId: string): Promise<ChatMessage[]> {
     const run = await this.current(id)
     if (run) {
+      const chat = await this.storage.read(id)
+      // 저장소를 읽는 동안 종료 커밋이 시작되면 이전 실행 객체를 수정하지 않습니다.
+      // 종료가 확정된 뒤 최신 저장소에 취소를 반영해야 삭제된 메시지가 재실행되지 않습니다.
+      if (run.closing) return this.dequeue(id, messageId)
       const index = run.queued.findIndex((queued) => queued.id === messageId)
       if (index >= 0) run.queued.splice(index, 1)
       else run.removed.add(messageId)
-      return visibleQueue(await this.storage.read(id), run)
+      return visibleQueue(chat, run)
     }
     const saved = await this.storage.write(id, (chat) => {
       const queue = (chat.queue ?? []).filter((queued) => queued.id !== messageId)
@@ -175,18 +181,25 @@ export class ChatRuns<T extends ActiveChatRun = ActiveChatRun> {
     if (message.role !== 'user') throw new Error('Only user messages can steer a run')
     const run = this.active.get(id)
     if (!run || run.closing || !run.runId) return false
+    const pending = run.submitting.get(message.id)
+    if (pending) return pending
     if (run.submitted.some((submitted) => submitted.id === message.id)) return true
     run.submitted.push(message)
-    let accepted = false
-    try {
-      accepted = await deliver(run)
-    } finally {
-      if (!accepted) {
-        const index = run.submitted.findIndex((submitted) => submitted.id === message.id)
-        if (index >= 0) run.submitted.splice(index, 1)
+    const delivery = (async () => {
+      let accepted = false
+      try {
+        accepted = await deliver(run)
+        return accepted
+      } finally {
+        if (!accepted) {
+          const index = run.submitted.findIndex((submitted) => submitted.id === message.id)
+          if (index >= 0) run.submitted.splice(index, 1)
+        }
+        run.submitting.delete(message.id)
       }
-    }
-    return accepted
+    })()
+    run.submitting.set(message.id, delivery)
+    return delivery
   }
 
   /**
