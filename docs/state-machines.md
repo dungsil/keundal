@@ -9,56 +9,56 @@
 
 ## 상태 머신 목록
 
-| 식별자 | 상태 소유자 | 명시·암시 상태 | 근거 |
-| --- | --- | --- | --- |
-| SM-01 | 생성 실행(`GenerationService`) | `running / completed / failed / cancelled / interrupted` (명시) | [생성 계약](../packages/generation/src/generation.ts), [저장소](../packages/plugin-store-memory/src/generation.ts) |
-| SM-02 | 세션(`SessionService`) | 없음·준비됨·revision 커밋됨·삭제됨 (암시) | [세션 계약](../packages/session/src/session.ts), [메모리 구현](../packages/plugin-store-memory/src/session.ts) |
-| SM-03 | 채팅 실행(`ChatRuns`) | 비활성·활성·종료 확정 중·해제됨 (암시, `active`·`closing`) | [실행 대기열](../packages/chat/src/run-queue.ts) |
-| SM-04 | Queue / Steer | 저장됨·실행 중 보류·전달 중·반영됨·취소됨·다음 실행 대기 (암시) | [실행 대기열](../packages/chat/src/run-queue.ts), [제어 문서](run-control.md) |
-| SM-05 | UI 응답 | `ready / submitted / streaming / error` (명시) | [화면 제어](../packages/ui-chat/app/lib/use-keundal-chat.ts) |
-| SM-06 | 도구 승인 | `requested / decided`, `allow / deny` (명시) | [도구 승인](../packages/tool-approval/src/index.ts) |
-| SM-07 | 백그라운드 작업 | `queued / running / completed / failed / cancelled / interrupted` (명시) | [작업 계약](../packages/task/src/index.ts), [실행 구현](../packages/task-memory/src/index.ts) |
-| SM-08 | 자동화 전달 시도 | `dispatching / submitted / failed / interrupted / skipped` (명시) | [자동화 계약](../packages/automation/src/index.ts) |
-| SM-09 | 실행 구독 | 저널 재생·실시간 수신·종료 (암시, cursor·listener·done) | [구독 구현](../packages/generation/src/journal-follow.ts) |
+| 식별자 | 상태 소유자                    | 명시·암시 상태                                                           | 근거                                                                                                               |
+| ------ | ------------------------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| SM-01  | 생성 실행(`GenerationService`) | `running / completed / failed / cancelled / interrupted` (명시)          | [생성 계약](../packages/generation/src/generation.ts), [저장소](../packages/plugin-store-memory/src/generation.ts) |
+| SM-02  | 세션(`SessionService`)         | 없음·준비됨·revision 커밋됨·삭제됨 (암시)                                | [세션 계약](../packages/session/src/session.ts), [메모리 구현](../packages/plugin-store-memory/src/session.ts)     |
+| SM-03  | 채팅 실행(`ChatRuns`)          | 비활성·활성·종료 확정 중·해제됨 (암시, `active`·`closing`)               | [실행 대기열](../packages/chat/src/run-queue.ts)                                                                   |
+| SM-04  | Queue / Steer                  | 저장됨·실행 중 보류·전달 중·반영됨·취소됨·다음 실행 대기 (암시)          | [실행 대기열](../packages/chat/src/run-queue.ts), [제어 문서](run-control.md)                                      |
+| SM-05  | UI 응답                        | `ready / submitted / streaming / error` (명시)                           | [화면 제어](../packages/ui-chat/app/lib/use-keundal-chat.ts)                                                       |
+| SM-06  | 도구 승인                      | `requested / decided`, `allow / deny` (명시)                             | [도구 승인](../packages/tool-approval/src/index.ts)                                                                |
+| SM-07  | 백그라운드 작업                | `queued / running / completed / failed / cancelled / interrupted` (명시) | [작업 계약](../packages/task/src/index.ts), [실행 구현](../packages/task-memory/src/index.ts)                      |
+| SM-08  | 자동화 전달 시도               | `dispatching / submitted / failed / interrupted / skipped` (명시)        | [자동화 계약](../packages/automation/src/index.ts)                                                                 |
+| SM-09  | 실행 구독                      | 저널 재생·실시간 수신·종료 (암시, cursor·listener·done)                  | [구독 구현](../packages/generation/src/journal-follow.ts)                                                          |
 
 ## SM-01 생성 실행 전이표
 
-| 이전 상태 | 사건 | 다음 상태 | 불변량 / 금지 전이 |
-| --- | --- | --- | --- |
-| 기록 없음 | `run()` 등록 성공 | `running` | 같은 `runId`를 중복 시작해서는 안 됩니다. |
-| `running` | 성공 응답과 커밋 완료 | `completed` | `RUN_FINISHED` 성공 이벤트는 내구성 커밋 이후에만 외부로 전달합니다. |
-| `running` | 공급자·도구 오류 | `failed` | 부분 저널과 출력은 보존합니다. |
-| `running` | 취소 신호 | `cancelled` | 취소가 실제 실행 중 작업에 전달되어야 합니다. |
-| `running` | 수명 종료·복구 | `interrupted` | 복구는 LLM·도구를 자동 재실행하지 않습니다. |
-| 종료 상태 | 재구독 또는 중복 커밋 | 동일 종료 상태 | 종료 상태를 `running`으로 되돌리거나 결과를 중복 반영하지 않습니다. |
+| 이전 상태 | 사건                  | 다음 상태      | 불변량 / 금지 전이                                                   |
+| --------- | --------------------- | -------------- | -------------------------------------------------------------------- |
+| 기록 없음 | `run()` 등록 성공     | `running`      | 같은 `runId`를 중복 시작해서는 안 됩니다.                            |
+| `running` | 성공 응답과 커밋 완료 | `completed`    | `RUN_FINISHED` 성공 이벤트는 내구성 커밋 이후에만 외부로 전달합니다. |
+| `running` | 공급자·도구 오류      | `failed`       | 부분 저널과 출력은 보존합니다.                                       |
+| `running` | 취소 신호             | `cancelled`    | 취소가 실제 실행 중 작업에 전달되어야 합니다.                        |
+| `running` | 수명 종료·복구        | `interrupted`  | 복구는 LLM·도구를 자동 재실행하지 않습니다.                          |
+| 종료 상태 | 재구독 또는 중복 커밋 | 동일 종료 상태 | 종료 상태를 `running`으로 되돌리거나 결과를 중복 반영하지 않습니다.  |
 
 **주의:** 메모리·IndexedDB·SQLite의 원자적 쓰기와 lease 처리는 각 공급자가 책임집니다.
 `session.commit()` 실패와 취소 경합의 모든 프로세스 간 순서까지 검증한 것은 아닙니다.
 
 ## SM-02 세션 revision 전이표
 
-| 상태 / 사건 | 변경 사항 | 불변량 |
-| --- | --- | --- |
-| 저장되지 않음 → `prepare()` | 기존 메시지와 요청 입력을 병합하고 기준 revision 0을 반환합니다. | `prepare()` 자체는 영속 상태를 변경하지 않습니다. |
-| 저장됨(`revision=n`) → `prepare()` | 입력과 `revision=n`을 준비합니다. | 기존 `threadId`·`runId`를 유지합니다. |
-| `commit(expectedRevision=n)` | 메시지·상태·메타데이터와 선택적 생성 종료 기록을 확정하고 revision을 증가시킵니다. | 현재 revision이 다르면 충돌을 반환합니다. 생성 종료의 중복 커밋은 다시 적용하지 않습니다. |
-| `delete(expectedRevision=n)` | 세션과 연결된 종료된 실행·저널을 삭제합니다. | revision이 다르거나 실행이 `running`이면 거부합니다. |
-| 삭제됨 → 새로운 생성 | 새 revision 0에서 시작할 수 있습니다. | 영구 tombstone을 저장하지 않습니다. |
+| 상태 / 사건                        | 변경 사항                                                                          | 불변량                                                                                    |
+| ---------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 저장되지 않음 → `prepare()`        | 기존 메시지와 요청 입력을 병합하고 기준 revision 0을 반환합니다.                   | `prepare()` 자체는 영속 상태를 변경하지 않습니다.                                         |
+| 저장됨(`revision=n`) → `prepare()` | 입력과 `revision=n`을 준비합니다.                                                  | 기존 `threadId`·`runId`를 유지합니다.                                                     |
+| `commit(expectedRevision=n)`       | 메시지·상태·메타데이터와 선택적 생성 종료 기록을 확정하고 revision을 증가시킵니다. | 현재 revision이 다르면 충돌을 반환합니다. 생성 종료의 중복 커밋은 다시 적용하지 않습니다. |
+| `delete(expectedRevision=n)`       | 세션과 연결된 종료된 실행·저널을 삭제합니다.                                       | revision이 다르거나 실행이 `running`이면 거부합니다.                                      |
+| 삭제됨 → 새로운 생성               | 새 revision 0에서 시작할 수 있습니다.                                              | 영구 tombstone을 저장하지 않습니다.                                                       |
 
 ## SM-03·04 채팅 실행, Queue, Steer 전이표
 
-| 현재 상태 | 사건 | 다음 상태 / 처리 | 불변량 |
-| --- | --- | --- | --- |
-| 비활성 | `respond()` | 활성 실행 등록 | 같은 대화의 두 번째 실행을 거부합니다. |
-| 활성 | `enqueue(message)` | 실행 중 Queue에 임시 보류 | 같은 ID는 한 번만 추가하며 총 32개를 초과하지 않습니다. 종료 커밋 전에는 revision을 바꾸지 않습니다. |
-| 활성 | `dequeue(messageId)` | 임시 Queue 제거 또는 `removed` 표시 | 종료 확정이 시작된 경우 과거 실행 객체가 아니라 최신 저장소에 반영해야 합니다. |
-| 활성 | `steer(message)` | 제출 기록 및 전달 진행 | 동일 ID의 동시 요청은 **최종 전달 결과**를 공유해야 합니다. 성공으로 확정되지 않은 전달을 성공으로 보고하지 않습니다. |
-| 전달 진행 | 전달 성공 | 지시 대기열에 반영 | 동일 메시지 ID는 한 번만 전달합니다. |
-| 전달 진행 | 전달 실패·예외 | 제출 기록 제거 | 호출자가 Queue로 전환하거나 재시도할 수 있어야 합니다. |
-| 활성 | `closing=true` | 종료 확정 중 | 종료 도중 새 변경은 종료 커밋을 기다린 뒤 저장된 Queue에 적용합니다. |
-| 종료 확정 중 | 성공 커밋 | 비활성 + 저장됨/반영됨 | 대기 메시지·미반영 지시·반영된 응답을 같은 revision에서 확정합니다. |
-| 종료 확정 중 | 실패 후 `release()` | 비활성 + Queue 보존 | 확정되지 못한 보류 메시지는 저장소로 병합합니다. |
-| 저장된 Queue | 정상 `RUN_FINISHED` | 다음 메시지 실행 | `cancelled`·`interrupt`·오류·불완전 스트림은 Queue를 자동 재실행하지 않습니다. |
+| 현재 상태    | 사건                 | 다음 상태 / 처리                    | 불변량                                                                                                                |
+| ------------ | -------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 비활성       | `respond()`          | 활성 실행 등록                      | 같은 대화의 두 번째 실행을 거부합니다.                                                                                |
+| 활성         | `enqueue(message)`   | 실행 중 Queue에 임시 보류           | 같은 ID는 한 번만 추가하며 총 32개를 초과하지 않습니다. 종료 커밋 전에는 revision을 바꾸지 않습니다.                  |
+| 활성         | `dequeue(messageId)` | 임시 Queue 제거 또는 `removed` 표시 | 종료 확정이 시작된 경우 과거 실행 객체가 아니라 최신 저장소에 반영해야 합니다.                                        |
+| 활성         | `steer(message)`     | 제출 기록 및 전달 진행              | 동일 ID의 동시 요청은 **최종 전달 결과**를 공유해야 합니다. 성공으로 확정되지 않은 전달을 성공으로 보고하지 않습니다. |
+| 전달 진행    | 전달 성공            | 지시 대기열에 반영                  | 동일 메시지 ID는 한 번만 전달합니다.                                                                                  |
+| 전달 진행    | 전달 실패·예외       | 제출 기록 제거                      | 호출자가 Queue로 전환하거나 재시도할 수 있어야 합니다.                                                                |
+| 활성         | `closing=true`       | 종료 확정 중                        | 종료 도중 새 변경은 종료 커밋을 기다린 뒤 저장된 Queue에 적용합니다.                                                  |
+| 종료 확정 중 | 성공 커밋            | 비활성 + 저장됨/반영됨              | 대기 메시지·미반영 지시·반영된 응답을 같은 revision에서 확정합니다.                                                   |
+| 종료 확정 중 | 실패 후 `release()`  | 비활성 + Queue 보존                 | 확정되지 못한 보류 메시지는 저장소로 병합합니다.                                                                      |
+| 저장된 Queue | 정상 `RUN_FINISHED`  | 다음 메시지 실행                    | `cancelled`·`interrupt`·오류·불완전 스트림은 Queue를 자동 재실행하지 않습니다.                                        |
 
 `SteerQueue`의 지시는 이미 진행 중인 모델 호출·도구를 중단하지 않습니다. 도구 후속 요청
 또는 응답 경계에서 반영합니다. 반영하지 못한 지시는 기존 Queue 앞에 보존합니다.
@@ -66,61 +66,61 @@
 
 ## SM-05 UI 응답 전이표
 
-| 이전 | 사건 | 다음 | 불변량 |
-| --- | --- | --- | --- |
-| `ready` | `runOnce()` | `submitted` | 화면의 `active`는 실제 응답 시작 전에 등록합니다. |
-| `submitted` | 첫 표시 메시지 | `streaming` | 이미 등록한 실행을 중복 시작하지 않습니다. |
-| `submitted/streaming` | 응답 오류 | `error` | 부분 응답을 버리지 않고 종료 후 저장소와 동기화합니다. |
-| `submitted/streaming` | 정상 완료·취소 | `ready` (오류는 `error`) | 다음 Queue는 정상 완료가 확인된 경우만 실행합니다. |
-| 종료 중 | `sync()` 및 `onFinish()` | 비활성 | UI의 `active`는 동기화가 끝난 다음 해제합니다. |
+| 이전                  | 사건                     | 다음                     | 불변량                                                 |
+| --------------------- | ------------------------ | ------------------------ | ------------------------------------------------------ |
+| `ready`               | `runOnce()`              | `submitted`              | 화면의 `active`는 실제 응답 시작 전에 등록합니다.      |
+| `submitted`           | 첫 표시 메시지           | `streaming`              | 이미 등록한 실행을 중복 시작하지 않습니다.             |
+| `submitted/streaming` | 응답 오류                | `error`                  | 부분 응답을 버리지 않고 종료 후 저장소와 동기화합니다. |
+| `submitted/streaming` | 정상 완료·취소           | `ready` (오류는 `error`) | 다음 Queue는 정상 완료가 확인된 경우만 실행합니다.     |
+| 종료 중               | `sync()` 및 `onFinish()` | 비활성                   | UI의 `active`는 동기화가 끝난 다음 해제합니다.         |
 
 ## SM-06 도구 승인 전이표
 
-| 이전 | 사건 | 다음 | 불변량 |
-| --- | --- | --- | --- |
-| 없음 | `ask` 정책 | `requested` | 실행별 `requestId`가 고유해야 합니다. |
-| `requested` | 올바른 `runId`의 최초 응답 | `decided:allow/deny` | 중복·만료·다른 실행의 승인은 거부합니다. |
-| `requested` | Abort | 제거됨 | 대기 Promise를 해제하며 취소 뒤 도구는 실행하지 않습니다. |
-| 없음 | `allow/deny` 정책 | `decided` | 결정 기록을 남긴 다음 허용된 도구만 실행합니다. |
+| 이전        | 사건                       | 다음                 | 불변량                                                    |
+| ----------- | -------------------------- | -------------------- | --------------------------------------------------------- |
+| 없음        | `ask` 정책                 | `requested`          | 실행별 `requestId`가 고유해야 합니다.                     |
+| `requested` | 올바른 `runId`의 최초 응답 | `decided:allow/deny` | 중복·만료·다른 실행의 승인은 거부합니다.                  |
+| `requested` | Abort                      | 제거됨               | 대기 Promise를 해제하며 취소 뒤 도구는 실행하지 않습니다. |
+| 없음        | `allow/deny` 정책          | `decided`            | 결정 기록을 남긴 다음 허용된 도구만 실행합니다.           |
 
 ## SM-07 백그라운드 작업 전이표
 
-| 이전 | 사건 | 다음 | 불변량 |
-| --- | --- | --- | --- |
-| 없음 | `enqueue()` | `queued` | 작업 스냅숏을 저장하고 실행 콜백은 영속 저장하지 않습니다. |
-| `queued` | 실행 슬롯 확보 | `running` | 동시 실행 수는 `maxActive` 이하입니다. |
-| `running` | 성공 `RUN_FINISHED` | `completed` | 성공 이벤트가 없으면 완료로 표시하지 않습니다. |
-| `running` | 오류 또는 불완전 스트림 | `failed` | 부분 출력과 오류를 보존합니다. |
-| `queued/running` | `cancel()` | `cancelled` | 대기 작업을 제거하거나 실행 작업에 Abort를 전달합니다. |
-| `queued/running` | 내구성 복구·서비스 중지 | `interrupted` | 자동 재시작 또는 중복 도구 실행을 하지 않습니다. |
+| 이전             | 사건                    | 다음          | 불변량                                                     |
+| ---------------- | ----------------------- | ------------- | ---------------------------------------------------------- |
+| 없음             | `enqueue()`             | `queued`      | 작업 스냅숏을 저장하고 실행 콜백은 영속 저장하지 않습니다. |
+| `queued`         | 실행 슬롯 확보          | `running`     | 동시 실행 수는 `maxActive` 이하입니다.                     |
+| `running`        | 성공 `RUN_FINISHED`     | `completed`   | 성공 이벤트가 없으면 완료로 표시하지 않습니다.             |
+| `running`        | 오류 또는 불완전 스트림 | `failed`      | 부분 출력과 오류를 보존합니다.                             |
+| `queued/running` | `cancel()`              | `cancelled`   | 대기 작업을 제거하거나 실행 작업에 Abort를 전달합니다.     |
+| `queued/running` | 내구성 복구·서비스 중지 | `interrupted` | 자동 재시작 또는 중복 도구 실행을 하지 않습니다.           |
 
 ## SM-08 자동화 전달 시도 전이표
 
-| 현재 상태 | 사건 | 다음 상태 | 불변량 |
-| --- | --- | --- | --- |
-| 없음 | `claim(automationId,key)` 성공 | `dispatching` | 같은 ID와 key의 전달은 원자적으로 한 번만 주장합니다. |
-| `dispatching` | 작업 등록 성공 | `submitted` | 작업 상태는 `TaskService`에서 별도 추적합니다. |
-| `dispatching` | 전달 실패·중단·건너뜀 | `failed/interrupted/skipped` | 이미 제출한 작업을 무조건 다시 실행하지 않습니다. |
-| 기록 있음 | 같은 이벤트 ID로 재시도 | 기존 기록 유지 | 중복 전달이 새 작업으로 바뀌면 안 됩니다. |
+| 현재 상태     | 사건                           | 다음 상태                    | 불변량                                                |
+| ------------- | ------------------------------ | ---------------------------- | ----------------------------------------------------- |
+| 없음          | `claim(automationId,key)` 성공 | `dispatching`                | 같은 ID와 key의 전달은 원자적으로 한 번만 주장합니다. |
+| `dispatching` | 작업 등록 성공                 | `submitted`                  | 작업 상태는 `TaskService`에서 별도 추적합니다.        |
+| `dispatching` | 전달 실패·중단·건너뜀          | `failed/interrupted/skipped` | 이미 제출한 작업을 무조건 다시 실행하지 않습니다.     |
+| 기록 있음     | 같은 이벤트 ID로 재시도        | 기존 기록 유지               | 중복 전달이 새 작업으로 바뀌면 안 됩니다.             |
 
 자동화 전체의 재시작·프로세스 간 경합은 **미검증**이며 별도 회귀 테스트가 필요합니다.
 
 ## SM-09 journal 재구독 전이표
 
-| 현재 상태 | 사건 | 다음 상태 | 불변량 |
-| --- | --- | --- | --- |
-| 구독 전 | `listen()` 후 `read()` | 저널 재생 | 읽기와 리스너 등록 사이 기록을 잃지 않습니다. |
-| 저널 재생 | `sequence > cursor` | 전달 후 cursor 갱신 | 동일·과거 sequence를 다시 전달하지 않습니다. |
-| 재생 완료, 실행 중 | 새 `publish()` | 실시간 수신 | 재연결은 LLM·도구를 재실행하지 않습니다. |
-| 진행 중 | `end()` 또는 종료 스냅숏 | 구독 종료 | 최종 저널을 전달한 후 끝납니다. |
-| 임의 | Abort | 구독 종료 | 리스너와 Abort 핸들러를 해제합니다. |
+| 현재 상태          | 사건                     | 다음 상태           | 불변량                                        |
+| ------------------ | ------------------------ | ------------------- | --------------------------------------------- |
+| 구독 전            | `listen()` 후 `read()`   | 저널 재생           | 읽기와 리스너 등록 사이 기록을 잃지 않습니다. |
+| 저널 재생          | `sequence > cursor`      | 전달 후 cursor 갱신 | 동일·과거 sequence를 다시 전달하지 않습니다.  |
+| 재생 완료, 실행 중 | 새 `publish()`           | 실시간 수신         | 재연결은 LLM·도구를 재실행하지 않습니다.      |
+| 진행 중            | `end()` 또는 종료 스냅숏 | 구독 종료           | 최종 저널을 전달한 후 끝납니다.               |
+| 임의               | Abort                    | 구독 종료           | 리스너와 Abort 핸들러를 해제합니다.           |
 
 ## 우선순위 및 수정 그룹
 
-| 그룹 | 결함 | 영향 | 증거와 재현 | 수정 / 회귀 테스트 |
-| --- | --- | --- | --- | --- |
-| G1 / P1 | 진행 중 Steer를 중복 성공 처리 | 실패한 지시가 Queue에도 남지 않아 유실될 수 있습니다. | [`ChatRuns.steer()`](../packages/chat/src/run-queue.ts): `submitted`에 있으면 진행 중인 `deliver()`의 결과를 기다리지 않고 `true` 반환 | `submitting` 결과 공유. [`run-queue.test.ts`](../packages/chat/tests/run-queue.test.ts): 동시 성공, 실패, 예외 및 재시도 |
-| G1 / P1 | 종료 중 Queue 취소를 과거 실행에만 반영 | 취소된 메시지가 저장되어 다음 실행에서 재사용될 수 있습니다. | [`ChatRuns.dequeue()`](../packages/chat/src/run-queue.ts): 비동기 `read()` 뒤 `closing` 검사가 없었던 경로 | 종료 후 최신 저장소에 취소 재적용. 같은 테스트: 지연된 `read()`와 종료 경합 및 반복 취소 |
+| 그룹    | 결함                                    | 영향                                                         | 증거와 재현                                                                                                                            | 수정 / 회귀 테스트                                                                                                       |
+| ------- | --------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| G1 / P1 | 진행 중 Steer를 중복 성공 처리          | 실패한 지시가 Queue에도 남지 않아 유실될 수 있습니다.        | [`ChatRuns.steer()`](../packages/chat/src/run-queue.ts): `submitted`에 있으면 진행 중인 `deliver()`의 결과를 기다리지 않고 `true` 반환 | `submitting` 결과 공유. [`run-queue.test.ts`](../packages/chat/tests/run-queue.test.ts): 동시 성공, 실패, 예외 및 재시도 |
+| G1 / P1 | 종료 중 Queue 취소를 과거 실행에만 반영 | 취소된 메시지가 저장되어 다음 실행에서 재사용될 수 있습니다. | [`ChatRuns.dequeue()`](../packages/chat/src/run-queue.ts): 비동기 `read()` 뒤 `closing` 검사가 없었던 경로                             | 종료 후 최신 저장소에 취소 재적용. 같은 테스트: 지연된 `read()`와 종료 경합 및 반복 취소                                 |
 
 두 결함은 **G1: 공용 채팅 실행의 동시성 보장** 하나로 묶어 수정합니다.
 문서에는 증거가 명확한 두 결함만 확정으로 기록합니다. 다른 상태 머신에 대한 표는
