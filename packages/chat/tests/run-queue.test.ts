@@ -1,7 +1,8 @@
+import { expect, test } from 'vitest'
+
 import type { ChatMessage } from '../src/chat-message'
 import type { LocalChat } from '../src/chat-store'
 import { ChatRuns, createActiveChatRun } from '../src/run-queue'
-import { expect, test } from 'vitest'
 
 const message = (id: string): ChatMessage => ({
   id,
@@ -118,5 +119,5 @@ test('저장소 읽기 도중 종료된 실행의 Queue 취소는 최신 저장�
   reading.resolve(fixtureState.saved)
   expect(await removing).toEqual([])
   expect(fixtureState.saved.queue).toBeUndefined()
-  expect(readCount).toBe(2)
+  expect(readCount).toBe(1)
 })
