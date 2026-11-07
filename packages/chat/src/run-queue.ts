@@ -124,6 +124,7 @@ export interface ChatRunStorage {
  */
 export class ChatRuns<T extends ActiveChatRun = ActiveChatRun> {
   readonly active = new Map<string, T>()
+  private readonly pendingSteers = new WeakMap<T, Map<string, Promise<boolean>>>()
 
   constructor(private readonly storage: ChatRunStorage) {}
 
@@ -154,10 +155,13 @@ export class ChatRuns<T extends ActiveChatRun = ActiveChatRun> {
   async dequeue(id: string, messageId: string): Promise<ChatMessage[]> {
     const run = await this.current(id)
     if (run) {
+      const chat = await this.storage.read(id)
+      // Reading the stored queue may overlap settlement. Never modify an already closing run.
+      if (run.closing) return this.dequeue(id, messageId)
       const index = run.queued.findIndex((queued) => queued.id === messageId)
       if (index >= 0) run.queued.splice(index, 1)
       else run.removed.add(messageId)
-      return visibleQueue(await this.storage.read(id), run)
+      return visibleQueue(chat, run)
     }
     const saved = await this.storage.write(id, (chat) => {
       const queue = (chat.queue ?? []).filter((queued) => queued.id !== messageId)
@@ -175,18 +179,29 @@ export class ChatRuns<T extends ActiveChatRun = ActiveChatRun> {
     if (message.role !== 'user') throw new Error('Only user messages can steer a run')
     const run = this.active.get(id)
     if (!run || run.closing || !run.runId) return false
+    const pending = this.pendingSteers.get(run) ?? new Map<string, Promise<boolean>>()
+    this.pendingSteers.set(run, pending)
+    // An in-flight duplicate must observe the same eventual delivery result, not an optimistic success.
+    const inFlight = pending.get(message.id)
+    if (inFlight) return inFlight
     if (run.submitted.some((submitted) => submitted.id === message.id)) return true
     run.submitted.push(message)
-    let accepted = false
-    try {
-      accepted = await deliver(run)
-    } finally {
-      if (!accepted) {
-        const index = run.submitted.findIndex((submitted) => submitted.id === message.id)
-        if (index >= 0) run.submitted.splice(index, 1)
+    const delivery = (async () => {
+      let accepted = false
+      try {
+        accepted = await deliver(run)
+        return accepted
+      } finally {
+        if (!accepted) {
+          const index = run.submitted.findIndex((submitted) => submitted.id === message.id)
+          if (index >= 0) run.submitted.splice(index, 1)
+        }
+        pending.delete(message.id)
+        if (!pending.size) this.pendingSteers.delete(run)
       }
-    }
-    return accepted
+    })()
+    pending.set(message.id, delivery)
+    return delivery
   }
 
   /**
