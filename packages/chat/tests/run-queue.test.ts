@@ -100,13 +100,18 @@ test('저장소 읽기 도중 종료된 실행의 Queue 취소는 최신 저장�
   const run = createActiveChatRun(new AbortController(), done.promise)
   runs.active.set('thread', run)
   const reading = Promise.withResolvers<LocalChat | undefined>()
+  const readingStarted = Promise.withResolvers<void>()
   let readCount = 0
   fixtureState.setRead(() => {
     readCount++
-    if (readCount === 1) return reading.promise
+    if (readCount === 1) {
+      readingStarted.resolve()
+      return reading.promise
+    }
     return Promise.resolve(fixtureState.saved)
   })
   const removing = runs.dequeue('thread', 'queued')
+  await readingStarted.promise
   run.closing = true
   runs.active.delete('thread')
   done.resolve()
