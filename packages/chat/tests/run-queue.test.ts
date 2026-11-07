@@ -1,8 +1,8 @@
+import { expect, test } from 'vitest'
+
 import type { ChatMessage } from '../src/chat-message'
 import type { LocalChat } from '../src/chat-store'
 import { ChatRuns, createActiveChatRun, type ChatRunStorage } from '../src/run-queue'
-
-import { expect, test } from 'vitest'
 
 const threadId = 'chat'
 
