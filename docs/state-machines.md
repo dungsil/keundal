@@ -5,44 +5,44 @@
 
 ## 1. 상태 머신 색인
 
-| 상태 머신 | 명시적 상태 또는 암시적 상태 | 구현 | 검증·보장 |
-| --- | --- | --- | --- |
-| 생성 실행 (Generation) | `running` → `completed / failed / cancelled / interrupted` | `packages/generation/src/generation.ts`, `packages/plugin-store-{memory,sqlite,indexeddb}/src/generation.ts` | `docs/run-control.md`, 저장소별 recovery/conformance 테스트 |
-| 채팅 실행과 Queue (ChatRuns) | `idle / active / closing`, Queue `queued / removed / committed` | `packages/chat/src/run-queue.ts`, `packages/plugin-chat-local/src/index.ts`, `packages/chat-http/src/index.ts` | `packages/chat/tests/run-queue.test.ts`, `packages/ui-chat/tests/chat-queue.test.ts` |
-| Steer 전달 | `not-submitted / delivering / accepted / rejected / applied / requeued` | `packages/chat/src/run-queue.ts`, `packages/tool-execution/src/index.ts` | `packages/chat/tests/run-queue.test.ts`, `packages/agent-host/tests/run-control.test.ts` |
-| 세션 Revision | `prepared(revision N) / committed(N+1) / conflict / deleted` | `packages/session/src/session.ts`, `packages/plugin-store-*/src/session.ts` | 저장소별 conformance/store 테스트 |
-| 백그라운드 작업 | `queued / running / completed / failed / cancelled / interrupted` | `packages/task/src/index.ts`, `packages/task-memory/src/index.ts` | `packages/task-memory/tests/tasks.test.ts` |
-| 도구 승인 | `requested / decided(allow|deny) / cancelled` (마지막 상태는 대기 요청 해제의 암시적 상태) | `packages/tool-approval/src/index.ts` | `packages/agent-host/tests/run-control.test.ts` |
-| journal 재구독 | `replay / following / ended / aborted` | `packages/generation/src/journal-follow.ts` | 저장소별 recovery 및 호스트의 구독 테스트 |
-| 자동화 전달 | `dispatching / submitted / failed / interrupted / skipped` | `packages/automation/src/index.ts` | 관련 자동화 테스트 |
+| 상태 머신                    | 명시적 상태 또는 암시적 상태                                                               | 구현                                                                                                           | 검증·보장                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 생성 실행 (Generation)       | `running` → `completed / failed / cancelled / interrupted`                                 | `packages/generation/src/generation.ts`, `packages/plugin-store-{memory,sqlite,indexeddb}/src/generation.ts`   | `docs/run-control.md`, 저장소별 recovery/conformance 테스트                              |
+| 채팅 실행과 Queue (ChatRuns) | `idle / active / closing`, Queue `queued / removed / committed`                            | `packages/chat/src/run-queue.ts`, `packages/plugin-chat-local/src/index.ts`, `packages/chat-http/src/index.ts` | `packages/chat/tests/run-queue.test.ts`, `packages/ui-chat/tests/chat-queue.test.ts`     |
+| Steer 전달                   | `not-submitted / delivering / accepted / rejected / applied / requeued`                    | `packages/chat/src/run-queue.ts`, `packages/tool-execution/src/index.ts`                                       | `packages/chat/tests/run-queue.test.ts`, `packages/agent-host/tests/run-control.test.ts` |
+| 세션 Revision                | `prepared(revision N) / committed(N+1) / conflict / deleted`                               | `packages/session/src/session.ts`, `packages/plugin-store-*/src/session.ts`                                    | 저장소별 conformance/store 테스트                                                        |
+| 백그라운드 작업              | `queued / running / completed / failed / cancelled / interrupted`                          | `packages/task/src/index.ts`, `packages/task-memory/src/index.ts`                                              | `packages/task-memory/tests/tasks.test.ts`                                               |
+| 도구 승인                    | `requested / decided(allow/deny) / cancelled` (마지막 상태는 대기 요청 해제의 암시적 상태) | `packages/tool-approval/src/index.ts`                                                                          | `packages/agent-host/tests/run-control.test.ts`                                          |
+| journal 재구독               | `replay / following / ended / aborted`                                                     | `packages/generation/src/journal-follow.ts`                                                                    | 저장소별 recovery 및 호스트의 구독 테스트                                                |
+| 자동화 전달                  | `dispatching / submitted / failed / interrupted / skipped`                                 | `packages/automation/src/index.ts`                                                                             | 관련 자동화 테스트                                                                       |
 
 ## 2. 생성 실행 상태 전이
 
-| 현재 | 사건 | 다음 | 불변량 |
-| --- | --- | --- | --- |
-| 없음 | 유효한 새 runId로 실행 시작 | running | 같은 runId의 활성 실행을 중복 등록하지 않음 |
-| running | 성공한 스트림 종료 및 세션 commit | completed | 성공 `RUN_FINISHED`는 내구성 commit 이후 전달 |
-| running | 스트림 실패 | failed | 기존 journal 및 부분 응답 보존 |
-| running | 사용자 취소 | cancelled | 실제 작업의 AbortSignal 전파, 부분 응답 보존 |
-| running | 프로세스 재시작·임차 만료 후 recover | interrupted | 모델·도구 재실행 금지 |
-| terminal | subscribe / recover | 같은 terminal | 이벤트 재생만 수행하며 부작용 없음 |
-| terminal | 동일 종료 commit 재시도 | 같은 terminal | revision 증가 및 메시지 중복 적용 금지 |
+| 현재     | 사건                                 | 다음          | 불변량                                        |
+| -------- | ------------------------------------ | ------------- | --------------------------------------------- |
+| 없음     | 유효한 새 runId로 실행 시작          | running       | 같은 runId의 활성 실행을 중복 등록하지 않음   |
+| running  | 성공한 스트림 종료 및 세션 commit    | completed     | 성공 `RUN_FINISHED`는 내구성 commit 이후 전달 |
+| running  | 스트림 실패                          | failed        | 기존 journal 및 부분 응답 보존                |
+| running  | 사용자 취소                          | cancelled     | 실제 작업의 AbortSignal 전파, 부분 응답 보존  |
+| running  | 프로세스 재시작·임차 만료 후 recover | interrupted   | 모델·도구 재실행 금지                         |
+| terminal | subscribe / recover                  | 같은 terminal | 이벤트 재생만 수행하며 부작용 없음            |
+| terminal | 동일 종료 commit 재시도              | 같은 terminal | revision 증가 및 메시지 중복 적용 금지        |
 
 관련 계약: `packages/generation/src/generation.ts`, `packages/session/src/session.ts`, `docs/run-control.md`.
 실제 저장소별 영속성 보장의 상세한 조건은 각 구현 및 conformance 테스트에서 확인해야 합니다.
 
 ## 3. 채팅 실행 상태 전이
 
-| 현재 | 사건 | 다음 | 허용되는 동작 |
-| --- | --- | --- | --- |
-| idle | respond 시작 | active | 대화당 한 실행 등록 |
-| active | enqueue | active | 메모리의 `queued`에 추가, id 중복 제거, 32개 상한 유지 |
-| active | dequeue | active | 저장된 항목은 `removed`로 표시, 임시 항목은 제거 |
-| active | steer | active | id별 전달이 완료된 경우에만 성공 반환 |
-| active | 종료 커밋 시작 | closing | 새 enqueue/dequeue는 종료 완료 후 저장소에 적용 |
-| closing | release | idle | 실패 시 대기 변경을 복구하고 등록 해제 |
-| idle | enqueue/dequeue | idle | 저장소에 직접 반영 |
-| active/closing | 같은 대화 respond | 금지 | 중복 실행 거부 |
+| 현재           | 사건              | 다음    | 허용되는 동작                                          |
+| -------------- | ----------------- | ------- | ------------------------------------------------------ |
+| idle           | respond 시작      | active  | 대화당 한 실행 등록                                    |
+| active         | enqueue           | active  | 메모리의 `queued`에 추가, id 중복 제거, 32개 상한 유지 |
+| active         | dequeue           | active  | 저장된 항목은 `removed`로 표시, 임시 항목은 제거       |
+| active         | steer             | active  | id별 전달이 완료된 경우에만 성공 반환                  |
+| active         | 종료 커밋 시작    | closing | 새 enqueue/dequeue는 종료 완료 후 저장소에 적용        |
+| closing        | release           | idle    | 실패 시 대기 변경을 복구하고 등록 해제                 |
+| idle           | enqueue/dequeue   | idle    | 저장소에 직접 반영                                     |
+| active/closing | 같은 대화 respond | 금지    | 중복 실행 거부                                         |
 
 ### 필수 불변량
 
@@ -54,16 +54,16 @@
 
 ## 4. Steer 상태 전이
 
-| 현재 | 사건 | 다음 | 허용 결과 |
-| --- | --- | --- | --- |
-| not-submitted | 유효한 active run에 전달 시작 | delivering | submitted에 한 번만 추가 |
-| delivering | 같은 ID의 요청 | delivering | 기존 Promise를 공유 |
-| delivering | 전달 성공 | accepted | 모든 동시 호출에 true |
-| delivering | 전달 거절 | rejected | 모든 동시 호출에 false, submitted에서 제거 |
-| delivering | 전달 예외 | rejected | 모든 동시 호출에 같은 실패, submitted에서 제거 |
-| rejected | 재시도 | delivering | 실제 전달을 새로 시도 |
-| accepted | 안전한 모델 경계에서 소비 | applied | journal에 반영 |
-| accepted | 실행이 소비 전에 종료 | requeued | Queue 앞으로 이동 |
+| 현재          | 사건                          | 다음       | 허용 결과                                      |
+| ------------- | ----------------------------- | ---------- | ---------------------------------------------- |
+| not-submitted | 유효한 active run에 전달 시작 | delivering | submitted에 한 번만 추가                       |
+| delivering    | 같은 ID의 요청                | delivering | 기존 Promise를 공유                            |
+| delivering    | 전달 성공                     | accepted   | 모든 동시 호출에 true                          |
+| delivering    | 전달 거절                     | rejected   | 모든 동시 호출에 false, submitted에서 제거     |
+| delivering    | 전달 예외                     | rejected   | 모든 동시 호출에 같은 실패, submitted에서 제거 |
+| rejected      | 재시도                        | delivering | 실제 전달을 새로 시도                          |
+| accepted      | 안전한 모델 경계에서 소비     | applied    | journal에 반영                                 |
+| accepted      | 실행이 소비 전에 종료         | requeued   | Queue 앞으로 이동                              |
 
 ## 5. 검증된 잘못된 전이와 변경
 
