@@ -22,7 +22,7 @@
   "dependencies": {
     "@iconify-json/logos": "^1.2.15",
     "@iconify-json/lucide": "^1.2.142",
-    "@iconify-json/simple-icons": "^1.2.99",
+    "@iconify-json/simple-icons": "^1.2.101",
     "@keundal/chat": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
