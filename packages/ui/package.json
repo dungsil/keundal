@@ -26,7 +26,7 @@
     "@keundal/chat": "workspace:*",
     "@keundal/core": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
-    "@nuxt/ui": "^4.11.3",
+    "@nuxt/ui": "^4.12.0",
     "@vueuse/core": "^14.4.0",
     "motion-v": "^2.6.0",
     "nuxt": "^4.6.2",
