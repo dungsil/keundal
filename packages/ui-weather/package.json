@@ -13,7 +13,7 @@
     "@keundal/ui": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
     "cordis": "catalog:",
-    "nuxt": "^4.6.2",
+    "nuxt": "^4.6.3",
     "vue": "3.5.44"
   }
 }
