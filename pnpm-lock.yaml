@@ -165,8 +165,8 @@ settings:
 catalogs:
   default:
     '@ag-ui/core':
-      specifier: 1.0.2
-      version: 1.0.2
+      specifier: 1.0.4
+      version: 1.0.4
     '@anthropic-ai/sdk':
       specifier: 1.1.0
       version: 1.1.0
@@ -1494,7 +1494,7 @@ importers:
     dependencies:
       '@ag-ui/core':
         specifier: 'catalog:'
-        version: 1.0.2(zod@4.6.7)
+        version: 1.0.4(zod@4.6.7)
       fast-json-patch:
         specifier: 3.1.1
         version: 3.1.1
@@ -4625,8 +4625,8 @@ importers:
 
 packages:
 
-  '@ag-ui/core@1.0.2':
-    resolution: {integrity: sha512-lb0YfvHY4eTHcXthTWzXjsElLqycGWDhaXGTejwMkUV5TtJVZircRS12/tMpqzd32sL+WZ2PWQ4m0+ThKrGF8A==}
+  '@ag-ui/core@1.0.4':
+    resolution: {integrity: sha512-Z/G3UXYRyZ/1LcOtCCf6RJiFPTjRqaNublW/kQ7wsfiP4Qw5oIVmvO6NkUQYoqCoMXuXggyD3MMH2Td5OVKECQ==}
     peerDependencies:
       zod: ^3.25.18 || ^4.0.0
     peerDependenciesMeta:
@@ -11699,7 +11699,7 @@ packages:
 
 snapshots:
 
-  '@ag-ui/core@1.0.2(zod@4.6.7)':
+  '@ag-ui/core@1.0.4(zod@4.6.7)':
     optionalDependencies:
       zod: 4.6.7
 
