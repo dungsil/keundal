@@ -17,7 +17,7 @@
     "@comark/vue": "^0.8.1",
     "@keundal/ui": "workspace:*",
     "@keundal/ui-slots": "workspace:*",
-    "@shikijs/langs": "^4.5.0",
+    "@shikijs/langs": "^4.6.0",
     "cordis": "catalog:",
     "nuxt": "^4.6.3",
     "shiki": "^4.5.0",
