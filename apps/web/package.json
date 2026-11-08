@@ -39,7 +39,7 @@
     "@keundal/ui-trace": "workspace:*",
     "@keundal/ui-weather": "workspace:*",
     "@keundal/agent-host": "workspace:*",
-    "nuxt": "^4.6.2",
+    "nuxt": "^4.6.3",
     "h3": "2.0.8",
     "@keundal/agent-runtime-node": "workspace:*",
     "@keundal/chat": "workspace:*",

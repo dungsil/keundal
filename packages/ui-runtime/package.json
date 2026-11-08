@@ -34,7 +34,7 @@
     "@keundal/workspace": "workspace:*",
     "@vueuse/core": "^14.4.0",
     "cordis": "catalog:",
-    "nuxt": "^4.6.2"
+    "nuxt": "^4.6.3"
   },
   "devDependencies": {
     "@keundal/browser-composition": "workspace:*",
