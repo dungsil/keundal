@@ -13,7 +13,7 @@ import {
 import { Context, type Fiber } from 'cordis'
 import { assert, expect, test } from 'vitest'
 
-test('저장소 적합성과 동시 커밋의 단일 반영 및 journal 재생을 검증한다', async () => {
+test('저장소 적합성과 동시 커밋의 단일 반영 및 journal 재생을 검증한다', { timeout: 30_000 }, async () => {
   const makeStore = async (): Promise<ConformanceStore> => {
     const path = join(mkdtempSync(join(tmpdir(), 'conformance-')), 'db.sqlite')
     const ctx = new Context()

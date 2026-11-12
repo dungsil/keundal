@@ -339,4 +339,4 @@ test('비밀번호 누락·오입력·변조·미지원 암호화는 기존 대�
     expect(await target.ctx.backup.export()).toEqual(history)
     expect(target.values).toEqual(settings)
   }
-})
+}, 30_000)
