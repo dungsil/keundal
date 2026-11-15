@@ -22,7 +22,7 @@
     "@keundal/notification": "workspace:*",
     "@keundal/task": "workspace:*",
     "cordis": "catalog:",
-    "cron-parser": "5.10.2"
+    "cron-parser": "5.10.5"
   },
   "devDependencies": {
     "@keundal/plugin-store-sqlite": "workspace:*",
