@@ -19,7 +19,7 @@
     "@keundal/ui-slots": "workspace:*",
     "@shikijs/langs": "^4.6.0",
     "cordis": "catalog:",
-    "nuxt": "^4.6.3",
+    "nuxt": "^4.6.4",
     "shiki": "^4.6.0",
     "vue": "3.5.44"
   },
