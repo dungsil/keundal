@@ -10,6 +10,10 @@ allowBuilds:
 overrides:
   # nuxt-csurf는 아직 h3 v1 이벤트 API를 사용합니다. 원본 템플릿의 고정을 유지합니다.
   h3: 1.15.11
+  # archiver@8의 readdir-glob@3은 minimatch@10을 요구합니다. Minimatch 생성자와 match()만 사용하므로 보안 수정 버전으로 올립니다.
+  readdir-glob>minimatch: 11.0.9
+  # @nuxt/fonts@0.14의 fontless@0.2는 esbuild@0.27을 요구합니다. CSS transform()만 사용하므로 보안 수정 버전으로 올립니다.
+  fontless>esbuild: 0.28.2
 
 savePrefix: ''
 
