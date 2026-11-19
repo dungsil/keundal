@@ -149,27 +149,32 @@ try {
     let appError
     app.on('error', error => (appError = error))
     let ready = false
-    const deadline = Date.now() + 30_000
+    let window
+    const started = Date.now()
+    // Allow headroom for cold desktop startup on hosted Windows runners.
+    const deadline = started + 60_000
     while (Date.now() < deadline) {
       if (appError) throw appError
       assert.equal(app.exitCode, null, 'Desktop exited before creating its window')
-      const window = spawnSync(
+      window = spawnSync(
         'powershell.exe',
         [
           '-NoProfile',
           '-NonInteractive',
           '-Command',
-          `$p = Get-Process -Id ${app.pid} -ErrorAction Stop; if ($p.MainWindowHandle -eq 0 -or -not $p.Responding) { exit 1 }`
+          `$p = Get-Process -Id ${app.pid} -ErrorAction Stop; $p | Select-Object Id, MainWindowHandle, Responding; if ($p.MainWindowHandle -eq 0 -or -not $p.Responding) { exit 1 }`
         ],
         { encoding: 'utf8', timeout: 10_000 }
       )
+      if (window.error) throw window.error
       if (window.status === 0) {
         ready = true
         break
       }
       await delay(500)
     }
-    assert.ok(ready, 'Desktop did not create a responding native window')
+    assert.ok(ready, `Desktop did not create a responding native window:\n${window?.stdout}\n${window?.stderr}`)
+    console.log(`PASS: desktop native window became responsive in ${Date.now() - started}ms`)
     await delay(3_000)
     assert.equal(app.exitCode, null, 'Desktop exited after creating its window')
     await verifyChatScreen(app.pid)
