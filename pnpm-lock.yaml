@@ -360,8 +360,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui-workspace
       '@tauri-apps/api':
-        specifier: 2.12.4
-        version: 2.12.4
+        specifier: 2.12.5
+        version: 2.12.5
       cordis:
         specifier: 'catalog:'
         version: 4.0.0-rc.11
@@ -1253,8 +1253,8 @@ importers:
         specifier: workspace:*
         version: link:../../tools/tsdown
       '@tauri-apps/api':
-        specifier: 2.12.4
-        version: 2.12.4
+        specifier: 2.12.5
+        version: 2.12.5
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.6
@@ -2026,8 +2026,8 @@ importers:
         specifier: workspace:*
         version: link:../../tools/tsdown
       '@tauri-apps/api':
-        specifier: 2.12.4
-        version: 2.12.4
+        specifier: 2.12.5
+        version: 2.12.5
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.6
@@ -6718,8 +6718,8 @@ packages:
     peerDependencies:
       vue: ^2.7.0 || ^3.0.0
 
-  '@tauri-apps/api@2.12.4':
-    resolution: {integrity: sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg==}
+  '@tauri-apps/api@2.12.5':
+    resolution: {integrity: sha512-G9QIMt5fzED+aS4QhVK3w1HWLKpLIwH/MnpCr9z1ugGEHnS2ORmqrLkc0uALOjRK4qXJy+4Yiw8LDl/KicC1Hg==}
 
   '@tauri-apps/cli-darwin-arm64@2.12.3':
     resolution: {integrity: sha512-xmVNoJOOKzKLj7GLHXmXLimRby9M42aBIJa0sB80N7o24eKV5JiVmToKTRLVH9yhL05GZ/B6rSSOmbzNFJwBAA==}
@@ -14100,7 +14100,7 @@ snapshots:
       '@tanstack/virtual-core': 3.19.11
       vue: 3.5.44(typescript@6.0.3)
 
-  '@tauri-apps/api@2.12.4': {}
+  '@tauri-apps/api@2.12.5': {}
 
   '@tauri-apps/cli-darwin-arm64@2.12.3':
     optional: true
