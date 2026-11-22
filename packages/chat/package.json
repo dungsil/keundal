@@ -85,7 +85,7 @@
     "@keundal/tool-approval": "workspace:*",
     "@keundal/tools": "workspace:*",
     "@keundal/workspace": "workspace:*",
-    "papaparse": "5.7.0",
+    "papaparse": "5.7.1",
     "pdfjs-dist": "6.5.438",
     "zod": "catalog:"
   },
