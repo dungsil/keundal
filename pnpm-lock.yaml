@@ -189,8 +189,8 @@ catalogs:
       specifier: 24.13.6
       version: 24.13.6
     cordis:
-      specifier: 4.0.0-rc.11
-      version: 4.0.0-rc.11
+      specifier: 4.0.0-rc.13
+      version: 4.0.0-rc.13
     openai:
       specifier: 7.15.0
       version: 7.15.0
@@ -364,7 +364,7 @@ importers:
         version: 2.12.5
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       desktop-npm:
         specifier: npm:npm@11.12.0
         version: npm@11.12.0
@@ -542,7 +542,7 @@ importers:
         version: link:../../packages/ui-weather
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       h3:
         specifier: 1.15.11
         version: 1.15.11
@@ -618,7 +618,7 @@ importers:
         version: link:../../packages/plugin-tool-fs
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -652,7 +652,7 @@ importers:
         version: link:../../packages/plugin-store-sqlite
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -714,7 +714,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -775,7 +775,7 @@ importers:
         version: link:../workspace
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/chat-http':
         specifier: workspace:*
@@ -875,7 +875,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -1030,7 +1030,7 @@ importers:
         version: link:../workspace
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       import-meta-resolve:
         specifier: 4.2.0
         version: 4.2.0
@@ -1073,7 +1073,7 @@ importers:
         version: link:../task
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -1107,7 +1107,7 @@ importers:
         version: link:../task
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       cron-parser:
         specifier: 5.10.5
         version: 5.10.5
@@ -1153,7 +1153,7 @@ importers:
         version: link:../session
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -1211,7 +1211,7 @@ importers:
         version: link:../plugin-transcription-openai
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/agent-loop':
         specifier: workspace:*
@@ -1480,7 +1480,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -1561,7 +1561,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -1592,7 +1592,7 @@ importers:
         version: link:../llm
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -1617,7 +1617,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -1701,7 +1701,7 @@ importers:
         version: link:../tools
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -1732,7 +1732,7 @@ importers:
         version: link:../memory
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -1748,7 +1748,7 @@ importers:
     dependencies:
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -1791,7 +1791,7 @@ importers:
         version: link:../tool-approval
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -1837,7 +1837,7 @@ importers:
         version: link:../agent-loop
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/agent':
         specifier: workspace:*
@@ -1931,7 +1931,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/llm':
         specifier: workspace:*
@@ -2081,7 +2081,7 @@ importers:
         version: link:../tool-approval
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/plugin-agent-chat':
         specifier: workspace:*
@@ -2136,7 +2136,7 @@ importers:
         version: link:../session
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -2170,7 +2170,7 @@ importers:
         version: link:../fs
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/plugin-context':
         specifier: workspace:*
@@ -2207,7 +2207,7 @@ importers:
         version: link:../fs
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -2238,7 +2238,7 @@ importers:
         version: link:../fs
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/plugin-fs-local':
         specifier: workspace:*
@@ -2281,7 +2281,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -2321,7 +2321,7 @@ importers:
         version: link:../llm-settings
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -2364,7 +2364,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -2404,7 +2404,7 @@ importers:
         version: link:../llm
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -2444,7 +2444,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       openai:
         specifier: 'catalog:'
         version: 7.15.0(undici@8.12.4)(ws@8.22.0)(zod@4.6.7)
@@ -2493,7 +2493,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       openai:
         specifier: 'catalog:'
         version: 7.15.0(undici@8.12.4)(ws@8.22.0)(zod@4.6.7)
@@ -2564,7 +2564,7 @@ importers:
         version: 24.13.6
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       tsdown:
         specifier: 'catalog:'
         version: 0.23.4(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.13)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.13(typescript@6.0.3))
@@ -2588,7 +2588,7 @@ importers:
         version: link:../memory-store
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -2616,7 +2616,7 @@ importers:
         version: link:../notification
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/plugin-store-sqlite':
         specifier: workspace:*
@@ -2650,7 +2650,7 @@ importers:
         version: link:../tools
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -2675,7 +2675,7 @@ importers:
         version: link:../shell
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -2706,7 +2706,7 @@ importers:
         version: link:../skill
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -2740,7 +2740,7 @@ importers:
         version: link:../skill-markdown
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/plugin-skill':
         specifier: workspace:*
@@ -2801,7 +2801,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/store-conformance':
         specifier: workspace:*
@@ -2856,7 +2856,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/store-conformance':
         specifier: workspace:*
@@ -2923,7 +2923,7 @@ importers:
         version: 1.1.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/plugin-store-indexeddb':
         specifier: workspace:*
@@ -2994,7 +2994,7 @@ importers:
         version: link:../tools
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/core':
         specifier: workspace:*
@@ -3043,7 +3043,7 @@ importers:
         version: link:../tools
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/core':
         specifier: workspace:*
@@ -3139,7 +3139,7 @@ importers:
         version: link:../workspace
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/plugin-workspace-git':
         specifier: workspace:*
@@ -3173,7 +3173,7 @@ importers:
         version: link:../transcription
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       openai:
         specifier: 'catalog:'
         version: 7.15.0(undici@8.12.4)(ws@8.22.0)(zod@4.6.7)
@@ -3213,7 +3213,7 @@ importers:
         version: link:../workspace
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -3272,7 +3272,7 @@ importers:
         version: link:../generation
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -3297,7 +3297,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -3328,7 +3328,7 @@ importers:
         version: link:../tools
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -3421,7 +3421,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -3449,7 +3449,7 @@ importers:
         version: link:../task
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -3586,7 +3586,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -3690,7 +3690,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.13.6)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -3733,7 +3733,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.13.6)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -3773,7 +3773,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -3794,7 +3794,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -3842,7 +3842,7 @@ importers:
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.13.6)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -3915,7 +3915,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       date-fns:
         specifier: ^4.4.0
         version: 4.4.0
@@ -3951,7 +3951,7 @@ importers:
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -3975,7 +3975,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -3999,7 +3999,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4026,7 +4026,7 @@ importers:
         version: 4.6.0
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.13.6)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4066,7 +4066,7 @@ importers:
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4090,7 +4090,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4123,7 +4123,7 @@ importers:
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4177,7 +4177,7 @@ importers:
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.13.6)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4226,7 +4226,7 @@ importers:
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4256,7 +4256,7 @@ importers:
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4280,7 +4280,7 @@ importers:
         version: 4.13.0(6709cd899a8790d61899dfec38d3b199)
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4298,7 +4298,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4325,7 +4325,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       fflate:
         specifier: 0.8.3
         version: 0.8.3
@@ -4353,7 +4353,7 @@ importers:
     dependencies:
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -4396,7 +4396,7 @@ importers:
         version: 14.4.0(vue@3.5.44(typescript@6.0.3))
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4420,7 +4420,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4450,7 +4450,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.13.6)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4484,7 +4484,7 @@ importers:
         version: link:../ui-slots
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4508,7 +4508,7 @@ importers:
         version: link:../workspace
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
       nuxt:
         specifier: ^4.6.4
         version: 4.6.4(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7(supports-color@10.2.2)))(@libsql/client@0.18.0)(@oxc-project/types@0.156.0)(@types/node@24.19.2)(@vue/compiler-sfc@3.5.44)(acorn@8.19.0)(confbox@0.3.1)(db0@0.3.4(@libsql/client@0.18.0)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1)))(dotenv@17.4.2)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(@opentelemetry/api@1.9.1))(esbuild@0.28.2)(giget@3.3.1)(ioredis@5.11.1(supports-color@10.2.2))(lightningcss@1.33.0)(mlly@1.8.2)(optionator@0.9.4)(oxlint@1.94.0(oxlint-tsgolint@7.0.2007))(rolldown@1.2.16)(rollup-plugin-visualizer@7.1.1(rolldown@1.2.16)(rollup@4.68.0))(rollup@4.68.0)(srvx@1.0.5)(supports-color@10.2.2)(terser@5.51.2)(tsx@4.23.15)(typescript@6.0.3)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1)
@@ -4523,7 +4523,7 @@ importers:
         version: link:../core
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -4569,7 +4569,7 @@ importers:
         version: link:../../packages/trace
       cordis:
         specifier: 'catalog:'
-        version: 4.0.0-rc.11
+        version: 4.0.0-rc.13
     devDependencies:
       '@keundal/tsconfig':
         specifier: workspace:*
@@ -7888,16 +7888,22 @@ packages:
     resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
     engines: {node: '>=18'}
 
-  cordis@4.0.0-rc.11:
-    resolution: {integrity: sha512-03PHbcYJzp84XRKnW7jd17g26bPvG5UvSyhyjxGIu/1VQs3bweNMACo3t1W0ikzoZ7q+wytHyk8jJsaIQOkPkA==}
+  cordis@4.0.0-rc.13:
+    resolution: {integrity: sha512-rYsquBfrd1U8HuaDr/1TYpdnHiuy5X2oEWJbfEveIZwysfjg3vTXJWKvTPlaPtt2VeFsAJIrzHZnymONyOr3PA==}
     hasBin: true
     peerDependencies:
-      '@cordisjs/plugin-include': ^1.1.1
-      '@cordisjs/plugin-loader': ^1.0.0-rc.8
+      '@cordisjs/fs': ^2.0.0-rc.0
+      '@cordisjs/fs-node': ^0.1.0
+      '@cordisjs/include': ^2.0.0-rc.0
+      '@cordisjs/loader': ^1.0.0-rc.10
     peerDependenciesMeta:
-      '@cordisjs/plugin-include':
+      '@cordisjs/fs':
         optional: true
-      '@cordisjs/plugin-loader':
+      '@cordisjs/fs-node':
+        optional: true
+      '@cordisjs/include':
+        optional: true
+      '@cordisjs/loader':
         optional: true
 
   core-util-is@1.0.3:
@@ -11162,18 +11168,22 @@ packages:
   yuku-ast@0.19.0:
     resolution: {integrity: sha512-PyCsiScaelhxBGzL8dyeJkLqvRZycoh78R31Vrt/WqYrm0hMFoKwIw/X7Dx5mBKLWAMlV9I9HEyBOHnj2gZVyw==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-codegen@0.19.0:
     resolution: {integrity: sha512-uymAKHjDuaP4BEpkXC/BSLz4DUEF5oArZ5AuD3888nb2miChjWSgpPdojEJxm3pjpXkgUaCRJQyNAbnMN33wHg==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-core@0.19.0:
     resolution: {integrity: sha512-kYK9e1XdfirNhkipzW0wmMcSWcVF/CWnuugodfVYRCUwvoBefweL9HzB96OiKEhsx78V5WbUxbJqlizMX869Qg==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-parser@0.19.0:
     resolution: {integrity: sha512-XrBh9ZiQK5mJVRxZBAvD6LwRyAYrK3MFtH3+onyuxFL5hFD44EC3QOmIC1FjTj6H2MMwq46/NAI+NZxLZPZgxg==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   zip-stream@7.0.5:
     resolution: {integrity: sha512-dSvYKdvLsAHCDqPOhIwk/q5CvuWtTB3Dgpoe0uVEFjTzIOAmsQpprX25InCvrvJsirEbu1OHyy67n/kAj1Sw/w==}
@@ -15392,7 +15402,7 @@ snapshots:
 
   cookie@1.1.1: {}
 
-  cordis@4.0.0-rc.11:
+  cordis@4.0.0-rc.13:
     dependencies:
       '@standard-schema/spec': 1.1.0
       cosmokit: 1.8.1
